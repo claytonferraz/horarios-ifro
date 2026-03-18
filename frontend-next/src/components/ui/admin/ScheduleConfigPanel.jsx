@@ -136,8 +136,39 @@ export function ScheduleConfigPanel({ isDarkMode }) {
 
   // ── Bimesters ─────────────────────────────────────────────────────────────
   const addBimester = () => {
-    const n = localBimesters.length + 1;
-    setLocalBimesters(prev => [...prev, { id: Date.now().toString(), name: `${n}º Bimestre`, startDate: '', endDate: '' }]);
+    setLocalBimesters(prev => {
+      const n = prev.length + 1;
+      let startStr = '';
+      let endStr = '';
+
+      if (prev.length > 0) {
+        // Sort by end date to find the latest
+        const sorted = [...prev].sort((a,b) => (a.endDate || '').localeCompare(b.endDate || ''));
+        const last = sorted[sorted.length - 1];
+        if (last && last.endDate) {
+          const lastDate = new Date(last.endDate + 'T12:00:00');
+          lastDate.setDate(lastDate.getDate() + 1); // Next day
+          startStr = lastDate.toISOString().split('T')[0];
+          
+          // Add 9 weeks (63 days)
+          lastDate.setDate(lastDate.getDate() + 62); // 1st day + 62 = 63 days total
+          endStr = lastDate.toISOString().split('T')[0];
+        }
+      } else {
+        // First bimester defaults to current date or Jan 1st of selected year
+        const start = new Date(`${selectedConfigYear}-02-01T12:00:00`);
+        startStr = start.toISOString().split('T')[0];
+        start.setDate(start.getDate() + 62);
+        endStr = start.toISOString().split('T')[0];
+      }
+
+      return [...prev, { 
+        id: Date.now().toString(), 
+        name: `${n}º Bimestre`, 
+        startDate: startStr, 
+        endDate: endStr 
+      }];
+    });
   };
 
   const updateBimester = (id, field, value) =>
