@@ -4,10 +4,10 @@
 const API_URL = '/api';
 
 // Proteção para ambientes de Container (SSR/Build) que não possuem window/sessionStorage na compilação
-let sessionToken = typeof window !== 'undefined' ? sessionStorage.getItem('admin_token') || '' : '';
+let internalSessionToken = '';
 
 export const setToken = (t) => { 
-  sessionToken = t; 
+  internalSessionToken = t;
   if (typeof window !== 'undefined') {
     if (t) {
       sessionStorage.setItem('admin_token', t);
@@ -15,22 +15,25 @@ export const setToken = (t) => {
         method: 'POST', 
         headers: { 'Content-Type': 'application/json' }, 
         body: JSON.stringify({ token: t })
-      });
+      }).catch(e => console.warn('session route fail', e));
     } else {
       sessionStorage.removeItem('admin_token');
       fetch('/api/session', { 
         method: 'POST', 
         headers: { 'Content-Type': 'application/json' }, 
         body: JSON.stringify({ action: 'logout' })
-      });
+      }).catch(e => console.warn('logout route fail', e));
     }
   }
 };
 
-export const getHeaders = () => ({
-  'Content-Type': 'application/json',
-  ...(sessionToken ? { 'Authorization': `Bearer ${sessionToken}` } : {})
-});
+export const getHeaders = () => {
+  const token = typeof window !== 'undefined' ? sessionStorage.getItem('admin_token') || internalSessionToken : internalSessionToken;
+  return {
+    'Content-Type': 'application/json',
+    ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+  };
+};
 
 // Cliente de API com Fallback Local para testes sem backend
 export const apiClient = {

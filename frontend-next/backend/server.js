@@ -225,7 +225,8 @@ app.post('/api/auth/login', (req, res) => {
           console.warn("Falha ao parsear perfis do usuário:", user.siape);
         }
         
-        const role = perfis.includes('admin') ? 'admin' : (perfis.length > 0 ? 'servidor' : 'publico');
+        const isManager = perfis.some(p => ['gestor', 'gestao', 'tae'].includes(p.toLowerCase()));
+        const role = perfis.includes('admin') ? 'admin' : (isManager ? 'gestao' : (perfis.length > 0 ? 'servidor' : 'publico'));
         const token = jwt.sign({ id: user.siape, role }, JWT_SECRET, { expiresIn: '12h' });
         
         console.log("Login bem sucedido:", user.siape);
@@ -253,7 +254,8 @@ app.get('/api/auth/me', verifyToken, (req, res) => {
       perfis = JSON.parse(user.perfis || '[]');
     } catch(e) {}
     
-    const role = perfis.includes('admin') ? 'admin' : (perfis.length > 0 ? 'servidor' : 'publico');
+    const isManager = perfis.some(p => ['gestor', 'gestao', 'tae'].includes(p.toLowerCase()));
+    const role = perfis.includes('admin') ? 'admin' : (isManager ? 'gestao' : (perfis.length > 0 ? 'servidor' : 'publico'));
     
     res.json({ id: user.siape, username: user.email || user.siape, role, nome_exibicao: user.nome_exibicao, perfis });
   });
