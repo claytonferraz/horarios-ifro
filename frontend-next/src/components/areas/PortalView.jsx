@@ -8,6 +8,8 @@ import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd';
 import { SearchableSelect } from '../ui/SearchableSelect';
 import { InlineInput } from '../ui/InlineInput';
 import { ScheduleEditorModal } from '../ui/admin/ScheduleEditorModal';
+import { TeacherExchangeModal } from '../ui/TeacherExchangeModal';
+import { ScheduleNotifications } from '../ui/admin/ScheduleNotifications';
 import { MAP_DAYS, getColorHash, isTeacherPending, resolveTeacherName } from '@/lib/dates';
 import { useData } from '@/contexts/DataContext';
 import { apiClient } from '@/lib/apiClient';
@@ -22,7 +24,7 @@ export function PortalView({
   selectedDay, setSelectedDay, selectedWeek, setSelectedWeek, activeWeeksList,
   getCellRecords, activeCourseClasses, profStats, activeDays, classTimes, rawData, loadAdminMetadata
 }) {
-  const { globalTeachers, refreshData } = useData();
+  const { globalTeachers, refreshData, subjectHoursMeta } = useData();
   const [editorModal, setEditorModal] = useState(null);
   const [pendingRequests, setPendingRequests] = useState([]);
 
@@ -37,6 +39,7 @@ export function PortalView({
   }, [scheduleMode, selectedWeek, appMode, userRole]);
 
   const [draggingRecord, setDraggingRecord] = useState(null);
+  const [exchangeTarget, setExchangeTarget] = useState(null);
 
   const checkConflict = (record, dDay, dTime, dCls) => {
     if (!record || !record.teacher || record.teacher === 'A Definir' || record.teacher === '-') return null;
@@ -889,30 +892,45 @@ export function PortalView({
                       })()}
                      </div>
 
-                      {/* Sidebar de Elementos Nao Alocados */}
+                      {/* Sidebar de Elementos Nao Alocados e Notificacoes */}
                       {['admin','gestao'].includes(userRole) && scheduleMode === 'previa' && (
-                        <div className={`w-full lg:w-72 shrink-0 rounded-2xl border shadow-sm p-4 h-fit sticky top-20 ${isDarkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'}`}>
-                          <h3 className={`text-sm font-black uppercase tracking-widest mb-4 flex items-center gap-2 ${isDarkMode ? 'text-slate-200' : 'text-slate-700'}`}>
-                            <ListTodo size={16}/> Pendentes
-                          </h3>
-                          <Droppable droppableId="unallocated">
-                            {(provided, snapshot) => (
-                              <div ref={provided.innerRef} {...provided.droppableProps} className={`space-y-2 min-h-[300px] p-2 rounded-xl transition-colors ${snapshot.isDraggingOver ? (isDarkMode ? 'bg-slate-700' : 'bg-slate-50') : 'bg-transparent'}`}>
-                                {activeData.filter(r => r.day === 'A Definir' || !r.day || r.day === '-').map((r, index) => (
-                                  <Draggable key={r.id} draggableId={r.id} index={index}>
-                                    {(prov2, snap2) => (
-                                      <div ref={prov2.innerRef} {...prov2.draggableProps} {...prov2.dragHandleProps} className={`p-3 rounded-xl border shadow-sm transition-all ${snap2.isDragging ? 'shadow-xl scale-105 z-50' : ''} ${getColorHash(r.subject, isDarkMode)}`}>
-                                        <p className={`font-black text-xs leading-tight ${isDarkMode ? 'text-white' : 'text-slate-800'}`}>{r.subject}</p>
-                                        <p className={`text-[10px] font-bold mt-1 opacity-80 uppercase tracking-widest ${isDarkMode ? 'text-slate-200' : 'text-slate-700'}`}>{r.className} - {resolveTeacherName(r.teacher, globalTeachers)}</p>
-                                        {r.room && <span className={`inline-block mt-2 bg-black/10 text-center px-1.5 py-0.5 rounded text-[8px] uppercase tracking-widest`}>{r.room}</span>}
-                                      </div>
-                                    )}
-                                  </Draggable>
-                                ))}
-                                {provided.placeholder}
-                              </div>
-                            )}
-                          </Droppable>
+                        <div className="w-full lg:w-72 shrink-0 space-y-4 sticky top-20 flex flex-col items-end">
+                          
+                          <ScheduleNotifications 
+                            recordsForWeek={activeData} 
+                            subjectHoursMeta={subjectHoursMeta} 
+                            isDarkMode={isDarkMode} 
+                          />
+
+                          <div className={`w-full rounded-2xl border shadow-sm p-4 ${isDarkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'}`}>
+                            <h3 className={`text-sm font-black uppercase tracking-widest mb-4 flex items-center gap-2 ${isDarkMode ? 'text-slate-200' : 'text-slate-700'}`}>
+                              <ListTodo size={16}/> Staging Area / Pendentes
+                            </h3>
+                            <Droppable droppableId="unallocated">
+                              {(provided, snapshot) => (
+                                <div ref={provided.innerRef} {...provided.droppableProps} className={`space-y-3 min-h-[300px] p-2 rounded-xl transition-colors ${snapshot.isDraggingOver ? (isDarkMode ? 'bg-slate-700/50' : 'bg-slate-50') : 'bg-transparent'}`}>
+                                  {activeData.filter(r => r.day === 'A Definir' || !r.day || r.day === '-').map((r, index) => (
+                                    <Draggable key={r.id} draggableId={r.id} index={index}>
+                                      {(prov2, snap2) => (
+                                        <div ref={prov2.innerRef} {...prov2.draggableProps} {...prov2.dragHandleProps} className={`p-4 rounded-xl border shadow-sm transition-all hover:scale-[1.02] cursor-grab active:cursor-grabbing ${snap2.isDragging ? 'shadow-2xl scale-[1.04] z-50 ring-2 ring-indigo-500' : 'hover:shadow-md'} ${getColorHash(r.subject, isDarkMode)}`}>
+                                          <p className={`font-black text-xs leading-tight ${isDarkMode ? 'text-white' : 'text-slate-800'}`}>{r.subject}</p>
+                                          <p className={`text-[10px] font-bold mt-1.5 opacity-80 uppercase tracking-widest ${isDarkMode ? 'text-slate-200' : 'text-slate-700'}`}>{r.className} <br/><span className="mt-1 block opacity-80">{resolveTeacherName(r.teacher, globalTeachers)}</span></p>
+                                          {r.room && <span className={`inline-block mt-3 bg-black/10 text-center px-2 py-1 rounded text-[8px] font-black uppercase tracking-[0.2em]`}>{r.room}</span>}
+                                        </div>
+                                      )}
+                                    </Draggable>
+                                  ))}
+                                  {provided.placeholder}
+                                  {activeData.filter(r => r.day === 'A Definir' || !r.day || r.day === '-').length === 0 && (
+                                    <div className={`h-full flex flex-col items-center justify-center opacity-30 text-center py-10 ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>
+                                       <ListTodo size={32} className="mb-2"/>
+                                       <span className="text-[10px] font-black uppercase tracking-[0.2em]">Nenhum bloco<br/>estacionado</span>
+                                    </div>
+                                  )}
+                                </div>
+                              )}
+                            </Droppable>
+                          </div>
                         </div>
                       )}
 
@@ -1009,7 +1027,15 @@ export function PortalView({
                                                         {records.length > 0 ? records.map(r => {
                                                           const isPending = isTeacherPending(r.teacher);
                                                           return (
-                                                          <div key={`p-rec-${r.id}`} className={`print-clean-card p-2.5 rounded-xl border shadow-sm flex flex-col justify-center min-h-[60px] transition-all hover:scale-[1.02] hover:shadow-md active:scale-95 ${isPending ? (isDarkMode ? 'bg-red-900/30 border-red-800/50 text-red-300' : 'bg-red-50 border-red-300 text-red-800') : getColorHash(r.subject, isDarkMode)}`}>
+                                                          <div 
+                                                            key={`p-rec-${r.id}`} 
+                                                            onClick={() => {
+                                                               if (appMode === 'professor' && viewMode === 'professor' && r.teacher === selectedTeacher && ['servidor', 'admin', 'gestao'].includes(userRole)) {
+                                                                 setExchangeTarget({ targetClass: cls, targetCourse: course, originalRecord: r });
+                                                               }
+                                                            }}
+                                                            className={`print-clean-card p-2.5 rounded-xl border shadow-sm flex flex-col justify-center min-h-[60px] transition-all hover:scale-[1.02] hover:shadow-md active:scale-95 ${appMode === 'professor' && viewMode === 'professor' && r.teacher === selectedTeacher && ['servidor', 'admin', 'gestao'].includes(userRole) ? 'cursor-pointer hover:ring-2 hover:ring-indigo-500 hover:scale-[1.03]' : ''} ${isPending ? (isDarkMode ? 'bg-red-900/30 border-red-800/50 text-red-300' : 'bg-red-50 border-red-300 text-red-800') : getColorHash(r.subject, isDarkMode)}`}
+                                                          >
                                                             {isPending && <span className={`text-[7px] font-black uppercase tracking-widest px-1.5 py-0.5 rounded w-fit mx-auto mb-0.5 ${isDarkMode ? 'text-red-400 bg-red-900/50' : 'text-red-600 bg-red-100'}`}>SEM PROFESSOR</span>}
                                                             <p className="subject font-black text-[11px] leading-tight text-center">{r.subject}</p>
                                                             {r.room && <span className={`details text-[8px] font-black tracking-tighter opacity-70 px-1.5 py-0.5 rounded mt-1 w-fit uppercase mx-auto ${isDarkMode ? 'bg-white/10' : 'bg-black/5'}`}>{r.room}</span>}
@@ -1541,6 +1567,22 @@ export function PortalView({
       )}
 
       {/* SISTEMA DE SOLICITAÇÕES PARA O PROFESSOR */}
+      {exchangeTarget && (
+        <TeacherExchangeModal 
+          isOpen={true} 
+          isDarkMode={isDarkMode}
+          onClose={() => setExchangeTarget(null)}
+          originalRecord={exchangeTarget.originalRecord}
+          targetClass={exchangeTarget.targetClass}
+          targetCourse={exchangeTarget.targetCourse}
+          classRecords={recordsForWeek.filter(r => r.className === exchangeTarget.targetClass)}
+          safeDays={safeDays}
+          safeTimes={safeTimes}
+          globalTeachers={globalTeachersList}
+          apiClient={apiClient}
+          selectedWeek={selectedWeek}
+        />
+      )}
       {appMode === 'professor' && ['servidor', 'admin', 'gestao'].includes(userRole) && (
         <TeacherRequestsSection 
           isDarkMode={isDarkMode}

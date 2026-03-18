@@ -74,18 +74,24 @@ Armazena os objetos complexos JSON para matrizes curriculares e turmas.
     *   No caso de `matrix`: `{ id, name, course, courseAcronym, series: [ {id, name, disciplines: [{id, name, code, hours}]} ] }`
     *   No caso de `class`: `{ id, name, room, academicYear, matrixId, serieId, professorAssignments: { [discId]: [nome_professor] } }`
 
-### 10. `change_requests`
+### 10. `change_requests` (solicitacoes_troca)
 Armazena as solicitações de mudança de horário feitas pelos professores (Portal do Professor) para apreciação da gestão.
 *   `id` (INTEGER, PRIMARY KEY, AUTOINCREMENT): Identificador único da solicitação.
 *   `siape` (TEXT): Matrícula SIAPE do professor solicitante.
 *   `week_id` (TEXT): A semana alvo da solicitação (ex: "Semana 01", "24/03 a 28/03").
 *   `description` (TEXT): Descrição detalhada ou justificativa do pedido de mudança.
 *   `original_slot` (TEXT): Opcional. Bloco original (ex: "Segunda-feira - 1º e 2º Horário - TDS").
-*   `proposed_slot` (TEXT): Opcional. Bloco proposto (ex: "Terça-feira - 3º e 4º Horário").
+*   `proposed_slot` (TEXT): Opcional. Bloco proposto em JSON contendo dia, horário e tipificação da aula.
 *   `status` (TEXT, DEFAULT 'pendente'): Status atual ('pendente', 'aprovado', 'rejeitado').
-*   `admin_feedback` (TEXT): Resposta ou recado opcional deixado pelo gestor/DAPE ao avaliar o pedido.
+*   `admin_feedback` (TEXT): Resposta ou recado opcional deixado pelo gestor/DAPE.
 *   `createdAt` (DATETIME, DEFAULT CURRENT_TIMESTAMP): Carimbo de data/hora de criação.
 
+### 11. `area_neutra_horario` (Estacionamento Temporário)
+Armazena os blocos de aula temporariamente removidos/desalocados do "Master Grid Interativo" pelo Gestor, permitindo que a aula seja reorganizada no quadro através de Drag-and-Drop sem perder seus dados vinculativos.
+*   `id` (TEXT, PRIMARY KEY): ID único do registro gerado no front-end.
+*   `week_id` (TEXT): Semana em que o estacionamento da aula ocorreu.
+*   `record_payload` (TEXT): JSON do slot de aula (professor, turma, curso, subject, etc.) que foi estacionado.
+*   `updatedAt` (DATETIME, DEFAULT CURRENT_TIMESTAMP): Carimbo de data/hora da última movimentação na staging area.
 ## Relacionamentos Lógicos Adicionais e Transições de Ano (Smart Copy)
 - Em `curriculum_data` do tipo `class`, a propriedade JSON `professorAssignments` faz uma referência lógica pelo NOME do servidor docente com a tabela `users` e `roomAssignments` por salas.
 - **Aulas Semanais e Turnos:** Em `curriculum_data` do tipo `matrix`, o campo numérico `hours` (Carga Horária) nas disciplinas gera dinamicamente sua conversão para contagem de slots na grade via fórmula de proporção matemática padronizada: `aulas_semanais = Math.floor(hours / 40)`. Essa chave restringe e afofoca a quantidade de slots (TD) possíveis na Grade Visual (Editor Interativo) de Semanas.

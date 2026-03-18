@@ -17,13 +17,10 @@ export function ScheduleEditorModal({
 
   useEffect(() => {
     if (isOpen) {
-      apiClient.fetchCurriculumData('matrix').then(res => setMatrixData(res));
-      apiClient.fetchCurriculumData('class').then(res => setClassesData(res));
+      apiClient.fetchCurriculum('matrix').then(res => setMatrixData(res));
+      apiClient.fetchCurriculum('class').then(res => setClassesData(res));
       apiClient.fetchAdminMeta().then(() => {
-         fetch(`${apiClient.config.backendUrl || 'http://localhost:3000'}/api/admin/users`, { headers: { 'Authorization': `Bearer ${localStorage.getItem('dape_token')}` } })
-         .then(r => r.json())
-         .then(res => setUsersList(res.users || []))
-         .catch(e => setUsersList([]));
+         apiClient.fetchTeachers().then(res => setUsersList(res || []));
       });
     }
   }, [isOpen]);
