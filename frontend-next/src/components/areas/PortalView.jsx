@@ -24,7 +24,7 @@ export function PortalView({
   selectedDay, setSelectedDay, selectedWeek, setSelectedWeek, activeWeeksList,
   getCellRecords, activeCourseClasses, profStats, activeDays, classTimes, rawData, loadAdminMetadata
 }) {
-  const { globalTeachers, refreshData, subjectHoursMeta } = useData();
+  const { globalTeachers, refreshData, subjectHoursMeta, intervals } = useData();
   const [editorModal, setEditorModal] = useState(null);
   const [pendingRequests, setPendingRequests] = useState([]);
 
