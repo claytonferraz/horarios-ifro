@@ -36,7 +36,7 @@ import { DAYS, MAP_DAYS, getWeekBoundaries, isDatePastOrToday, isTeacherPending,
 export function HomeApp({ appMode }) {
   const { rawData, setRawData, disabledWeeks, setDisabledWeeks, disciplinesMeta, academicYearsMeta, subjectHoursMeta, loadAdminMetadata, refreshData, academicWeeks, activeDays, classTimes, bimesters, intervals } = useData();
   const { isDarkMode } = useTheme();
-  const { isUnlocked, userRole, siape, userName, login, logout } = useAuth();
+  const { isUnlocked, userRole, siape, userName, isLoadingAuth, login, logout } = useAuth();
 
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   
