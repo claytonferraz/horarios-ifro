@@ -7,7 +7,7 @@ import { DAYS, MAP_DAYS, isFutureWeek, isCurrentWeek, isDatePastOrToday, isTeach
 
 export function useScheduleView({ appMode, rawData, disabledWeeks, targetData, disciplinesMeta, subjectHoursMeta, adminFilterCourses, adminFilterClasses, setAdminFilterClasses, activeDays, classTimes, bimesters = [] }) {
   const [viewMode, setViewMode] = useState('hoje');
-  const [scheduleMode, setScheduleMode] = useState('padrao'); 
+  const [scheduleMode, setScheduleMode] = useState('oficial'); 
 
   const todayIndex = new Date().getDay();
   const nameOfToday = MAP_DAYS[todayIndex];

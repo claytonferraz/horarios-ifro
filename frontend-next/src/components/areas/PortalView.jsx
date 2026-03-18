@@ -759,69 +759,133 @@ export function PortalView({
 
                         return (
                           <>
-                             {/* Horizontal Day Selector */}
-                             <div className={`flex overflow-x-auto p-1.5 border-b no-scrollbar no-print ${isDarkMode ? 'bg-slate-900/50 border-slate-800' : 'bg-slate-50 border-slate-100'}`}>
-                                {safeDays.map(d => (
-                                   <button key={d} onClick={() => setSelectedDay(d)} className={`px-4 py-2 rounded-lg text-[10px] font-black uppercase tracking-widest whitespace-nowrap transition-all ${selectedDay === d ? 'bg-indigo-500 text-white shadow-sm' : (isDarkMode ? 'text-slate-400 hover:bg-slate-800 hover:text-slate-300' : 'text-slate-400 hover:bg-slate-200 hover:text-slate-700')}`}>{getFormattedDayLabel(d)}</button>
-                                ))}
+                             {/* Desktop Matrix View (Professor) */}
+                             <div className="hidden md:block overflow-x-auto">
+                                <table className="w-full min-w-[750px] border-collapse relative text-xs">
+                                  <thead>
+                                    <tr className={`border-b text-[9px] font-black uppercase tracking-widest text-slate-400 ${isDarkMode ? 'bg-slate-900 border-slate-700' : 'bg-slate-50 border-slate-200'}`}>
+                                      <th className={`sticky left-0 z-20 py-3 px-4 border-r-[3px] w-28 text-center ${isDarkMode ? 'bg-slate-900 border-slate-700 shadow-[2px_0_5px_rgba(0,0,0,0.2)]' : 'bg-slate-100 border-slate-300 shadow-[2px_0_5px_rgba(0,0,0,0.02)]'}`}>Horário</th>
+                                      {safeDays.map(day => (<th key={day} className={`py-3 px-4 border-r-[3px] last:border-r-0 text-center ${isDarkMode ? 'border-slate-700' : 'border-slate-300'}`}>{day.split('-')[0]}</th>))}
+                                    </tr>
+                                  </thead>
+                                  <tbody className={`divide-y ${isDarkMode ? 'divide-slate-800' : 'divide-slate-100'}`}>
+                                    {(() => {
+                                      const entityShifts = new Set(profRecords.map(r => safeTimes.find(t => t.timeStr === r.time)?.shift).filter(Boolean));
+                                      const hasDiurno = entityShifts.has('Matutino') || entityShifts.has('Vespertino');
+                                      const hasNoturno = entityShifts.has('Noturno');
+                                      const displayShifts = new Set();
+                                      
+                                      if (hasDiurno) { displayShifts.add('Matutino'); displayShifts.add('Vespertino'); }
+                                      if (hasNoturno) displayShifts.add('Noturno');
+                                      
+                                      const entityTimes = safeTimes.filter(t => displayShifts.has(t.shift));
+        
+                                      let currentShift = '';
+                                      return entityTimes.map((timeObj, index) => {
+                                        const time = timeObj.timeStr || timeObj;
+                                        const shift = timeObj.shift || '';
+                                        const isNewShift = shift && shift !== currentShift;
+                                        if (isNewShift) currentShift = shift;
+                                        const isLunch = time === '11:10 - 12:00';
+                                        
+                                        return (
+                                          <React.Fragment key={`desk-prof-${time}`}>
+                                          {isNewShift && (
+                                            <tr className={`print-interval text-[8px] font-black uppercase tracking-[0.4em] border-y-[3px] ${isDarkMode ? 'bg-slate-800/60 text-slate-500 border-slate-700' : 'bg-slate-100/60 text-slate-400 border-slate-300'}`}>
+                                              <td colSpan={safeDays.length + 1} className="py-2 text-center shadow-inner">{shift}</td>
+                                            </tr>
+                                          )}
+                                          <tr className="group transition-colors">
+                                            <td className={`sticky left-0 z-10 py-3 px-4 border-r-[3px] font-bold text-xs whitespace-nowrap text-center ${isDarkMode ? 'bg-slate-800 group-hover:bg-slate-700/50 border-slate-700 text-slate-400 shadow-[2px_0_5px_rgba(0,0,0,0.2)]' : 'bg-white group-hover:bg-slate-50 border-slate-300 text-slate-500 shadow-[2px_0_5px_rgba(0,0,0,0.02)]'}`}>{time}</td>
+                                            {safeDays.map(day => {
+                                              const records = profRecords.filter(r => r.day === day && r.time === time);
+                                              return (
+                                                <td key={`${day}-${time}`} className={`p-1.5 border-r-[3px] last:border-r-0 align-top w-32 ${isDarkMode ? 'border-slate-700 group-hover:bg-slate-700/30 bg-slate-800/20' : 'border-slate-300 group-hover:bg-slate-50/50 bg-slate-50/20'}`}>
+                                                  {records.length > 0 ? (
+                                                    <div className="flex flex-col gap-1.5">
+                                                      {records.map(r => {
+                                                        const isPending = isTeacherPending(r.teacher);
+                                                        
+                                                        return (
+                                                          <div key={r.id} className={`print-clean-card p-2 rounded-xl border shadow-sm flex flex-col justify-center min-h-[60px] transition-all hover:scale-[1.02] hover:shadow-md active:scale-95 ${isPending ? (isDarkMode ? 'bg-red-900/30 border-red-800/50 text-red-300' : 'bg-red-50 border-red-300 text-red-800') : getColorHash(r.subject, isDarkMode)}`}>
+                                                            {isPending && <span className={`text-[7px] font-black uppercase tracking-widest px-1.5 py-0.5 rounded w-fit mx-auto mb-0.5 ${isDarkMode ? 'text-red-400 bg-red-900/50' : 'text-red-600 bg-red-100'}`}>SEM PROFESSOR</span>}
+                                                            <p className="subject font-bold text-[10px] leading-tight mb-0.5 text-center">{r.subject}</p>
+                                                            <p className="details text-[8px] font-bold opacity-80 flex items-center justify-center gap-1 uppercase truncate">
+                                                              {r.className}
+                                                            </p>
+                                                            {r.room && <span className={`details text-[8px] font-black tracking-tighter opacity-60 px-1.5 py-0.5 rounded mt-1 w-fit uppercase mx-auto ${isDarkMode ? 'bg-white/10' : 'bg-black/5'}`}>{r.room}</span>}
+                                                          </div>
+                                                        )
+                                                      })}
+                                                    </div>
+                                                  ) : <div className={`h-[60px] flex items-center justify-center font-black text-[9px] tracking-widest uppercase select-none ${isDarkMode ? 'opacity-20' : 'opacity-5'}`}>-</div>}
+                                                </td>
+                                              );
+                                            })}
+                                          </tr>
+                                          {isLunch && (
+                                            <tr className={`print-interval text-[8px] font-black uppercase tracking-[0.4em] border-y-[3px] ${isDarkMode ? 'bg-slate-800/60 text-slate-500 border-slate-700' : 'bg-slate-100/60 text-slate-400 border-slate-300'}`}>
+                                              <td colSpan={safeDays.length + 1} className="py-2 text-center shadow-inner">Intervalo / Almoço</td>
+                                            </tr>
+                                          )}
+                                          </React.Fragment>
+                                        );
+                                      });
+                                    })()}
+                                  </tbody>
+                                </table>
                              </div>
-                             
-                             {/* Daily Timeline Container */}
-                             <div className="p-4 md:p-6 space-y-3">
-                                {(() => {
-                                   let currentShift = '';
-                                   const dailyRecords = profRecords.filter(r => r.day === selectedDay);
-                                   
-                                   if (dailyRecords.length === 0) {
-                                      return <div className={`p-8 rounded-xl border text-center font-bold text-xs uppercase tracking-widest shadow-sm ${isDarkMode ? 'bg-slate-900 border-slate-700 text-slate-500' : 'bg-slate-50 border-slate-200 text-slate-400'}`}>Sem aulas programadas para este dia.</div>;
-                                   }
-                                   
-                                   const dayShifts = new Set(dailyRecords.map(r => safeTimes.find(t => t.timeStr === r.time)?.shift).filter(Boolean));
-                                   const activeTimes = safeTimes.filter(t => dailyRecords.some(r => r.time === t.timeStr));
 
-                                   if (activeTimes.length === 0) {
-                                      return <div className={`p-8 rounded-xl border text-center font-bold text-xs uppercase tracking-widest shadow-sm ${isDarkMode ? 'bg-slate-900 border-slate-700 text-slate-500' : 'bg-slate-50 border-slate-200 text-slate-400'}`}>Sem aulas programadas para este dia.</div>;
-                                   }
-                                   
-                                   return activeTimes.map((timeObj, index) => {
-                                      const time = timeObj.timeStr;
-                                      const shift = timeObj.shift;
-                                      const isNewShift = shift !== currentShift;
-                                      if (isNewShift) currentShift = shift;
-                                      
-                                      const records = dailyRecords.filter(r => r.time === time);
-                                      
-                                      return (
-                                         <React.Fragment key={`frag-${time}`}>
-                                           {isNewShift && (
-                                              <div className={`flex items-center gap-2 mt-4 mb-2 opacity-50 ${index === 0 ? '!mt-0' : ''}`}>
-                                                 <div className={`flex-1 h-px ${isDarkMode ? 'bg-slate-700' : 'bg-slate-300'}`}></div>
-                                                 <span className="text-[9px] font-black uppercase tracking-[0.3em]">{shift}</span>
-                                                 <div className={`flex-1 h-px ${isDarkMode ? 'bg-slate-700' : 'bg-slate-300'}`}></div>
-                                              </div>
-                                           )}
-                                           <div key={time} className={`flex flex-col sm:flex-row gap-3 sm:items-center p-3 rounded-xl border transition-colors ${isDarkMode ? 'border-slate-700 bg-slate-800/30 hover:bg-slate-800/50' : 'border-slate-100 bg-slate-50/50 hover:bg-slate-50'}`}>
-                                              <div className="w-32 shrink-0 text-center sm:text-left">
-                                                 <span className={`border font-bold text-xs px-3 py-1.5 rounded-lg shadow-sm inline-block ${isDarkMode ? 'bg-slate-900 border-slate-700 text-slate-300' : 'bg-white border-slate-200 text-slate-600'}`}>{time}</span>
-                                              </div>
-                                              <div className="flex-1 space-y-2">
-                                                 {records.map(r => {
+                             {/* Mobile Stacked View (Professor Full Week) */}
+                             <div className="md:hidden p-4 space-y-4">
+                                {(() => {
+                                  if (profRecords.length === 0) return null;
+                                  return safeDays.map(day => {
+                                    const dayRecords = profRecords.filter(r => r.day === day);
+                                    if (dayRecords.length === 0) return null;
+                                    
+                                    const dayShifts = new Set(dayRecords.map(r => safeTimes.find(t => t.timeStr === r.time)?.shift).filter(Boolean));
+                                    const activeTimes = safeTimes.filter(t => dayRecords.some(r => r.time === t.timeStr));
+                                    
+                                    if (activeTimes.length === 0) return null;
+                                    
+                                    return (
+                                      <div key={`mob-prof-${day}`} className={`rounded-xl border overflow-hidden shadow-sm animate-in fade-in slide-in-from-bottom-2 ${isDarkMode ? 'border-slate-700 bg-slate-800/30' : 'border-slate-200 bg-white'}`}>
+                                        <div className={`px-4 py-2.5 font-black text-[10px] uppercase tracking-widest ${isDarkMode ? 'bg-slate-800 text-slate-300' : 'bg-slate-100 text-slate-600'}`}>
+                                          {getFormattedDayLabel(day)}
+                                        </div>
+                                        <div className={`divide-y ${isDarkMode ? 'divide-slate-800' : 'divide-slate-100'}`}>
+                                          {activeTimes.map((timeObj) => {
+                                            const time = timeObj.timeStr || timeObj;
+                                            const records = dayRecords.filter(r => r.time === time);
+                                            if (records.length === 0) return null;
+                                            
+                                            return (
+                                              <div key={`mob-prof-${day}-${time}-row`} className={`flex items-start gap-3 p-3 transition-colors ${isDarkMode ? 'hover:bg-slate-800/50' : 'hover:bg-slate-50'}`}>
+                                                <div className="w-16 shrink-0 text-center">
+                                                   <span className={`block border font-black text-[9px] px-1 py-1 rounded-md shadow-sm opacity-80 ${isDarkMode ? 'bg-slate-900 border-slate-700 text-slate-400' : 'bg-white border-slate-200 text-slate-500'}`}>{time}</span>
+                                                </div>
+                                                <div className="flex-1 space-y-2">
+                                                  {records.map(r => {
                                                     const isPending = isTeacherPending(r.teacher);
                                                     return (
-                                                       <div key={r.id} className={`p-3 rounded-lg border flex flex-col sm:flex-row justify-between sm:items-center gap-2 shadow-sm ${isPending ? (isDarkMode ? 'bg-red-900/30 border-red-800/50 text-red-300' : 'bg-red-50 border-red-200 text-red-800') : getColorHash(r.subject, isDarkMode)}`}>
-                                                          <div>
-                                                             <p className={`font-black text-sm leading-tight ${isDarkMode ? 'text-white' : 'text-slate-800'}`}>{r.subject}</p>
-                                                             <p className={`text-[10px] font-bold uppercase tracking-wider mt-0.5 opacity-80 ${isDarkMode ? 'text-white' : 'text-slate-900'}`}>Turma: {r.className}</p>
-                                                          </div>
-                                                          {r.room && <span className={`text-[9px] font-black uppercase tracking-widest px-2 py-1 rounded-md self-start sm:self-auto shrink-0 ${isDarkMode ? 'bg-white/10' : 'bg-black/5'}`}>{r.room}</span>}
-                                                       </div>
+                                                      <div key={`mob-rec-${r.id}`} className={`p-2.5 rounded-lg border shadow-sm flex flex-col justify-center gap-1.5 ${isPending ? (isDarkMode ? 'bg-red-900/30 border-red-800/50 text-red-300' : 'bg-red-50 border-red-300 text-red-800') : getColorHash(r.subject, isDarkMode)}`}>
+                                                        <div className="flex items-center gap-2">
+                                                          <span className={`text-[8px] font-black uppercase rounded px-1.5 py-0.5 shrink-0 shadow-sm ${isDarkMode ? 'bg-white/20' : 'bg-black/10'}`}>{r.className}</span>
+                                                          <span className="font-bold text-[11px] leading-tight truncate">{r.subject}</span>
+                                                        </div>
+                                                        {r.room && <span className={`text-[8px] font-black uppercase tracking-widest pl-1 mt-0.5 opacity-80`}>SALA: {r.room}</span>}
+                                                      </div>
                                                     )
-                                                 })}
+                                                  })}
+                                                </div>
                                               </div>
-                                           </div>
-                                         </React.Fragment>
-                                      );
-                                   });
+                                            );
+                                          })}
+                                        </div>
+                                      </div>
+                                    );
+                                  });
                                 })()}
                              </div>
                           </>

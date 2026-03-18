@@ -59,7 +59,7 @@ export function HomeApp({ appMode }) {
   const navigateTo = (mode) => {
     if (mode === 'home') { window.location.href = "/"; setMobileMenuOpen(false); }
     else if (mode === 'aluno') { scheduleState.setViewMode('hoje'); scheduleState.setScheduleMode('oficial'); window.location.href = "/aluno"; setMobileMenuOpen(false); } 
-    else if (mode === 'professor') { scheduleState.setViewMode('professor'); scheduleState.setScheduleMode('padrao'); window.location.href = "/professor"; setMobileMenuOpen(false); } 
+    else if (mode === 'professor') { scheduleState.setViewMode('professor'); scheduleState.setScheduleMode('oficial'); window.location.href = "/professor"; setMobileMenuOpen(false); } 
     else if (mode === 'admin') { window.location.href = "/admin"; setAdminTab('planilhas'); setMobileMenuOpen(false); }
   };
 
