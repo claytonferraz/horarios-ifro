@@ -37,24 +37,33 @@ db.serialize(() => {
       senha_hash TEXT,
       status TEXT DEFAULT 'ativo',
       perfis TEXT DEFAULT '[]',
-      atua_como_docente INTEGER DEFAULT 1
+      atua_como_docente INTEGER DEFAULT 1,
+      exigir_troca_senha INTEGER DEFAULT 1
   )`);
+
+  // ESTRUTURA REFORMULADA: Schedules com Tipificação e Ciclo de Vida
+  // status: 'Padrão' (Template), 'Prévia' (Editável Semanal), 'Consolidado' (Imutável)
   db.run(`CREATE TABLE IF NOT EXISTS schedules (
     id TEXT PRIMARY KEY,
-    week TEXT,
-    type TEXT,
+    academic_year TEXT,
+    week_id TEXT, 
+    status TEXT DEFAULT 'Padrão', 
+    type TEXT, 
     fileName TEXT,
-    records TEXT,
-    updatedAt TEXT
+    records TEXT, -- JSON com as alocações e metadados de tipificação
+    updatedAt TEXT,
+    closedAt TEXT -- Data de fechamento para 'Consolidado'
   )`);
+
   db.run(`CREATE TABLE IF NOT EXISTS config (
-    id INTEGER PRIMARY KEY,
+    id TEXT PRIMARY KEY, -- config_2026
     disabledWeeks TEXT,
     activeDays TEXT,
-    classTimes TEXT,
-    bimesters TEXT,
+    classTimes TEXT, -- Inclui durações e lógica de cadeia
+    intervals TEXT,   -- Configuração de 20min/10min por turno
     activeDefaultScheduleId TEXT
   )`);
+
   db.run(`CREATE TABLE IF NOT EXISTS academic_weeks (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     name TEXT UNIQUE,
@@ -62,22 +71,21 @@ db.serialize(() => {
     end_date TEXT,
     category TEXT DEFAULT 'regular',
     school_days INTEGER DEFAULT 0,
-    academic_year TEXT
+    academic_year TEXT,
+    is_closed INTEGER DEFAULT 0 -- Bloqueia edições se consolidado
   )`);
-  // Migration: safe column additions for existing databases
-  db.run(`ALTER TABLE academic_weeks ADD COLUMN category TEXT DEFAULT 'regular'`, () => {});
-  db.run(`ALTER TABLE academic_weeks ADD COLUMN school_days INTEGER DEFAULT 0`, () => {});
-  db.run(`ALTER TABLE academic_weeks ADD COLUMN academic_year TEXT`, () => {});
-  
-  // Novas Tabelas para a Gestão Acadêmica (Admin)
+
+  // Tabelas de Metadados e Controle
   db.run(`CREATE TABLE IF NOT EXISTS discipline_meta (
     id TEXT PRIMARY KEY,
     suapHours INTEGER
   )`);
+  
   db.run(`CREATE TABLE IF NOT EXISTS subject_hours (
     id TEXT PRIMARY KEY,
     totalHours INTEGER
   )`);
+
   db.run(`CREATE TABLE IF NOT EXISTS academic_years (
     year TEXT PRIMARY KEY,
     totalDays INTEGER,
@@ -87,7 +95,17 @@ db.serialize(() => {
   db.run(`CREATE TABLE IF NOT EXISTS curriculum_data (
     id TEXT PRIMARY KEY,
     dataType TEXT,
-    payload TEXT
+    payload TEXT -- Contém matrizes e turmas (referência de professores por SIAPE)
+  )`);
+
+  // Tabela de Log de Conflitos (Para Auditoria/Motor de Regras)
+  db.run(`CREATE TABLE IF NOT EXISTS conflict_logs (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    schedule_id TEXT,
+    type TEXT, -- 'Professor', 'SaúdeDocente', 'Espaço'
+    description TEXT,
+    severity TEXT, -- 'Bloqueio', 'Aviso'
+    createdAt TEXT
   )`);
 });
 
