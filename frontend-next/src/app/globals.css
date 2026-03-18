@@ -1,9 +1,15 @@
 @import "tailwindcss";
 @plugin "tailwindcss-animate";
+@custom-variant dark (&:where(.dark, .dark *));
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --background: #f8fafc;
+  --foreground: #1e293b;
+}
+
+.dark {
+  --background: #020617;
+  --foreground: #f1f5f9;
 }
 
 @theme inline {
@@ -13,9 +19,9 @@
 }
 
 @media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+  :root:not(.light) {
+    --background: #020617;
+    --foreground: #f1f5f9;
   }
 }
 
