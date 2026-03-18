@@ -182,7 +182,7 @@ export function PortalView({
                 <div className={`flex flex-wrap p-1 rounded-xl shadow-inner w-full lg:w-auto overflow-hidden ${isDarkMode ? 'bg-slate-900' : 'bg-slate-100'}`}>
                   {appMode === 'professor' && (
                     <>
-                      <button onClick={() => { setViewMode('professor'); if(userRole==='servidor' && typeof setSelectedTeacher === 'function') setSelectedTeacher(siape); }} className={`flex-1 min-w-[80px] md:flex-none flex items-center justify-center gap-1.5 px-4 py-2 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all ${viewMode === 'professor' ? (isDarkMode ? 'bg-slate-700 text-indigo-400 shadow-sm' : 'bg-white text-indigo-700 shadow-sm') : (isDarkMode ? 'text-slate-400 hover:text-slate-300' : 'text-slate-500 hover:text-slate-700')}`}><UserCircle size={14} /> Meu Horário</button>
+                      <button onClick={() => { setViewMode('professor'); if(['servidor', 'admin', 'gestao'].includes(userRole) && typeof setSelectedTeacher === 'function') setSelectedTeacher(siape); }} className={`flex-1 min-w-[80px] md:flex-none flex items-center justify-center gap-1.5 px-4 py-2 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all ${viewMode === 'professor' ? (isDarkMode ? 'bg-slate-700 text-indigo-400 shadow-sm' : 'bg-white text-indigo-700 shadow-sm') : (isDarkMode ? 'text-slate-400 hover:text-slate-300' : 'text-slate-500 hover:text-slate-700')}`}><UserCircle size={14} /> Meu Horário</button>
                       <button onClick={() => setViewMode('outro_professor')} className={`flex-1 min-w-[80px] md:flex-none flex items-center justify-center gap-1.5 px-4 py-2 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all ${viewMode === 'outro_professor' ? (isDarkMode ? 'bg-slate-700 text-cyan-400 shadow-sm' : 'bg-white text-cyan-700 shadow-sm') : (isDarkMode ? 'text-slate-400 hover:text-slate-300' : 'text-slate-500 hover:text-slate-700')}`}><Users size={14} /> Ver Colegas</button>
                       <button onClick={() => setViewMode('curso')} className={`flex-1 min-w-[80px] md:flex-none flex items-center justify-center gap-1.5 px-4 py-2 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all ${viewMode === 'curso' ? (isDarkMode ? 'bg-slate-700 text-rose-400 shadow-sm' : 'bg-white text-rose-700 shadow-sm') : (isDarkMode ? 'text-slate-400 hover:text-slate-300' : 'text-slate-500 hover:text-slate-700')}`}><Layers size={14} /> Horário dos Cursos</button>
                       <div className={`w-px mx-0.5 hidden lg:block ${isDarkMode ? 'bg-slate-700' : 'bg-slate-200'}`}></div>
@@ -1541,7 +1541,7 @@ export function PortalView({
       )}
 
       {/* SISTEMA DE SOLICITAÇÕES PARA O PROFESSOR */}
-      {appMode === 'professor' && userRole === 'servidor' && (
+      {appMode === 'professor' && ['servidor', 'admin', 'gestao'].includes(userRole) && (
         <TeacherRequestsSection 
           isDarkMode={isDarkMode}
           siape={selectedTeacher}
