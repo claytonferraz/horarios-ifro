@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { User, Users, Search, Plus, Trash2, RotateCcw, Save, ShieldCheck, ShieldAlert, FileText, Upload } from 'lucide-react';
 import { apiClient } from '@/lib/apiClient';
 
-export function UsersManager({ isDarkMode }) {
+export function UsersManager({ isDarkMode, showConfirm }) {
   const [teachers, setTeachers] = useState([]);
   const [originalTeachers, setOriginalTeachers] = useState([]); // Keep track of original state for changes
   const [loading, setLoading] = useState(true);
@@ -131,55 +131,57 @@ export function UsersManager({ isDarkMode }) {
     }));
   };
 
-  const handleClearDuplicates = async () => {
-     if (!window.confirm("Essa ação vai eliminar duplicidades onde o NOME COMPLETO for idêntico (mantendo apenas um registro) e limpar a base de dados de demonstração salvos no navegador. Deseja continuar?")) return;
-     try {
-       if (typeof window !== 'undefined') localStorage.removeItem('sqlite_mock_teachers');
-       const unique = [];
-       const names = new Set();
-       originalTeachers.forEach(t => {
-          if (!names.has(t.nome_completo)) {
-             names.add(t.nome_completo);
-             unique.push(t);
-          } else {
-             // delete it from backend
-             apiClient.deleteTeacher(t.siape);
-          }
-       });
-       setTeachers(unique);
-       setOriginalTeachers(JSON.parse(JSON.stringify(unique)));
-       alert("Duplicidades e cache local limpos. Verifique os remanescentes e salve!");
-     } catch (e) {
-       alert("Erro: " + e.message);
-     }
+  const handleClearDuplicates = () => {
+     showConfirm("Limpar Duplicados", "Essa ação vai eliminar duplicidades onde o NOME COMPLETO for idêntico e limpar o cache do navegador. Continuar?", async () => {
+       try {
+         if (typeof window !== 'undefined') localStorage.removeItem('sqlite_mock_teachers');
+         const unique = [];
+         const names = new Set();
+         originalTeachers.forEach(t => {
+            if (!names.has(t.nome_completo)) {
+               names.add(t.nome_completo);
+               unique.push(t);
+            } else {
+               apiClient.deleteTeacher(t.siape);
+            }
+         });
+         setTeachers(unique);
+         setOriginalTeachers(JSON.parse(JSON.stringify(unique)));
+       } catch (e) {
+         alert("Erro: " + e.message);
+       }
+     });
   };
 
-  const handleRemove = async (clientId, siape) => {
+  const handleRemove = (clientId, siape) => {
     if (siape && originalTeachers.find(t => t.siape === siape)) {
-      if (!window.confirm("Este professor já está no banco de dados. Excluí-lo removerá o registro permanentemente. Continuar?")) return;
-      try {
-        await apiClient.deleteTeacher(siape);
-      } catch (e) {
-        alert("Erro ao excluir do banco: " + e.message);
-        return;
-      }
+      showConfirm("Excluir Professor", "Este professor já está no banco de dados. Excluí-lo removerá o registro permanentemente. Continuar?", async () => {
+        try {
+          await apiClient.deleteTeacher(siape);
+          setTeachers(prev => prev.filter(t => t._clientId !== clientId));
+          setOriginalTeachers(prev => prev.filter(t => t._clientId !== clientId));
+        } catch (e) {
+          alert("Erro ao excluir do banco: " + e.message);
+        }
+      });
+    } else {
+      setTeachers(teachers.filter(t => t._clientId !== clientId));
     }
-    setTeachers(teachers.filter(t => t._clientId !== clientId));
-    setOriginalTeachers(originalTeachers.filter(t => t._clientId !== clientId));
   };
 
-  const handleResetPassword = async (teacher) => {
+  const handleResetPassword = (teacher) => {
     if (!teacher.oldSiape) return alert("Salve o professor antes de resetar a senha.");
     const currentYear = new Date().getFullYear();
     const newPass = `prof@${currentYear}`;
-    if (!window.confirm(`Deseja resetar a senha de ${teacher.nome_completo} para '${newPass}'? O usuário será notificado a trocar a senha no próximo login.`)) return;
-    try {
-      await apiClient.saveTeacher({ ...teacher, senha: newPass, exigir_troca_senha: 1 });
-      alert("Senha resetada com sucesso!");
-      load(); // recarrega para atualizar a flag exigir_troca_senha visualmente
-    } catch(e) {
-      alert("Erro ao resetar: " + e.message);
-    }
+    showConfirm("Resetar Senha", `Deseja resetar a senha de ${teacher.nome_completo} para '${newPass}'?`, async () => {
+      try {
+        await apiClient.saveTeacher({ ...teacher, senha: newPass, exigir_troca_senha: 1 });
+        alert("Senha resetada com sucesso!");
+        load();
+      } catch(e) {
+        alert("Erro ao resetar: " + e.message);
+      }
+    }, 'info');
   };
 
   const processImport = () => {

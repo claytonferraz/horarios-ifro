@@ -11,8 +11,11 @@ app.use(cors());
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ limit: '50mb', extended: true }));
 
+const path = require('path');
 const JWT_SECRET = 'SUA_CHAVE_SECRETA_AQUI_MUITO_SEGURA_2026';
-const db = new sqlite3.Database('./horarios.db');
+const dbPath = path.join(__dirname, 'horarios.db');
+const db = new sqlite3.Database(dbPath);
+console.log('Banco de dados conectado em:', dbPath);
 
 // ==========================================
 // CONTROLE DE SMART POLLING
@@ -104,7 +107,12 @@ const verifyToken = (req, res, next) => {
 // ROTA PÚBLICA DE STATUS (Para o Frontend)
 // ==========================================
 app.get('/api/status', (req, res) => {
-  res.json({ lastUpdate: lastUpdateTimestamp });
+  try {
+    res.json({ lastUpdate: lastUpdateTimestamp });
+  } catch(e) {
+    console.error("ERRO NA ROTA STATUS:", e);
+    res.status(500).json({ error: e.message });
+  }
 });
 
 // ==========================================
@@ -112,46 +120,83 @@ app.get('/api/status', (req, res) => {
 // ==========================================
 app.get('/api/auth/setup', (req, res) => {
   db.get("SELECT COUNT(*) as count FROM users WHERE perfis LIKE '%admin%'", (err, row) => {
-    if (err) return res.status(500).json({ error: err.message });
+    if (err) {
+      console.error("ERRO NO SETUP GET:", err);
+      return res.status(500).json({ error: err.message });
+    }
     res.json({ needsSetup: row.count === 0 });
   });
 });
 
 app.post('/api/auth/setup', async (req, res) => {
-  const { username, password } = req.body;
-  if (!username || !password || password.length < 4) return res.status(400).json({ error: "Credenciais inválidas." });
-  
-  db.get("SELECT COUNT(*) as count FROM users WHERE perfis LIKE '%admin%'", async (err, row) => {
-    if (row.count > 0) return res.status(403).json({ error: "O administrador mestre já foi configurado." });
+  try {
+    const { username, password } = req.body;
+    if (!username || !password || password.length < 4) return res.status(400).json({ error: "Credenciais inválidas." });
     
-    const hash = await bcrypt.hash(password, 10);
-    db.run("INSERT INTO users (siape, nome_completo, nome_exibicao, email, senha_hash, perfis, atua_como_docente) VALUES (?, 'Administrador', 'Admin', ?, ?, '[\"admin\"]', 0)", 
-      ['admin', username, hash], function(err) {
-      if (err) return res.status(500).json({ error: "Erro ao criar admin." });
-      res.json({ message: "Admin criado com sucesso." });
+    db.get("SELECT COUNT(*) as count FROM users WHERE perfis LIKE '%admin%'", async (err, row) => {
+      if (err) {
+        console.error("ERRO NO SETUP POST (check):", err);
+        return res.status(500).json({ error: err.message });
+      }
+      if (row.count > 0) return res.status(403).json({ error: "O administrador mestre já foi configurado." });
+      
+      const hash = await bcrypt.hash(password, 10);
+      db.run("INSERT INTO users (siape, nome_completo, nome_exibicao, email, senha_hash, perfis, atua_como_docente) VALUES (?, 'Administrador', 'Admin', ?, ?, '[\"admin\"]', 0)", 
+        ['admin', username, hash], function(err) {
+        if (err) {
+          console.error("ERRO NO SETUP POST (insert):", err);
+          return res.status(500).json({ error: "Erro ao criar admin." });
+        }
+        res.json({ message: "Admin criado com sucesso." });
+      });
     });
-  });
+  } catch(e) {
+    console.error("ERRO FATAL NO SETUP:", e);
+    res.status(500).json({ error: e.message });
+  }
 });
 
 app.post('/api/auth/login', (req, res) => {
-  const { username, password } = req.body;
-  db.get("SELECT * FROM users WHERE email = ? OR siape = ?", [username, username], async (err, user) => {
-    if (err) return res.status(500).json({ error: err.message });
-    if (!user) return res.status(401).json({ error: "Usuário ou senha incorretos." });
-    if (user.status !== 'ativo') return res.status(401).json({ error: "Usuário inativo." });
+  try {
+    const { username, password } = req.body;
+    console.log("Tentativa de login para:", username);
     
-    const isValid = await bcrypt.compare(password, user.senha_hash);
-    if (!isValid) return res.status(401).json({ error: "Usuário ou senha incorretos." });
+    db.get("SELECT * FROM users WHERE email = ? OR siape = ?", [username, username], async (err, user) => {
+      if (err) {
+        console.error("ERRO SQL NO LOGIN:", err);
+        return res.status(500).json({ error: err.message });
+      }
+      if (!user) {
+        console.log("Usuário não encontrado:", username);
+        return res.status(401).json({ error: "Usuário ou senha incorretos." });
+      }
+      if (user.status !== 'ativo') return res.status(401).json({ error: "Usuário inativo." });
+      
+      try {
+        const isValid = await bcrypt.compare(password, user.senha_hash);
+        if (!isValid) return res.status(401).json({ error: "Usuário ou senha incorretos." });
 
-    let perfis = [];
-    try {
-      perfis = JSON.parse(user.perfis || '[]');
-    } catch(e) {}
-    
-    const role = perfis.includes('admin') ? 'admin' : (perfis.length > 0 ? 'servidor' : 'publico');
-    const token = jwt.sign({ id: user.siape, role }, JWT_SECRET, { expiresIn: '12h' });
-    res.json({ token, role, siape: user.siape, nome_exibicao: user.nome_exibicao, perfis });
-  });
+        let perfis = [];
+        try {
+          perfis = JSON.parse(user.perfis || '[]');
+        } catch(e) {
+          console.warn("Falha ao parsear perfis do usuário:", user.siape);
+        }
+        
+        const role = perfis.includes('admin') ? 'admin' : (perfis.length > 0 ? 'servidor' : 'publico');
+        const token = jwt.sign({ id: user.siape, role }, JWT_SECRET, { expiresIn: '12h' });
+        
+        console.log("Login bem sucedido:", user.siape);
+        res.json({ token, role, siape: user.siape, nome_exibicao: user.nome_exibicao, perfis });
+      } catch(bcryptErr) {
+        console.error("ERRO NO BCRYPT LOGIN:", bcryptErr);
+        res.status(500).json({ error: "Erro na verificação da senha." });
+      }
+    });
+  } catch(e) {
+    console.error("ERRO FATAL NO LOGIN:", e);
+    res.status(500).json({ error: e.message });
+  }
 });
 
 // Alteração individual de senhas removida - processo 100% via Users Manager (Gestão de Servidores)

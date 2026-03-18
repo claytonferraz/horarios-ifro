@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { BookOpen, Users, Plus, Trash2, Edit2, Save, X, Settings2, CalendarDays, CheckCircle, User as UserIcon } from 'lucide-react';
+import { BookOpen, Users, Plus, Trash2, Edit2, Save, X, Settings2, CalendarDays, CheckCircle, User as UserIcon, AlertTriangle } from 'lucide-react';
 import { apiClient } from '@/lib/apiClient';
 import { UsersManager } from './UsersManager';
 
@@ -9,6 +9,13 @@ export function CurriculumManager({ isDarkMode, academicYearsMeta, groupedDiscip
   const [classes, setClasses] = useState([]);
   const [globalTeachers, setGlobalTeachers] = useState([]);
   const [loading, setLoading] = useState(true);
+
+  // Modal State
+  const [modalConfig, setModalConfig] = useState(null); // { title, message, onConfirm, type }
+
+  const showConfirm = (title, message, onConfirm, type = 'danger') => {
+    setModalConfig({ title, message, onConfirm, type });
+  };
 
   // Load initial data
   useEffect(() => {
@@ -36,6 +43,24 @@ export function CurriculumManager({ isDarkMode, academicYearsMeta, groupedDiscip
 
   return (
     <div className={`rounded-2xl shadow-sm border overflow-hidden ${isDarkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'}`}>
+      {/* GLOBAL MODAL */}
+      {modalConfig && (
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className={`w-full max-w-sm rounded-2xl shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200 ${isDarkMode ? 'bg-slate-900 border border-slate-700' : 'bg-white'}`}>
+            <div className={`p-6 text-center ${modalConfig.type === 'danger' ? 'text-rose-500' : 'text-blue-500'}`}>
+              <div className={`w-16 h-16 rounded-full mx-auto flex items-center justify-center mb-4 ${modalConfig.type === 'danger' ? 'bg-rose-500/10' : 'bg-blue-500/10'}`}>
+                <AlertTriangle size={32} />
+              </div>
+              <h3 className="font-black text-lg uppercase tracking-widest mb-2">{modalConfig.title}</h3>
+              <p className={`text-sm font-medium leading-relaxed ${isDarkMode ? 'text-slate-400' : 'text-slate-600'}`}>{modalConfig.message}</p>
+            </div>
+            <div className={`p-4 flex gap-3 border-t ${isDarkMode ? 'bg-slate-950/50 border-slate-800' : 'bg-slate-50 border-slate-100'}`}>
+               <button onClick={() => setModalConfig(null)} className={`flex-1 py-3 rounded-xl text-xs font-black uppercase tracking-widest transition-all ${isDarkMode ? 'bg-slate-800 text-slate-400 hover:bg-slate-700' : 'bg-white text-slate-500 hover:bg-slate-100'}`}>Cancelar</button>
+               <button onClick={() => { modalConfig.onConfirm(); setModalConfig(null); }} className={`flex-1 py-3 rounded-xl text-xs font-black uppercase tracking-widest transition-all text-white shadow-lg ${modalConfig.type === 'danger' ? 'bg-rose-600 hover:bg-rose-700' : 'bg-blue-600 hover:bg-blue-700'}`}>Confirmar</button>
+            </div>
+          </div>
+        </div>
+      )}
       <div className={`text-white px-6 py-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 border-b ${isDarkMode ? 'bg-slate-950 border-slate-800' : 'bg-slate-900 border-slate-800'}`}>
         <div className="flex items-center gap-3">
           <BookOpen size={18} className="text-indigo-400" />
@@ -81,9 +106,9 @@ export function CurriculumManager({ isDarkMode, academicYearsMeta, groupedDiscip
           <div className="text-center p-12 text-blue-500 font-bold animate-pulse">Carregando dados estruturais...</div>
         ) : (
           <>
-            {activeTab === 'matrices' && <MatricesTab isDarkMode={isDarkMode} matrices={matrices} setMatrices={setMatrices} generateId={generateId} groupedDisciplinesBySerie={groupedDisciplinesBySerie} academicYearsMeta={academicYearsMeta} />}
-            {activeTab === 'classes' && <ClassesTab isDarkMode={isDarkMode} matrices={matrices} classes={classes} setClasses={setClasses} generateId={generateId} academicYearsMeta={academicYearsMeta} globalTeachers={globalTeachers} />}
-            {activeTab === 'teachers' && <UsersManager isDarkMode={isDarkMode} />}
+            {activeTab === 'matrices' && <MatricesTab isDarkMode={isDarkMode} matrices={matrices} setMatrices={setMatrices} generateId={generateId} groupedDisciplinesBySerie={groupedDisciplinesBySerie} academicYearsMeta={academicYearsMeta} showConfirm={showConfirm} />}
+            {activeTab === 'classes' && <ClassesTab isDarkMode={isDarkMode} matrices={matrices} classes={classes} setClasses={setClasses} generateId={generateId} academicYearsMeta={academicYearsMeta} globalTeachers={globalTeachers} showConfirm={showConfirm} />}
+            {activeTab === 'teachers' && <UsersManager isDarkMode={isDarkMode} showConfirm={showConfirm} />}
           </>
         )}
       </div>
@@ -151,10 +176,11 @@ function MatricesTab({ isDarkMode, matrices, setMatrices, generateId, groupedDis
     }
   };
 
-  const handleDeleteMatrix = async (id) => {
-    if (!window.confirm("Certeza que deseja excluir esta Matriz Curricular inteira?")) return;
-    const res = await apiClient.deleteCurriculum('matrix', id);
-    if (res.success) setMatrices(matrices.filter(m => m.id !== id));
+  const handleDeleteMatrix = (id) => {
+    showConfirm("Excluir Matriz", "Certeza que deseja excluir esta Matriz Curricular inteira? Essa ação não pode ser desfeita.", async () => {
+      const res = await apiClient.deleteCurriculum('matrix', id);
+      if (res.success) setMatrices(prev => prev.filter(m => m.id !== id));
+    });
   };
 
   const addSerie = () => {
@@ -416,7 +442,7 @@ function MatricesTab({ isDarkMode, matrices, setMatrices, generateId, groupedDis
 // ==========================================
 // 2. ABA DE TURMAS
 // ==========================================
-function ClassesTab({ isDarkMode, matrices, classes, setClasses, generateId, academicYearsMeta, globalTeachers = [] }) {
+function ClassesTab({ isDarkMode, matrices, classes, setClasses, generateId, academicYearsMeta, globalTeachers = [], showConfirm }) {
   const [editingId, setEditingId] = useState(null);
   const [localFormData, setLocalFormData] = useState(null);
 
@@ -474,23 +500,27 @@ function ClassesTab({ isDarkMode, matrices, classes, setClasses, generateId, aca
     }
   };
 
-  const handleDeleteClass = async (id) => {
-    if (!window.confirm("Certeza que deseja excluir esta Turma?")) return;
-    const res = await apiClient.deleteCurriculum('class', id);
-    if (res.success) setClasses(classes.filter(c => c.id !== id));
+  const handleDeleteClass = (id) => {
+    showConfirm("Excluir Turma", "Certeza que deseja excluir esta Turma permanentemente?", async () => {
+      const res = await apiClient.deleteCurriculum('class', id);
+      if (res.success) {
+        setClasses(prev => prev.filter(c => c.id !== id));
+      }
+    });
   };
 
-  const handleDuplicateClass = async (cls) => {
-    if (!window.confirm(`Deseja clonar a turma "${cls.name}" com os professores já atribuídos?`)) return;
-    const newCls = {
-      ...cls,
-      id: generateId(),
-      name: cls.name + " (Cópia)"
-    };
-    const saved = await apiClient.saveCurriculum('class', newCls);
-    if (saved.success) {
-      setClasses([...classes, newCls]);
-    }
+  const handleDuplicateClass = (cls) => {
+    showConfirm("Clonar Turma", `Deseja clonar a turma "${cls.name}" com os professores já atribuídos?`, async () => {
+      const newCls = {
+        ...cls,
+        id: generateId(),
+        name: cls.name + " (Cópia)"
+      };
+      const saved = await apiClient.saveCurriculum('class', newCls);
+      if (saved.success) {
+        setClasses(prev => [...prev, newCls]);
+      }
+    }, 'info');
   };
 
   const handleProfChange = (discId, profStr) => {
