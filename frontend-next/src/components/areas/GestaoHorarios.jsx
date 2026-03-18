@@ -156,6 +156,7 @@ export function GestaoHorarios({
           <CurriculumManager 
             isDarkMode={isDarkMode} 
             academicYearsMeta={academicYearsMeta} 
+            groupedDisciplinesBySerie={groupedDisciplinesBySerie}
           />
         )}
 

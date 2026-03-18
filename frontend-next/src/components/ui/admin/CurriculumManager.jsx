@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { BookOpen, Users, Plus, Trash2, Edit2, Save, X, Settings2, CalendarDays, CheckCircle } from 'lucide-react';
 import { apiClient } from '@/lib/apiClient';
 
-export function CurriculumManager({ isDarkMode, academicYearsMeta }) {
+export function CurriculumManager({ isDarkMode, academicYearsMeta, groupedDisciplinesBySerie = {} }) {
   const [activeTab, setActiveTab] = useState('matrices');
   const [matrices, setMatrices] = useState([]);
   const [classes, setClasses] = useState([]);
@@ -152,9 +152,10 @@ function MatricesTab({ isDarkMode, matrices, setMatrices, generateId }) {
     }));
   };
 
-  const allDisciplines = Array.from(new Set(
-    matrices.flatMap(m => (m.series || []).flatMap(s => (s.disciplines || []).map(d => d.name)))
-  )).filter(Boolean).sort();
+  const allDisciplines = Array.from(new Set([
+    ...matrices.flatMap(m => (m.series || []).flatMap(s => (s.disciplines || []).map(d => d.name))),
+    ...Object.values(groupedDisciplinesBySerie).flatMap(list => list.map(item => item.subject))
+  ])).filter(Boolean).sort();
 
   const updateDiscipline = (sId, dId, field, value) => {
     setLocalFormData(prev => ({
