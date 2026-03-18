@@ -386,13 +386,13 @@ export function ScheduleConfigPanel({ isDarkMode }) {
                 respeitando a duração de {calcStep} min e os intervalos configurados acima.
               </p>
 
-              <div className="flex gap-3">
+               <div className="flex gap-3">
                  {SHIFTS.map(shift => (
                    <button 
                      key={shift}
                      onClick={() => {
                         let timesForShift = localTimes.filter(t => t.shift === shift);
-                        let firstStr = '07:30'; // Fallback
+                        let firstStr = '07:30'; 
                         if (shift === 'Vespertino') firstStr = '13:00';
                         if (shift === 'Noturno') firstStr = '19:00';
 
@@ -405,14 +405,20 @@ export function ScheduleConfigPanel({ isDarkMode }) {
                         if(isNaN(hh) || isNaN(mm)) return alert(`Horário inicial "${firstStr}" inválido.`);
                         
                         let currentClock = hh * 60 + mm;
-                        const shiftInts = localIntervals.filter(i => i.shift === shift);
                         const numAulas = calcCounts[shift] || 6;
                         const newShiftTimes = [];
+
+                        // REGRAS DE OURO / AUTOMATIZAÇÃO (3ª aula -> 20min ou 2ª aula -> 10min no Noturno)
+                        const autoIntervals = {
+                          'Matutino': { pos: 3, dur: 20 },
+                          'Vespertino': { pos: 3, dur: 20 },
+                          'Noturno': { pos: 2, dur: 10 }
+                        };
 
                         for(let i = 0; i < numAulas; i++) {
                            const sH = Math.floor(currentClock / 60).toString().padStart(2, '0');
                            const sM = (currentClock % 60).toString().padStart(2, '0');
-                           currentClock += calcStep; 
+                           currentClock += 50; // Duração Fixa: 50 Minutos
                            const eH = Math.floor(currentClock / 60).toString().padStart(2, '0');
                            const eM = (currentClock % 60).toString().padStart(2, '0');
                            
@@ -422,19 +428,30 @@ export function ScheduleConfigPanel({ isDarkMode }) {
                              timeStr: `${sH}:${sM} - ${eH}:${eM}` 
                            });
 
-                           const interval = shiftInts.find(int => Number(int.position) === i + 1);
-                           if (interval) currentClock += Number(interval.duration || 0);
+                           // Aplica Intervalo Automático (Padrão ouro conforme prompt)
+                           const rule = autoIntervals[shift];
+                           if (rule && (i + 1) === rule.pos) {
+                              currentClock += rule.dur;
+                           }
                         }
 
-                        // Substituir os horários do turno no estado global
                         setLocalTimes(prev => {
                            const others = prev.filter(pt => pt.shift !== shift);
                            return [...others, ...newShiftTimes];
                         });
+                        
+                        // Sincroniza intervalos visualmente se necessário
+                        const rule = autoIntervals[shift];
+                        if (rule) {
+                           setLocalIntervals(prev => {
+                             const others = prev.filter(inv => !(inv.shift === shift && inv.position === rule.pos));
+                             return [...others, { id: 'auto_' + shift + '_' + rule.pos, shift, position: rule.pos, duration: rule.dur, description: 'Intervalo Automático' }];
+                           });
+                        }
                      }}
                      className={`flex-1 py-4 rounded-xl text-xs font-black uppercase tracking-widest border shadow-sm transition-all hover:scale-[1.02] active:scale-95 ${shift === 'Matutino' ? 'text-amber-500 border-amber-500/30 hover:bg-amber-500/10' : shift === 'Vespertino' ? 'text-blue-500 border-blue-500/30 hover:bg-blue-500/10' : 'text-violet-500 border-violet-500/30 hover:bg-violet-500/10'}`}
                    >
-                     Gerar {shift}
+                     Gerar {shift} (50min + Int)
                    </button>
                  ))}
               </div>

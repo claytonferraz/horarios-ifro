@@ -39,7 +39,8 @@ export function ScheduleEditorModal({
             day, time, className, 
             teacher: '', subject: '',
             startTime: timeObj?.startTime || '',
-            endTime: timeObj?.endTime || ''
+            endTime: timeObj?.endTime || '',
+            classType: 'Regular'
         }]);
       }
       checkInconsistencies();
@@ -70,9 +71,36 @@ export function ScheduleEditorModal({
      // Check Hours/Quota
      serie.disciplines.forEach(disc => {
         const expected = disc.aulas_semanais || 0;
-        const assigned = classTotalRecords.filter(r => r.subject === disc.name).length;
+        // REGRA DE OURO: Somente aulas 'Regular' abatem a carga horária
+        const assigned = classTotalRecords.filter(r => r.subject === disc.name && (r.classType === 'Regular' || !r.classType)).length;
         if (expected > 0 && assigned !== expected) {
-           issues.push(`Carga Horária Divergente: ${disc.name} tem ${assigned}/${expected} aulas alocadas na semana.`);
+           issues.push(`Carga Horária Divergente: ${disc.name} tem ${assigned}/${expected} aulas 'Regulares' alocadas na semana.`);
+        }
+     });
+
+     // Check Saúde Docente (3 Turnos no mesmo dia)
+     const profsInThisDay = new Set(weekData.records.filter(r => r.day === day).map(r => r.teacher));
+     localRecords.forEach(lr => {
+        if(lr.teacher && lr.teacher !== 'SEM PROFESSOR') profsInThisDay.add(lr.teacher);
+     });
+
+     profsInThisDay.forEach(profSiape => {
+        if(!profSiape) return;
+        const profDayRecords = weekData.records.filter(r => r.teacher === profSiape && r.day === day && r.className !== className);
+        const currentTeacherLocal = localRecords.filter(lr => lr.teacher === profSiape);
+        
+        const shifts = new Set(profDayRecords.map(r => {
+           const tObj = classTimes.find(ct => ct.timeStr === r.time);
+           return tObj ? tObj.shift : null;
+        }).filter(Boolean));
+
+        currentTeacherLocal.forEach(() => {
+           if(timeObj && timeObj.shift) shifts.add(timeObj.shift);
+        });
+
+        if (shifts.size >= 3) {
+           const profName = usersList.find(u => u.siape === profSiape)?.nome_exibicao || profSiape;
+           issues.push(`ALERTA SAÚDE: O professor ${profName} está alocado nos 3 TURNOS (${Array.from(shifts).join(', ')}) neste dia!`);
         }
      });
 
@@ -108,7 +136,8 @@ export function ScheduleEditorModal({
          day, time, className, 
          teacher: '', subject: '',
          startTime: timeObj?.startTime || '',
-         endTime: timeObj?.endTime || ''
+         endTime: timeObj?.endTime || '',
+         classType: 'Regular'
      }]);
   };
 
@@ -204,7 +233,31 @@ export function ScheduleEditorModal({
                     </select>
                   </div>
                 </div>
-                <div className="flex justify-end mt-3">
+                <div className="mt-4">
+                  <label className="text-[10px] font-black uppercase tracking-widest opacity-60 block mb-2">Tipo de Aula (Tipificação)</label>
+                  <div className="flex flex-wrap gap-2">
+                     {['Regular', 'Recuperação', 'Exame', 'Atendimento'].map(type => (
+                       <button
+                         key={type}
+                         onClick={(e) => {
+                            e.preventDefault();
+                            handleUpdate(r.id, 'classType', type);
+                         }}
+                         className={`px-4 py-2 rounded-lg text-[10px] font-black uppercase tracking-widest border transition-all ${
+                           (r.classType || 'Regular') === type
+                             ? (isDarkMode ? 'bg-indigo-900 border-indigo-500 text-indigo-400 shadow-sm' : 'bg-indigo-50 border-indigo-200 text-indigo-700 shadow-sm')
+                             : (isDarkMode ? 'bg-slate-900 border-slate-700 text-slate-500' : 'bg-white border-slate-200 text-slate-400 font-bold')
+                         }`}
+                       >
+                         {type}
+                       </button>
+                     ))}
+                  </div>
+                  <p className="text-[9px] mt-1.5 opacity-50 font-bold italic">
+                    * Somente aulas 'Regulares' abatem a carga horária da matriz.
+                  </p>
+                </div>
+                <div className="flex justify-end mt-3 pt-3 border-t border-dashed border-slate-700/30">
                    <button onClick={() => handleRemove(r.id)} className="text-rose-500 hover:text-rose-400 text-[10px] font-black uppercase tracking-widest flex items-center gap-1"><Trash2 size={12}/> Remover Slot</button>
                 </div>
              </div>
