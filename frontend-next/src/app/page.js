@@ -12,7 +12,7 @@ export default function HomePage() {
   const { isDarkMode } = useTheme();
 
   return (
-    <>
+    <div className={`min-h-screen font-sans flex flex-col transition-colors duration-300 ${isDarkMode ? 'bg-slate-950 text-slate-100' : 'bg-slate-50 text-slate-800'}`}>
       <Navbar />
       <main className="flex-1 flex flex-col items-center justify-center p-6 pb-20 animate-in fade-in slide-in-from-bottom-8 duration-700 mt-10">
         <div className="text-center max-w-2xl mx-auto mb-12">
@@ -90,6 +90,6 @@ export default function HomePage() {
         </div>
       </main>
       <Footer isDarkMode={isDarkMode} />
-    </>
+    </div>
   );
 }
