@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { X, Send, AlertCircle, RefreshCcw } from 'lucide-react';
-import { resolveTeacherName } from '@/lib/utils/resolveTeacherName';
+import { resolveTeacherName } from '@/lib/dates';
 
 // Utility for hashing subject string into a consistent color pair (extracted from PortalView optionally or replicated)
 const COLORS = [
