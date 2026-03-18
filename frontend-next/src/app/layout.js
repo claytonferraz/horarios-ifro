@@ -7,9 +7,23 @@ const inter = Inter({
   subsets: ["latin"],
 });
 
+export const viewport = {
+  themeColor: '#0f172a',
+  width: 'device-width',
+  initialScale: 1,
+  maximumScale: 1,
+  userScalable: false,
+};
+
 export const metadata = {
   title: "Horários IFRO - Ji-Paraná",
   description: "Sistema de Horários do IFRO Campus Ji-Paraná",
+  manifest: "/manifest.json",
+  appleWebApp: {
+    capable: true,
+    title: "Horários IFRO",
+    statusBarStyle: "black-translucent",
+  },
 };
 
 export default function RootLayout({ children }) {

@@ -814,7 +814,7 @@ export function PortalView({
                         </button>
                       </div>
                       
-                      <div className="overflow-x-auto">
+                      <div className="hidden md:block overflow-x-auto">
                         <table className="w-full min-w-[750px] border-collapse relative text-xs">
                           <thead>
                             <tr className={`border-b text-[9px] font-black uppercase tracking-widest text-slate-400 ${isDarkMode ? 'bg-slate-900 border-slate-700' : 'bg-slate-50 border-slate-200'}`}>
@@ -894,6 +894,74 @@ export function PortalView({
                             })()}
                           </tbody>
                         </table>
+                      </div>
+                      
+                      {/* Mobile Stacked View (Turma) */}
+                      <div className="md:hidden p-4 space-y-4">
+                        {(() => {
+                          const turmaRecords = recordsForWeek.filter(r => r.className === selectedClass);
+                          if (turmaRecords.length === 0) {
+                            return <div className="text-center text-slate-400 font-bold uppercase tracking-widest text-[10px] p-8 border rounded-xl border-dashed">Sem aulas programadas</div>;
+                          }
+                          return safeDays.map(day => {
+                            const dayRecords = turmaRecords.filter(r => r.day === day);
+                            if (dayRecords.length === 0) return null;
+                            
+                            const dayShifts = new Set(dayRecords.map(r => safeTimes.find(t => t.timeStr === r.time)?.shift).filter(Boolean));
+                            const hasDiurno = dayShifts.has('Matutino') || dayShifts.has('Vespertino');
+                            const hasNoturno = dayShifts.has('Noturno');
+                            const displayShifts = new Set();
+                            if (hasDiurno) { displayShifts.add('Matutino'); displayShifts.add('Vespertino'); }
+                            if (hasNoturno) displayShifts.add('Noturno');
+                            const activeTimes = safeTimes.filter(t => displayShifts.has(t.shift));
+                            
+                            return (
+                              <div key={`mob-${day}`} className={`rounded-xl border overflow-hidden shadow-sm animate-in fade-in slide-in-from-bottom-2 ${isDarkMode ? 'border-slate-700 bg-slate-800/30' : 'border-slate-200 bg-white'}`}>
+                                <div className={`px-4 py-2.5 font-black text-[10px] uppercase tracking-widest ${isDarkMode ? 'bg-slate-800 text-slate-300' : 'bg-slate-100 text-slate-600'}`}>
+                                  {getFormattedDayLabel(day)}
+                                </div>
+                                <div className={`divide-y ${isDarkMode ? 'divide-slate-800' : 'divide-slate-100'}`}>
+                                  {activeTimes.map((timeObj, idx) => {
+                                    const time = timeObj.timeStr || timeObj;
+                                    const records = dayRecords.filter(r => r.time === time);
+                                    const isLunch = time === '11:10 - 12:00';
+                                    
+                                    const timeRow = (
+                                      <div key={`${day}-${time}-row`} className={`flex items-center gap-3 p-3 transition-colors ${isDarkMode ? 'hover:bg-slate-800/50' : 'hover:bg-slate-50'}`}>
+                                        <div className="w-16 shrink-0 text-center">
+                                           <span className={`block border font-black text-[9px] px-1 py-1 rounded-md shadow-sm opacity-80 ${isDarkMode ? 'bg-slate-900 border-slate-700 text-slate-400' : 'bg-white border-slate-200 text-slate-500'}`}>{time}</span>
+                                        </div>
+                                        <div className="flex-1 space-y-2">
+                                          {records.length > 0 ? records.map(r => {
+                                            const isPending = isTeacherPending(r.teacher);
+                                            return (
+                                              <div key={`mob-rec-${r.id}`} className={`p-2.5 rounded-lg border shadow-sm flex flex-col justify-center ${isPending ? (isDarkMode ? 'bg-red-900/30 border-red-800/50 text-red-300' : 'bg-red-50 border-red-200 text-red-800') : getColorHash(r.subject, isDarkMode)}`}>
+                                                <p className="font-black text-[11px] leading-tight mb-1">{r.subject}</p>
+                                                <p className={`text-[9px] font-bold uppercase tracking-wide truncate ${isPending ? (isDarkMode ? 'text-red-400' : 'text-red-600') : 'opacity-80'}`}>{isPending ? 'SEM PROFESSOR' : r.teacher}</p>
+                                                {r.room && <span className={`text-[8px] font-black uppercase tracking-widest mt-1.5 px-2 py-0.5 rounded w-fit ${isDarkMode ? 'bg-white/10' : 'bg-black/5'}`}>{r.room}</span>}
+                                              </div>
+                                            )
+                                          }) : <div className={`font-black tracking-widest text-[9px] opacity-20 uppercase mx-auto w-fit`}>-</div>}
+                                        </div>
+                                      </div>
+                                    );
+                                    
+                                    return (
+                                      <React.Fragment key={`${day}-${time}-frag`}>
+                                        {timeRow}
+                                        {isLunch && (
+                                           <div className={`py-1.5 text-center text-[7px] font-black uppercase tracking-[0.4em] border-y-[2px] ${isDarkMode ? 'bg-slate-800/40 text-slate-500 border-slate-700' : 'bg-slate-50 text-slate-400 border-slate-200'}`}>
+                                             Intervalo
+                                           </div>
+                                        )}
+                                      </React.Fragment>
+                                    );
+                                  })}
+                                </div>
+                              </div>
+                            );
+                          });
+                        })()}
                       </div>
                     </div>
                   )}
