@@ -34,9 +34,9 @@ import { DAYS, MAP_DAYS, getWeekBoundaries, isDatePastOrToday, isTeacherPending,
 // APLICAÇÃO PRINCIPAL
 // ==========================================
 export function HomeApp({ appMode }) {
-  const { rawData, setRawData, disabledWeeks, setDisabledWeeks, disciplinesMeta, academicYearsMeta, subjectHoursMeta, loadAdminMetadata, refreshData, academicWeeks, activeDays, classTimes, bimesters } = useData();
+  const { rawData, setRawData, disabledWeeks, setDisabledWeeks, disciplinesMeta, academicYearsMeta, subjectHoursMeta, loadAdminMetadata, refreshData, academicWeeks, activeDays, classTimes, bimesters, intervals } = useData();
   const { isDarkMode } = useTheme();
-  const { isUnlocked, userRole, login, logout, changePassword } = useAuth();
+  const { isUnlocked, userRole, login, logout } = useAuth();
 
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   
@@ -132,14 +132,7 @@ export function HomeApp({ appMode }) {
                     </div>
                 
                     <div className="flex items-center gap-2">
-                        {userRole === 'admin' && (
-                        <button onClick={() => {
-                            security.setSecurityTab('password');
-                            security.setPwdModal({ show: true, current: '', newPwd: '', confirm: '', error: '', success: '' });
-                        }} className={`px-4 py-2.5 border rounded-lg font-black text-[10px] uppercase tracking-widest flex items-center gap-2 shadow-sm transition-all ${isDarkMode ? 'bg-slate-800 text-slate-200 border-slate-700 hover:bg-slate-700' : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50'}`}>
-                            <KeyRound size={14} className={isDarkMode ? 'text-blue-400' : 'text-blue-600'} /> Segurança
-                        </button>
-                        )}
+                        {/* Removed Segurança Button as requested */}
                         <button onClick={() => logout()} className={`px-4 py-2.5 border rounded-lg font-black text-[10px] uppercase tracking-widest flex items-center gap-2 shadow-sm transition-all ${isDarkMode ? 'bg-rose-900/20 text-rose-400 border-rose-800/50 hover:bg-rose-900/40' : 'bg-rose-50 text-rose-600 border-rose-200 hover:bg-rose-100'}`}>
                         <Power size={14} /> Sair
                         </button>
@@ -180,6 +173,8 @@ export function HomeApp({ appMode }) {
                 </div>
                 <AlunoView 
                     appMode="aluno" isDarkMode={isDarkMode}
+                    userRole={userRole} rawData={rawData} loadAdminMetadata={loadAdminMetadata}
+                    intervals={intervals}
                     {...scheduleState}
                     handlePrint={executePrint} getColorHash={getColorHash} isTeacherPending={isTeacherPending}
                 />
@@ -205,6 +200,8 @@ export function HomeApp({ appMode }) {
                 </div>
                 <ProfessorView 
                     appMode="professor" isDarkMode={isDarkMode}
+                    userRole={userRole} rawData={rawData} loadAdminMetadata={loadAdminMetadata}
+                    intervals={intervals}
                     {...scheduleState}
                     handlePrint={executePrint} getColorHash={getColorHash} isTeacherPending={isTeacherPending}
                 />

@@ -181,41 +181,7 @@ export const apiClient = {
     }
   },
 
-  async changePassword(currentPassword, newPassword) {
-    try {
-      const res = await fetch(`${API_URL}/auth/change-password`, { method: 'POST', headers: getHeaders(), body: JSON.stringify({ currentPassword, newPassword }) });
-      if (!res.ok) { const err = await res.json(); throw new Error(err.error || "Falha ao alterar senha"); }
-      return await res.json();
-    } catch (e) {
-      if (e.message.includes("fetch") && typeof window !== 'undefined') {
-        const mockUsers = JSON.parse(localStorage.getItem('sqlite_mock_users') || '[]');
-        if (mockUsers.length > 0) {
-           if (mockUsers[0].password !== btoa(encodeURIComponent(currentPassword))) throw new Error("Senha atual incorreta.");
-           mockUsers[0].password = btoa(encodeURIComponent(newPassword));
-           localStorage.setItem('sqlite_mock_users', JSON.stringify(mockUsers));
-           return { message: "Senha alterada com sucesso" };
-        }
-      }
-      throw e;
-    }
-  },
-
-  async registerUser(username, password, role) {
-    try {
-      const res = await fetch(`${API_URL}/auth/register`, { method: 'POST', headers: getHeaders(), body: JSON.stringify({ username, password, role }) });
-      if (!res.ok) { const err = await res.json(); throw new Error(err.error || "Falha ao criar usuário"); }
-      return await res.json();
-    } catch (e) {
-      if (e.message.includes("fetch") && typeof window !== 'undefined') {
-        const mockUsers = JSON.parse(localStorage.getItem('sqlite_mock_users') || '[]');
-        if (mockUsers.some(u => u.username === username)) throw new Error("Usuário já existe.");
-        mockUsers.push({ username, password: btoa(encodeURIComponent(password)) });
-        localStorage.setItem('sqlite_mock_users', JSON.stringify(mockUsers));
-        return { message: "Usuário mock criado." };
-      }
-      throw e;
-    }
-  },
+  // Funções avulsas de alterar senha e cadastro independente deletadas conforme instrução
 
   async saveSchedule(weekKey, dataObj) {
     try {
@@ -361,6 +327,90 @@ export const apiClient = {
       if (typeof window !== 'undefined') {
         const current = JSON.parse(localStorage.getItem(`sqlite_mock_curriculum_${type}`) || '[]');
         localStorage.setItem(`sqlite_mock_curriculum_${type}`, JSON.stringify(current.filter(c => c.id !== id)));
+        return { success: true };
+      }
+      throw e;
+    }
+  },
+
+  async fetchTeachers() {
+    try {
+      const res = await fetch(`${API_URL}/admin/teachers`);
+      if (!res.ok) throw new Error('Falha ao buscar professores');
+      return await res.json();
+    } catch (e) {
+      if (typeof window !== 'undefined') {
+        return JSON.parse(localStorage.getItem('sqlite_mock_teachers') || '[]');
+      }
+      return [];
+    }
+  },
+
+  async saveTeacher(data) {
+    try {
+      const res = await fetch(`${API_URL}/admin/teachers`, {
+        method: 'PUT',
+        headers: getHeaders(),
+        body: JSON.stringify(data)
+      });
+      if (!res.ok) throw new Error('Falha ao salvar professor');
+      return await res.json();
+    } catch (e) {
+      if (typeof window !== 'undefined') {
+        const current = JSON.parse(localStorage.getItem('sqlite_mock_teachers') || '[]');
+        const idx = current.findIndex(t => t.siape === data.siape);
+        if (idx > -1) current[idx] = data; else current.push(data);
+        localStorage.setItem('sqlite_mock_teachers', JSON.stringify(current));
+        return { success: true, siape: data.siape };
+      }
+      throw e;
+    }
+  },
+
+  async saveTeachersBatch(dataArray) {
+    try {
+      const res = await fetch(`${API_URL}/admin/teachers/batch`, {
+        method: 'POST',
+        headers: getHeaders(),
+        body: JSON.stringify(dataArray)
+      });
+      if (!res.ok) throw new Error('Falha ao salvar professores em lote');
+      return await res.json();
+    } catch (e) {
+      if (typeof window !== 'undefined') {
+        let current = JSON.parse(localStorage.getItem('sqlite_mock_teachers') || '[]');
+        dataArray.forEach(data => {
+          let targetSiape = data.oldSiape || data.siape;
+          const idx = current.findIndex(t => t.siape === targetSiape);
+          const newRep = {
+             siape: data.siape,
+             nome_exibicao: data.nome_exibicao || '',
+             nome_completo: data.nome_completo,
+             email: data.email || null,
+             status: data.status || 'ativo',
+             perfis: data.perfis || [],
+             atua_como_docente: data.atua_como_docente || 0,
+             exigir_troca_senha: data.exigir_troca_senha !== undefined ? data.exigir_troca_senha : 1
+          };
+          if (idx > -1) current[idx] = { ...current[idx], ...newRep }; 
+          else current.push(newRep);
+        });
+        localStorage.setItem('sqlite_mock_teachers', JSON.stringify(current));
+        return { success: true, count: dataArray.length };
+      }
+      throw e;
+    }
+  },
+
+  async deleteTeacher(siape) {
+    try {
+      const res = await fetch(`${API_URL}/admin/teachers/${siape}`, { method: 'DELETE', headers: getHeaders() });
+      if (!res.ok) throw new Error('Falha ao remover professor');
+      return await res.json();
+    } catch (e) {
+      if (typeof window !== 'undefined') {
+        const current = JSON.parse(localStorage.getItem('sqlite_mock_teachers') || '[]');
+        localStorage.setItem('sqlite_mock_teachers', JSON.stringify(current.filter(t => t.siape !== siape)));
         return { success: true };
       }
       throw e;

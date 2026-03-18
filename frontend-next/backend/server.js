@@ -27,10 +27,14 @@ let lastUpdateTimestamp = Date.now();
 db.serialize(() => {
   // Tabelas Base
   db.run(`CREATE TABLE IF NOT EXISTS users (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    username TEXT UNIQUE,
-    password_hash TEXT,
-    role TEXT DEFAULT 'publico'
+      siape TEXT PRIMARY KEY,
+      nome_completo TEXT,
+      nome_exibicao TEXT,
+      email TEXT UNIQUE,
+      senha_hash TEXT,
+      status TEXT DEFAULT 'ativo',
+      perfis TEXT DEFAULT '[]',
+      atua_como_docente INTEGER DEFAULT 1
   )`);
   db.run(`CREATE TABLE IF NOT EXISTS schedules (
     id TEXT PRIMARY KEY,
@@ -107,7 +111,7 @@ app.get('/api/status', (req, res) => {
 // ROTAS DE AUTENTICAÇÃO (Login / Criação)
 // ==========================================
 app.get('/api/auth/setup', (req, res) => {
-  db.get("SELECT COUNT(*) as count FROM users", (err, row) => {
+  db.get("SELECT COUNT(*) as count FROM users WHERE perfis LIKE '%admin%'", (err, row) => {
     if (err) return res.status(500).json({ error: err.message });
     res.json({ needsSetup: row.count === 0 });
   });
@@ -117,11 +121,12 @@ app.post('/api/auth/setup', async (req, res) => {
   const { username, password } = req.body;
   if (!username || !password || password.length < 4) return res.status(400).json({ error: "Credenciais inválidas." });
   
-  db.get("SELECT COUNT(*) as count FROM users", async (err, row) => {
+  db.get("SELECT COUNT(*) as count FROM users WHERE perfis LIKE '%admin%'", async (err, row) => {
     if (row.count > 0) return res.status(403).json({ error: "O administrador mestre já foi configurado." });
     
     const hash = await bcrypt.hash(password, 10);
-    db.run("INSERT INTO users (username, password_hash, role) VALUES (?, ?, 'admin')", [username, hash], function(err) {
+    db.run("INSERT INTO users (siape, nome_completo, nome_exibicao, email, senha_hash, perfis, atua_como_docente) VALUES (?, 'Administrador', 'Admin', ?, ?, '[\"admin\"]', 0)", 
+      ['admin', username, hash], function(err) {
       if (err) return res.status(500).json({ error: "Erro ao criar admin." });
       res.json({ message: "Admin criado com sucesso." });
     });
@@ -130,59 +135,44 @@ app.post('/api/auth/setup', async (req, res) => {
 
 app.post('/api/auth/login', (req, res) => {
   const { username, password } = req.body;
-  db.get("SELECT * FROM users WHERE username = ?", [username], async (err, user) => {
+  db.get("SELECT * FROM users WHERE email = ? OR siape = ?", [username, username], async (err, user) => {
     if (err) return res.status(500).json({ error: err.message });
     if (!user) return res.status(401).json({ error: "Usuário ou senha incorretos." });
+    if (user.status !== 'ativo') return res.status(401).json({ error: "Usuário inativo." });
     
-    const isValid = await bcrypt.compare(password, user.password_hash);
+    const isValid = await bcrypt.compare(password, user.senha_hash);
     if (!isValid) return res.status(401).json({ error: "Usuário ou senha incorretos." });
 
-    const role = user.role || 'publico';
-    const token = jwt.sign({ id: user.id, role }, JWT_SECRET, { expiresIn: '12h' });
-    res.json({ token, role });
-  });
-});
-
-app.post('/api/auth/change-password', verifyToken, (req, res) => {
-  const { currentPassword, newPassword } = req.body;
-  if (!newPassword || newPassword.length < 4) return res.status(400).json({ error: "Nova senha muito curta." });
-
-  db.get("SELECT * FROM users WHERE id = ?", [req.userId], async (err, user) => {
-    if (!user) return res.status(404).json({ error: "Usuário não encontrado." });
+    let perfis = [];
+    try {
+      perfis = JSON.parse(user.perfis || '[]');
+    } catch(e) {}
     
-    const isValid = await bcrypt.compare(currentPassword, user.password_hash);
-    if (!isValid) return res.status(401).json({ error: "Senha atual incorreta." });
-
-    const newHash = await bcrypt.hash(newPassword, 10);
-    db.run("UPDATE users SET password_hash = ? WHERE id = ?", [newHash, req.userId], (err) => {
-      if (err) return res.status(500).json({ error: "Erro ao atualizar senha." });
-      res.json({ message: "Senha atualizada com sucesso." });
-    });
+    const role = perfis.includes('admin') ? 'admin' : (perfis.length > 0 ? 'servidor' : 'publico');
+    const token = jwt.sign({ id: user.siape, role }, JWT_SECRET, { expiresIn: '12h' });
+    res.json({ token, role, siape: user.siape, nome_exibicao: user.nome_exibicao, perfis });
   });
 });
+
+// Alteração individual de senhas removida - processo 100% via Users Manager (Gestão de Servidores)
 
 app.get('/api/auth/me', verifyToken, (req, res) => {
-  db.get("SELECT id, username, role FROM users WHERE id = ?", [req.userId], (err, user) => {
+  db.get("SELECT siape, nome_exibicao, email, perfis FROM users WHERE siape = ?", [req.userId], (err, user) => {
     if (err) return res.status(500).json({ error: "Erro no servidor." });
     if (!user) return res.status(404).json({ error: "Usuário não encontrado." });
-    res.json({ id: user.id, username: user.username, role: user.role || 'publico' });
+    
+    let perfis = [];
+    try {
+      perfis = JSON.parse(user.perfis || '[]');
+    } catch(e) {}
+    
+    const role = perfis.includes('admin') ? 'admin' : (perfis.length > 0 ? 'servidor' : 'publico');
+    
+    res.json({ id: user.siape, username: user.email || user.siape, role, nome_exibicao: user.nome_exibicao, perfis });
   });
 });
 
-app.post('/api/auth/register', verifyToken, async (req, res) => {
-  const { username, password, role } = req.body;
-  if (!username || !password || password.length < 4) return res.status(400).json({ error: "Dados inválidos." });
-
-  const finalRole = role || 'publico';
-  const hash = await bcrypt.hash(password, 10);
-  db.run("INSERT INTO users (username, password_hash, role) VALUES (?, ?, ?)", [username, hash, finalRole], function(err) {
-    if (err) {
-      if (err.message.includes('UNIQUE')) return res.status(400).json({ error: "Usuário já existe." });
-      return res.status(500).json({ error: "Erro ao criar usuário." });
-    }
-    res.json({ message: "Usuário criado com sucesso." });
-  });
-});
+// Cadastro avulso de usuário removido - 100% via UsersManager (SIAPE)
 
 // ==========================================
 // ROTAS DE HORÁRIOS
@@ -236,20 +226,21 @@ app.delete('/api/schedules/:id', verifyToken, (req, res) => {
 });
 
 app.put('/api/config', verifyToken, (req, res) => {
-  const { disabledWeeks, activeDays, classTimes, bimesters, activeDefaultScheduleId, year } = req.body;
+  const { disabledWeeks, activeDays, classTimes, bimesters, activeDefaultScheduleId, intervals, year } = req.body;
   const targetYear = year || new Date().getFullYear().toString();
   const configId = `config_${targetYear}`;
   
   db.run(
-    `INSERT OR REPLACE INTO config (id, disabledWeeks, activeDays, classTimes, bimesters, activeDefaultScheduleId) 
-     VALUES (?, ?, ?, ?, ?, ?)`, 
+    `INSERT OR REPLACE INTO config (id, disabledWeeks, activeDays, classTimes, bimesters, activeDefaultScheduleId, intervals) 
+     VALUES (?, ?, ?, ?, ?, ?, ?)`, 
     [
       configId,
       disabledWeeks ? JSON.stringify(disabledWeeks) : '[]',
       activeDays ? JSON.stringify(activeDays) : null,
       classTimes ? JSON.stringify(classTimes) : null,
       bimesters ? JSON.stringify(bimesters) : null,
-      activeDefaultScheduleId || null
+      activeDefaultScheduleId || null,
+      intervals ? JSON.stringify(intervals) : '[]'
     ], 
     (err) => {
       if (err) return res.status(500).json({ error: err.message });
@@ -282,29 +273,62 @@ app.post('/api/config/import', verifyToken, (req, res) => {
       const finalTimes    = ops.times     !== false ? row.classTimes : existing.classTimes;
       const finalBimester = ops.bimesters !== false ? row.bimesters  : existing.bimesters;
       const finalDefault  = ops.default   !== false ? row.activeDefaultScheduleId : existing.activeDefaultScheduleId;
-      // 'disabledWeeks' are usually year-specific exceptions so generally we shouldn't copy them by default, but existing logic did. 
-      // We'll preserve existing target's disabledWeeks if present, else empty array.
       const finalDisabled = existing.disabledWeeks || '[]';
 
       db.run(
         `INSERT OR REPLACE INTO config (id, disabledWeeks, activeDays, classTimes, bimesters, activeDefaultScheduleId) 
          VALUES (?, ?, ?, ?, ?, ?)`, 
-        [
-          toId,
-          finalDisabled,
-          finalDays,
-          finalTimes,
-          finalBimester,
-          finalDefault
-        ], 
+        [toId, finalDisabled, finalDays, finalTimes, finalBimester, finalDefault], 
         (err2) => {
           if (err2) return res.status(500).json({ error: err2.message });
-          lastUpdateTimestamp = Date.now();
-          res.json({ success: true, message: 'Importação parcial/total concluída com sucesso!' });
+
+          // --- AGORA REALIZA A DUPLICAÇÃO DAS TURMAS ---
+          db.all("SELECT id, payload FROM curriculum_data WHERE dataType = 'class'", (err3, classRows) => {
+             if(err3) return finishImport(res);
+
+             const insertStmt = db.prepare("INSERT INTO curriculum_data (id, dataType, payload) VALUES (?, 'class', ?)");
+             const classesToInsert = [];
+
+             // Busca as turmas do ano base
+             (classRows || []).forEach(cr => {
+                try {
+                   const classData = JSON.parse(cr.payload);
+                   if (classData.academicYear === fromYear) {
+                      // Duplica e ajusta
+                      const newId = `c_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+                      const newPayload = { ...classData, id: newId, academicYear: toYear };
+                      classesToInsert.push([newId, JSON.stringify(newPayload)]);
+                   }
+                } catch(e){}
+             });
+
+             if(classesToInsert.length === 0) {
+               return finishImport(res);
+             }
+
+             // Insere as cópias
+             let completed = 0;
+             let hasErrors = false;
+             classesToInsert.forEach(params => {
+                insertStmt.run(params, (errInsert) => {
+                   if(errInsert) hasErrors = true;
+                   completed++;
+                   if(completed === classesToInsert.length) {
+                     insertStmt.finalize();
+                     finishImport(res, hasErrors);
+                   }
+                });
+             });
+          });
         }
       );
     });
   });
+
+  function finishImport(responseObj, partialErrors = false) {
+     lastUpdateTimestamp = Date.now();
+     responseObj.json({ success: true, message: partialErrors ? 'Importação concluída com alguns alertas na cópia de turmas.' : 'Importação da configuração base e duplicação da malha de turmas concluída com sucesso!' });
+  }
 });
 
 // ==========================================
@@ -405,7 +429,31 @@ app.get('/api/admin/academic-years', (req, res) => { // Público para o painel d
     if (err) return res.status(500).json({ error: err.message });
     const map = {};
     (rows || []).forEach(r => { map[r.year] = { totalDays: r.totalDays, currentDays: r.currentDays }; });
-    res.json(map);
+    
+    // Busca na tabela de configuração para não perder os anos salvos la
+    db.all("SELECT id FROM config", (err2, confRows) => {
+       if(!err2) {
+         (confRows || []).forEach(cr => {
+            const y = String(cr.id || '').replace('config_', '');
+            if(!map[y] && y) map[y] = { totalDays: '', currentDays: '' };
+         });
+       }
+       
+       // E no curriculum_data (Turmas) para garantir
+       db.all("SELECT payload FROM curriculum_data WHERE dataType = 'class'", (err3, classRows) => {
+          if(!err3) {
+             (classRows || []).forEach(cRow => {
+                try {
+                   const parsed = JSON.parse(cRow.payload);
+                   if(parsed.academicYear && !map[parsed.academicYear]) {
+                      map[parsed.academicYear] = { totalDays: '', currentDays: '' };
+                   }
+                } catch(e){}
+             });
+          }
+          res.json(map);
+       });
+    });
   });
 });
 
@@ -454,6 +502,117 @@ app.put('/api/admin/curriculum/:type', verifyToken, (req, res) => {
 app.delete('/api/admin/curriculum/:type/:id', verifyToken, (req, res) => {
   const { type, id } = req.params;
   db.run("DELETE FROM curriculum_data WHERE id = ? AND dataType = ?", [id, type], (err) => {
+    if (err) return res.status(500).json({ error: err.message });
+    lastUpdateTimestamp = Date.now();
+    res.json({ success: true });
+  });
+});
+
+// ==========================================
+// ROTAS DE USUÁRIOS/SERVIDORES (Antigo Teachers)
+// ==========================================
+app.get('/api/admin/teachers', (req, res) => {
+  db.all("SELECT siape, nome_exibicao, nome_completo, email, status, perfis, atua_como_docente, exigir_troca_senha FROM users ORDER BY nome_exibicao ASC", (err, rows) => {
+    if (err) return res.status(500).json({ error: err.message });
+    // Parse perfis string back to array for frontend
+    const mapped = (rows || []).map(r => {
+      let p = [];
+      try { p = JSON.parse(r.perfis || '[]'); } catch(e){}
+      return { ...r, perfis: p };
+    });
+    res.json(mapped);
+  });
+});
+
+app.put('/api/admin/teachers', verifyToken, async (req, res) => {
+  let { siape, nome_exibicao, nome_completo, email, senha, status, perfis, atua_como_docente } = req.body;
+  if (!siape || !nome_completo) return res.status(400).json({ error: "SIAPE e Nome Mínimos requeridos." });
+
+  const perfisStr = JSON.stringify(perfis || []);
+  const atuaDoc = atua_como_docente ? 1 : 0;
+
+  db.get("SELECT senha_hash, exigir_troca_senha FROM users WHERE siape = ?", [siape], async (err, row) => {
+    if (err) return res.status(500).json({ error: err.message });
+    
+    let finalHash = row ? row.senha_hash : null;
+    
+    if (!finalHash && !senha) senha = "prof@2026";
+    if (senha) finalHash = await bcrypt.hash(senha, 10);
+    
+    // Se a senha foi alterada via admin, força a flag de exigir_troca_senha para 1. Se não, mantém a atual.
+    const exigirTroca = senha ? 1 : (row ? row.exigir_troca_senha : 1);
+
+    db.run(
+      `INSERT OR REPLACE INTO users (siape, nome_exibicao, nome_completo, email, senha_hash, status, perfis, atua_como_docente, exigir_troca_senha) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [siape, nome_exibicao || '', nome_completo, email || null, finalHash, status || 'ativo', perfisStr, atuaDoc, exigirTroca],
+      (err2) => {
+        if (err2) return res.status(500).json({ error: err2.message });
+        lastUpdateTimestamp = Date.now();
+        res.json({ success: true, siape });
+      }
+    );
+  });
+});
+
+app.post('/api/admin/teachers/batch', verifyToken, async (req, res) => {
+  const users = req.body;
+  if (!Array.isArray(users)) return res.status(400).json({ error: "O corpo da requisição deve ser um array." });
+
+  db.serialize(() => {
+    db.run("BEGIN TRANSACTION");
+
+    const stmtMerge = db.prepare("INSERT OR REPLACE INTO users (siape, nome_exibicao, nome_completo, email, senha_hash, status, perfis, atua_como_docente, exigir_troca_senha) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)");
+    const stmtUpdateSiape = db.prepare("UPDATE users SET siape = ?, nome_exibicao = ?, nome_completo = ?, email = ?, status = ?, perfis = ?, atua_como_docente = ? WHERE siape = ?");
+    const stmtCheck = db.prepare("SELECT senha_hash, exigir_troca_senha FROM users WHERE siape = ?");
+
+    const processItem = async (item) => {
+      const { siape, oldSiape, nome_exibicao, nome_completo, email, status, perfis, atua_como_docente, exigir_troca_senha } = item;
+      if (!siape || !nome_completo) return; 
+
+      const targetSiape = oldSiape && oldSiape.trim() !== '' ? oldSiape : siape;
+      const perfisStr = JSON.stringify(perfis || []);
+      const atuaDoc = atua_como_docente ? 1 : 0;
+
+      return new Promise((resolve, reject) => {
+        stmtCheck.get([targetSiape], async (err, row) => {
+          if (err) return reject(err);
+          let exigirTroca = exigir_troca_senha !== undefined ? exigir_troca_senha : (row ? row.exigir_troca_senha : 1);
+          if (!finalHash) {
+            finalHash = await bcrypt.hash(`prof@${new Date().getFullYear()}`, 10);
+            exigirTroca = 1;
+          }
+
+          if (oldSiape && oldSiape !== siape) {
+             stmtUpdateSiape.run([siape, nome_exibicao || '', nome_completo, email || null, status || 'ativo', perfisStr, atuaDoc, oldSiape], (err) => {
+                if (err) return reject(err);
+                resolve();
+             });
+          } else {
+             stmtMerge.run([siape, nome_exibicao || '', nome_completo, email || null, finalHash, status || 'ativo', perfisStr, atuaDoc, exigirTroca], (err) => {
+                if (err) return reject(err);
+                resolve();
+             });
+          }
+        });
+      });
+    };
+
+    (async () => {
+      try {
+        for (const item of users) await processItem(item);
+        db.run("COMMIT");
+        lastUpdateTimestamp = Date.now();
+        res.json({ success: true, count: users.length });
+      } catch (err) {
+        db.run("ROLLBACK");
+        res.status(500).json({ error: err.message });
+      }
+    })();
+  });
+});
+
+app.delete('/api/admin/teachers/:siape', verifyToken, (req, res) => {
+  db.run("DELETE FROM users WHERE siape = ?", [req.params.siape], (err) => {
     if (err) return res.status(500).json({ error: err.message });
     lastUpdateTimestamp = Date.now();
     res.json({ success: true });

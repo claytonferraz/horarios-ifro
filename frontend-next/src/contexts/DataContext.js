@@ -11,6 +11,7 @@ export function DataProvider({ children }) {
   const [activeDays, setActiveDays] = useState(null);
   const [classTimes, setClassTimes] = useState(null);
   const [bimesters, setBimesters] = useState(null);
+  const [intervals, setIntervals] = useState([]);
   const [activeDefaultScheduleId, setActiveDefaultScheduleId] = useState(null);
   const [academicWeeks, setAcademicWeeks] = useState([]);
   const [selectedConfigYear, setSelectedConfigYear] = useState(new Date().getFullYear().toString());
@@ -43,6 +44,7 @@ export function DataProvider({ children }) {
         setActiveDays(config.activeDays !== undefined ? config.activeDays : null);
         setClassTimes(config.classTimes !== undefined ? config.classTimes : null);
         setBimesters(config.bimesters !== undefined ? config.bimesters : null);
+        setIntervals(config.intervals !== undefined ? config.intervals : []);
         setActiveDefaultScheduleId(config.activeDefaultScheduleId !== undefined ? config.activeDefaultScheduleId : null);
       }
       
@@ -88,6 +90,8 @@ export function DataProvider({ children }) {
     setActiveDays,
     classTimes,
     setClassTimes,
+    intervals,
+    setIntervals,
     bimesters,
     setBimesters,
     activeDefaultScheduleId,

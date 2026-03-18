@@ -29,6 +29,7 @@ export function ScheduleConfigPanel({ isDarkMode }) {
     activeDays, setActiveDays,
     classTimes, setClassTimes,
     bimesters, setBimesters,
+    intervals, setIntervals,
     activeDefaultScheduleId, setActiveDefaultScheduleId,
     rawData, refreshData, setErrorMsg,
     selectedConfigYear, setSelectedConfigYear,
@@ -41,6 +42,7 @@ export function ScheduleConfigPanel({ isDarkMode }) {
   const [localDays, setLocalDays] = useState([]);
   const [localTimes, setLocalTimes] = useState([]);
   const [localBimesters, setLocalBimesters] = useState([]);
+  const [localIntervals, setLocalIntervals] = useState([]);
   const [localDefaultId, setLocalDefaultId] = useState('');
 
   // Sync state whenever the contextual data from useData changes (trigger by year switch)
@@ -48,8 +50,9 @@ export function ScheduleConfigPanel({ isDarkMode }) {
     setLocalDays(activeDays || ['Segunda-feira', 'Terça-feira', 'Quarta-feira', 'Quinta-feira', 'Sexta-feira']);
     setLocalTimes(classTimes || []);
     setLocalBimesters(bimesters || []);
+    setLocalIntervals(intervals || []);
     setLocalDefaultId(activeDefaultScheduleId || '');
-  }, [activeDays, classTimes, bimesters, activeDefaultScheduleId, selectedConfigYear]);
+  }, [activeDays, classTimes, bimesters, intervals, activeDefaultScheduleId, selectedConfigYear]);
 
   const [savingSection, setSavingSection] = useState(null);
   const [savedSection, setSavedSection] = useState(null);
@@ -88,30 +91,40 @@ export function ScheduleConfigPanel({ isDarkMode }) {
   const saveDays = async () => {
     setSavingSection('days');
     try {
-      await apiClient.updateConfig({ year: selectedConfigYear, activeDays: localDays, classTimes, bimesters, activeDefaultScheduleId });
+      await apiClient.updateConfig({ year: selectedConfigYear, activeDays: localDays, classTimes, bimesters, intervals, activeDefaultScheduleId });
       setActiveDays(localDays);
       flashSaved('days');
     } catch (e) { setErrorMsg(`Falha: ${e.message}`); }
     finally { setSavingSection(null); }
   };
 
-  // ── Times ─────────────────────────────────────────────────────────────────
+  // ── Times & Intervals ───────────────────────────────────────────────────────
   const addTime = () =>
     setLocalTimes(prev => [...prev, { id: Date.now().toString(), timeStr: '00:00 - 00:00', shift: 'Matutino' }]);
-
+    
   const updateTime = (id, field, value) =>
     setLocalTimes(prev => prev.map(t => t.id === id ? { ...t, [field]: value } : t));
 
   const removeTime = (id) =>
     setLocalTimes(prev => prev.filter(t => t.id !== id));
 
-  const saveTimes = async () => {
+  const addInterval = () =>
+    setLocalIntervals(prev => [...prev, { id: 'i_' + Date.now(), shift: 'Matutino', position: 3, duration: 20, description: 'Intervalo/Lanche' }]);
+
+  const updateInterval = (id, field, value) =>
+    setLocalIntervals(prev => prev.map(i => i.id === id ? { ...i, [field]: value } : i));
+
+  const removeInterval = (id) =>
+    setLocalIntervals(prev => prev.filter(i => i.id !== id));
+
+  const saveTimesAndIntervals = async () => {
     setSavingSection('times');
     const sorted = sortTimes(localTimes);
     try {
-      await apiClient.updateConfig({ year: selectedConfigYear, activeDays, classTimes: sorted, bimesters, activeDefaultScheduleId });
+      await apiClient.updateConfig({ year: selectedConfigYear, activeDays, classTimes: sorted, bimesters, intervals: localIntervals, activeDefaultScheduleId });
       setLocalTimes(sorted);
       setClassTimes(sorted);
+      setIntervals(localIntervals);
       flashSaved('times');
     } catch (e) { setErrorMsg(`Falha: ${e.message}`); }
     finally { setSavingSection(null); }
@@ -132,7 +145,7 @@ export function ScheduleConfigPanel({ isDarkMode }) {
   const saveBimesters = async () => {
     setSavingSection('bimesters');
     try {
-      await apiClient.updateConfig({ year: selectedConfigYear, activeDays, classTimes, bimesters: localBimesters, activeDefaultScheduleId });
+      await apiClient.updateConfig({ year: selectedConfigYear, activeDays, classTimes, bimesters: localBimesters, intervals, activeDefaultScheduleId });
       setBimesters(localBimesters);
       flashSaved('bimesters');
     } catch (e) { setErrorMsg(`Falha: ${e.message}`); }
@@ -300,49 +313,104 @@ export function ScheduleConfigPanel({ isDarkMode }) {
               </div>
             </div>
 
-            <div className="space-y-3 mb-8">
-              {localTimes.map((item, i) => (
-                <div key={item.id} className={`flex items-center gap-3 p-3 rounded-xl border ${isDarkMode ? 'bg-slate-800/50 border-slate-700' : 'bg-slate-50 border-slate-200'}`}>
-                  <div className="w-8 h-8 rounded-lg flex items-center justify-center bg-black/5 dark:bg-black/20 text-xs font-black opacity-60">{i + 1}</div>
-                  <input
-                    type="text"
-                    value={item.timeStr || ''}
-                    onChange={e => updateTime(item.id, 'timeStr', e.target.value)}
-                    placeholder="07:30 - 08:20"
-                    className={`flex-1 text-sm font-bold bg-transparent border-none focus:outline-none focus:ring-1 focus:ring-blue-500 rounded px-2 py-1 ${isDarkMode ? 'text-slate-200 placeholder-slate-600' : 'text-slate-700 placeholder-slate-400'}`}
-                  />
-                  <select
-                    value={item.shift}
-                    onChange={e => updateTime(item.id, 'shift', e.target.value)}
-                    className={`text-sm font-bold rounded-lg border-none focus:ring-1 focus:ring-blue-500 px-3 py-1.5 ${isDarkMode ? 'bg-slate-900 text-slate-300' : 'bg-white text-slate-700 shadow-sm'}`}
-                  >
-                    {SHIFTS.map(s => <option key={s} value={s}>{s}</option>)}
-                  </select>
-                  <button onClick={() => removeTime(item.id)} className="p-2 text-red-500 hover:bg-red-500/10 rounded-lg transition-colors"><Trash2 size={16}/></button>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-8">
+              <div className="space-y-3">
+                <h4 className="text-[10px] font-black uppercase tracking-widest opacity-60 flex items-center gap-2"><Clock size={12}/> Slots de Aula</h4>
+                {localTimes.map((item, i) => (
+                  <div key={item.id} className={`flex flex-wrap items-center gap-2 p-3 rounded-xl border ${isDarkMode ? 'bg-slate-800/50 border-slate-700' : 'bg-slate-50 border-slate-200'}`}>
+                    <div className="w-8 h-8 rounded-lg flex items-center justify-center bg-black/5 dark:bg-black/20 text-xs font-black opacity-60 shrink-0">{i + 1}</div>
+                    <input
+                      type="text"
+                      value={item.timeStr || ''}
+                      onChange={e => updateTime(item.id, 'timeStr', e.target.value)}
+                      placeholder="07:30 - 08:20"
+                      className={`w-32 text-sm font-bold bg-transparent border-none focus:outline-none focus:ring-1 focus:ring-blue-500 rounded px-2 py-1 ${isDarkMode ? 'text-slate-200 placeholder-slate-600' : 'text-slate-700 placeholder-slate-400'}`}
+                    />
+                    <select
+                      value={item.shift}
+                      onChange={e => updateTime(item.id, 'shift', e.target.value)}
+                      className={`text-[10px] font-bold rounded-lg border-none focus:ring-1 focus:ring-blue-500 px-2 py-1.5 ${isDarkMode ? 'bg-slate-900 text-slate-300' : 'bg-white text-slate-700 shadow-sm'}`}
+                    >
+                      {SHIFTS.map(s => <option key={s} value={s}>{s}</option>)}
+                    </select>
+                    <button onClick={() => removeTime(item.id)} className="ml-auto p-2 text-red-500 hover:bg-red-500/10 rounded-lg transition-colors"><Trash2 size={16}/></button>
+                  </div>
+                ))}
+                {localTimes.length === 0 && <p className="text-sm opacity-50 italic py-4 text-center">Nenhum horário cadastrado. Adicione tempos de aula para começar.</p>}
+              </div>
+
+              <div className="space-y-3">
+                <div className="flex justify-between items-center">
+                  <h4 className="text-[10px] font-black uppercase tracking-widest opacity-60 flex items-center gap-2"><Clock size={12}/> Intervalos</h4>
+                  <button onClick={addInterval} className={`px-3 py-1.5 rounded-lg text-[10px] font-bold flex items-center gap-1.5 transition-colors ${isDarkMode ? 'bg-amber-900/30 text-amber-500 hover:bg-amber-900/50' : 'bg-amber-100 text-amber-700 hover:bg-amber-200'}`}>
+                    <Plus size={12}/> Add Intervalo
+                  </button>
                 </div>
-              ))}
-              {localTimes.length === 0 && <p className="text-sm opacity-50 italic py-4 text-center">Nenhum horário cadastrado. Adicione tempos de aula para começar.</p>}
+                {localIntervals.map((inv, i) => (
+                  <div key={inv.id} className={`flex flex-col gap-2 p-3 rounded-xl border border-dashed ${isDarkMode ? 'bg-amber-900/10 border-amber-800/50' : 'bg-amber-50 border-amber-200'}`}>
+                    <div className="flex justify-between items-center text-xs font-black">
+                       <input type="text" value={inv.description} onChange={e => updateInterval(inv.id, 'description', e.target.value)} className="bg-transparent border-b font-bold w-1/2 focus:outline-none text-amber-600 dark:text-amber-500" placeholder="Ex: Recreio" />
+                       <button onClick={() => removeInterval(inv.id)} className="text-red-500 hover:opacity-70"><Trash2 size={14}/></button>
+                    </div>
+                    <div className="flex gap-2">
+                      <select value={inv.shift} onChange={e => updateInterval(inv.id, 'shift', e.target.value)} className={`text-[10px] font-bold rounded-md px-1 py-1 flex-1 ${isDarkMode ? 'bg-slate-900 text-white' : 'bg-white text-slate-800'}`}>
+                        {SHIFTS.map(s => <option key={s} value={s}>{s}</option>)}
+                      </select>
+                    </div>
+                    <div className="flex items-center gap-2 text-[10px]">
+                      <span className="font-bold opacity-70">Após a aula: </span>
+                      <input type="number" min="1" max="10" value={inv.position} onChange={e => updateInterval(inv.id, 'position', e.target.value)} className={`w-12 text-center rounded px-1 py-1 font-black ${isDarkMode?'bg-slate-900 text-slate-200':'bg-white border'}`} />
+                      <span className="font-bold border-l pl-2 opacity-70">Duração (min): </span>
+                      <input type="number" min="5" max="120" value={inv.duration} onChange={e => updateInterval(inv.id, 'duration', e.target.value)} className={`w-14 text-center rounded px-1 py-1 font-black text-amber-600 ${isDarkMode?'bg-slate-900':'bg-white border'}`} />
+                    </div>
+                  </div>
+                ))}
+                {localIntervals.length === 0 && <p className="text-[10px] font-bold opacity-50 italic py-2 text-center">Nenhum intervalo cadastrado.</p>}
+              </div>
+
             </div>
 
-            {Object.keys(groupedTimes).length > 0 && (
-              <div className={`p-5 rounded-2xl border ${isDarkMode ? 'bg-slate-800/30 border-slate-700' : 'bg-slate-50 border-slate-200'}`}>
-                <p className="font-black uppercase tracking-widest opacity-50 text-xs mb-4">Preview da Estrutura</p>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                  {Object.entries(groupedTimes).map(([shift, items]) => (
-                    <div key={shift}>
-                      <p className={`font-black text-[10px] uppercase tracking-widest mb-2 flex items-center gap-1.5 ${shift === 'Matutino' ? 'text-amber-500' : shift === 'Vespertino' ? 'text-blue-500' : 'text-violet-500'}`}>
-                        <span className="w-1.5 h-1.5 rounded-full bg-current"></span> {shift}
-                      </p>
-                      <div className="flex flex-col gap-1.5">
-                        {items.map(t => (
-                          <span key={t.id} className={`px-3 py-1.5 rounded-lg text-xs font-bold text-center ${isDarkMode ? 'bg-slate-800 text-slate-300' : 'bg-white border border-slate-200 text-slate-700 shadow-sm'}`}>{t.timeStr}</span>
-                        ))}
-                      </div>
-                    </div>
-                  ))}
-                </div>
+            <div className={`p-5 rounded-2xl border ${isDarkMode ? 'bg-slate-800/30 border-slate-700' : 'bg-slate-50 border-slate-200'}`}>
+              <div className="flex items-center justify-between mb-4">
+                <p className="font-black uppercase tracking-widest opacity-60 text-xs">Ações Práticas (Recalcular Horários em Cadeia)</p>
               </div>
-            )}
+              <p className="text-xs mb-4 opacity-75 font-medium">Ao clicar em um turno, o sistema usará a hora/minuto da <span className="font-bold text-amber-500">1ª aula</span> atual, e recalculará as demais com base em aulas de 50 minutos + a duração dos intervalos configurados.</p>
+              <div className="flex gap-3">
+                 {SHIFTS.map(shift => (
+                   <button 
+                     key={shift}
+                     onClick={() => {
+                        let timesForShift = localTimes.filter(t => t.shift === shift);
+                        if(timesForShift.length === 0) return alert(`Adicione pelo menos 1 aula no turno ${shift}!`);
+                        timesForShift.sort((a,b) => a.timeStr.localeCompare(b.timeStr));
+                        const firstStr = timesForShift[0].timeStr.split('-')[0].trim();
+                        let [hh, mm] = firstStr.split(':').map(Number);
+                        if(isNaN(hh) || isNaN(mm)) return alert(`O horário da 1ª aula do turno ${shift} "${firstStr}" não está num formato válido (HH:MM).`);
+                        let minutesCounter = hh * 60 + mm;
+                        const intervalsForShift = localIntervals.filter(i => i.shift === shift);
+                        const newTimes = [];
+                        for(let i = 0; i < timesForShift.length; i++) {
+                           const startHH = Math.floor(minutesCounter / 60).toString().padStart(2, '0');
+                           const startMM = (minutesCounter % 60).toString().padStart(2, '0');
+                           minutesCounter += 50; 
+                           const endHH = Math.floor(minutesCounter / 60).toString().padStart(2, '0');
+                           const endMM = (minutesCounter % 60).toString().padStart(2, '0');
+                           newTimes.push({ ...timesForShift[i], timeStr: `${startHH}:${startMM} - ${endHH}:${endMM}` });
+                           const interval = intervalsForShift.find(int => Number(int.position) === i + 1);
+                           if (interval) minutesCounter += Number(interval.duration);
+                        }
+                        setLocalTimes(prev => prev.map(pt => {
+                            const updated = newTimes.find(nt => nt.id === pt.id);
+                            return updated ? updated : pt;
+                        }));
+                     }}
+                     className={`flex-1 py-3 rounded-lg text-xs font-black uppercase tracking-widest border transition-all hover:scale-[1.02] ${shift === 'Matutino' ? 'text-amber-500 border-amber-500/30 hover:bg-amber-500/10' : shift === 'Vespertino' ? 'text-blue-500 border-blue-500/30 hover:bg-blue-500/10' : 'text-violet-500 border-violet-500/30 hover:bg-violet-500/10'}`}
+                   >
+                     Recalcular {shift}
+                   </button>
+                 ))}
+              </div>
+            </div>
           </div>
         )}
 

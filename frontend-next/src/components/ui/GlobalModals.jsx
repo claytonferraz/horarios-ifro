@@ -1,6 +1,5 @@
 import React from 'react';
 import { AuthModal } from './modals/AuthModal';
-import { SecurityModal } from './modals/SecurityModal';
 import { ImportUrlModal } from './modals/ImportUrlModal';
 import { PendingUploadModal } from './modals/PendingUploadModal';
 import { ConflictModal } from './modals/ConflictModal';
@@ -12,7 +11,6 @@ export function GlobalModals({
   
   // Auth & Security
   authModal, closeAuthModal, handleAuthSubmit, usernameInput, setUsernameInput, passwordInput, setPasswordInput, errorMsg,
-  pwdModal, setPwdModal, securityTab, setSecurityTab, handleSecuritySubmit, newUserForm, setNewUserForm,
   
   // Imports & Core Admin Flags
   importUrlModal, setImportUrlModal, processUrlUpload, uploadType, isLoading,
@@ -41,17 +39,6 @@ export function GlobalModals({
         academicWeeks={academicWeeks}
         finalizeUpload={finalizeUpload}
         onGoToConfig={onGoToConfig}
-      />
-
-      <SecurityModal
-        pwdModal={pwdModal}
-        setPwdModal={setPwdModal}
-        securityTab={securityTab}
-        setSecurityTab={setSecurityTab}
-        isDarkMode={isDarkMode}
-        handleSecuritySubmit={handleSecuritySubmit}
-        newUserForm={newUserForm}
-        setNewUserForm={setNewUserForm}
       />
 
       <ConflictModal

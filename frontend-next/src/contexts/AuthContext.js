@@ -67,13 +67,9 @@ export function AuthProvider({ children }) {
     window.location.href = '/';
   };
 
-  const changePassword = async (currentPassword, newPassword) => {
-    return apiClient.changePassword(currentPassword, newPassword);
-  };
-
   return (
     <AuthContext.Provider
-      value={{ isUnlocked, userRole, isLoadingAuth, login, logout, changePassword, checkInitialAuth }}
+      value={{ isUnlocked, userRole, isLoadingAuth, login, logout, checkInitialAuth }}
     >
       {children}
     </AuthContext.Provider>

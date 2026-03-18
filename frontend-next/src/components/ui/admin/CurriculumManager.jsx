@@ -1,11 +1,13 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { BookOpen, Users, Plus, Trash2, Edit2, Save, X, Settings2, CalendarDays, CheckCircle } from 'lucide-react';
+import { BookOpen, Users, Plus, Trash2, Edit2, Save, X, Settings2, CalendarDays, CheckCircle, User as UserIcon } from 'lucide-react';
 import { apiClient } from '@/lib/apiClient';
+import { UsersManager } from './UsersManager';
 
 export function CurriculumManager({ isDarkMode, academicYearsMeta, groupedDisciplinesBySerie = {} }) {
   const [activeTab, setActiveTab] = useState('matrices');
   const [matrices, setMatrices] = useState([]);
   const [classes, setClasses] = useState([]);
+  const [globalTeachers, setGlobalTeachers] = useState([]);
   const [loading, setLoading] = useState(true);
 
   // Load initial data
@@ -13,12 +15,14 @@ export function CurriculumManager({ isDarkMode, academicYearsMeta, groupedDiscip
     async function load() {
       setLoading(true);
       try {
-        const [loadedMatrices, loadedClasses] = await Promise.all([
+        const [loadedMatrices, loadedClasses, dbTeachers] = await Promise.all([
           apiClient.fetchCurriculum('matrix'),
-          apiClient.fetchCurriculum('class')
+          apiClient.fetchCurriculum('class'),
+          apiClient.fetchTeachers()
         ]);
         setMatrices(loadedMatrices || []);
         setClasses(loadedClasses || []);
+        setGlobalTeachers(dbTeachers || []);
       } catch (e) {
         console.error("Erro ao carregar currículos:", e);
       }
@@ -35,7 +39,7 @@ export function CurriculumManager({ isDarkMode, academicYearsMeta, groupedDiscip
       <div className={`text-white px-6 py-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 border-b ${isDarkMode ? 'bg-slate-950 border-slate-800' : 'bg-slate-900 border-slate-800'}`}>
         <div className="flex items-center gap-3">
           <BookOpen size={18} className="text-indigo-400" />
-          <h2 className="font-black text-sm uppercase tracking-[0.2em]">Gestão Curricular (Matrizes e Turmas)</h2>
+          <h2 className="font-black text-sm uppercase tracking-[0.2em]">Gestão Administrativa</h2>
         </div>
       </div>
 
@@ -58,7 +62,17 @@ export function CurriculumManager({ isDarkMode, academicYearsMeta, groupedDiscip
               : (isDarkMode ? 'bg-slate-900/50 text-slate-400 hover:text-slate-200' : 'bg-slate-50 text-slate-500 hover:text-slate-800')
           }`}
         >
-          <div className="flex items-center justify-center gap-2"><Users size={14} /> 2. Turmas e Professores</div>
+          <div className="flex items-center justify-center gap-2"><Users size={14} /> 2. Cadastro de Turma</div>
+        </button>
+        <button
+          onClick={() => setActiveTab('teachers')}
+          className={`flex-1 py-3 px-4 font-black text-xs uppercase tracking-widest transition-colors whitespace-nowrap ${
+            activeTab === 'teachers'
+              ? (isDarkMode ? 'bg-slate-800 text-green-400 border-b-2 border-green-500' : 'bg-white text-green-600 border-b-2 border-green-600')
+              : (isDarkMode ? 'bg-slate-900/50 text-slate-400 hover:text-slate-200' : 'bg-slate-50 text-slate-500 hover:text-slate-800')
+          }`}
+        >
+          <div className="flex items-center justify-center gap-2"><UserIcon size={14} /> 3. Gestão de Servidores</div>
         </button>
       </div>
 
@@ -67,8 +81,9 @@ export function CurriculumManager({ isDarkMode, academicYearsMeta, groupedDiscip
           <div className="text-center p-12 text-blue-500 font-bold animate-pulse">Carregando dados estruturais...</div>
         ) : (
           <>
-            {activeTab === 'matrices' && <MatricesTab isDarkMode={isDarkMode} matrices={matrices} setMatrices={setMatrices} generateId={generateId} groupedDisciplinesBySerie={groupedDisciplinesBySerie} />}
-            {activeTab === 'classes' && <ClassesTab isDarkMode={isDarkMode} matrices={matrices} classes={classes} setClasses={setClasses} generateId={generateId} academicYearsMeta={academicYearsMeta} />}
+            {activeTab === 'matrices' && <MatricesTab isDarkMode={isDarkMode} matrices={matrices} setMatrices={setMatrices} generateId={generateId} groupedDisciplinesBySerie={groupedDisciplinesBySerie} academicYearsMeta={academicYearsMeta} />}
+            {activeTab === 'classes' && <ClassesTab isDarkMode={isDarkMode} matrices={matrices} classes={classes} setClasses={setClasses} generateId={generateId} academicYearsMeta={academicYearsMeta} globalTeachers={globalTeachers} />}
+            {activeTab === 'teachers' && <UsersManager isDarkMode={isDarkMode} />}
           </>
         )}
       </div>
@@ -79,19 +94,37 @@ export function CurriculumManager({ isDarkMode, academicYearsMeta, groupedDiscip
 // ==========================================
 // 1. ABA DE MATRIZES
 // ==========================================
-function MatricesTab({ isDarkMode, matrices, setMatrices, generateId, groupedDisciplinesBySerie }) {
+function MatricesTab({ isDarkMode, matrices, setMatrices, generateId, groupedDisciplinesBySerie, academicYearsMeta }) {
   const [editingId, setEditingId] = useState(null);
   const [localFormData, setLocalFormData] = useState(null);
+  const [filterYear, setFilterYear] = useState('');
+  
+  const activeYearsList = Object.keys(academicYearsMeta || {}).sort((a,b) => Number(b) - Number(a));
+
+  useEffect(() => {
+    if(!filterYear && activeYearsList.length > 0) {
+       const currentY = new Date().getFullYear().toString();
+       setFilterYear(activeYearsList.includes(currentY) ? currentY : activeYearsList[0]);
+    }
+  }, [activeYearsList, filterYear]);
 
   const handleStartEdit = (matrix = null) => {
     if (matrix) {
       setEditingId(matrix.id);
       const copy = JSON.parse(JSON.stringify(matrix)); // deep copy
       if (!copy.series) copy.series = [];
+      if (!copy.academicYear) copy.academicYear = filterYear || new Date().getFullYear().toString();
       setLocalFormData(copy);
     } else {
       setEditingId('new');
-      setLocalFormData({ id: generateId(), name: '', course: '', courseAcronym: '', series: [] });
+      setLocalFormData({ 
+        id: generateId(), 
+        name: '', 
+        course: '', 
+        courseAcronym: '', 
+        academicYear: filterYear || new Date().getFullYear().toString(),
+        series: [] 
+      });
     }
   };
 
@@ -123,7 +156,25 @@ function MatricesTab({ isDarkMode, matrices, setMatrices, generateId, groupedDis
   const addSerie = () => {
     setLocalFormData(prev => ({ 
       ...prev, 
-      series: [...(prev.series || []), { id: generateId(), name: 'Nova Série', disciplines: [] }] 
+      series: [{ id: generateId(), name: 'Nova Série', disciplines: [] }, ...(prev.series || [])] 
+    }));
+  };
+  
+  const copyDisciplines = (targetSerieId, sourceSerieId) => {
+    if (!sourceSerieId) return;
+    const allSeries = matrices.flatMap(m => m.series || []).concat(localFormData.series || []);
+    const sourceSerie = allSeries.find(s => s.id === sourceSerieId);
+    if (!sourceSerie || !sourceSerie.disciplines) return;
+    
+    if (!window.confirm(`Deseja copiar ${sourceSerie.disciplines.length} disciplinas para esta série? Disciplinas atuais serão mantidas.`)) return;
+
+    const clonedDisciplines = sourceSerie.disciplines.map(d => ({ ...d, id: generateId() }));
+    setLocalFormData(prev => ({
+      ...prev,
+      series: prev.series.map(s => {
+        if (s.id !== targetSerieId) return s;
+        return { ...s, disciplines: [...s.disciplines, ...clonedDisciplines] };
+      })
     }));
   };
   
@@ -146,7 +197,7 @@ function MatricesTab({ isDarkMode, matrices, setMatrices, generateId, groupedDis
       ...prev,
       series: prev.series.map(s => {
         if (s.id !== sId) return s;
-        return { ...s, disciplines: [...s.disciplines, { id: generateId(), name: '', code: '', hours: 0, color: 'bg-indigo-500' }] };
+        return { ...s, disciplines: [...s.disciplines, { id: generateId(), name: '', code: '', hours: 0, aulas_semanais: 0, color: 'bg-indigo-500' }] };
       })
     }));
   };
@@ -163,7 +214,12 @@ function MatricesTab({ isDarkMode, matrices, setMatrices, generateId, groupedDis
         if (s.id !== sId) return s;
         return {
           ...s,
-          disciplines: s.disciplines.map(d => d.id === dId ? { ...d, [field]: value } : d)
+          disciplines: s.disciplines.map(d => {
+            if (d.id !== dId) return d;
+            const updated = { ...d, [field]: value };
+            if (field === 'hours') updated.aulas_semanais = Math.floor(value / 40);
+            return updated;
+          })
         };
       })
     }));
@@ -190,7 +246,14 @@ function MatricesTab({ isDarkMode, matrices, setMatrices, generateId, groupedDis
           </div>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+          <div>
+            <label className="block text-[10px] font-black uppercase tracking-widest opacity-60 mb-2">Ano Letivo</label>
+            <select value={localFormData.academicYear} onChange={e => setLocalFormData({...localFormData, academicYear: e.target.value})} className={`w-full px-3 py-2.5 rounded-xl border focus:ring-2 focus:ring-indigo-500 font-bold transition-all ${isDarkMode ? 'bg-slate-900 border-slate-700' : 'bg-slate-50 border-slate-200'}`}>
+               {activeYearsList.length === 0 && <option value={localFormData.academicYear}>{localFormData.academicYear}</option>}
+               {activeYearsList.map(y => <option key={y} value={y}>{y}</option>)}
+            </select>
+          </div>
           <div>
             <label className="block text-[10px] font-black uppercase tracking-widest opacity-60 mb-2">Nome da Matriz</label>
             <input type="text" value={localFormData.name || ''} onChange={e => setLocalFormData({...localFormData, name: e.target.value})} placeholder="Ex: Informática 2024" className={`w-full px-3 py-2.5 rounded-xl border focus:ring-2 focus:ring-indigo-500 font-bold transition-all ${isDarkMode ? 'bg-slate-900 border-slate-700' : 'bg-slate-50 border-slate-200'}`} />
@@ -225,8 +288,7 @@ function MatricesTab({ isDarkMode, matrices, setMatrices, generateId, groupedDis
                     />
                   </div>
                   <div className="flex gap-2">
-                    <button type="button" onClick={() => addDiscipline(serie.id)} className={`px-2 py-1 rounded text-[9px] font-black uppercase tracking-widest flex items-center gap-1 transition-all ${isDarkMode ? 'bg-emerald-900/50 text-emerald-400 hover:bg-emerald-800/80' : 'bg-emerald-100 text-emerald-700 hover:bg-emerald-200'}`}><Plus size={12}/> Disciplina</button>
-                    <button type="button" onClick={() => removeSerie(serie.id)} className={`px-2 py-1 rounded text-[9px] font-black uppercase tracking-widest flex items-center gap-1 transition-all ${isDarkMode ? 'bg-rose-900/30 text-rose-400 hover:bg-rose-800/50' : 'bg-rose-100 text-rose-700 hover:bg-rose-200'}`}><Trash2 size={12}/></button>
+                    <button type="button" onClick={() => removeSerie(serie.id)} className={`px-2 py-1 rounded text-[9px] font-black uppercase tracking-widest flex items-center gap-1 transition-all ${isDarkMode ? 'bg-rose-900/30 text-rose-400 hover:bg-rose-800/50' : 'bg-rose-100 text-rose-700 hover:bg-rose-200'}`}><Trash2 size={12}/> Excluir Série</button>
                   </div>
                 </div>
 
@@ -242,6 +304,7 @@ function MatricesTab({ isDarkMode, matrices, setMatrices, generateId, groupedDis
                         <tr className="uppercase tracking-widest opacity-60 font-black">
                           <th className="pb-2">Nome</th>
                           <th className="pb-2 w-24">C. Horária</th>
+                          <th className="pb-2 w-24">Aulas Sem.</th>
                           <th className="pb-2 w-32">Cód. (Opcional)</th>
                           <th className="pb-2 w-12 text-right">Ações</th>
                         </tr>
@@ -256,7 +319,10 @@ function MatricesTab({ isDarkMode, matrices, setMatrices, generateId, groupedDis
                               <input type="number" value={disc.hours} onChange={e => updateDiscipline(serie.id, disc.id, 'hours', Number(e.target.value))} className={`w-full p-1.5 rounded-md border font-bold text-center ${isDarkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-300'}`} />
                             </td>
                             <td className="py-2 px-2">
-                              <input type="text" value={disc.code} onChange={e => updateDiscipline(serie.id, disc.id, 'code', e.target.value)} placeholder="Ex: MAT1" className={`w-full p-1.5 rounded-md border font-bold uppercase text-center ${isDarkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-300'}`} />
+                              <input type="number" value={disc.aulas_semanais !== undefined ? disc.aulas_semanais : Math.floor((disc.hours || 0) / 40)} onChange={e => updateDiscipline(serie.id, disc.id, 'aulas_semanais', Number(e.target.value))} className={`w-full p-1.5 rounded-md border font-bold text-center ${isDarkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-300'}`} />
+                            </td>
+                            <td className="py-2 px-2">
+                              <input type="text" value={disc.code || ''} onChange={e => updateDiscipline(serie.id, disc.id, 'code', e.target.value)} placeholder="Ex: MAT1" className={`w-full p-1.5 rounded-md border font-bold uppercase text-center ${isDarkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-300'}`} />
                             </td>
                             <td className="py-2 pl-2 text-right">
                               <button type="button" onClick={() => removeDiscipline(serie.id, disc.id)} className={`p-1.5 rounded-md transition-colors ${isDarkMode ? 'text-rose-400 hover:bg-rose-900/50' : 'text-rose-600 hover:bg-rose-100'}`}><Trash2 size={14}/></button>
@@ -267,8 +333,26 @@ function MatricesTab({ isDarkMode, matrices, setMatrices, generateId, groupedDis
                     </table>
                   </div>
                 )}
-                <div className="mt-4 flex justify-end border-t border-slate-200 dark:border-slate-800 pt-3">
-                   <button type="button" onClick={handleSaveMatrix} className="px-3 py-1.5 rounded-lg text-[10px] font-black bg-blue-600 text-white hover:bg-blue-700 transition-colors flex items-center gap-1.5 uppercase tracking-widest shadow-sm"><Save size={14} /> Salvar Modificações</button>
+                <div className="mt-4 flex flex-col md:flex-row items-center justify-between border-t border-slate-200 dark:border-slate-800 pt-3 gap-4">
+                   <div className="flex items-center gap-2 w-full md:w-auto">
+                      <button type="button" onClick={() => addDiscipline(serie.id)} className={`px-4 py-2 rounded-lg text-[10px] font-black uppercase tracking-widest flex items-center justify-center gap-1 transition-all w-full md:w-auto ${isDarkMode ? 'bg-emerald-900/50 text-emerald-400 hover:bg-emerald-800/80' : 'bg-emerald-100 text-emerald-700 hover:bg-emerald-200'}`}><Plus size={14}/> Nova Disciplina</button>
+                      <select onChange={(e) => { copyDisciplines(serie.id, e.target.value); e.target.value = ''; }} className={`w-full md:w-48 px-2 py-2 rounded-lg border text-[10px] font-black uppercase tracking-widest bg-transparent cursor-pointer ${isDarkMode ? 'border-slate-700 text-slate-300' : 'border-slate-300 text-slate-600'}`}>
+                         <option value="">Copiar Disciplinas de...</option>
+                         {matrices.map(m => (
+                            <optgroup key={m.id} label={m.name}>
+                               {m.series && m.series.map(s => (
+                                  <option key={s.id} value={s.id}>{s.name}</option>
+                               ))}
+                            </optgroup>
+                         ))}
+                         <optgroup label="Séries Desta Matriz">
+                               {localFormData.series.filter(s => s.id !== serie.id).map(s => (
+                                  <option key={s.id} value={s.id}>{s.name}</option>
+                               ))}
+                         </optgroup>
+                      </select>
+                   </div>
+                   <button type="button" onClick={handleSaveMatrix} className="px-5 py-2 rounded-lg text-[10px] font-black bg-blue-600 text-white hover:bg-blue-700 transition-colors w-full md:w-auto flex items-center justify-center gap-1.5 uppercase tracking-widest shadow-sm"><Save size={14} /> Salvar Modificações</button>
                 </div>
               </div>
             ))}
@@ -279,15 +363,23 @@ function MatricesTab({ isDarkMode, matrices, setMatrices, generateId, groupedDis
   }
 
   // List View
+  const displayedMatrices = matrices.filter(m => m.academicYear === filterYear || (!filterYear && !m.academicYear));
+
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <h3 className="text-xl font-black uppercase tracking-widest opacity-80">Catálogo de Matrizes Curriculares</h3>
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+        <div className="flex items-center gap-3">
+          <h3 className="text-xl font-black uppercase tracking-widest opacity-80">Catálogo de Matrizes Curriculares</h3>
+          <select value={filterYear} onChange={e => setFilterYear(e.target.value)} className={`text-xs font-bold px-3 py-1.5 rounded-lg border focus:outline-none ${isDarkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'}`}>
+            {activeYearsList.length === 0 && <option value="">Sem Anos Cadastrados</option>}
+            {activeYearsList.map(y => <option key={y} value={y}>{y}</option>)}
+          </select>
+        </div>
         <button onClick={() => handleStartEdit()} className={`px-4 py-2 rounded-xl text-xs font-black flex items-center gap-2 uppercase tracking-widest shadow-sm transition-all active:scale-95 ${isDarkMode ? 'bg-indigo-600 hover:bg-indigo-500 text-white' : 'bg-indigo-600 text-white hover:bg-indigo-700'}`}><Plus size={16}/> Criar Matriz</button>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        {matrices.map(matrix => {
+        {displayedMatrices.map(matrix => {
           const totalSeries = matrix.series ? matrix.series.length : 0;
           const totalDisciplines = matrix.series ? matrix.series.reduce((acc, s) => acc + (s.disciplines ? s.disciplines.length : 0), 0) : 0;
 
@@ -307,7 +399,7 @@ function MatricesTab({ isDarkMode, matrices, setMatrices, generateId, groupedDis
             </div>
           );
         })}
-        {matrices.length === 0 && (
+        {displayedMatrices.length === 0 && (
           <div className="col-span-1 lg:col-span-2 text-center p-12 opacity-50 font-black uppercase tracking-widest">
             Sem Matrizes Curriculares Cadastradas
           </div>
@@ -320,7 +412,7 @@ function MatricesTab({ isDarkMode, matrices, setMatrices, generateId, groupedDis
 // ==========================================
 // 2. ABA DE TURMAS
 // ==========================================
-function ClassesTab({ isDarkMode, matrices, classes, setClasses, generateId, academicYearsMeta }) {
+function ClassesTab({ isDarkMode, matrices, classes, setClasses, generateId, academicYearsMeta, globalTeachers = [] }) {
   const [editingId, setEditingId] = useState(null);
   const [localFormData, setLocalFormData] = useState(null);
 
@@ -328,7 +420,10 @@ function ClassesTab({ isDarkMode, matrices, classes, setClasses, generateId, aca
   const activeYearsList = Object.keys(academicYearsMeta || {}).sort((a,b) => Number(b) - Number(a));
 
   useEffect(() => {
-    if(!filterYear && activeYearsList.length > 0) setFilterYear(activeYearsList[0]);
+    if(!filterYear && activeYearsList.length > 0) {
+       const currentY = new Date().getFullYear().toString();
+       setFilterYear(activeYearsList.includes(currentY) ? currentY : activeYearsList[0]);
+    }
   }, [activeYearsList, filterYear]);
 
   const handleStartEdit = (cls = null) => {
@@ -341,7 +436,7 @@ function ClassesTab({ isDarkMode, matrices, classes, setClasses, generateId, aca
         id: generateId(), 
         name: '', 
         room: '',
-        academicYear: filterYear || (activeYearsList[0] || new Date().getFullYear().toString()), 
+        academicYear: new Date().getFullYear().toString(),
         matrixId: '', 
         serieId: '', 
         professorAssignments: {},
@@ -375,6 +470,19 @@ function ClassesTab({ isDarkMode, matrices, classes, setClasses, generateId, aca
     if (!window.confirm("Certeza que deseja excluir esta Turma?")) return;
     const res = await apiClient.deleteCurriculum('class', id);
     if (res.success) setClasses(classes.filter(c => c.id !== id));
+  };
+
+  const handleDuplicateClass = async (cls) => {
+    if (!window.confirm(`Deseja clonar a turma "${cls.name}" com os professores já atribuídos?`)) return;
+    const newCls = {
+      ...cls,
+      id: generateId(),
+      name: cls.name + " (Cópia)"
+    };
+    const saved = await apiClient.saveCurriculum('class', newCls);
+    if (saved.success) {
+      setClasses([...classes, newCls]);
+    }
   };
 
   const handleProfChange = (discId, profStr) => {
@@ -448,6 +556,9 @@ function ClassesTab({ isDarkMode, matrices, classes, setClasses, generateId, aca
         {selectedSerie && (
           <div className="pt-6">
             <h4 className="font-black text-sm uppercase tracking-widest flex items-center gap-2 mb-4"><Users size={16}/> Atribuição de Professores</h4>
+            <datalist id="teachers-list">
+               {globalTeachers.filter(t => t.atua_como_docente === 1 || t.atua_como_docente === true).map(t => <option key={t.siape} value={t.nome_exibicao || t.nome_completo} />)}
+            </datalist>
             <div className={`rounded-xl border overflow-hidden ${isDarkMode ? 'bg-slate-900/50 border-slate-700' : 'bg-slate-50 border-slate-200'}`}>
               <table className="w-full text-left text-xs">
                 <thead>
@@ -472,7 +583,8 @@ function ClassesTab({ isDarkMode, matrices, classes, setClasses, generateId, aca
                         <td className="p-3 font-black text-slate-500">{disc.hours}h</td>
                         <td className="p-2">
                           <input 
-                            type="text" 
+                            type="text"
+                            list="teachers-list"
                             value={profStr} 
                             onChange={e => handleProfChange(disc.id, e.target.value)} 
                             placeholder="Ex: Prof. Silva, Prof. Costa" 
@@ -558,7 +670,8 @@ function ClassesTab({ isDarkMode, matrices, classes, setClasses, generateId, aca
                       </div>
                     </td>
                     <td className="py-4 px-5 text-right space-x-2">
-                       <button onClick={() => handleStartEdit(cls)} className="px-3 py-1.5 rounded-lg text-[9px] font-black uppercase tracking-widest bg-blue-100 text-blue-700 hover:bg-blue-200 transition-colors dark:bg-blue-900/30 dark:text-blue-400">Atribuir / Editar</button>
+                       <button onClick={() => handleStartEdit(cls)} className="px-3 py-1.5 rounded-lg text-[9px] font-black uppercase tracking-widest bg-blue-100 text-blue-700 hover:bg-blue-200 transition-colors dark:bg-blue-900/30 dark:text-blue-400">Atribuir</button>
+                       <button onClick={() => handleDuplicateClass(cls)} className="px-3 py-1.5 rounded-lg text-[9px] font-black uppercase tracking-widest bg-emerald-100 text-emerald-700 hover:bg-emerald-200 transition-colors dark:bg-emerald-900/30 dark:text-emerald-400">Duplicar</button>
                        <button onClick={() => handleDeleteClass(cls.id)} className="px-2 py-1.5 rounded-lg text-[9px] font-black uppercase tracking-widest bg-rose-100 text-rose-700 hover:bg-rose-200 transition-colors dark:bg-rose-900/30 dark:text-rose-400"><Trash2 size={14}/></button>
                     </td>
                   </tr>

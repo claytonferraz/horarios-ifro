@@ -1,23 +1,25 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { 
   Calendar, Layers, UserCircle, AlertTriangle, BarChart3, ListTodo,
   ChevronDown, Clock, Printer, CheckCircle, Eye, BookOpen, FileText, Users
 } from 'lucide-react';
 import { SearchableSelect } from '../ui/SearchableSelect';
 import { InlineInput } from '../ui/InlineInput';
-
+import { ScheduleEditorModal } from '../ui/admin/ScheduleEditorModal';
 import { MAP_DAYS, getColorHash, isTeacherPending } from '@/lib/dates';
 
 export function PortalView({
-  appMode, isDarkMode, viewMode, setViewMode, scheduleMode, setScheduleMode,
+  appMode, isDarkMode, viewMode, setViewMode, scheduleMode, setScheduleMode, userRole,
   selectedCourse, setSelectedCourse, selectedClass, setSelectedClass, selectedTeacher, setSelectedTeacher,
   totalFilterYear, setTotalFilterYear, totalFilterTeacher, setTotalFilterTeacher, totalFilterClass, setTotalFilterClass, totalFilterSubject, setTotalFilterSubject,
   courses, classesList, globalTeachersList, availableYearsForTotal, availableTeachersForTotal, availableClassesForTotal, availableSubjectsForTotal,
   alunoStats, diarioStats, finalFilteredTotalData, bimestresData, recordsForWeek,
   activeData, handlePrint, getColorHash, isTeacherPending,
   selectedDay, setSelectedDay, selectedWeek, setSelectedWeek, activeWeeksList,
-  getCellRecords, activeCourseClasses, profStats, activeDays, classTimes
+  getCellRecords, activeCourseClasses, profStats, activeDays, classTimes, rawData, loadAdminMetadata
 }) {
+  const [editorModal, setEditorModal] = useState(null);
+
   const safeDays = [...(activeDays || ['Segunda-feira', 'Terça-feira', 'Quarta-feira', 'Quinta-feira', 'Sexta-feira'])].sort((a,b) => MAP_DAYS.indexOf(a) - MAP_DAYS.indexOf(b));
   const shiftOrder = { 'Matutino': 1, 'Vespertino': 2, 'Noturno': 3 };
   const safeTimes = [...(classTimes || [])].sort((a, b) => {
@@ -544,8 +546,10 @@ export function PortalView({
                                       }
 
                                       let currentShift = '';
+                                      let classPositionInShift = 0;
+                                      const activeIntervals = (intervals || []).filter(inv => displayShiftsDay.has(inv.shift));
                                       const shiftCount = new Set(activeTimes.map(i => i.shift)).size;
-                                      const spanSize = activeTimes.length + shiftCount;
+                                      const spanSize = activeTimes.length + shiftCount + activeIntervals.length;
 
                                       return (
                                         <React.Fragment key={`day-block-${day}`}>
@@ -553,8 +557,15 @@ export function PortalView({
                                             const time = timeObj.timeStr;
                                             const shift = timeObj.shift;
                                             const isNewShift = shift !== currentShift;
-                                            if (isNewShift) currentShift = shift;
+                                            if (isNewShift) {
+                                               currentShift = shift;
+                                               classPositionInShift = 1;
+                                            } else {
+                                               classPositionInShift++;
+                                            }
                                             const isFirstRowOfDay = index === 0;
+
+                                            const intervalMatched = activeIntervals.find(inv => inv.shift === shift && Number(inv.position) === classPositionInShift);
 
                                             return (
                                               <React.Fragment key={`${day}-${time}`}>
@@ -594,7 +605,17 @@ export function PortalView({
                                                   {courseClasses.map(cls => {
                                                     const records = courseRecords.filter(r => r.className === cls && r.day === day && r.time === time);
                                                     return (
-                                                      <td key={`${cls}-${time}`} className={`p-1.5 border-r-[3px] last:border-r-0 align-top min-w-[140px] ${isDarkMode ? 'border-slate-700 group-hover:bg-slate-700/30 bg-slate-800/20' : 'border-slate-300 group-hover:bg-slate-50/50 bg-slate-50/20'}`}>
+                                                    <td 
+                                                      key={`${cls}-${time}`} 
+                                                      onClick={() => {
+                                                         if (['admin','gestao'].includes(userRole)) {
+                                                            setEditorModal({ cls, day, time, tObj: timeObj });
+                                                         }
+                                                      }}
+                                                      className={`p-1.5 border-r-[3px] last:border-r-0 align-top min-w-[140px] transition-all
+                                                      ${['admin','gestao'].includes(userRole) ? 'cursor-pointer hover:ring-2 hover:ring-indigo-500 hover:z-30 relative' : ''}
+                                                      ${isDarkMode ? 'border-slate-700 group-hover:bg-slate-700/30 bg-slate-800/20' : 'border-slate-300 group-hover:bg-slate-50/50 bg-slate-50/20'}`}
+                                                    >
                                                         {records.length > 0 ? records.map(r => {
                                                           const isPending = isTeacherPending(r.teacher);
                                                           return (
@@ -609,6 +630,31 @@ export function PortalView({
                                                     );
                                                   })}
                                                 </tr>
+                                                {intervalMatched && (
+                                                  <tr className={`print-interval text-[9px] font-black uppercase tracking-widest ${isDarkMode ? 'bg-amber-900/40 text-amber-500 border-amber-900/50' : 'bg-amber-50 text-amber-700 border-amber-200'} border-y`}>
+                                                    <td className={`sticky left-[40px] z-10 py-2 px-3 text-center border-r-[3px] bg-transparent ${isDarkMode ? 'border-amber-900/50' : 'border-amber-200'}`}>
+                                                       <span className="opacity-80 font-bold block whitespace-nowrap">
+                                                          {(() => {
+                                                              let endStr = timeObj.timeStr.split('-')[1];
+                                                              if(!endStr) return '';
+                                                              endStr = endStr.trim();
+                                                              let [hh, mm] = endStr.split(':').map(Number);
+                                                              if(isNaN(hh) || isNaN(mm)) return '';
+                                                              let startText = endStr;
+                                                              let endMins = hh * 60 + mm + Number(intervalMatched.duration);
+                                                              let outHH = Math.floor(endMins / 60).toString().padStart(2, '0');
+                                                              let outMM = (endMins % 60).toString().padStart(2, '0');
+                                                              return `${startText} - ${outHH}:${outMM}`;
+                                                          })()}
+                                                       </span>
+                                                    </td>
+                                                    <td colSpan={courseClasses.length} className="py-2 px-4 shadow-sm relative text-center">
+                                                      <div className="flex items-center justify-center gap-2">
+                                                        <Clock size={12}/> {intervalMatched.description || 'Intervalo'} ({intervalMatched.duration} min)
+                                                      </div>
+                                                    </td>
+                                                  </tr>
+                                                )}
                                               </React.Fragment>
                                             );
                                           })}
@@ -1271,6 +1317,32 @@ export function PortalView({
             </div>
           </div>
         )}
+        
+      {/* Editor Interativo */}
+      {editorModal && (
+         <ScheduleEditorModal 
+            isOpen={true}
+            onClose={(shouldRefresh) => {
+               setEditorModal(null);
+               if (shouldRefresh === true && typeof loadAdminMetadata === 'function') {
+                  loadAdminMetadata(true);
+               }
+            }}
+            isDarkMode={isDarkMode}
+            scheduleMode={scheduleMode}
+            selectedWeek={selectedWeek}
+            className={editorModal.cls}
+            day={editorModal.day}
+            time={editorModal.time}
+            timeObj={editorModal.tObj}
+            courseRecords={getCellRecords ? getCellRecords(editorModal.cls, editorModal.day, editorModal.time) : []} 
+            weekData={rawData} 
+            matrixData={[]} // TODO
+            classesData={[]} // TODO
+            usersList={[]} // TODO
+            classTimes={classTimes}
+         />
+      )}
     </>
   );
 }

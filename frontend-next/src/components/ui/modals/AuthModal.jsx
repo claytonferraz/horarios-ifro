@@ -28,14 +28,14 @@ export function AuthModal({
             Área Restrita
           </h3>
           <p className={`text-sm ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>
-            {authModal.mode === 'setup' ? 'Crie o usuário e senha mestre (primeiro acesso).' : 'Insira suas credenciais para acessar.'}
+            Insira suas credenciais para acessar.
           </p>
           <form onSubmit={handleAuthSubmit} className="w-full space-y-4">
             <input
               type="text"
               autoFocus
               required
-              placeholder="Nome de usuário"
+              placeholder="SIAPE"
               className={`w-full font-semibold py-3 px-4 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500 text-center tracking-widest border ${isDarkMode ? 'bg-slate-950 border-slate-700 text-white' : 'bg-slate-50 border-slate-300 text-slate-800'}`}
               value={usernameInput}
               onChange={(e) => setUsernameInput(e.target.value)}
@@ -52,7 +52,7 @@ export function AuthModal({
               type="submit"
               className={`w-full text-white font-black py-3 rounded-xl transition-all shadow-lg flex justify-center items-center gap-2 ${isDarkMode ? 'bg-emerald-600 hover:bg-emerald-700' : 'bg-emerald-600 hover:bg-emerald-700'}`}
             >
-              <Unlock size={18} /> {authModal.mode === 'setup' ? 'Criar Mestre e Entrar' : 'Entrar'}
+              <Unlock size={18} /> Entrar
             </button>
           </form>
           {errorMsg && <p className="text-xs font-bold text-red-600 uppercase tracking-widest">{errorMsg}</p>}
