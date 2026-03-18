@@ -1122,15 +1122,7 @@ export function PortalView({
                                   const dayRecords = courseRecords.filter(r => r.day === day);
                                   if (dayRecords.length === 0) return null;
                                   
-                                  const dayShifts = new Set(dayRecords.map(r => safeTimes.find(t => t.timeStr === r.time)?.shift).filter(Boolean));
-                                  const activeTimes = safeTimes.filter(t => {
-                                    const shift = t.shift;
-                                    const isDiurnoDay = dayShifts.has('Matutino') || dayShifts.has('Vespertino');
-                                    const isNoturnoDay = dayShifts.has('Noturno');
-                                    if ((shift === 'Matutino' || shift === 'Vespertino') && isDiurnoDay) return true;
-                                    if (shift === 'Noturno' && isNoturnoDay) return true;
-                                    return false;
-                                  });
+                                  const activeTimes = safeTimes.filter(t => dayRecords.some(r => r.time === (t.timeStr || t)));
                                   
                                   return (
                                     <div key={`mob-vagas-${course}-${day}`} className={`rounded-xl border overflow-hidden shadow-sm animate-in fade-in ${isDarkMode ? 'border-slate-700 bg-slate-800/30' : 'border-slate-200 bg-white'}`}>
@@ -1149,14 +1141,14 @@ export function PortalView({
                                                  <span className={`block border font-black text-[9px] px-1 py-1 rounded-md shadow-sm opacity-80 ${isDarkMode ? 'bg-slate-900 border-slate-700 text-slate-400' : 'bg-white border-slate-200 text-slate-500'}`}>{time}</span>
                                               </div>
                                               <div className="flex-1 space-y-2">
-                                                {records.length > 0 ? records.map(r => (
-                                                  <div key={`mob-rec-${r.id}`} className={`p-2.5 rounded-lg border shadow-sm ${isDarkMode ? 'bg-red-900/30 border-red-800/50 text-red-300' : 'bg-red-50 border-red-200 text-red-900'}`}>
-                                                    <div className="flex items-center gap-1.5 flex-1 max-w-[calc(100%-60px)]">
+                                                {records.map(r => (
+                                                  <div key={`mob-rec-${r.id}`} className={`p-2.5 rounded-lg border shadow-sm flex flex-col justify-center ${isDarkMode ? 'bg-red-900/30 border-red-800/50 text-red-300' : 'bg-red-50 border-red-200 text-red-900'}`}>
+                                                    <div className="flex items-center gap-1.5 flex-1 w-full">
                                                       <span className={`text-[8px] font-black uppercase rounded px-1 shrink-0 ${isDarkMode ? 'bg-red-950 text-red-400' : 'bg-red-200 text-red-800'}`}>{r.className}</span>
                                                       <span className="font-bold text-[10px] leading-tight truncate">{r.subject}</span>
                                                     </div>
                                                   </div>
-                                                )) : <div className={`font-black tracking-widest text-[9px] opacity-20 uppercase mt-1`}>Sem Aulas Vagas</div>}
+                                                ))}
                                               </div>
                                             </div>
                                           );
