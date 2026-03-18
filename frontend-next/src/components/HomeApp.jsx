@@ -10,6 +10,7 @@ import { InlineInput } from "./ui/InlineInput";
 import { AdminStatsPanel } from "./ui/AdminStatsPanel";
 import { apiClient } from "@/lib/apiClient";
 import React, { useState, useEffect, useMemo, useRef } from 'react';
+import { useRouter } from 'next/navigation';
 import { useAdminActions } from '../hooks/useAdminActions';
 import { useSecurityActions } from '../hooks/useSecurityActions';
 import { useScheduleView } from '../hooks/useScheduleView';
@@ -39,6 +40,7 @@ export function HomeApp({ appMode }) {
   const { isUnlocked, userRole, siape, userName, isLoadingAuth, login, logout } = useAuth();
 
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const router = useRouter();
   
   const rawDataRef = useRef(rawData);
   const [uploadType, setUploadType] = useState('padrao'); 
@@ -57,10 +59,10 @@ export function HomeApp({ appMode }) {
   });
 
   const navigateTo = (mode) => {
-    if (mode === 'home') { window.location.href = "/"; setMobileMenuOpen(false); }
-    else if (mode === 'aluno') { scheduleState.setViewMode('hoje'); scheduleState.setScheduleMode('oficial'); window.location.href = "/aluno"; setMobileMenuOpen(false); } 
-    else if (mode === 'professor') { scheduleState.setViewMode('professor'); scheduleState.setScheduleMode('oficial'); window.location.href = "/professor"; setMobileMenuOpen(false); } 
-    else if (mode === 'admin') { window.location.href = "/admin"; setAdminTab('planilhas'); setMobileMenuOpen(false); }
+    if (mode === 'home') { router.push('/'); setMobileMenuOpen(false); }
+    else if (mode === 'aluno') { scheduleState.setViewMode('hoje'); scheduleState.setScheduleMode('oficial'); router.push('/aluno'); setMobileMenuOpen(false); } 
+    else if (mode === 'professor') { scheduleState.setViewMode('professor'); scheduleState.setScheduleMode('oficial'); router.push('/professor'); setMobileMenuOpen(false); } 
+    else if (mode === 'admin') { router.push('/admin'); setAdminTab('planilhas'); setMobileMenuOpen(false); }
   };
 
   const executePrint = () => {
@@ -142,7 +144,7 @@ export function HomeApp({ appMode }) {
                 
                     <div className="flex items-center gap-2">
                         {/* Removed Segurança Button as requested */}
-                        <button onClick={() => { window.location.href='/professor'; }} className={`px-4 py-2.5 border rounded-lg font-black text-[10px] uppercase tracking-widest flex items-center gap-2 shadow-sm transition-all ${isDarkMode ? 'bg-indigo-900/20 text-indigo-400 border-indigo-800/50 hover:bg-indigo-900/40' : 'bg-indigo-50 text-indigo-600 border-indigo-200 hover:bg-indigo-100'}`}>
+                        <button onClick={() => { router.push('/professor'); }} className={`px-4 py-2.5 border rounded-lg font-black text-[10px] uppercase tracking-widest flex items-center gap-2 shadow-sm transition-all ${isDarkMode ? 'bg-indigo-900/20 text-indigo-400 border-indigo-800/50 hover:bg-indigo-900/40' : 'bg-indigo-50 text-indigo-600 border-indigo-200 hover:bg-indigo-100'}`}>
                             <UserCheck size={14} /> Portal do Professor
                         </button>
                         <button onClick={() => logout()} className={`px-4 py-2.5 border rounded-lg font-black text-[10px] uppercase tracking-widest flex items-center gap-2 shadow-sm transition-all ${isDarkMode ? 'bg-rose-900/20 text-rose-400 border-rose-800/50 hover:bg-rose-900/40' : 'bg-rose-50 text-rose-600 border-rose-200 hover:bg-rose-100'}`}>
@@ -162,6 +164,7 @@ export function HomeApp({ appMode }) {
                     academicYearsMeta={academicYearsMeta}
                     adminFilterCourses={adminFilterCourses} setAdminFilterCourses={setAdminFilterCourses}
                     adminFilterClasses={adminFilterClasses} setAdminFilterClasses={setAdminFilterClasses}
+                    handlePrint={executePrint} getColorHash={getColorHash} isTeacherPending={isTeacherPending}
                 />
             </>
         )}
@@ -210,7 +213,7 @@ export function HomeApp({ appMode }) {
                         </div>
                     </div>
                     {['admin', 'gestao'].includes(userRole) && (
-                        <button onClick={() => { window.location.href='/admin'; }} className={`mt-4 sm:mt-0 flex items-center justify-center gap-2 px-6 py-2.5 rounded-lg shadow-sm text-[11px] font-black uppercase tracking-widest transition-all ${isDarkMode ? 'bg-amber-600/20 text-amber-400 hover:bg-amber-600/40 border border-amber-600/50' : 'bg-amber-100 text-amber-700 hover:bg-amber-200 border border-amber-300'}`}>
+                        <button onClick={() => { setAdminTab('master_grid'); scheduleState.setScheduleMode('previa'); scheduleState.setViewMode('curso'); router.push('/admin'); }} className={`mt-4 sm:mt-0 flex items-center justify-center gap-2 px-6 py-2.5 rounded-lg shadow-sm text-[11px] font-black uppercase tracking-widest transition-all ${isDarkMode ? 'bg-amber-600/20 text-amber-400 hover:bg-amber-600/40 border border-amber-600/50' : 'bg-amber-100 text-amber-700 hover:bg-amber-200 border border-amber-300'}`}>
                            <Settings size={16}/> Acessar Gestão Dinâmica
                         </button>
                     )}

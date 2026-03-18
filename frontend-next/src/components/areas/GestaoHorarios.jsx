@@ -13,6 +13,8 @@ import { MultiSelect } from '../ui/MultiSelect';
 import { InlineInput } from '../ui/InlineInput';
 import { apiClient } from '@/lib/apiClient';
 import { useData } from '@/contexts/DataContext';
+import { PortalView } from './PortalView';
+import { CalendarDays } from 'lucide-react';
 
 
 export function GestaoHorarios({
@@ -32,7 +34,8 @@ export function GestaoHorarios({
   adminAvailableClasses, adminFilterClasses, setAdminFilterClasses,
   groupedDisciplinesBySerie,
   subjectHoursMeta, loadAdminMetadata,
-  uniqueYearsData, academicYearsMeta
+  uniqueYearsData, academicYearsMeta,
+  ...props
 }) {
   const { academicWeeks, activeDays } = useData();
 
@@ -45,6 +48,7 @@ export function GestaoHorarios({
         <div className={`flex flex-wrap p-1.5 rounded-xl shadow-inner w-full mb-4 ${isDarkMode ? 'bg-slate-900' : 'bg-slate-100'}`}>
           <button onClick={() => setAdminTab('planilhas')} className={`flex-1 min-w-[120px] md:flex-none flex items-center justify-center gap-1.5 px-6 py-2.5 rounded-lg text-xs font-black uppercase tracking-widest transition-all ${adminTab === 'planilhas' ? (isDarkMode ? 'bg-slate-800 text-slate-100 shadow-sm' : 'bg-white text-slate-800 shadow-sm') : (isDarkMode ? 'text-slate-400 hover:text-slate-300' : 'text-slate-500 hover:text-slate-700')}`}><Database size={16} /> Gestão de Planilhas</button>
           <button onClick={() => setAdminTab('disciplinas')} className={`flex-1 min-w-[120px] md:flex-none flex items-center justify-center gap-1.5 px-6 py-2.5 rounded-lg text-xs font-black uppercase tracking-widest transition-all ${adminTab === 'disciplinas' ? (isDarkMode ? 'bg-slate-800 text-indigo-400 shadow-sm' : 'bg-white text-indigo-700 shadow-sm') : (isDarkMode ? 'text-slate-400 hover:text-slate-300' : 'text-slate-500 hover:text-slate-700')}`}><ClipboardList size={16} /> Gestão Escolar</button>
+          {['admin','gestao'].includes(userRole) && <button onClick={() => { setAdminTab('master_grid'); props.setScheduleMode('previa'); props.setViewMode('curso'); }} className={`flex-1 min-w-[120px] md:flex-none flex items-center justify-center gap-1.5 px-6 py-2.5 rounded-lg text-xs font-black uppercase tracking-widest transition-all ${adminTab === 'master_grid' ? (isDarkMode ? 'bg-slate-800 text-emerald-400 shadow-sm' : 'bg-white text-emerald-600 shadow-sm') : (isDarkMode ? 'text-slate-400 hover:text-slate-300' : 'text-slate-500 hover:text-slate-700')}`}><CalendarDays size={16} /> Master Grid</button>}
           {['admin','gestao'].includes(userRole) && <button onClick={() => setAdminTab('solicitacoes')} className={`flex-1 min-w-[120px] md:flex-none flex items-center justify-center gap-1.5 px-6 py-2.5 rounded-lg text-xs font-black uppercase tracking-widest transition-all ${adminTab === 'solicitacoes' ? (isDarkMode ? 'bg-slate-800 text-rose-400 shadow-sm' : 'bg-white text-rose-700 shadow-sm') : (isDarkMode ? 'text-slate-400 hover:text-slate-300' : 'text-slate-500 hover:text-slate-700')}`}><MessageSquare size={16} /> Solicitações</button>}
           {['admin','gestao'].includes(userRole) && <button onClick={() => setAdminTab('configuracoes')} className={`flex-1 min-w-[120px] md:flex-none flex items-center justify-center gap-1.5 px-6 py-2.5 rounded-lg text-xs font-black uppercase tracking-widest transition-all ${adminTab === 'configuracoes' ? (isDarkMode ? 'bg-slate-800 text-amber-400 shadow-sm' : 'bg-white text-amber-600 shadow-sm') : (isDarkMode ? 'text-slate-400 hover:text-slate-300' : 'text-slate-500 hover:text-slate-700')}`}><Settings size={16} /> Configurações de Horários</button>}
         </div>
@@ -152,7 +156,19 @@ export function GestaoHorarios({
           </div>
         )}
 
-        {/* ABA 2: GESTÃO ESCOLAR */}
+        {/* ABA: MASTER GRID */}
+        {adminTab === 'master_grid' && ['admin','gestao'].includes(userRole) && (
+           <PortalView
+              appMode="admin"
+              isDarkMode={isDarkMode}
+              userRole={userRole}
+              subjectHoursMeta={subjectHoursMeta}
+              loadAdminMetadata={loadAdminMetadata}
+              {...props}
+           />
+        )}
+
+        {/* ABA: GESTÃO ESCOLAR */}
         {adminTab === 'disciplinas' && (
           <CurriculumManager 
             isDarkMode={isDarkMode} 
