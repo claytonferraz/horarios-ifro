@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
 import { 
   ChevronDown, Clock, Printer, CheckCircle, Eye, BookOpen, FileText, Users,
-  MessageSquare, Send, CheckCircle2, XCircle, AlertCircle
+  MessageSquare, Send, CheckCircle2, XCircle, AlertCircle, GripVertical
 } from 'lucide-react';
+import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd';
 import { SearchableSelect } from '../ui/SearchableSelect';
 import { InlineInput } from '../ui/InlineInput';
 import { ScheduleEditorModal } from '../ui/admin/ScheduleEditorModal';
@@ -19,8 +20,38 @@ export function PortalView({
   selectedDay, setSelectedDay, selectedWeek, setSelectedWeek, activeWeeksList,
   getCellRecords, activeCourseClasses, profStats, activeDays, classTimes, rawData, loadAdminMetadata
 }) {
-  const { globalTeachers } = useData();
+  const { globalTeachers, refreshData } = useData();
   const [editorModal, setEditorModal] = useState(null);
+
+  const onDragEnd = async (result) => {
+    if (!result.destination) return;
+    const { source, destination, draggableId } = result;
+    if (source.droppableId === destination.droppableId) return;
+
+    // source: "day|time|className"
+    // destination: "day|time|className"
+    const [sDay, sTime, sCls] = source.droppableId.split('|');
+    const [dDay, dTime, dCls] = destination.droppableId.split('|');
+    
+    const recordId = draggableId;
+    const record = activeData.find(r => r.id === recordId);
+    if (!record) return;
+
+    try {
+      const updatedRecord = { 
+        ...record, 
+        day: dDay, 
+        time: dTime, 
+        className: dCls 
+      };
+      
+      // Update via API
+      await apiClient.updateScheduleRecord(selectedWeek, updatedRecord);
+      if (typeof refreshData === 'function') await refreshData();
+    } catch (e) {
+      alert("Erro ao mover aula: " + e.message);
+    }
+  };
 
   const safeDays = [...(activeDays || ['Segunda-feira', 'Terça-feira', 'Quarta-feira', 'Quinta-feira', 'Sexta-feira'])].sort((a,b) => MAP_DAYS.indexOf(a) - MAP_DAYS.indexOf(b));
   const shiftOrder = { 'Matutino': 1, 'Vespertino': 2, 'Noturno': 3 };
@@ -1018,56 +1049,89 @@ export function PortalView({
                               const entityTimes = safeTimes.filter(t => displayShifts.has(t.shift));
 
                               let currentShift = '';
-                              return entityTimes.map((timeObj, index) => {
-                                const time = timeObj.timeStr || timeObj;
-                                const shift = timeObj.shift || '';
-                                const isNewShift = shift && shift !== currentShift;
-                                if (isNewShift) currentShift = shift;
-                                const isLunch = time === '11:10 - 12:00';
-                                
                                 return (
-                                  <React.Fragment key={time}>
-                                  {isNewShift && (
-                                    <tr className={`print-interval text-[8px] font-black uppercase tracking-[0.4em] border-y-[3px] ${isDarkMode ? 'bg-slate-800/60 text-slate-500 border-slate-700' : 'bg-slate-100/60 text-slate-400 border-slate-300'}`}>
-                                      <td colSpan={safeDays.length + 1} className="py-2 text-center shadow-inner">{shift}</td>
-                                    </tr>
-                                  )}
-                                  <tr className="group transition-colors">
-                                    <td className={`sticky left-0 z-10 py-3 px-4 border-r-[3px] font-bold text-xs whitespace-nowrap text-center ${isDarkMode ? 'bg-slate-800 group-hover:bg-slate-700/50 border-slate-700 text-slate-400 shadow-[2px_0_5px_rgba(0,0,0,0.2)]' : 'bg-white group-hover:bg-slate-50 border-slate-300 text-slate-500 shadow-[2px_0_5px_rgba(0,0,0,0.02)]'}`}>{time}</td>
-                                    {safeDays.map(day => {
-                                      const records = getCellRecords(day, time);
+                                  <DragDropContext onDragEnd={onDragEnd}>
+                                    {entityTimes.map((timeObj, index) => {
+                                      const time = timeObj.timeStr || timeObj;
+                                      const shift = timeObj.shift || '';
+                                      const isNewShift = shift && shift !== currentShift;
+                                      if (isNewShift) currentShift = shift;
+                                      const isLunch = time === '11:10 - 12:00';
+                                      
                                       return (
-                                        <td key={`${day}-${time}`} className={`p-1.5 border-r-[3px] last:border-r-0 align-top w-32 ${isDarkMode ? 'border-slate-700 group-hover:bg-slate-700/30 bg-slate-800/20' : 'border-slate-300 group-hover:bg-slate-50/50 bg-slate-50/20'}`}>
-                                          {records.length > 0 ? (
-                                            <div className="flex flex-col gap-1.5">
-                                              {records.map(r => {
-                                                const isPending = isTeacherPending(r.teacher);
-                                                
-                                                return (
-                                                  <div key={r.id} className={`print-clean-card p-2 rounded-xl border shadow-sm flex flex-col justify-center min-h-[60px] transition-all hover:scale-[1.02] hover:shadow-md active:scale-95 ${isPending ? (isDarkMode ? 'bg-red-900/30 border-red-800/50 text-red-300' : 'bg-red-50 border-red-300 text-red-800') : getColorHash(r.subject, isDarkMode)}`}>
-                                                    {isPending && <span className={`text-[7px] font-black uppercase tracking-widest px-1.5 py-0.5 rounded w-fit mx-auto mb-0.5 ${isDarkMode ? 'text-red-400 bg-red-900/50' : 'text-red-600 bg-red-100'}`}>SEM PROFESSOR</span>}
-                                                    <p className="subject font-bold text-[10px] leading-tight mb-0.5 text-center">{r.subject}</p>
-                                                    <p className="details text-[8px] font-bold opacity-80 flex items-center justify-center gap-1 uppercase truncate">
-                                                      {resolveTeacherName(r.teacher, globalTeachers)}
-                                                    </p>
-                                                    {r.room && <span className={`details text-[8px] font-black tracking-tighter opacity-60 px-1.5 py-0.5 rounded mt-1 w-fit uppercase mx-auto ${isDarkMode ? 'bg-white/10' : 'bg-black/5'}`}>{r.room}</span>}
-                                                  </div>
-                                                )
-                                              })}
-                                            </div>
-                                          ) : <div className={`h-[60px] flex items-center justify-center font-black text-[9px] tracking-widest uppercase select-none ${isDarkMode ? 'opacity-20' : 'opacity-5'}`}>-</div>}
-                                        </td>
+                                        <React.Fragment key={time}>
+                                        {isNewShift && (
+                                          <tr className={`print-interval text-[8px] font-black uppercase tracking-[0.4em] border-y-[3px] ${isDarkMode ? 'bg-slate-800/60 text-slate-500 border-slate-700' : 'bg-slate-100/60 text-slate-400 border-slate-300'}`}>
+                                            <td colSpan={safeDays.length + 1} className="py-2 text-center shadow-inner">{shift}</td>
+                                          </tr>
+                                        )}
+                                        <tr className="group transition-colors">
+                                          <td className={`sticky left-0 z-10 py-3 px-4 border-r-[3px] font-bold text-xs whitespace-nowrap text-center ${isDarkMode ? 'bg-slate-800 group-hover:bg-slate-700/50 border-slate-700 text-slate-400 shadow-[2px_0_5px_rgba(0,0,0,0.2)]' : 'bg-white group-hover:bg-slate-50 border-slate-300 text-slate-500 shadow-[2px_0_5px_rgba(0,0,0,0.02)]'}`}>{time}</td>
+                                          {safeDays.map(day => {
+                                            const records = getCellRecords(day, time);
+                                            const droppableId = `${day}|${time}|${selectedClass}`;
+                                            return (
+                                              <Droppable droppableId={droppableId} key={droppableId}>
+                                                {(provided, snapshot) => (
+                                                  <td 
+                                                    ref={provided.innerRef}
+                                                    {...provided.droppableProps}
+                                                    className={`p-1.5 border-r-[3px] last:border-r-0 align-top w-32 transition-colors ${snapshot.isDraggingOver ? (isDarkMode ? 'bg-indigo-900/40' : 'bg-indigo-100/50') : (isDarkMode ? 'border-slate-700 group-hover:bg-slate-700/30 bg-slate-800/20' : 'border-slate-300 group-hover:bg-slate-50/50 bg-slate-50/20')}`}
+                                                  >
+                                                    {records.length > 0 ? (
+                                                      <div className="flex flex-col gap-1.5">
+                                                        {records.map((r, rIdx) => {
+                                                          const isPending = isTeacherPending(r.teacher);
+                                                          
+                                                          return (
+                                                            <Draggable key={r.id} draggableId={r.id.toString()} index={rIdx} isDragDisabled={appMode === 'aluno'}>
+                                                              {(drgProvided, drgSnapshot) => (
+                                                                <div 
+                                                                  ref={drgProvided.innerRef}
+                                                                  {...drgProvided.draggableProps}
+                                                                  {...drgProvided.dragHandleProps}
+                                                                  onClick={(e) => {
+                                                                    if (appMode !== 'aluno') {
+                                                                      setEditorModal({ cls: selectedClass, day, time, tObj: timeObj });
+                                                                    }
+                                                                  }}
+                                                                  className={`print-clean-card p-2 rounded-xl border shadow-sm flex flex-col justify-center min-h-[60px] transition-all relative ${drgSnapshot.isDragging ? 'z-50 scale-105 shadow-2xl rotate-2' : 'hover:scale-[1.02] hover:shadow-md active:scale-95'} ${isPending ? (isDarkMode ? 'bg-red-900/30 border-red-800/50 text-red-300' : 'bg-red-50 border-red-300 text-red-800') : getColorHash(r.subject, isDarkMode)}`}
+                                                                >
+                                                                  {appMode !== 'aluno' && (
+                                                                    <div className="absolute top-1 right-1 opacity-20 group-hover:opacity-100">
+                                                                       <GripVertical size={10} />
+                                                                    </div>
+                                                                  )}
+                                                                  {isPending && <span className={`text-[7px] font-black uppercase tracking-widest px-1.5 py-0.5 rounded w-fit mx-auto mb-0.5 ${isDarkMode ? 'text-red-400 bg-red-900/50' : 'text-red-600 bg-red-100'}`}>SEM PROFESSOR</span>}
+                                                                  <p className="subject font-bold text-[10px] leading-tight mb-0.5 text-center">{r.subject}</p>
+                                                                  <p className="details text-[8px] font-bold opacity-80 flex items-center justify-center gap-1 uppercase truncate">
+                                                                    {resolveTeacherName(r.teacher, globalTeachers)}
+                                                                  </p>
+                                                                  {r.room && <span className={`details text-[8px] font-black tracking-tighter opacity-60 px-1.5 py-0.5 rounded mt-1 w-fit uppercase mx-auto ${isDarkMode ? 'bg-white/10' : 'bg-black/5'}`}>{r.room}</span>}
+                                                                </div>
+                                                              )}
+                                                            </Draggable>
+                                                          )
+                                                        })}
+                                                      </div>
+                                                    ) : <div className={`h-[60px] flex items-center justify-center font-black text-[9px] tracking-widest uppercase select-none ${isDarkMode ? 'opacity-20' : 'opacity-5'}`}>-</div>}
+                                                    {provided.placeholder}
+                                                  </td>
+                                                )}
+                                              </Droppable>
+                                            );
+                                          })}
+                                        </tr>
+                                        {isLunch && (
+                                          <tr className={`print-interval text-[8px] font-black uppercase tracking-[0.4em] border-y-[3px] ${isDarkMode ? 'bg-slate-800/60 text-slate-500 border-slate-700' : 'bg-slate-100/60 text-slate-400 border-slate-300'}`}>
+                                            <td colSpan={safeDays.length + 1} className="py-2 text-center shadow-inner">Intervalo / Almoço</td>
+                                          </tr>
+                                        )}
+                                        </React.Fragment>
                                       );
                                     })}
-                                  </tr>
-                                  {isLunch && (
-                                    <tr className={`print-interval text-[8px] font-black uppercase tracking-[0.4em] border-y-[3px] ${isDarkMode ? 'bg-slate-800/60 text-slate-500 border-slate-700' : 'bg-slate-100/60 text-slate-400 border-slate-300'}`}>
-                                      <td colSpan={safeDays.length + 1} className="py-2 text-center shadow-inner">Intervalo / Almoço</td>
-                                    </tr>
-                                  )}
-                                  </React.Fragment>
+                                  </DragDropContext>
                                 );
-                              });
                             })()}
                           </tbody>
                         </table>
