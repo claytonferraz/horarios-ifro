@@ -1,0 +1,27 @@
+version: '3.8'
+
+services:
+  backend:
+    build: 
+      context: ./frontend-next/backend
+      dockerfile: Dockerfile
+    container_name: horarios-backend
+    ports:
+      - "3000:3000"
+    volumes:
+      # Regra de proteção: Impede que arquivos compilados localmente no Mac quebrem o ambiente Linux do container
+      - /app/node_modules
+      # Mapeia o banco de dados para sua máquina local para não perder os dados se o container reiniciar
+      - ./frontend-next/backend/horarios.db:/app/horarios.db 
+    restart: unless-stopped
+
+  frontend:
+    build: 
+      context: ./frontend-next
+      dockerfile: Dockerfile
+    container_name: horarios-frontend
+    ports:
+      - "80:3001"
+    depends_on:
+      - backend
+    restart: unless-stopped
