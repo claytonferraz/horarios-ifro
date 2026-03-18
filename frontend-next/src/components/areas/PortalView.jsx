@@ -776,7 +776,14 @@ export function PortalView({
                                       return <div className={`p-8 rounded-xl border text-center font-bold text-xs uppercase tracking-widest shadow-sm ${isDarkMode ? 'bg-slate-900 border-slate-700 text-slate-500' : 'bg-slate-50 border-slate-200 text-slate-400'}`}>Sem aulas programadas para este dia.</div>;
                                    }
                                    
-                                   return safeTimes.map((timeObj, index) => {
+                                   const dayShifts = new Set(dailyRecords.map(r => safeTimes.find(t => t.timeStr === r.time)?.shift).filter(Boolean));
+                                   const activeTimes = safeTimes.filter(t => dailyRecords.some(r => r.time === t.timeStr));
+
+                                   if (activeTimes.length === 0) {
+                                      return <div className={`p-8 rounded-xl border text-center font-bold text-xs uppercase tracking-widest shadow-sm ${isDarkMode ? 'bg-slate-900 border-slate-700 text-slate-500' : 'bg-slate-50 border-slate-200 text-slate-400'}`}>Sem aulas programadas para este dia.</div>;
+                                   }
+                                   
+                                   return activeTimes.map((timeObj, index) => {
                                       const time = timeObj.timeStr;
                                       const shift = timeObj.shift;
                                       const isNewShift = shift !== currentShift;
@@ -798,7 +805,7 @@ export function PortalView({
                                                  <span className={`border font-bold text-xs px-3 py-1.5 rounded-lg shadow-sm inline-block ${isDarkMode ? 'bg-slate-900 border-slate-700 text-slate-300' : 'bg-white border-slate-200 text-slate-600'}`}>{time}</span>
                                               </div>
                                               <div className="flex-1 space-y-2">
-                                                 {records.length > 0 ? records.map(r => {
+                                                 {records.map(r => {
                                                     const isPending = isTeacherPending(r.teacher);
                                                     return (
                                                        <div key={r.id} className={`p-3 rounded-lg border flex flex-col sm:flex-row justify-between sm:items-center gap-2 shadow-sm ${isPending ? (isDarkMode ? 'bg-red-900/30 border-red-800/50 text-red-300' : 'bg-red-50 border-red-200 text-red-800') : getColorHash(r.subject, isDarkMode)}`}>
@@ -809,7 +816,7 @@ export function PortalView({
                                                           {r.room && <span className={`text-[9px] font-black uppercase tracking-widest px-2 py-1 rounded-md self-start sm:self-auto shrink-0 ${isDarkMode ? 'bg-white/10' : 'bg-black/5'}`}>{r.room}</span>}
                                                        </div>
                                                     )
-                                                 }) : <div className={`text-[10px] font-bold uppercase tracking-widest py-1.5 px-1 ${isDarkMode ? 'text-slate-500' : 'text-slate-400'}`}>- Horário Vago -</div>}
+                                                 })}
                                               </div>
                                            </div>
                                          </React.Fragment>
