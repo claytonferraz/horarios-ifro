@@ -95,12 +95,19 @@ export function PortalView({
         time: dTime, 
         className: dCls 
       };
+
+      // Optimistic Update (Prevent Ghost Effect)
+      record.day = dDay;
+      record.time = dTime;
+      record.className = dCls;
       
       // Update via API
       await apiClient.updateScheduleRecord(selectedWeek, updatedRecord);
       if (typeof refreshData === 'function') await refreshData();
     } catch (e) {
       alert("Erro ao mover aula: " + e.message);
+      // Rollback on Error
+      if (typeof refreshData === 'function') await refreshData();
     }
   };
 

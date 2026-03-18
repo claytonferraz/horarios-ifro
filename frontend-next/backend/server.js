@@ -3,11 +3,50 @@ const cors = require('cors');
 const sqlite3 = require('sqlite3').verbose();
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
+const helmet = require('helmet');
+const xss = require('xss-clean');
+const rateLimit = require('express-rate-limit');
 
 const app = express();
-app.use(cors());
 
-// Aumento do limite para 50mb para suportar o arquivo gigante do "Padrão Anual"
+// 1. Segurança e Proteção Contra Ataques
+// Helmet protege cabeçalhos HTTP
+app.use(helmet());
+
+// XSS-Clean sanitiza query, body e params mitigando injeções
+app.use(xss());
+
+// Restrição Extrema de CORS: Apenas o domínio Next.js oficial operando em produção ou local
+const allowedOrigins = ['http://localhost:3001', 'http://localhost:3000', 'https://horarios-ifro.vercel.app'];
+app.options('*', cors());
+app.use(cors({
+  origin: function(origin, callback) {
+    if(!origin) return callback(null, true); // Mobile / Postman
+    if(allowedOrigins.indexOf(origin) === -1){
+      return callback(new Error('CORS Policy: Access Blocked'), false);
+    }
+    return callback(null, true);
+  },
+  credentials: true
+}));
+
+// Proteção contra DDoS e Brute Force Geral
+const generalLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, 
+  max: 1000, 
+  message: { error: 'Muitas requisições deste IP, por favor aguarde 15 minutos.' }
+});
+app.use(generalLimiter);
+
+// Limite específico rígido para Rotas de Login e Setup (Brute Force)
+const authLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000, 
+  max: 20, 
+  message: { error: 'Muitas tentativas de login. IP bloqueado por 1 hora.' }
+});
+app.use('/api/auth/', authLimiter);
+
+// Payload sizes limits
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ limit: '50mb', extended: true }));
 

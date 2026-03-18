@@ -103,11 +103,7 @@ export const apiClient = {
       const res = await fetch(`${API_URL}/admin/disciplines`, { method: 'PUT', headers: getHeaders(), body: JSON.stringify({ id, ...data }) });
       if (!res.ok) throw new Error("Falha ao salvar disciplina");
     } catch (e) {
-      if (typeof window !== 'undefined') {
-        const current = JSON.parse(localStorage.getItem('sqlite_mock_disciplines') || '{}');
-        current[id] = { ...current[id], ...data };
-        localStorage.setItem('sqlite_mock_disciplines', JSON.stringify(current));
-      }
+      throw e;
     }
   },
 
@@ -116,11 +112,7 @@ export const apiClient = {
       const res = await fetch(`${API_URL}/admin/subject-hours`, { method: 'PUT', headers: getHeaders(), body: JSON.stringify({ id, totalHours }) });
       if (!res.ok) throw new Error("Falha ao salvar carga horária");
     } catch (e) {
-      if (typeof window !== 'undefined') {
-        const current = JSON.parse(localStorage.getItem('sqlite_mock_subject_hours') || '{}');
-        current[id] = { totalHours };
-        localStorage.setItem('sqlite_mock_subject_hours', JSON.stringify(current));
-      }
+      throw e;
     }
   },
 
@@ -129,11 +121,7 @@ export const apiClient = {
       const res = await fetch(`${API_URL}/admin/academic-years`, { method: 'PUT', headers: getHeaders(), body: JSON.stringify({ year, ...data }) });
       if (!res.ok) throw new Error("Falha ao salvar ano letivo");
     } catch (e) {
-      if (typeof window !== 'undefined') {
-        const current = JSON.parse(localStorage.getItem('sqlite_mock_academic_years') || '{}');
-        current[year] = { ...current[year], ...data };
-        localStorage.setItem('sqlite_mock_academic_years', JSON.stringify(current));
-      }
+      throw e;
     }
   },
 
@@ -157,13 +145,6 @@ export const apiClient = {
       if (!res.ok) { const err = await res.json(); throw new Error(err.error || "Falha na criação"); }
       return await res.json();
     } catch (e) {
-      if (e.message.includes("fetch") && typeof window !== 'undefined') {
-        const mockUsers = JSON.parse(localStorage.getItem('sqlite_mock_users') || '[]');
-        if (mockUsers.length > 0) throw new Error("Admin já configurado.");
-        mockUsers.push({ username, password: btoa(encodeURIComponent(password)) });
-        localStorage.setItem('sqlite_mock_users', JSON.stringify(mockUsers));
-        return { message: "Setup mock concluído" };
-      }
       throw e;
     }
   },
@@ -187,12 +168,6 @@ export const apiClient = {
       
       return await res.json(); 
     } catch (e) {
-      if (e.message.includes("fetch") && typeof window !== 'undefined') {
-        const mockUsers = JSON.parse(localStorage.getItem('sqlite_mock_users') || '[]');
-        const user = mockUsers.find(u => u.username === username && u.password === btoa(encodeURIComponent(password)));
-        if (!user) throw new Error("Usuário ou senha incorretos.");
-        return { token: 'mock_jwt_token_123' };
-      }
       throw e;
     }
   },
@@ -207,12 +182,7 @@ export const apiClient = {
         throw new Error("Falha na API");
       }
     } catch (e) {
-      if (e.message.includes("autorizado")) throw e;
-      if (typeof window !== 'undefined') {
-        const schedules = JSON.parse(localStorage.getItem('sqlite_mock_schedules') || '[]');
-        const filtered = schedules.filter(s => s.id !== weekKey);
-        localStorage.setItem('sqlite_mock_schedules', JSON.stringify([...filtered, { id: weekKey, ...dataObj }]));
-      }
+      throw e;
     }
   },
 
@@ -224,11 +194,7 @@ export const apiClient = {
         throw new Error("Falha na API");
       }
     } catch (e) {
-      if (e.message.includes("autorizado")) throw e;
-      if (typeof window !== 'undefined') {
-        const schedules = JSON.parse(localStorage.getItem('sqlite_mock_schedules') || '[]');
-        localStorage.setItem('sqlite_mock_schedules', JSON.stringify(schedules.filter(s => s.id !== weekKey)));
-      }
+      throw e;
     }
   },
 
@@ -240,11 +206,7 @@ export const apiClient = {
         throw new Error("Falha na API");
       }
     } catch (e) {
-      if (e.message.includes("autorizado")) throw e;
-      if (typeof window !== 'undefined') {
-        const key = opts.year ? `sqlite_mock_config_${opts.year}` : 'sqlite_mock_config';
-        localStorage.setItem(key, JSON.stringify(opts));
-      }
+      throw e;
     }
   },
 
