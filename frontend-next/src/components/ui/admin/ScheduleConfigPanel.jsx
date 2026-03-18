@@ -58,6 +58,10 @@ export function ScheduleConfigPanel({ isDarkMode }) {
   const [savedSection, setSavedSection] = useState(null);
   const [importingFromYear, setImportingFromYear] = useState('');
 
+  // New states for dynamic calculation
+  const [calcStep, setCalcStep] = useState(50);
+  const [calcCounts, setCalcCounts] = useState({ 'Matutino': 6, 'Vespertino': 6, 'Noturno': 5 });
+
   const flashSaved = (section) => {
     setSavedSection(section);
     setTimeout(() => setSavedSection(null), 2000);
@@ -372,41 +376,91 @@ export function ScheduleConfigPanel({ isDarkMode }) {
 
             <div className={`p-5 rounded-2xl border ${isDarkMode ? 'bg-slate-800/30 border-slate-700' : 'bg-slate-50 border-slate-200'}`}>
               <div className="flex items-center justify-between mb-4">
-                <p className="font-black uppercase tracking-widest opacity-60 text-xs">Ações Práticas (Recalcular Horários em Cadeia)</p>
+                <p className="font-black uppercase tracking-widest opacity-60 text-xs">Ações Práticas (Gerar Grade em Cadeia)</p>
               </div>
-              <p className="text-xs mb-4 opacity-75 font-medium">Ao clicar em um turno, o sistema usará a hora/minuto da <span className="font-bold text-amber-500">1ª aula</span> atual, e recalculará as demais com base em aulas de 50 minutos + a duração dos intervalos configurados.</p>
+              
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+                <div>
+                  <label className="text-[10px] uppercase font-black tracking-widest opacity-60 block mb-2">Duração de cada aula (Minutos)</label>
+                  <input 
+                    type="number" 
+                    value={calcStep} 
+                    onChange={e => setCalcStep(Number(e.target.value))} 
+                    className={`w-full p-3 rounded-xl border font-black text-lg focus:ring-2 focus:ring-blue-500 outline-none transition-all ${isDarkMode ? 'bg-slate-900 border-slate-700 text-white' : 'bg-white border-slate-300'}`} 
+                  />
+                </div>
+                <div>
+                  <label className="text-[10px] uppercase font-black tracking-widest opacity-60 block mb-2">Quantas aulas por turno</label>
+                  <div className="flex gap-2">
+                    {SHIFTS.map(s => (
+                      <div key={s} className="flex-1">
+                        <span className="text-[9px] font-bold opacity-50 block text-center mb-1">{s.substring(0,3)}</span>
+                        <input 
+                          type="number" 
+                          value={calcCounts[s]} 
+                          onChange={e => setCalcCounts({...calcCounts, [s]: Number(e.target.value)})} 
+                          className={`w-full p-2 rounded-lg border text-center font-black text-sm focus:ring-2 focus:ring-blue-500 outline-none transition-all ${isDarkMode ? 'bg-slate-900 border-slate-700 text-white' : 'bg-white border-slate-300'}`} 
+                        />
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              <p className="text-xs mb-4 opacity-75 font-medium leading-relaxed">
+                Ao clicar abaixo, o sistema limpará os horários atuais do turno e **criará novos slots** a partir do horário da 1ª aula, 
+                respeitando a duração de {calcStep} min e os intervalos configurados acima.
+              </p>
+
               <div className="flex gap-3">
                  {SHIFTS.map(shift => (
                    <button 
                      key={shift}
                      onClick={() => {
                         let timesForShift = localTimes.filter(t => t.shift === shift);
-                        if(timesForShift.length === 0) return alert(`Adicione pelo menos 1 aula no turno ${shift}!`);
-                        timesForShift.sort((a,b) => a.timeStr.localeCompare(b.timeStr));
-                        const firstStr = timesForShift[0].timeStr.split('-')[0].trim();
-                        let [hh, mm] = firstStr.split(':').map(Number);
-                        if(isNaN(hh) || isNaN(mm)) return alert(`O horário da 1ª aula do turno ${shift} "${firstStr}" não está num formato válido (HH:MM).`);
-                        let minutesCounter = hh * 60 + mm;
-                        const intervalsForShift = localIntervals.filter(i => i.shift === shift);
-                        const newTimes = [];
-                        for(let i = 0; i < timesForShift.length; i++) {
-                           const startHH = Math.floor(minutesCounter / 60).toString().padStart(2, '0');
-                           const startMM = (minutesCounter % 60).toString().padStart(2, '0');
-                           minutesCounter += 50; 
-                           const endHH = Math.floor(minutesCounter / 60).toString().padStart(2, '0');
-                           const endMM = (minutesCounter % 60).toString().padStart(2, '0');
-                           newTimes.push({ ...timesForShift[i], timeStr: `${startHH}:${startMM} - ${endHH}:${endMM}` });
-                           const interval = intervalsForShift.find(int => Number(int.position) === i + 1);
-                           if (interval) minutesCounter += Number(interval.duration || 0);
+                        let firstStr = '07:30'; // Fallback
+                        if (shift === 'Vespertino') firstStr = '13:00';
+                        if (shift === 'Noturno') firstStr = '19:00';
+
+                        if (timesForShift.length > 0) {
+                           timesForShift.sort((a,b) => a.timeStr.localeCompare(b.timeStr));
+                           firstStr = timesForShift[0].timeStr.split('-')[0].trim();
                         }
-                        setLocalTimes(prev => prev.map(pt => {
-                            const updated = newTimes.find(nt => nt.id === pt.id);
-                            return updated ? updated : pt;
-                        }));
+
+                        let [hh, mm] = firstStr.split(':').map(Number);
+                        if(isNaN(hh) || isNaN(mm)) return alert(`Horário inicial "${firstStr}" inválido.`);
+                        
+                        let currentClock = hh * 60 + mm;
+                        const shiftInts = localIntervals.filter(i => i.shift === shift);
+                        const numAulas = calcCounts[shift] || 6;
+                        const newShiftTimes = [];
+
+                        for(let i = 0; i < numAulas; i++) {
+                           const sH = Math.floor(currentClock / 60).toString().padStart(2, '0');
+                           const sM = (currentClock % 60).toString().padStart(2, '0');
+                           currentClock += calcStep; 
+                           const eH = Math.floor(currentClock / 60).toString().padStart(2, '0');
+                           const eM = (currentClock % 60).toString().padStart(2, '0');
+                           
+                           newShiftTimes.push({ 
+                             id: 'gen_' + shift + '_' + i + '_' + Date.now(), 
+                             shift, 
+                             timeStr: `${sH}:${sM} - ${eH}:${eM}` 
+                           });
+
+                           const interval = shiftInts.find(int => Number(int.position) === i + 1);
+                           if (interval) currentClock += Number(interval.duration || 0);
+                        }
+
+                        // Substituir os horários do turno no estado global
+                        setLocalTimes(prev => {
+                           const others = prev.filter(pt => pt.shift !== shift);
+                           return [...others, ...newShiftTimes];
+                        });
                      }}
-                     className={`flex-1 py-3 rounded-lg text-xs font-black uppercase tracking-widest border transition-all hover:scale-[1.02] ${shift === 'Matutino' ? 'text-amber-500 border-amber-500/30 hover:bg-amber-500/10' : shift === 'Vespertino' ? 'text-blue-500 border-blue-500/30 hover:bg-blue-500/10' : 'text-violet-500 border-violet-500/30 hover:bg-violet-500/10'}`}
+                     className={`flex-1 py-4 rounded-xl text-xs font-black uppercase tracking-widest border shadow-sm transition-all hover:scale-[1.02] active:scale-95 ${shift === 'Matutino' ? 'text-amber-500 border-amber-500/30 hover:bg-amber-500/10' : shift === 'Vespertino' ? 'text-blue-500 border-blue-500/30 hover:bg-blue-500/10' : 'text-violet-500 border-violet-500/30 hover:bg-violet-500/10'}`}
                    >
-                     Recalcular {shift}
+                     Gerar {shift}
                    </button>
                  ))}
               </div>
