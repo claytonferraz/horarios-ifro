@@ -7,8 +7,16 @@ import { useTheme } from "@/contexts/ThemeContext";
 import { useAuth } from "@/contexts/AuthContext";
 
 export default function ProfessorPage() {
-  const { isUnlocked, isLoadingAuth } = useAuth();
+  const { isUnlocked, isLoadingAuth, userRole } = useAuth();
   const { isDarkMode } = useTheme();
+  
+  // Use generic window.location for simplicity, or router if imported
+  if (!isLoadingAuth && !isUnlocked) {
+    if (typeof window !== 'undefined') {
+      window.location.href = '/';
+      return null;
+    }
+  }
 
   if (isLoadingAuth) {
     return (

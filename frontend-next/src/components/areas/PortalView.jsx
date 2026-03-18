@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
 import { 
   ChevronDown, Clock, Printer, CheckCircle, Eye, BookOpen, FileText, Users,
-  MessageSquare, Send, CheckCircle2, XCircle, AlertCircle, GripVertical
+  MessageSquare, Send, CheckCircle2, XCircle, AlertCircle, GripVertical,
+  Calendar, UserCircle, Layers, AlertTriangle, BarChart3, ListTodo
 } from 'lucide-react';
 import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd';
 import { SearchableSelect } from '../ui/SearchableSelect';
@@ -9,6 +10,7 @@ import { InlineInput } from '../ui/InlineInput';
 import { ScheduleEditorModal } from '../ui/admin/ScheduleEditorModal';
 import { MAP_DAYS, getColorHash, isTeacherPending, resolveTeacherName } from '@/lib/dates';
 import { useData } from '@/contexts/DataContext';
+import { apiClient } from '@/lib/apiClient';
 
 export function PortalView({
   appMode, isDarkMode, viewMode, setViewMode, scheduleMode, setScheduleMode, userRole,
@@ -22,6 +24,17 @@ export function PortalView({
 }) {
   const { globalTeachers, refreshData } = useData();
   const [editorModal, setEditorModal] = useState(null);
+  const [pendingRequests, setPendingRequests] = useState([]);
+
+  React.useEffect(() => {
+    if ((appMode === 'admin' || userRole === 'gestao' || userRole === 'admin') && scheduleMode === 'previa' && selectedWeek) {
+      apiClient.fetchRequests().then(reqs => {
+        if (reqs) {
+          setPendingRequests(reqs.filter(r => r.status === 'pendente' && r.week_id === selectedWeek));
+        }
+      }).catch(e => console.error("Error fetching requests for previa alerts", e));
+    }
+  }, [scheduleMode, selectedWeek, appMode, userRole]);
 
   const onDragEnd = async (result) => {
     if (!result.destination) return;
@@ -134,7 +147,8 @@ export function PortalView({
                 <div className={`flex flex-wrap p-1 rounded-xl shadow-inner w-full lg:w-auto overflow-hidden ${isDarkMode ? 'bg-slate-900' : 'bg-slate-100'}`}>
                   {appMode === 'professor' && (
                     <>
-                      <button onClick={() => setViewMode('professor')} className={`flex-1 min-w-[80px] md:flex-none flex items-center justify-center gap-1.5 px-4 py-2 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all ${viewMode === 'professor' ? (isDarkMode ? 'bg-slate-700 text-indigo-400 shadow-sm' : 'bg-white text-indigo-700 shadow-sm') : (isDarkMode ? 'text-slate-400 hover:text-slate-300' : 'text-slate-500 hover:text-slate-700')}`}><UserCircle size={14} /> Meu Horário</button>
+                      <button onClick={() => { setViewMode('professor'); if(userRole==='servidor' && typeof setSelectedTeacher === 'function') setSelectedTeacher(siape); }} className={`flex-1 min-w-[80px] md:flex-none flex items-center justify-center gap-1.5 px-4 py-2 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all ${viewMode === 'professor' ? (isDarkMode ? 'bg-slate-700 text-indigo-400 shadow-sm' : 'bg-white text-indigo-700 shadow-sm') : (isDarkMode ? 'text-slate-400 hover:text-slate-300' : 'text-slate-500 hover:text-slate-700')}`}><UserCircle size={14} /> Meu Horário</button>
+                      <button onClick={() => setViewMode('outro_professor')} className={`flex-1 min-w-[80px] md:flex-none flex items-center justify-center gap-1.5 px-4 py-2 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all ${viewMode === 'outro_professor' ? (isDarkMode ? 'bg-slate-700 text-cyan-400 shadow-sm' : 'bg-white text-cyan-700 shadow-sm') : (isDarkMode ? 'text-slate-400 hover:text-slate-300' : 'text-slate-500 hover:text-slate-700')}`}><Users size={14} /> Ver Colegas</button>
                       <button onClick={() => setViewMode('curso')} className={`flex-1 min-w-[80px] md:flex-none flex items-center justify-center gap-1.5 px-4 py-2 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all ${viewMode === 'curso' ? (isDarkMode ? 'bg-slate-700 text-rose-400 shadow-sm' : 'bg-white text-rose-700 shadow-sm') : (isDarkMode ? 'text-slate-400 hover:text-slate-300' : 'text-slate-500 hover:text-slate-700')}`}><Layers size={14} /> Horário dos Cursos</button>
                       <div className={`w-px mx-0.5 hidden lg:block ${isDarkMode ? 'bg-slate-700' : 'bg-slate-200'}`}></div>
                       <button onClick={() => setViewMode('sem_professor')} className={`flex-1 min-w-[80px] md:flex-none flex items-center justify-center gap-1.5 px-4 py-2 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all ${viewMode === 'sem_professor' ? (isDarkMode ? 'bg-slate-700 text-red-400 shadow-sm' : 'bg-white text-red-700 shadow-sm') : (isDarkMode ? 'text-slate-400 hover:text-slate-300' : 'text-slate-500 hover:text-slate-700')}`}><AlertTriangle size={14} /> Aulas Vagas</button>
@@ -164,21 +178,22 @@ export function PortalView({
                       </div>
                     </>
                   )}
-                  {(viewMode === 'professor') && (
+                  {(viewMode === 'professor' && appMode === 'aluno') || viewMode === 'outro_professor' ? (
                     <div className="space-y-1 col-span-full md:col-span-2">
                       <label className="text-[9px] font-black tracking-[0.2em] text-slate-400 uppercase ml-1">
-                        {appMode === 'professor' && userRole === 'servidor' ? 'Seu Horário' : 'Buscar Professor'}
+                        Buscar Professor
                       </label>
                       <SearchableSelect 
                         isDarkMode={isDarkMode} 
-                        options={globalTeachersList.map(t => ({value: t, label: resolveTeacherName(t, globalTeachers)}))} 
+                        options={globalTeachersList
+                          .map(t => ({value: t, label: resolveTeacherName(t, globalTeachers)}))
+                          .sort((a,b) => a.label.localeCompare(b.label))} 
                         value={selectedTeacher} 
                         onChange={setSelectedTeacher} 
-                        disabled={appMode === 'professor' && userRole === 'servidor'}
                         colorClass={isDarkMode ? "bg-indigo-900/30 border-indigo-800/50 text-indigo-200 shadow-sm" : "bg-indigo-50 border-indigo-100 text-indigo-900 shadow-sm"} 
                       />
                     </div>
-                  )}
+                  ) : null}
                   {viewMode === 'total' && (
                     <>
                       <div className="space-y-1"><label className="text-[9px] font-black tracking-[0.2em] text-slate-400 uppercase ml-1">Ano Letivo</label>
@@ -217,7 +232,7 @@ export function PortalView({
               )}
 
               {/* ESTATÍSTICAS - PORTAL DO PROFESSOR */}
-              {(viewMode === 'professor') && selectedTeacher && (
+              {(viewMode === 'professor' || viewMode === 'outro_professor') && selectedTeacher && (
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                   <div className={`border p-3 rounded-xl text-center shadow-sm ${isDarkMode ? 'bg-indigo-900/20 border-indigo-800/50' : 'bg-indigo-50 border-indigo-100'}`}>
                     <span className={`text-2xl font-black leading-none ${isDarkMode ? 'text-indigo-400' : 'text-indigo-600'}`}>{profStats.dadas}</span>
@@ -820,7 +835,7 @@ export function PortalView({
                   )}
 
                   {/* GRADE DE HORÁRIO DO PROFESSOR (Separada por Curso) */}
-                  {viewMode === 'professor' && selectedTeacher && (
+                  {(viewMode === 'professor' || viewMode === 'outro_professor') && selectedTeacher && (
                     <div className="space-y-6 animate-in zoom-in-95 duration-500">
                       {(() => {
                         const profRecords = recordsForWeek.filter(r => r.teacher === selectedTeacher);
@@ -1005,7 +1020,19 @@ export function PortalView({
 
                   {/* GRADE DE HORÁRIO GERAL (Turma COMPLETA) */}
                   {viewMode === 'turma' && (
-                    <div className={`rounded-2xl shadow-sm border overflow-hidden animate-in zoom-in-95 duration-500 ${isDarkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'}`}>
+                    <div className="space-y-4">
+                      {/* ALERTS DE SOLICITAÇÃO NA PRÉVIA */}
+                      {(appMode === 'admin' || userRole === 'gestao' || userRole === 'admin') && scheduleMode === 'previa' && pendingRequests.length > 0 && (
+                        <div className={`p-4 rounded-xl border shadow-sm flex items-start gap-4 animate-in slide-in-from-top-2 ${isDarkMode ? 'bg-amber-900/30 border-amber-800/50' : 'bg-amber-50 border-amber-200'}`}>
+                           <AlertCircle size={24} className="text-amber-500 shrink-0 mt-0.5" />
+                           <div>
+                              <h4 className={`text-sm font-black uppercase tracking-widest ${isDarkMode ? 'text-amber-400' : 'text-amber-700'}`}>Atenção: Solicitações Pendentes para esta Semana</h4>
+                              <p className={`text-xs font-bold mt-1 ${isDarkMode ? 'text-amber-300' : 'text-amber-800'}`}>Você possui {pendingRequests.length} solicitação(ões) de mudança de horário aguardando revisão nesta "Prévia Semanal". Verifique no painel Administrativo ("Solicitações").</p>
+                           </div>
+                        </div>
+                      )}
+                      
+                      <div className={`rounded-2xl shadow-sm border overflow-hidden animate-in zoom-in-95 duration-500 ${isDarkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'}`}>
                       <div className={`text-white px-6 py-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 no-print ${scheduleMode === 'padrao' ? (isDarkMode ? 'bg-blue-950' : 'bg-blue-900') : scheduleMode === 'previa' ? (isDarkMode ? 'bg-violet-950' : 'bg-violet-900') : (isDarkMode ? 'bg-emerald-950' : 'bg-emerald-800')}`}>
                         <div className="flex items-center gap-2.5">
                           <Users size={18} className="opacity-80" />
@@ -1082,6 +1109,7 @@ export function PortalView({
                                                       <div className="flex flex-col gap-1.5">
                                                         {records.map((r, rIdx) => {
                                                           const isPending = isTeacherPending(r.teacher);
+                                                          const hasConflict = !isPending && r.teacher && r.teacher !== 'SEM PROFESSOR' && recordsForWeek.some(other => other.teacher === r.teacher && other.id !== r.id && other.day === r.day && other.time === r.time);
                                                           
                                                           return (
                                                             <Draggable key={r.id} draggableId={r.id.toString()} index={rIdx} isDragDisabled={appMode === 'aluno'}>
@@ -1095,11 +1123,16 @@ export function PortalView({
                                                                       setEditorModal({ cls: selectedClass, day, time, tObj: timeObj });
                                                                     }
                                                                   }}
-                                                                  className={`print-clean-card p-2 rounded-xl border shadow-sm flex flex-col justify-center min-h-[60px] transition-all relative ${drgSnapshot.isDragging ? 'z-50 scale-105 shadow-2xl rotate-2' : 'hover:scale-[1.02] hover:shadow-md active:scale-95'} ${isPending ? (isDarkMode ? 'bg-red-900/30 border-red-800/50 text-red-300' : 'bg-red-50 border-red-300 text-red-800') : getColorHash(r.subject, isDarkMode)}`}
+                                                                  className={`print-clean-card p-2 rounded-xl border shadow-sm flex flex-col justify-center min-h-[60px] transition-all relative ${drgSnapshot.isDragging ? 'z-50 scale-105 shadow-2xl rotate-2' : 'hover:scale-[1.02] hover:shadow-md active:scale-95'} ${isPending ? (isDarkMode ? 'bg-red-900/30 border-red-800/50 text-red-300' : 'bg-red-50 border-red-300 text-red-800') : hasConflict ? (isDarkMode ? 'bg-rose-950/80 border-rose-500/80 text-rose-200 shadow-[0_0_10px_rgba(225,29,72,0.4)]' : 'bg-rose-100 border-rose-500 text-rose-900 shadow-[0_0_10px_rgba(225,29,72,0.3)]') : getColorHash(r.subject, isDarkMode)}`}
                                                                 >
                                                                   {appMode !== 'aluno' && (
                                                                     <div className="absolute top-1 right-1 opacity-20 group-hover:opacity-100">
                                                                        <GripVertical size={10} />
+                                                                    </div>
+                                                                  )}
+                                                                  {hasConflict && (
+                                                                    <div className="absolute -top-2 -right-2 bg-rose-500 text-white rounded-full p-0.5 animate-pulse shadow-lg" title="Conflito de Professor!">
+                                                                      <AlertCircle size={14} />
                                                                     </div>
                                                                   )}
                                                                   {isPending && <span className={`text-[7px] font-black uppercase tracking-widest px-1.5 py-0.5 rounded w-fit mx-auto mb-0.5 ${isDarkMode ? 'text-red-400 bg-red-900/50' : 'text-red-600 bg-red-100'}`}>SEM PROFESSOR</span>}
@@ -1205,6 +1238,7 @@ export function PortalView({
                         })()}
                       </div>
                     </div>
+                  </div>
                   )}
 
                   {/* VISTA DE AULAS VAGAS: Separada por Curso */}
