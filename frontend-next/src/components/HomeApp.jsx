@@ -103,14 +103,23 @@ export function HomeApp({ appMode }) {
 
         {appMode === 'admin' && !isUnlocked && (
           <div className="flex-1 flex flex-col items-center justify-center p-6 mt-10 mb-20 animate-in zoom-in">
-             <div className={`p-8 rounded-full mb-6 ${isDarkMode ? 'bg-slate-800 text-slate-400' : 'bg-slate-100 text-slate-500'}`}>
-                <Lock size={64} />
-             </div>
-             <h2 className={`text-2xl md:text-3xl font-black uppercase tracking-widest mb-4 text-center ${isDarkMode ? 'text-white' : 'text-slate-800'}`}>Acesso Restrito</h2>
-             <p className={`mb-8 font-medium text-center max-w-md ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>Você precisa estar autenticado como administrador para acessar o painel de controle.</p>
-             <button onClick={() => security.setAuthModal({ show: true, pendingAction: null, mode: 'login' })} className="px-8 py-4 bg-emerald-600 hover:bg-emerald-700 text-white font-black rounded-xl shadow-lg transition-all flex items-center justify-center gap-3 active:scale-95 w-full max-w-xs">
-               <Unlock size={20}/> Fazer Login
-             </button>
+             {isLoadingAuth ? (
+               <div className="flex flex-col items-center justify-center opacity-50 py-10">
+                 <Loader2 size={48} className="animate-spin mb-4" />
+                 <p className="font-bold uppercase tracking-widest text-xs">Verificando Credenciais...</p>
+               </div>
+             ) : (
+               <>
+                 <div className={`p-8 rounded-full mb-6 ${isDarkMode ? 'bg-slate-800 text-slate-400' : 'bg-slate-100 text-slate-500'}`}>
+                    <Lock size={64} />
+                 </div>
+                 <h2 className={`text-2xl md:text-3xl font-black uppercase tracking-widest mb-4 text-center ${isDarkMode ? 'text-white' : 'text-slate-800'}`}>Acesso Restrito</h2>
+                 <p className={`mb-8 font-medium text-center max-w-md ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>Você precisa estar autenticado como administrador para acessar o painel de controle.</p>
+                 <button onClick={() => security.setAuthModal({ show: true, pendingAction: null, mode: 'login' })} className="px-8 py-4 bg-emerald-600 hover:bg-emerald-700 text-white font-black rounded-xl shadow-lg transition-all flex items-center justify-center gap-3 active:scale-95 w-full max-w-xs">
+                   <Unlock size={20}/> Fazer Login
+                 </button>
+               </>
+             )}
           </div>
         )}
 
