@@ -619,4 +619,4 @@ app.delete('/api/admin/teachers/:siape', verifyToken, (req, res) => {
   });
 });
 
-app.listen(5000, () => console.log('Backend rodando na porta 5000'));
+app.listen(3012, () => console.log('Backend rodando na porta 3012'));
