@@ -241,9 +241,9 @@ function MatricesTab({ isDarkMode, matrices, setMatrices, generateId, groupedDis
                       <thead>
                         <tr className="uppercase tracking-widest opacity-60 font-black">
                           <th className="pb-2">Nome</th>
-                          <th className="pb-2">Cód. (Opcional)</th>
-                          <th className="pb-2">C. Horária</th>
-                          <th className="pb-2">Ações</th>
+                          <th className="pb-2 w-24">C. Horária</th>
+                          <th className="pb-2 w-32">Cód. (Opcional)</th>
+                          <th className="pb-2 w-12 text-right">Ações</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-slate-200 dark:divide-slate-800">
@@ -253,12 +253,12 @@ function MatricesTab({ isDarkMode, matrices, setMatrices, generateId, groupedDis
                               <input type="text" list="all-disciplines" value={disc.name} onChange={e => updateDiscipline(serie.id, disc.id, 'name', e.target.value)} placeholder="Ex: Matemática" className={`w-full p-1.5 rounded-md border font-bold ${isDarkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-300'}`} />
                             </td>
                             <td className="py-2 px-2">
-                              <input type="text" value={disc.code} onChange={e => updateDiscipline(serie.id, disc.id, 'code', e.target.value)} placeholder="Ex: MAT1" className={`w-full p-1.5 rounded-md border font-bold uppercase ${isDarkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-300'}`} />
+                              <input type="number" value={disc.hours} onChange={e => updateDiscipline(serie.id, disc.id, 'hours', Number(e.target.value))} className={`w-full p-1.5 rounded-md border font-bold text-center ${isDarkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-300'}`} />
                             </td>
                             <td className="py-2 px-2">
-                              <input type="number" value={disc.hours} onChange={e => updateDiscipline(serie.id, disc.id, 'hours', Number(e.target.value))} className={`w-full p-1.5 rounded-md border font-bold ${isDarkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-300'}`} />
+                              <input type="text" value={disc.code} onChange={e => updateDiscipline(serie.id, disc.id, 'code', e.target.value)} placeholder="Ex: MAT1" className={`w-full p-1.5 rounded-md border font-bold uppercase text-center ${isDarkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-300'}`} />
                             </td>
-                            <td className="py-2 pl-2">
+                            <td className="py-2 pl-2 text-right">
                               <button type="button" onClick={() => removeDiscipline(serie.id, disc.id)} className={`p-1.5 rounded-md transition-colors ${isDarkMode ? 'text-rose-400 hover:bg-rose-900/50' : 'text-rose-600 hover:bg-rose-100'}`}><Trash2 size={14}/></button>
                             </td>
                           </tr>
@@ -267,6 +267,9 @@ function MatricesTab({ isDarkMode, matrices, setMatrices, generateId, groupedDis
                     </table>
                   </div>
                 )}
+                <div className="mt-4 flex justify-end border-t border-slate-200 dark:border-slate-800 pt-3">
+                   <button type="button" onClick={handleSaveMatrix} className="px-3 py-1.5 rounded-lg text-[10px] font-black bg-blue-600 text-white hover:bg-blue-700 transition-colors flex items-center gap-1.5 uppercase tracking-widest shadow-sm"><Save size={14} /> Salvar Modificações</button>
+                </div>
               </div>
             ))}
           </div>
