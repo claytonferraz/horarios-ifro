@@ -147,10 +147,14 @@ function MatricesTab({ isDarkMode, matrices, setMatrices, generateId }) {
       ...prev,
       series: prev.series.map(s => {
         if (s.id !== sId) return s;
-        return { ...s, disciplines: [...s.disciplines, { id: generateId(), name: 'Nova Disciplina', code: '', hours: 0, color: 'bg-indigo-500' }] };
+        return { ...s, disciplines: [...s.disciplines, { id: generateId(), name: '', code: '', hours: 0, color: 'bg-indigo-500' }] };
       })
     }));
   };
+
+  const allDisciplines = Array.from(new Set(
+    matrices.flatMap(m => (m.series || []).flatMap(s => (s.disciplines || []).map(d => d.name)))
+  )).filter(Boolean).sort();
 
   const updateDiscipline = (sId, dId, field, value) => {
     setLocalFormData(prev => ({
@@ -231,6 +235,9 @@ function MatricesTab({ isDarkMode, matrices, setMatrices, generateId }) {
                   <p className="text-xs font-semibold opacity-50 text-center py-4">Série sem disciplinas.</p>
                 ) : (
                   <div className="overflow-x-auto">
+                    <datalist id="all-disciplines">
+                      {allDisciplines.map(d => <option key={d} value={d} />)}
+                    </datalist>
                     <table className="w-full text-[10px] text-left">
                       <thead>
                         <tr className="uppercase tracking-widest opacity-60 font-black">
@@ -244,7 +251,7 @@ function MatricesTab({ isDarkMode, matrices, setMatrices, generateId }) {
                         {serie.disciplines.map(disc => (
                           <tr key={disc.id}>
                             <td className="py-2 pr-2">
-                              <input type="text" value={disc.name} onChange={e => updateDiscipline(serie.id, disc.id, 'name', e.target.value)} className={`w-full p-1.5 rounded-md border font-bold ${isDarkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-300'}`} />
+                              <input type="text" list="all-disciplines" value={disc.name} onChange={e => updateDiscipline(serie.id, disc.id, 'name', e.target.value)} placeholder="Ex: Matemática" className={`w-full p-1.5 rounded-md border font-bold ${isDarkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-300'}`} />
                             </td>
                             <td className="py-2 px-2">
                               <input type="text" value={disc.code} onChange={e => updateDiscipline(serie.id, disc.id, 'code', e.target.value)} placeholder="Ex: MAT1" className={`w-full p-1.5 rounded-md border font-bold uppercase ${isDarkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-300'}`} />
