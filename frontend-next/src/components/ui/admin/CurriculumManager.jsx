@@ -123,12 +123,18 @@ function MatricesTab({ isDarkMode, matrices, setMatrices, generateId }) {
   const addSerie = () => {
     const sName = prompt("Nome da Série (ex: 1º Ano)?");
     if (!sName) return;
-    setLocalFormData({ ...localFormData, series: [...(localFormData.series || []), { id: generateId(), name: sName, disciplines: [] }] });
+    setLocalFormData(prev => ({ 
+      ...prev, 
+      series: [...(prev.series || []), { id: generateId(), name: sName, disciplines: [] }] 
+    }));
   };
   
   const removeSerie = (sId) => {
     if (!window.confirm("Remover esta série e todas as disciplinas dela?")) return;
-    setLocalFormData({ ...localFormData, series: (localFormData.series || []).filter(s => s.id !== sId) });
+    setLocalFormData(prev => ({ 
+      ...prev, 
+      series: prev.series.filter(s => s.id !== sId) 
+    }));
   };
 
   const addDiscipline = (sId) => {
