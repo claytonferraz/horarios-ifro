@@ -24,6 +24,10 @@ export const metadata = {
     title: "Horários IFRO",
     statusBarStyle: "black-translucent",
   },
+  icons: {
+    icon: '/icon.svg',
+    apple: '/icon.svg',
+  },
 };
 
 export default function RootLayout({ children }) {

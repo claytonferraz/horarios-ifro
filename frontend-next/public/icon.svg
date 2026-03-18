@@ -1,0 +1,79 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" fill="none">
+  <!-- Definindo Gradientes e Sombras -->
+  <defs>
+    <!-- Fundo Sombrio/Slate Escuro p/ Padrão do Sistema -->
+    <linearGradient id="bgMask" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#1e293b"/>
+      <stop offset="100%" stop-color="#020617"/>
+    </linearGradient>
+
+    <!-- Gradiente Verde IFRO / Esmeralda p/ Destaques -->
+    <linearGradient id="greenAccent" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#34d399"/>
+      <stop offset="50%" stop-color="#10b981"/>
+      <stop offset="100%" stop-color="#047857"/>
+    </linearGradient>
+    
+    <!-- Nuances sutis -->
+    <linearGradient id="headerGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#0f172a"/>
+      <stop offset="100%" stop-color="#020617"/>
+    </linearGradient>
+
+    <!-- Sombras p/ Profundidade Estilo Apple -->
+    <filter id="dropShadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="16" stdDeviation="20" flood-color="#000" flood-opacity="0.45"/>
+    </filter>
+    <filter id="lightShadow" x="-10%" y="-10%" width="120%" height="120%">
+      <feDropShadow dx="0" dy="4" stdDeviation="6" flood-color="#000" flood-opacity="0.25"/>
+    </filter>
+  </defs>
+
+  <!-- Fundo Apple Squircle (Formato icônico do iOS) -->
+  <rect width="512" height="512" rx="116" fill="url(#bgMask)"/>
+  
+  <!-- Borda interna fina para dar brilho de vidro (Glassmorphism) -->
+  <rect x="2" y="2" width="508" height="508" rx="114" stroke="#ffffff" stroke-width="4" stroke-opacity="0.06"/>
+  
+  <!-- Grade de fundo sutil (Simulando uma matriz de planilhas/horários) -->
+  <path d="M 100 160 L 412 160 M 100 240 L 412 240 M 100 320 L 412 320 M 100 400 L 412 400" stroke="#334155" stroke-width="4" stroke-linecap="round" stroke-dasharray="8 8" opacity="0.4"/>
+
+  <!-- Ícone de Calendário Principal Centralizado e Flutuante -->
+  <rect x="126" y="110" width="260" height="260" rx="36" fill="#ffffff" filter="url(#dropShadow)"/>
+
+  <!-- Topo do Calendário (Com verde) -->
+  <path d="M126 146 C126 126.118 142.118 110 162 110 L350 110 C369.882 110 386 126.118 386 146 L386 186 L126 186 Z" fill="url(#greenAccent)"/>
+
+  <!-- Furos Metálicos do encadernamento do calendário -->
+  <circle cx="190" cy="110" r="12" fill="#020617" filter="url(#lightShadow)"/>
+  <circle cx="322" cy="110" r="12" fill="#020617" filter="url(#lightShadow)"/>
+
+  <rect x="182" y="80" width="16" height="50" rx="8" fill="#f8fafc" filter="url(#lightShadow)"/>
+  <rect x="314" y="80" width="16" height="50" rx="8" fill="#f8fafc" filter="url(#lightShadow)"/>
+
+  <!-- Blocos de Horário (Tracks de Aulas) -->
+  <!-- Linha 1 -->
+  <rect x="166" y="216" width="60" height="28" rx="10" fill="url(#greenAccent)"/>
+  <rect x="246" y="216" width="104" height="28" rx="10" fill="#e2e8f0"/>
+  
+  <!-- Linha 2 -->
+  <rect x="166" y="266" width="94" height="28" rx="10" fill="#cbd5e1"/>
+  <rect x="280" y="266" width="70" height="28" rx="10" fill="url(#greenAccent)"/>
+  
+  <!-- Linha 3 (Vago) -->
+  <rect x="166" y="316" width="70" height="28" rx="10" fill="#f1f5f9"/>
+
+  <!-- Elemento 3D de Relógio Sobreposto para dar ênfase no "Tempo/Horário" -->
+  <circle cx="386" cy="366" r="76" fill="#ffffff" filter="url(#dropShadow)"/>
+  <circle cx="386" cy="366" r="64" fill="url(#headerGrad)"/>
+  <circle cx="386" cy="366" r="54" fill="#1e293b"/>
+  
+  <!-- Marcações das horas no relógio -->
+  <path d="M386 318 L386 324 M386 408 L386 414 M338 366 L344 366 M428 366 L434 366" stroke="#475569" stroke-width="4" stroke-linecap="round"/>
+
+  <!-- Ponteiros do relógio -->
+  <path d="M386 332 L386 366 L410 380" stroke="url(#greenAccent)" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/>
+  
+  <!-- Parafuso central do relógio -->
+  <circle cx="386" cy="366" r="6" fill="#10b981"/>
+</svg>
