@@ -317,64 +317,7 @@ export function ScheduleConfigPanel({ isDarkMode }) {
               </div>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-8">
-              <div className="space-y-3">
-                <h4 className="text-[10px] font-black uppercase tracking-widest opacity-60 flex items-center gap-2"><Clock size={12}/> Slots de Aula</h4>
-                {localTimes.map((item, i) => (
-                  <div key={item.id} className={`flex flex-wrap items-center gap-2 p-3 rounded-xl border ${isDarkMode ? 'bg-slate-800/50 border-slate-700' : 'bg-slate-50 border-slate-200'}`}>
-                    <div className="w-8 h-8 rounded-lg flex items-center justify-center bg-black/5 dark:bg-black/20 text-xs font-black opacity-60 shrink-0">{i + 1}</div>
-                    <input
-                      type="text"
-                      value={item.timeStr || ''}
-                      onChange={e => updateTime(item.id, 'timeStr', e.target.value)}
-                      placeholder="07:30 - 08:20"
-                      className={`w-32 text-sm font-bold bg-transparent border-none focus:outline-none focus:ring-1 focus:ring-blue-500 rounded px-2 py-1 ${isDarkMode ? 'text-slate-200 placeholder-slate-600' : 'text-slate-700 placeholder-slate-400'}`}
-                    />
-                    <select
-                      value={item.shift}
-                      onChange={e => updateTime(item.id, 'shift', e.target.value)}
-                      className={`text-[10px] font-bold rounded-lg border-none focus:ring-1 focus:ring-blue-500 px-2 py-1.5 ${isDarkMode ? 'bg-slate-900 text-slate-300' : 'bg-white text-slate-700 shadow-sm'}`}
-                    >
-                      {SHIFTS.map(s => <option key={s} value={s}>{s}</option>)}
-                    </select>
-                    <button onClick={() => removeTime(item.id)} className="ml-auto p-2 text-red-500 hover:bg-red-500/10 rounded-lg transition-colors"><Trash2 size={16}/></button>
-                  </div>
-                ))}
-                {localTimes.length === 0 && <p className="text-sm opacity-50 italic py-4 text-center">Nenhum horário cadastrado. Adicione tempos de aula para começar.</p>}
-              </div>
-
-              <div className="space-y-3">
-                <div className="flex justify-between items-center">
-                  <h4 className="text-[10px] font-black uppercase tracking-widest opacity-60 flex items-center gap-2"><Clock size={12}/> Intervalos</h4>
-                  <button onClick={addInterval} className={`px-3 py-1.5 rounded-lg text-[10px] font-bold flex items-center gap-1.5 transition-colors ${isDarkMode ? 'bg-amber-900/30 text-amber-500 hover:bg-amber-900/50' : 'bg-amber-100 text-amber-700 hover:bg-amber-200'}`}>
-                    <Plus size={12}/> Add Intervalo
-                  </button>
-                </div>
-                {localIntervals.map((inv, i) => (
-                  <div key={inv.id} className={`flex flex-col gap-2 p-3 rounded-xl border border-dashed ${isDarkMode ? 'bg-amber-900/10 border-amber-800/50' : 'bg-amber-50 border-amber-200'}`}>
-                    <div className="flex justify-between items-center text-xs font-black">
-                       <input type="text" value={inv.description} onChange={e => updateInterval(inv.id, 'description', e.target.value)} className="bg-transparent border-b font-bold w-1/2 focus:outline-none text-amber-600 dark:text-amber-500" placeholder="Ex: Recreio" />
-                       <button onClick={() => removeInterval(inv.id)} className="text-red-500 hover:opacity-70"><Trash2 size={14}/></button>
-                    </div>
-                    <div className="flex gap-2">
-                      <select value={inv.shift} onChange={e => updateInterval(inv.id, 'shift', e.target.value)} className={`text-[10px] font-bold rounded-md px-1 py-1 flex-1 ${isDarkMode ? 'bg-slate-900 text-white' : 'bg-white text-slate-800'}`}>
-                        {SHIFTS.map(s => <option key={s} value={s}>{s}</option>)}
-                      </select>
-                    </div>
-                    <div className="flex items-center gap-2 text-[10px]">
-                      <span className="font-bold opacity-70">Após a aula: </span>
-                      <input type="number" min="1" max="10" value={inv.position} onChange={e => updateInterval(inv.id, 'position', e.target.value)} className={`w-12 text-center rounded px-1 py-1 font-black ${isDarkMode?'bg-slate-900 text-slate-200':'bg-white border'}`} />
-                      <span className="font-bold border-l pl-2 opacity-70">Duração (min): </span>
-                      <input type="number" min="5" max="120" value={inv.duration} onChange={e => updateInterval(inv.id, 'duration', e.target.value)} className={`w-14 text-center rounded px-1 py-1 font-black text-amber-600 ${isDarkMode?'bg-slate-900':'bg-white border'}`} />
-                    </div>
-                  </div>
-                ))}
-                {localIntervals.length === 0 && <p className="text-[10px] font-bold opacity-50 italic py-2 text-center">Nenhum intervalo cadastrado.</p>}
-              </div>
-
-            </div>
-
-            <div className={`p-5 rounded-2xl border ${isDarkMode ? 'bg-slate-800/30 border-slate-700' : 'bg-slate-50 border-slate-200'}`}>
+            <div className={`p-5 rounded-2xl border mb-8 ${isDarkMode ? 'bg-slate-800/30 border-slate-700' : 'bg-slate-50 border-slate-200'}`}>
               <div className="flex items-center justify-between mb-4">
                 <p className="font-black uppercase tracking-widest opacity-60 text-xs">Ações Práticas (Gerar Grade em Cadeia)</p>
               </div>
@@ -464,6 +407,67 @@ export function ScheduleConfigPanel({ isDarkMode }) {
                    </button>
                  ))}
               </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-8">
+              <div className="space-y-3">
+                <h4 className="text-[10px] font-black uppercase tracking-widest opacity-60 flex items-center gap-2"><Clock size={12}/> Slots de Aula</h4>
+                {localTimes.sort((a,b) => {
+                  const shiftDiff = (SHIFT_ORDER[a.shift] ?? 99) - (SHIFT_ORDER[b.shift] ?? 99);
+                  if (shiftDiff !== 0) return shiftDiff;
+                  return (a.timeStr || '').localeCompare(b.timeStr || '');
+                }).map((item, i) => (
+                  <div key={item.id} className={`flex flex-wrap items-center gap-2 p-3 rounded-xl border ${isDarkMode ? 'bg-slate-800/50 border-slate-700' : 'bg-slate-50 border-slate-200'}`}>
+                    <div className="w-8 h-8 rounded-lg flex items-center justify-center bg-black/5 dark:bg-black/20 text-xs font-black opacity-60 shrink-0">{i + 1}</div>
+                    <input
+                      type="text"
+                      value={item.timeStr || ''}
+                      onChange={e => updateTime(item.id, 'timeStr', e.target.value)}
+                      placeholder="07:30 - 08:20"
+                      className={`w-32 text-sm font-bold bg-transparent border-none focus:outline-none focus:ring-1 focus:ring-blue-500 rounded px-2 py-1 ${isDarkMode ? 'text-slate-200 placeholder-slate-600' : 'text-slate-700 placeholder-slate-400'}`}
+                    />
+                    <select
+                      value={item.shift}
+                      onChange={e => updateTime(item.id, 'shift', e.target.value)}
+                      className={`text-[10px] font-bold rounded-lg border-none focus:ring-1 focus:ring-blue-500 px-2 py-1.5 ${isDarkMode ? 'bg-slate-900 text-slate-300' : 'bg-white text-slate-700 shadow-sm'}`}
+                    >
+                      {SHIFTS.map(s => <option key={s} value={s}>{s}</option>)}
+                    </select>
+                    <button onClick={() => removeTime(item.id)} className="ml-auto p-2 text-red-500 hover:bg-red-500/10 rounded-lg transition-colors"><Trash2 size={16}/></button>
+                  </div>
+                ))}
+                {localTimes.length === 0 && <p className="text-sm opacity-50 italic py-4 text-center">Nenhum horário cadastrado. Adicione tempos de aula para começar.</p>}
+              </div>
+
+              <div className="space-y-3">
+                <div className="flex justify-between items-center">
+                  <h4 className="text-[10px] font-black uppercase tracking-widest opacity-60 flex items-center gap-2"><Clock size={12}/> Intervalos</h4>
+                  <button onClick={addInterval} className={`px-3 py-1.5 rounded-lg text-[10px] font-bold flex items-center gap-1.5 transition-colors ${isDarkMode ? 'bg-amber-900/30 text-amber-500 hover:bg-amber-900/50' : 'bg-amber-100 text-amber-700 hover:bg-amber-200'}`}>
+                    <Plus size={12}/> Add Intervalo
+                  </button>
+                </div>
+                {localIntervals.map((inv, i) => (
+                  <div key={inv.id} className={`flex flex-col gap-2 p-3 rounded-xl border border-dashed ${isDarkMode ? 'bg-amber-900/10 border-amber-800/50' : 'bg-amber-50 border-amber-200'}`}>
+                    <div className="flex justify-between items-center text-xs font-black">
+                       <input type="text" value={inv.description} onChange={e => updateInterval(inv.id, 'description', e.target.value)} className="bg-transparent border-b font-bold w-1/2 focus:outline-none text-amber-600 dark:text-amber-500" placeholder="Ex: Recreio" />
+                       <button onClick={() => removeInterval(inv.id)} className="text-red-500 hover:opacity-70"><Trash2 size={14}/></button>
+                    </div>
+                    <div className="flex gap-2">
+                      <select value={inv.shift} onChange={e => updateInterval(inv.id, 'shift', e.target.value)} className={`text-[10px] font-bold rounded-md px-1 py-1 flex-1 ${isDarkMode ? 'bg-slate-900 text-white' : 'bg-white text-slate-800'}`}>
+                        {SHIFTS.map(s => <option key={s} value={s}>{s}</option>)}
+                      </select>
+                    </div>
+                    <div className="flex items-center gap-2 text-[10px]">
+                      <span className="font-bold opacity-70">Após a aula: </span>
+                      <input type="number" min="1" max="10" value={inv.position} onChange={e => updateInterval(inv.id, 'position', e.target.value)} className={`w-12 text-center rounded px-1 py-1 font-black ${isDarkMode?'bg-slate-900 text-slate-200':'bg-white border'}`} />
+                      <span className="font-bold border-l pl-2 opacity-70">Duração (min): </span>
+                      <input type="number" min="5" max="120" value={inv.duration} onChange={e => updateInterval(inv.id, 'duration', e.target.value)} className={`w-14 text-center rounded px-1 py-1 font-black text-amber-600 ${isDarkMode?'bg-slate-900':'bg-white border'}`} />
+                    </div>
+                  </div>
+                ))}
+                {localIntervals.length === 0 && <p className="text-[10px] font-bold opacity-50 italic py-2 text-center">Nenhum intervalo cadastrado.</p>}
+              </div>
+
             </div>
           </div>
         )}
