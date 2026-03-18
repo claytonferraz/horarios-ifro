@@ -199,7 +199,7 @@ export function ScheduleEditorModal({
                       <option value="SEM PROFESSOR">SEM PROFESSOR</option>
                       <option value="SUBSTITUTO">SUBSTITUTO</option>
                       {usersList.map(u => (
-                         <option key={u.siape} value={u.nome_exibicao}>{u.nome_exibicao}</option>
+                         <option key={u.siape} value={u.siape}>{u.nome_exibicao || u.nome_completo}</option>
                       ))}
                     </select>
                   </div>

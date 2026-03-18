@@ -69,6 +69,13 @@ export function isTeacherPending(teacher) {
   return !teacher || teacher === 'A Definir' || /sem professor/i.test(teacher) || teacher === '-';
 }
 
+export function resolveTeacherName(siapeOrName, globalTeachersList = []) {
+  if (isTeacherPending(siapeOrName)) return 'SEM PROFESSOR';
+  if (!globalTeachersList || !Array.isArray(globalTeachersList)) return siapeOrName;
+  const teacher = globalTeachersList.find(t => t.siape === siapeOrName || t.id === siapeOrName);
+  return teacher ? (teacher.nome_exibicao || teacher.nome_completo || teacher.siape) : siapeOrName;
+}
+
 export function getColorHash(str, isDark) {
   if (!str) return isDark ? 'bg-slate-900 text-transparent' : 'bg-slate-50 text-transparent';
   

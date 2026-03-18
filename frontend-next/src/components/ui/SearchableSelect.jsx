@@ -19,8 +19,17 @@ export const SearchableSelect = ({ value, onChange, options, colorClass, placeho
   }, []);
 
   const filteredOptions = useMemo(() => 
-    options.filter(o => o.toString().toLowerCase().includes(search.toLowerCase()))
+    options.filter(o => {
+      const text = typeof o === 'object' ? o.label : o.toString();
+      return text.toLowerCase().includes(search.toLowerCase());
+    })
   , [options, search]);
+
+  const getDisplayValue = (val) => {
+    if (!val) return 'Selecione...';
+    const obj = options.find(o => (typeof o === 'object' ? o.value === val : o === val));
+    return obj ? (typeof obj === 'object' ? obj.label : obj) : val;
+  };
 
   return (
     <div className="relative w-full" ref={wrapperRef}>
@@ -28,7 +37,7 @@ export const SearchableSelect = ({ value, onChange, options, colorClass, placeho
         className={`w-full appearance-none border font-semibold py-2 px-3 pr-8 rounded-lg focus:outline-none cursor-pointer flex justify-between items-center text-[11px] uppercase tracking-wide transition-all ${colorClass}`}
         onClick={() => { setIsOpen(!isOpen); setSearch(''); }}
       >
-        <span className="truncate block pr-2">{value || 'Selecione...'}</span>
+        <span className="truncate block pr-2">{getDisplayValue(value)}</span>
         <ChevronDown size={14} className={`absolute right-2 opacity-50 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
       </div>
       
@@ -46,7 +55,9 @@ export const SearchableSelect = ({ value, onChange, options, colorClass, placeho
           </div>
           <ul className="overflow-y-auto p-1">
             {filteredOptions.length > 0 ? filteredOptions.map(opt => {
-               const isSelected = value === opt;
+               const optValue = typeof opt === 'object' ? opt.value : opt;
+               const optLabel = typeof opt === 'object' ? opt.label : opt;
+               const isSelected = value === optValue;
                let itemClasses = "px-2 py-1.5 text-[11px] uppercase rounded-md cursor-pointer transition-colors ";
                if (isSelected) {
                    itemClasses += isDarkMode ? "bg-emerald-900/40 text-emerald-300 font-bold" : "bg-emerald-50 text-emerald-800 font-bold";
@@ -56,11 +67,11 @@ export const SearchableSelect = ({ value, onChange, options, colorClass, placeho
 
                return (
                 <li 
-                  key={opt}
+                  key={optValue}
                   className={itemClasses}
-                  onClick={() => { onChange(opt); setIsOpen(false); setSearch(''); }}
+                  onClick={() => { onChange(optValue); setIsOpen(false); setSearch(''); }}
                 >
-                  {opt}
+                  {optLabel}
                 </li>
                )
             }) : (

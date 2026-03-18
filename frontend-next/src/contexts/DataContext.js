@@ -60,6 +60,7 @@ export function DataProvider({ children }) {
     }
   };
 
+  const [globalTeachers, setGlobalTeachers] = useState([]);
   const loadMetadata = async () => {
     try {
       const meta = await apiClient.fetchAdminMeta();
@@ -68,6 +69,8 @@ export function DataProvider({ children }) {
         setDisciplinesMeta(meta.disciplines || {});
         setAcademicYearsMeta(meta.academicYears || {});
       }
+      const teachers = await apiClient.fetchTeachers();
+      setGlobalTeachers(teachers || []);
     } catch (err) {
       console.warn("Falha ao carregar metadados administrativos:", err.message);
     }
@@ -86,6 +89,8 @@ export function DataProvider({ children }) {
     subjectHoursMeta,
     disciplinesMeta,
     academicYearsMeta,
+    globalTeachers,
+    setGlobalTeachers,
     activeDays,
     setActiveDays,
     classTimes,

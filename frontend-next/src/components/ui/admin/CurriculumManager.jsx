@@ -486,8 +486,13 @@ function ClassesTab({ isDarkMode, matrices, classes, setClasses, generateId, aca
   };
 
   const handleProfChange = (discId, profStr) => {
-    // We store professors as an array from a comma-separated string
-    const profArray = profStr.split(',').map(p => p.trim()).filter(Boolean);
+    const profArray = profStr.split(',').map(p => {
+       const trimmed = p.trim();
+       if (!trimmed) return null;
+       const match = globalTeachers.find(t => t.nome_exibicao === trimmed || t.nome_completo === trimmed || t.siape === trimmed);
+       return match ? match.siape : trimmed;
+    }).filter(Boolean);
+    
     setLocalFormData(prev => ({
       ...prev,
       professorAssignments: {
@@ -576,7 +581,10 @@ function ClassesTab({ isDarkMode, matrices, classes, setClasses, generateId, aca
                   {disciplinesToAssign.map(disc => {
                     const assignedProfs = localFormData.professorAssignments?.[disc.id] || [];
                     const assignedRoom = localFormData.roomAssignments?.[disc.id] || '';
-                    const profStr = assignedProfs.join(', ');
+                    const profStr = assignedProfs.map(siape => {
+                      const match = globalTeachers.find(t => t.siape === siape);
+                      return match ? (match.nome_exibicao || match.nome_completo) : siape;
+                    }).join(', ');
                     return (
                       <tr key={disc.id}>
                         <td className="p-3 font-bold">{disc.name} {disc.code && <span className="opacity-50 ml-1 text-[10px] uppercase">({disc.code})</span>}</td>

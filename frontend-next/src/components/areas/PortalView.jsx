@@ -6,7 +6,8 @@ import {
 import { SearchableSelect } from '../ui/SearchableSelect';
 import { InlineInput } from '../ui/InlineInput';
 import { ScheduleEditorModal } from '../ui/admin/ScheduleEditorModal';
-import { MAP_DAYS, getColorHash, isTeacherPending } from '@/lib/dates';
+import { MAP_DAYS, getColorHash, isTeacherPending, resolveTeacherName } from '@/lib/dates';
+import { useData } from '@/contexts/DataContext';
 
 export function PortalView({
   appMode, isDarkMode, viewMode, setViewMode, scheduleMode, setScheduleMode, userRole,
@@ -18,6 +19,7 @@ export function PortalView({
   selectedDay, setSelectedDay, selectedWeek, setSelectedWeek, activeWeeksList,
   getCellRecords, activeCourseClasses, profStats, activeDays, classTimes, rawData, loadAdminMetadata
 }) {
+  const { globalTeachers } = useData();
   const [editorModal, setEditorModal] = useState(null);
 
   const safeDays = [...(activeDays || ['Segunda-feira', 'Terça-feira', 'Quarta-feira', 'Quinta-feira', 'Sexta-feira'])].sort((a,b) => MAP_DAYS.indexOf(a) - MAP_DAYS.indexOf(b));
@@ -133,7 +135,7 @@ export function PortalView({
                   )}
                   {(viewMode === 'professor') && (
                     <div className="space-y-1 col-span-full md:col-span-2"><label className="text-[9px] font-black tracking-[0.2em] text-slate-400 uppercase ml-1">Buscar Professor</label>
-                      <SearchableSelect isDarkMode={isDarkMode} options={globalTeachersList} value={selectedTeacher} onChange={setSelectedTeacher} colorClass={isDarkMode ? "bg-indigo-900/30 border-indigo-800/50 text-indigo-200 shadow-sm" : "bg-indigo-50 border-indigo-100 text-indigo-900 shadow-sm"} />
+                      <SearchableSelect isDarkMode={isDarkMode} options={globalTeachersList.map(t => ({value: t, label: resolveTeacherName(t, globalTeachers)}))} value={selectedTeacher} onChange={setSelectedTeacher} colorClass={isDarkMode ? "bg-indigo-900/30 border-indigo-800/50 text-indigo-200 shadow-sm" : "bg-indigo-50 border-indigo-100 text-indigo-900 shadow-sm"} />
                     </div>
                   )}
                   {viewMode === 'total' && (
@@ -142,7 +144,7 @@ export function PortalView({
                         <SearchableSelect isDarkMode={isDarkMode} options={availableYearsForTotal} value={totalFilterYear} onChange={setTotalFilterYear} colorClass={isDarkMode ? 'bg-slate-800 border-slate-700 text-slate-200 shadow-sm' : 'bg-white border-slate-200 text-slate-800 shadow-sm'} />
                       </div>
                       <div className="space-y-1"><label className="text-[9px] font-black tracking-[0.2em] text-slate-400 uppercase ml-1">Professor</label>
-                        <SearchableSelect isDarkMode={isDarkMode} options={availableTeachersForTotal} value={totalFilterTeacher} onChange={setTotalFilterTeacher} colorClass={isDarkMode ? 'bg-slate-800 border-slate-700 text-slate-200 shadow-sm' : 'bg-white border-slate-200 text-slate-800 shadow-sm'} />
+                        <SearchableSelect isDarkMode={isDarkMode} options={availableTeachersForTotal.map(t => ({value: t, label: resolveTeacherName(t, globalTeachers)}))} value={totalFilterTeacher} onChange={setTotalFilterTeacher} colorClass={isDarkMode ? 'bg-slate-800 border-slate-700 text-slate-200 shadow-sm' : 'bg-white border-slate-200 text-slate-800 shadow-sm'} />
                       </div>
                       <div className="space-y-1"><label className="text-[9px] font-black tracking-[0.2em] text-slate-400 uppercase ml-1">Turma</label>
                         <SearchableSelect isDarkMode={isDarkMode} options={availableClassesForTotal} value={totalFilterClass} onChange={setTotalFilterClass} colorClass={isDarkMode ? 'bg-slate-800 border-slate-700 text-slate-200 shadow-sm' : 'bg-white border-slate-200 text-slate-800 shadow-sm'} />
@@ -290,7 +292,7 @@ export function PortalView({
                                                 <div key={r.id} className={`p-3 rounded-lg border flex flex-col sm:flex-row justify-between sm:items-center gap-2 shadow-sm ${isPending ? (isDarkMode ? 'bg-red-900/30 border-red-800/50 text-red-300' : 'bg-red-50 border-red-200 text-red-800') : getColorHash(r.subject, isDarkMode)}`}>
                                                    <div>
                                                       <p className={`font-black text-sm leading-tight ${isDarkMode ? 'text-white' : 'text-slate-800'}`}>{r.subject}</p>
-                                                      <p className={`text-[10px] font-bold uppercase tracking-wider mt-0.5 ${isPending ? (isDarkMode ? 'text-red-400' : 'text-red-600') : 'opacity-80'}`}>{isPending ? 'Sem Professor' : r.teacher}</p>
+                                                      <p className={`text-[10px] font-bold uppercase tracking-wider mt-0.5 ${isPending ? (isDarkMode ? 'text-red-400' : 'text-red-600') : 'opacity-80'}`}>{isPending ? 'Sem Professor' : resolveTeacherName(r.teacher, globalTeachers)}</p>
                                                    </div>
                                                    {r.room && <span className={`text-[9px] font-black uppercase tracking-widest px-2 py-1 rounded-md self-start sm:self-auto shrink-0 ${isDarkMode ? 'bg-white/10' : 'bg-black/5'}`}>{r.room}</span>}
                                                 </div>
@@ -621,7 +623,7 @@ export function PortalView({
                                                           return (
                                                             <div key={r.id} className={`print-clean-card p-2 rounded-xl border shadow-sm flex flex-col justify-center min-h-[50px] transition-all hover:scale-[1.02] hover:shadow-md active:scale-95 ${isPending ? (isDarkMode ? 'bg-red-900/30 border-red-800/50 text-red-300' : 'bg-red-50 border-red-300 text-red-800') : getColorHash(r.subject, isDarkMode)}`}>
                                                               <p className={`subject font-medium text-[10px] leading-tight text-center ${isDarkMode ? 'text-slate-200' : 'text-slate-700'}`}>
-                                                                {r.subject} <span className={`font-medium opacity-80 ${isPending ? (isDarkMode ? 'text-red-400 font-bold' : 'text-red-600 font-bold') : ''}`}>- {r.teacher}</span>
+                                                                {r.subject} <span className={`font-medium opacity-80 ${isPending ? (isDarkMode ? 'text-red-400 font-bold' : 'text-red-600 font-bold') : ''}`}>- {resolveTeacherName(r.teacher, globalTeachers)}</span>
                                                               </p>
                                                             </div>
                                                           );
@@ -738,7 +740,7 @@ export function PortalView({
                                                                   <div className="flex items-center gap-1.5 flex-1 max-w-[calc(100%-60px)]">
                                                                     <span className="font-bold text-[10px] leading-tight break-words pr-1">{r.subject}</span>
                                                                   </div>
-                                                                  <span className={`text-[8px] font-bold uppercase tracking-wide shrink-0 bg-white/10 px-1 rounded ${isPending ? (isDarkMode ? 'text-red-400' : 'text-red-600') : 'opacity-80'}`}>{isPending ? 'SEM PROF.' : r.teacher.split(' ')[0]}</span>
+                                                                  <span className={`text-[8px] font-bold uppercase tracking-wide shrink-0 bg-white/10 px-1 rounded ${isPending ? (isDarkMode ? 'text-red-400' : 'text-red-600') : 'opacity-80'}`}>{isPending ? 'SEM PROF.' : resolveTeacherName(r.teacher, globalTeachers).split(' ')[0]}</span>
                                                                 </div>
                                                               )
                                                             }) : (
@@ -1036,7 +1038,7 @@ export function PortalView({
                                                     {isPending && <span className={`text-[7px] font-black uppercase tracking-widest px-1.5 py-0.5 rounded w-fit mx-auto mb-0.5 ${isDarkMode ? 'text-red-400 bg-red-900/50' : 'text-red-600 bg-red-100'}`}>SEM PROFESSOR</span>}
                                                     <p className="subject font-bold text-[10px] leading-tight mb-0.5 text-center">{r.subject}</p>
                                                     <p className="details text-[8px] font-bold opacity-80 flex items-center justify-center gap-1 uppercase truncate">
-                                                      {r.teacher}
+                                                      {resolveTeacherName(r.teacher, globalTeachers)}
                                                     </p>
                                                     {r.room && <span className={`details text-[8px] font-black tracking-tighter opacity-60 px-1.5 py-0.5 rounded mt-1 w-fit uppercase mx-auto ${isDarkMode ? 'bg-white/10' : 'bg-black/5'}`}>{r.room}</span>}
                                                   </div>
@@ -1102,7 +1104,7 @@ export function PortalView({
                                             return (
                                               <div key={`mob-rec-${r.id}`} className={`p-2.5 rounded-lg border shadow-sm flex flex-col justify-center ${isPending ? (isDarkMode ? 'bg-red-900/30 border-red-800/50 text-red-300' : 'bg-red-50 border-red-200 text-red-800') : getColorHash(r.subject, isDarkMode)}`}>
                                                 <p className="font-black text-[11px] leading-tight mb-1">{r.subject}</p>
-                                                <p className={`text-[9px] font-bold uppercase tracking-wide truncate ${isPending ? (isDarkMode ? 'text-red-400' : 'text-red-600') : 'opacity-80'}`}>{isPending ? 'SEM PROFESSOR' : r.teacher}</p>
+                                                <p className={`text-[9px] font-bold uppercase tracking-wide truncate ${isPending ? (isDarkMode ? 'text-red-400' : 'text-red-600') : 'opacity-80'}`}>{isPending ? 'SEM PROFESSOR' : resolveTeacherName(r.teacher, globalTeachers)}</p>
                                                 {r.room && <span className={`text-[8px] font-black uppercase tracking-widest mt-1.5 px-2 py-0.5 rounded w-fit ${isDarkMode ? 'bg-white/10' : 'bg-black/5'}`}>{r.room}</span>}
                                               </div>
                                             )

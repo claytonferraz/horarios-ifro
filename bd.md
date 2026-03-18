@@ -15,6 +15,13 @@ Armazena a relação consolidada de usuários do sistema, equipe multidisciplina
 *   `perfis` (TEXT, DEFAULT '[]'): Objeto JSON (stringificado) com os papéis do sistema (ex: `["TAE", "Professor"]`).
 *   `atua_como_docente` (INTEGER, DEFAULT 1): Booleano de indexação. Se marcado como `1` (true), a pessoa sempre será exibida na base de listas de atribuições de turmas.
 
+### 2. `curriculum_data` (Dados Mestre Anuais)
+Armazena as definições de Matrizes Curriculares e as Turmas do ano letivo.
+*   `id` (TEXT, PRIMARY KEY): Identificador único.
+*   `dataType` (TEXT): Tipo ('matrix' | 'class').
+*   `payload` (TEXT): Objeto JSON da matriz ou da turma.
+   - **Nota sobre Vínculo de Professores (Turma)**: O array `professorAssignments` no payload de uma *Class* armazena obrigatoriamente a matrícula **SIAPE** como chave estrangeira em vez do nome por extenso do docente. O frontend do sistema interage em tempo real varrendo os usuários na renderização (`PortalView`) mapeando o SIAPE para apresentar o `nome_exibicao`. Qualquer troca no Nome de Exibição de um SIAPE atualizará instantaneamente o componente das Turmas onde ele leciona.
+
 ### 3. `schedules`
 Armazena os agendamentos/quadros de horários semanais consolidados ou prévios.
 *   `id` (TEXT, PRIMARY KEY): String composta única do horário (ex: "43/2026_oficial").
