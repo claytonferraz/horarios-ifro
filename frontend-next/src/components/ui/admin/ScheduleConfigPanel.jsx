@@ -397,7 +397,7 @@ export function ScheduleConfigPanel({ isDarkMode }) {
                            const endMM = (minutesCounter % 60).toString().padStart(2, '0');
                            newTimes.push({ ...timesForShift[i], timeStr: `${startHH}:${startMM} - ${endHH}:${endMM}` });
                            const interval = intervalsForShift.find(int => Number(int.position) === i + 1);
-                           if (interval) minutesCounter += Number(interval.duration);
+                           if (interval) minutesCounter += Number(interval.duration || 0);
                         }
                         setLocalTimes(prev => prev.map(pt => {
                             const updated = newTimes.find(nt => nt.id === pt.id);
