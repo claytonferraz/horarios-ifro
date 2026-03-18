@@ -279,11 +279,16 @@ app.get('/api/config', (req, res) => {
   db.get("SELECT disabledWeeks, activeDays, classTimes, bimesters, activeDefaultScheduleId FROM config WHERE id = ?", [configId], (err, row) => {
     if (err) return res.status(500).json({ error: err.message });
     if (row) {
+      let dWeeks = [], aDays = null, cTimes = null, bimesters = null;
+      try { dWeeks = row.disabledWeeks ? JSON.parse(row.disabledWeeks) : []; } catch(e) {}
+      try { aDays = row.activeDays ? JSON.parse(row.activeDays) : null; } catch(e) {}
+      try { cTimes = row.classTimes ? JSON.parse(row.classTimes) : null; } catch(e) {}
+      try { bimesters = row.bimesters ? JSON.parse(row.bimesters) : null; } catch(e) {}
       res.json({
-        disabledWeeks: row.disabledWeeks ? JSON.parse(row.disabledWeeks) : [],
-        activeDays: row.activeDays ? JSON.parse(row.activeDays) : null,
-        classTimes: row.classTimes ? JSON.parse(row.classTimes) : null,
-        bimesters: row.bimesters ? JSON.parse(row.bimesters) : null,
+        disabledWeeks: dWeeks,
+        activeDays: aDays,
+        classTimes: cTimes,
+        bimesters: bimesters,
         activeDefaultScheduleId: row.activeDefaultScheduleId || null
       });
     } else {
@@ -666,22 +671,26 @@ app.post('/api/admin/teachers/batch', verifyToken, async (req, res) => {
         stmtCheck.get([targetSiape], async (err, row) => {
           if (err) return reject(err);
           let exigirTroca = exigir_troca_senha !== undefined ? exigir_troca_senha : (row ? row.exigir_troca_senha : 1);
-          let finalHash = row ? row.senha_hash : null;
-          if (!finalHash) {
-            finalHash = await bcrypt.hash(`prof@${new Date().getFullYear()}`, 10);
-            exigirTroca = 1;
-          }
+          try {
+            let finalHash = row ? row.senha_hash : null;
+            if (!finalHash) {
+              finalHash = await bcrypt.hash(`prof@${new Date().getFullYear()}`, 10);
+              exigirTroca = 1;
+            }
 
-          if (oldSiape && oldSiape !== siape) {
-             stmtUpdateSiape.run([siape, nome_exibicao || '', nome_completo, email || null, status || 'ativo', perfisStr, atuaDoc, oldSiape], (err) => {
-                if (err) return reject(err);
-                resolve();
-             });
-          } else {
-             stmtMerge.run([siape, nome_exibicao || '', nome_completo, email || null, finalHash, status || 'ativo', perfisStr, atuaDoc, exigirTroca], (err) => {
-                if (err) return reject(err);
-                resolve();
-             });
+            if (oldSiape && oldSiape !== siape) {
+               stmtUpdateSiape.run([siape, nome_exibicao || '', nome_completo, email || null, status || 'ativo', perfisStr, atuaDoc, oldSiape], (err) => {
+                  if (err) return reject(err);
+                  resolve();
+               });
+            } else {
+               stmtMerge.run([siape, nome_exibicao || '', nome_completo, email || null, finalHash, status || 'ativo', perfisStr, atuaDoc, exigirTroca], (err) => {
+                  if (err) return reject(err);
+                  resolve();
+               });
+            }
+          } catch(e) {
+            reject(e);
           }
         });
       });
@@ -746,6 +755,7 @@ app.post('/api/professor/request', verifyToken, (req, res) => {
       if (row && row.records) {
         let records = [];
         try { records = JSON.parse(row.records); } catch(e){}
+        if (!Array.isArray(records)) records = [];
         const conflict = records.find(r => r.teacher === siape && r.day === proposed_slot.day && r.time === proposed_slot.time);
         if (conflict) {
           return res.status(400).json({ error: `Choque de Horários: Você já possui aula de ${conflict.subject} na turma ${conflict.className} neste horário.` });
