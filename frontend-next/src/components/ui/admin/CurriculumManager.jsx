@@ -86,10 +86,12 @@ function MatricesTab({ isDarkMode, matrices, setMatrices, generateId }) {
   const handleStartEdit = (matrix = null) => {
     if (matrix) {
       setEditingId(matrix.id);
-      setLocalFormData(JSON.parse(JSON.stringify(matrix))); // deep copy
+      const copy = JSON.parse(JSON.stringify(matrix)); // deep copy
+      if (!copy.series) copy.series = [];
+      setLocalFormData(copy);
     } else {
       setEditingId('new');
-      setLocalFormData({ id: generateId(), name: '', course: '', series: [] });
+      setLocalFormData({ id: generateId(), name: '', course: '', courseAcronym: '', series: [] });
     }
   };
 
@@ -121,12 +123,12 @@ function MatricesTab({ isDarkMode, matrices, setMatrices, generateId }) {
   const addSerie = () => {
     const sName = prompt("Nome da Série (ex: 1º Ano)?");
     if (!sName) return;
-    setLocalFormData({ ...localFormData, series: [...localFormData.series, { id: generateId(), name: sName, disciplines: [] }] });
+    setLocalFormData({ ...localFormData, series: [...(localFormData.series || []), { id: generateId(), name: sName, disciplines: [] }] });
   };
   
   const removeSerie = (sId) => {
     if (!window.confirm("Remover esta série e todas as disciplinas dela?")) return;
-    setLocalFormData({ ...localFormData, series: localFormData.series.filter(s => s.id !== sId) });
+    setLocalFormData({ ...localFormData, series: (localFormData.series || []).filter(s => s.id !== sId) });
   };
 
   const addDiscipline = (sId) => {
@@ -176,14 +178,18 @@ function MatricesTab({ isDarkMode, matrices, setMatrices, generateId }) {
           </div>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <div>
             <label className="block text-[10px] font-black uppercase tracking-widest opacity-60 mb-2">Nome da Matriz</label>
-            <input type="text" value={localFormData.name} onChange={e => setLocalFormData({...localFormData, name: e.target.value})} placeholder="Ex: Informática 2024" className={`w-full px-3 py-2.5 rounded-xl border focus:ring-2 focus:ring-indigo-500 font-bold transition-all ${isDarkMode ? 'bg-slate-900 border-slate-700' : 'bg-slate-50 border-slate-200'}`} />
+            <input type="text" value={localFormData.name || ''} onChange={e => setLocalFormData({...localFormData, name: e.target.value})} placeholder="Ex: Informática 2024" className={`w-full px-3 py-2.5 rounded-xl border focus:ring-2 focus:ring-indigo-500 font-bold transition-all ${isDarkMode ? 'bg-slate-900 border-slate-700' : 'bg-slate-50 border-slate-200'}`} />
           </div>
           <div>
             <label className="block text-[10px] font-black uppercase tracking-widest opacity-60 mb-2">Vínculo com Curso</label>
-            <input type="text" value={localFormData.course} onChange={e => setLocalFormData({...localFormData, course: e.target.value})} placeholder="Ex: Informática" className={`w-full px-3 py-2.5 rounded-xl border focus:ring-2 focus:ring-indigo-500 font-bold transition-all ${isDarkMode ? 'bg-slate-900 border-slate-700' : 'bg-slate-50 border-slate-200'}`} />
+            <input type="text" value={localFormData.course || ''} onChange={e => setLocalFormData({...localFormData, course: e.target.value})} placeholder="Ex: Informática" className={`w-full px-3 py-2.5 rounded-xl border focus:ring-2 focus:ring-indigo-500 font-bold transition-all ${isDarkMode ? 'bg-slate-900 border-slate-700' : 'bg-slate-50 border-slate-200'}`} />
+          </div>
+          <div>
+            <label className="block text-[10px] font-black uppercase tracking-widest opacity-60 mb-2">Sigla do Curso</label>
+            <input type="text" value={localFormData.courseAcronym || ''} onChange={e => setLocalFormData({...localFormData, courseAcronym: e.target.value})} placeholder="Ex: INFO" className={`w-full px-3 py-2.5 rounded-xl border uppercase focus:ring-2 focus:ring-indigo-500 font-bold transition-all ${isDarkMode ? 'bg-slate-900 border-slate-700' : 'bg-slate-50 border-slate-200'}`} />
           </div>
         </div>
 
@@ -267,7 +273,7 @@ function MatricesTab({ isDarkMode, matrices, setMatrices, generateId }) {
               <div>
                 <div className="flex justify-between items-start mb-2">
                    <h4 className="font-black text-lg">{matrix.name}</h4>
-                   <span className={`px-2 py-0.5 rounded text-[9px] font-black uppercase tracking-widest ${isDarkMode ? 'bg-indigo-900/80 text-indigo-300' : 'bg-indigo-100 text-indigo-700'}`}>{matrix.course}</span>
+                   <span className={`px-2 py-0.5 rounded text-[9px] font-black uppercase tracking-widest ${isDarkMode ? 'bg-indigo-900/80 text-indigo-300' : 'bg-indigo-100 text-indigo-700'}`}>{matrix.courseAcronym ? `${matrix.course} (${matrix.courseAcronym})` : matrix.course}</span>
                 </div>
                 <p className="text-xs font-bold opacity-60 mb-5">{totalSeries} Anos/Séries, total de {totalDisciplines} Disciplinas cadastradas.</p>
               </div>
