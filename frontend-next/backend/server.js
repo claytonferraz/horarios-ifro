@@ -204,7 +204,12 @@ app.post('/api/auth/login', (req, res) => {
       if (user.status !== 'ativo') return res.status(401).json({ error: "Usuário inativo." });
       
       try {
-        const isValid = await bcrypt.compare(password, user.senha_hash);
+        let isValid = false;
+        if (user.senha_hash && user.senha_hash.startsWith('$2')) {
+          isValid = await bcrypt.compare(password, user.senha_hash);
+        } else {
+          isValid = (password === user.senha_hash);
+        }
         if (!isValid) return res.status(401).json({ error: "Usuário ou senha incorretos." });
 
         let perfis = [];
