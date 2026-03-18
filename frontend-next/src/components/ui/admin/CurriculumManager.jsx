@@ -144,6 +144,10 @@ function MatricesTab({ isDarkMode, matrices, setMatrices, generateId, groupedDis
       }
       setEditingId(null);
       setLocalFormData(null);
+      
+      // Refresh global teachers in case names were changed in another tab
+      const dbTeachers = await apiClient.fetchTeachers();
+      setGlobalTeachers(dbTeachers || []);
     }
   };
 
@@ -463,6 +467,10 @@ function ClassesTab({ isDarkMode, matrices, classes, setClasses, generateId, aca
       }
       setEditingId(null);
       setLocalFormData(null);
+
+      // Refresh global teachers to ensure sync
+      const dbTeachers = await apiClient.fetchTeachers();
+      if (dbTeachers) setGlobalTeachers(dbTeachers);
     }
   };
 
@@ -486,17 +494,26 @@ function ClassesTab({ isDarkMode, matrices, classes, setClasses, generateId, aca
   };
 
   const handleProfChange = (discId, profStr) => {
+    // Treat the input string as a comma-separated list of names or SIAPEs
     const profArray = profStr.split(',').map(p => {
        const trimmed = p.trim();
        if (!trimmed) return null;
-       const match = globalTeachers.find(t => t.nome_exibicao === trimmed || t.nome_completo === trimmed || t.siape === trimmed);
+       
+       // Try to find a teacher by display name, full name or existing SIAPE
+       const match = globalTeachers.find(t => 
+         t.nome_exibicao === trimmed || 
+         t.nome_completo === trimmed || 
+         t.siape === trimmed
+       );
+       
+       // Store SIAPE if found, otherwise store as is (it will resolve later if user types exact name)
        return match ? match.siape : trimmed;
     }).filter(Boolean);
     
     setLocalFormData(prev => ({
       ...prev,
       professorAssignments: {
-        ...prev.professorAssignments,
+        ...(prev.professorAssignments || {}),
         [discId]: profArray
       }
     }));
@@ -581,8 +598,11 @@ function ClassesTab({ isDarkMode, matrices, classes, setClasses, generateId, aca
                   {disciplinesToAssign.map(disc => {
                     const assignedProfs = localFormData.professorAssignments?.[disc.id] || [];
                     const assignedRoom = localFormData.roomAssignments?.[disc.id] || '';
+                    
+                    // NEW DYNAMIC RESOLUTION: Lookup SIAPE in globalTeachers to get the CURRENT name
                     const profStr = assignedProfs.map(siape => {
                       const match = globalTeachers.find(t => t.siape === siape);
+                      // If no match by SIAPE, maybe it's a name we haven't linked yet
                       return match ? (match.nome_exibicao || match.nome_completo) : siape;
                     }).join(', ');
                     return (
