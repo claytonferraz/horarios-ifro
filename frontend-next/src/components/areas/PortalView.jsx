@@ -385,7 +385,7 @@ export function PortalView({
                            </div>
                            <div className="flex items-center gap-3">
                              <span className="text-[9px] font-black text-slate-400 tracking-widest uppercase">Distribuição por bimestre</span>
-                             <button onClick={handlePrint} className="flex items-center gap-2 bg-white/20 hover:bg-white/30 text-white px-3 py-1.5 rounded-lg text-[10px] font-black transition-all shadow-sm">
+                             <button onClick={handlePrint} className="hidden md:flex items-center gap-2 bg-white/20 hover:bg-white/30 text-white px-3 py-1.5 rounded-lg text-[10px] font-black transition-all shadow-sm">
                                <Printer size={14} /> Imprimir Diário
                              </button>
                            </div>
@@ -484,7 +484,7 @@ export function PortalView({
                                   </h2>
                                   {appMode !== 'aluno' && scheduleMode !== 'padrao' && <span className="text-[9px] font-black bg-white/10 px-3 py-1 rounded-full tracking-widest uppercase shadow-inner ml-2">{selectedWeek}</span>}
                                 </div>
-                                <button onClick={handlePrint} className="flex items-center gap-2 bg-white/20 hover:bg-white/30 text-white px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all shadow-sm active:scale-95 no-print">
+                                <button onClick={handlePrint} className="hidden md:flex items-center gap-2 bg-white/20 hover:bg-white/30 text-white px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all shadow-sm active:scale-95 no-print">
                                   <Printer size={14} /> Imprimir Horário do Curso
                                 </button>
                               </div>
@@ -766,7 +766,7 @@ export function PortalView({
                                   </h2>
                                   {appMode !== 'aluno' && scheduleMode !== 'padrao' && <span className="text-[9px] font-black bg-white/10 px-3 py-1 rounded-full tracking-widest uppercase shadow-inner ml-2">{selectedWeek}</span>}
                                 </div>
-                                <button onClick={handlePrint} className="flex items-center gap-2 bg-white/20 hover:bg-white/30 text-white px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all shadow-sm active:scale-95 no-print">
+                                <button onClick={handlePrint} className="hidden md:flex items-center gap-2 bg-white/20 hover:bg-white/30 text-white px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all shadow-sm active:scale-95 no-print">
                                   <Printer size={14} /> Imprimir Horário
                                 </button>
                               </div>
@@ -928,7 +928,7 @@ export function PortalView({
                           {appMode !== 'aluno' && scheduleMode !== 'padrao' && <span className="text-[9px] font-black bg-white/10 px-3 py-1 rounded-full tracking-widest uppercase shadow-inner ml-2">{selectedWeek}</span>}
                         </div>
                         
-                        <button onClick={handlePrint} className="flex items-center gap-2 bg-white/20 hover:bg-white/30 text-white px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all shadow-sm active:scale-95 no-print">
+                        <button onClick={handlePrint} className="hidden md:flex items-center gap-2 bg-white/20 hover:bg-white/30 text-white px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all shadow-sm active:scale-95 no-print">
                           <Printer size={14} /> Imprimir Grade
                         </button>
                       </div>
@@ -1121,7 +1121,7 @@ export function PortalView({
                                   </h2>
                                   {appMode !== 'aluno' && scheduleMode !== 'padrao' && <span className="text-[9px] font-black bg-white/10 px-3 py-1 rounded-full tracking-widest uppercase shadow-inner ml-2">{selectedWeek}</span>}
                                 </div>
-                                <button onClick={handlePrint} className="flex items-center gap-2 bg-white/20 hover:bg-white/30 text-white px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all shadow-sm active:scale-95 no-print">
+                                <button onClick={handlePrint} className="hidden md:flex items-center gap-2 bg-white/20 hover:bg-white/30 text-white px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all shadow-sm active:scale-95 no-print">
                                   <Printer size={14} /> Imprimir Aulas Vagas
                                 </button>
                               </div>
