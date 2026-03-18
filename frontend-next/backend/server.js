@@ -98,6 +98,19 @@ db.serialize(() => {
     payload TEXT -- Contém matrizes e turmas (referência de professores por SIAPE)
   )`);
 
+  // Tabela de Solicitações de Mudança (Portal do Professor)
+  db.run(`CREATE TABLE IF NOT EXISTS change_requests (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    siape TEXT,
+    week_id TEXT,
+    description TEXT,
+    original_slot TEXT, -- JSON: {day, time, className, subject}
+    proposed_slot TEXT, -- JSON: {day, time}
+    status TEXT DEFAULT 'pending', -- 'pending', 'approved', 'rejected'
+    admin_feedback TEXT,
+    createdAt TEXT
+  )`);
+
   // Tabela de Log de Conflitos (Para Auditoria/Motor de Regras)
   db.run(`CREATE TABLE IF NOT EXISTS conflict_logs (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -680,6 +693,47 @@ app.delete('/api/admin/teachers/:siape', verifyToken, (req, res) => {
     lastUpdateTimestamp = Date.now();
     res.json({ success: true });
   });
+});
+
+// ==========================================
+// ROTAS DE SOLICITAÇÕES DE MUDANÇA (PROMPT 2)
+// ==========================================
+app.get('/api/requests', (req, res) => {
+  const { siape } = req.query;
+  const query = siape ? "SELECT * FROM change_requests WHERE siape = ? ORDER BY createdAt DESC" : "SELECT * FROM change_requests ORDER BY createdAt DESC";
+  const params = siape ? [siape] : [];
+  
+  db.all(query, params, (err, rows) => {
+    if (err) return res.status(500).json({ error: err.message });
+    res.json(rows || []);
+  });
+});
+
+app.post('/api/requests', verifyToken, (req, res) => {
+  const { week_id, description, original_slot, proposed_slot } = req.body;
+  const siape = req.userId;
+  const now = new Date().toISOString();
+  
+  db.run(
+    "INSERT INTO change_requests (siape, week_id, description, original_slot, proposed_slot, createdAt) VALUES (?, ?, ?, ?, ?, ?)",
+    [siape, week_id, description, JSON.stringify(original_slot), JSON.stringify(proposed_slot), now],
+    function(err) {
+      if (err) return res.status(500).json({ error: err.message });
+      res.json({ id: this.lastID, success: true });
+    }
+  );
+});
+
+app.put('/api/requests/:id', verifyToken, (req, res) => {
+  const { status, admin_feedback } = req.body;
+  db.run(
+    "UPDATE change_requests SET status = ?, admin_feedback = ? WHERE id = ?",
+    [status, admin_feedback, req.params.id],
+    (err) => {
+      if (err) return res.status(500).json({ error: err.message });
+      res.json({ success: true });
+    }
+  );
 });
 
 app.listen(3012, () => console.log('Backend rodando na porta 3012'));

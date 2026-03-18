@@ -428,5 +428,37 @@ export const apiClient = {
       }
       throw e;
     }
+  },
+
+  // --- SOLICITAÇÕES DE MUDANÇA (PROMPT 2) ---
+  async fetchRequests(siape = null) {
+    try {
+      const url = siape ? `${API_URL}/requests?siape=${siape}` : `${API_URL}/requests`;
+      const res = await fetch(url, { headers: getHeaders() });
+      if (!res.ok) throw new Error('Falha ao buscar solicitações');
+      return await res.json();
+    } catch (e) {
+      return [];
+    }
+  },
+
+  async submitRequest(data) {
+    const res = await fetch(`${API_URL}/requests`, {
+      method: 'POST',
+      headers: getHeaders(),
+      body: JSON.stringify(data)
+    });
+    if (!res.ok) throw new Error('Falha ao enviar solicitação');
+    return await res.json();
+  },
+
+  async updateRequestStatus(id, status, admin_feedback = '') {
+    const res = await fetch(`${API_URL}/requests/${id}`, {
+      method: 'PUT',
+      headers: getHeaders(),
+      body: JSON.stringify({ status, admin_feedback })
+    });
+    if (!res.ok) throw new Error('Falha ao atualizar solicitação');
+    return await res.json();
   }
 };

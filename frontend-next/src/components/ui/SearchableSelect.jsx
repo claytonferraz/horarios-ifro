@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useRef, useMemo } from "react";
 import { ChevronDown } from "lucide-react";
 
-export const SearchableSelect = ({ value, onChange, options, colorClass, placeholder = "Pesquisar...", isDarkMode }) => {
+export const SearchableSelect = ({ value, onChange, options, colorClass, placeholder = "Pesquisar...", isDarkMode, disabled = false }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [search, setSearch] = useState('');
   const wrapperRef = useRef(null);
@@ -32,10 +32,10 @@ export const SearchableSelect = ({ value, onChange, options, colorClass, placeho
   };
 
   return (
-    <div className="relative w-full" ref={wrapperRef}>
+    <div className={`relative w-full ${disabled ? 'opacity-60 cursor-not-allowed' : ''}`} ref={wrapperRef}>
       <div 
-        className={`w-full appearance-none border font-semibold py-2 px-3 pr-8 rounded-lg focus:outline-none cursor-pointer flex justify-between items-center text-[11px] uppercase tracking-wide transition-all ${colorClass}`}
-        onClick={() => { setIsOpen(!isOpen); setSearch(''); }}
+        className={`w-full appearance-none border font-semibold py-2 px-3 pr-8 rounded-lg focus:outline-none cursor-pointer flex justify-between items-center text-[11px] uppercase tracking-wide transition-all ${colorClass} ${disabled ? 'pointer-events-none grayscale-[0.5]' : ''}`}
+        onClick={() => { if (!disabled) { setIsOpen(!isOpen); setSearch(''); } }}
       >
         <span className="truncate block pr-2">{getDisplayValue(value)}</span>
         <ChevronDown size={14} className={`absolute right-2 opacity-50 transition-transform ${isOpen ? 'rotate-180' : ''}`} />

@@ -5,7 +5,7 @@ import { useScheduleStats } from './useScheduleStats';
 import { useScheduleDataTransform } from './useScheduleDataTransform';
 import { DAYS, MAP_DAYS, isFutureWeek, isCurrentWeek, isDatePastOrToday, isTeacherPending } from "@/lib/dates";
 
-export function useScheduleView({ appMode, rawData, disabledWeeks, targetData, disciplinesMeta, subjectHoursMeta, adminFilterCourses, adminFilterClasses, setAdminFilterClasses, activeDays, classTimes, bimesters = [] }) {
+export function useScheduleView({ appMode, rawData, disabledWeeks, targetData, disciplinesMeta, subjectHoursMeta, adminFilterCourses, adminFilterClasses, setAdminFilterClasses, activeDays, classTimes, bimesters = [], siape = null, userRole = null }) {
   const [viewMode, setViewMode] = useState('hoje');
   const [scheduleMode, setScheduleMode] = useState('oficial'); 
 
@@ -43,7 +43,9 @@ export function useScheduleView({ appMode, rawData, disabledWeeks, targetData, d
     scheduleMode,
     viewMode,
     selectedTeacher,
-    setSelectedTeacher
+    setSelectedTeacher,
+    siape,
+    userRole
   });
 
   const resolvedTargetData = targetData || localTargetData;

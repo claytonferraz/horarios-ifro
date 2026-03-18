@@ -10,7 +10,9 @@ export function useScheduleDataTransform({
   scheduleMode,
   viewMode,
   selectedTeacher,
-  setSelectedTeacher
+  setSelectedTeacher,
+  siape = null,
+  userRole = null
 }) {
   const adminAvailableCourses = useMemo(() => {
     if (appMode !== 'admin') return [];
@@ -98,10 +100,16 @@ export function useScheduleDataTransform({
   }, [activeData]);
 
   useEffect(() => {
+    // Se for servidor no portal do professor, trava no próprio SIAPE
+    if (appMode === 'professor' && userRole === 'servidor' && siape) {
+      if (selectedTeacher !== siape) setSelectedTeacher(siape);
+      return;
+    }
+
     if ((appMode === 'professor' || viewMode === 'professor') && (!selectedTeacher || !globalTeachersList.includes(selectedTeacher))) {
       if (globalTeachersList.length > 0) setSelectedTeacher(globalTeachersList[0]);
     }
-  }, [appMode, viewMode, globalTeachersList, selectedTeacher, setSelectedTeacher]);
+  }, [appMode, viewMode, globalTeachersList, selectedTeacher, setSelectedTeacher, siape, userRole]);
 
   const pendingWeeks = useMemo(() => {
     const officialDates = activeData.filter(r => r.type === 'oficial');

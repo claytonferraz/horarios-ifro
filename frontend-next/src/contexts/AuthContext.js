@@ -9,6 +9,8 @@ export function AuthProvider({ children }) {
   const [isUnlocked, setIsUnlocked] = useState(false);
   const [isLoadingAuth, setIsLoadingAuth] = useState(true);
   const [userRole, setUserRole] = useState(null);
+  const [siape, setSiape] = useState(null);
+  const [userName, setUserName] = useState(null);
 
   useEffect(() => {
     checkInitialAuth();
@@ -22,6 +24,8 @@ export function AuthProvider({ children }) {
       const isValid = !!status; // Naive check
       setIsUnlocked(isValid);
       setUserRole(isValid && status.role ? status.role : null);
+      setSiape(isValid && status.id ? status.id : null);
+      setUserName(isValid && status.nome_exibicao ? status.nome_exibicao : null);
     } catch (e) {
       setIsUnlocked(false);
       setUserRole(null);
@@ -48,6 +52,8 @@ export function AuthProvider({ children }) {
           setIsUnlocked(true);
           setToken(res.token);
           setUserRole(res.role || 'publico');
+          setSiape(res.siape || null);
+          setUserName(res.nome_exibicao || null);
         }
         return res;
       }
@@ -69,7 +75,7 @@ export function AuthProvider({ children }) {
 
   return (
     <AuthContext.Provider
-      value={{ isUnlocked, userRole, isLoadingAuth, login, logout, checkInitialAuth }}
+      value={{ isUnlocked, userRole, siape, userName, isLoadingAuth, login, logout, checkInitialAuth }}
     >
       {children}
     </AuthContext.Provider>

@@ -36,7 +36,7 @@ import { DAYS, MAP_DAYS, getWeekBoundaries, isDatePastOrToday, isTeacherPending,
 export function HomeApp({ appMode }) {
   const { rawData, setRawData, disabledWeeks, setDisabledWeeks, disciplinesMeta, academicYearsMeta, subjectHoursMeta, loadAdminMetadata, refreshData, academicWeeks, activeDays, classTimes, bimesters, intervals } = useData();
   const { isDarkMode } = useTheme();
-  const { isUnlocked, userRole, login, logout } = useAuth();
+  const { isUnlocked, userRole, siape, userName, login, logout } = useAuth();
 
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   
@@ -53,7 +53,7 @@ export function HomeApp({ appMode }) {
   const [adminFilterClasses, setAdminFilterClasses] = useState([]);
 
   const scheduleState = useScheduleView({
-    appMode, rawData, disabledWeeks, targetData: null, disciplinesMeta, subjectHoursMeta, adminFilterCourses, adminFilterClasses, setAdminFilterClasses, activeDays, classTimes, bimesters
+    appMode, rawData, disabledWeeks, targetData: null, disciplinesMeta, subjectHoursMeta, adminFilterCourses, adminFilterClasses, setAdminFilterClasses, activeDays, classTimes, bimesters, siape, userRole
   });
 
   const navigateTo = (mode) => {
