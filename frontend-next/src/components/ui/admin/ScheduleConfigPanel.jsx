@@ -309,7 +309,7 @@ export function ScheduleConfigPanel({ isDarkMode }) {
                 <button onClick={addTime} className={`px-4 py-2 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-colors ${isDarkMode ? 'bg-slate-800 hover:bg-slate-700 text-white' : 'bg-slate-100 hover:bg-slate-200 text-slate-800'}`}>
                   <Plus size={14}/> Adicionar Horário
                 </button>
-                <SaveBtn section="times" onClick={saveTimes} />
+                <SaveBtn section="times" onClick={saveTimesAndIntervals} />
               </div>
             </div>
 
