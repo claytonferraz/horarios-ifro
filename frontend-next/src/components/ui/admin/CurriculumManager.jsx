@@ -340,10 +340,12 @@ function ClassesTab({ isDarkMode, matrices, classes, setClasses, generateId, aca
       setLocalFormData({ 
         id: generateId(), 
         name: '', 
+        room: '',
         academicYear: filterYear || (activeYearsList[0] || new Date().getFullYear().toString()), 
         matrixId: '', 
         serieId: '', 
-        professorAssignments: {} 
+        professorAssignments: {},
+        roomAssignments: {}
       });
     }
   };
@@ -387,6 +389,16 @@ function ClassesTab({ isDarkMode, matrices, classes, setClasses, generateId, aca
     }));
   };
 
+  const handleRoomChange = (discId, roomStr) => {
+    setLocalFormData(prev => ({
+      ...prev,
+      roomAssignments: {
+        ...(prev.roomAssignments || {}),
+        [discId]: roomStr
+      }
+    }));
+  };
+
   if (editingId) {
     const selectedMatrix = matrices.find(m => m.id === localFormData.matrixId);
     const selectedSerie = selectedMatrix ? selectedMatrix.series.find(s => s.id === localFormData.serieId) : null;
@@ -406,6 +418,10 @@ function ClassesTab({ isDarkMode, matrices, classes, setClasses, generateId, aca
           <div>
             <label className="block text-[10px] font-black uppercase tracking-widest opacity-60 mb-2">Nome Oficial (Turma)</label>
             <input type="text" value={localFormData.name} onChange={e => setLocalFormData({...localFormData, name: e.target.value})} placeholder="Ex: 1º Ano A Informática" className={`w-full px-3 py-2.5 rounded-xl border focus:ring-2 focus:ring-indigo-500 font-bold transition-all ${isDarkMode ? 'bg-slate-900 border-slate-700' : 'bg-slate-50 border-slate-200'}`} />
+          </div>
+          <div>
+            <label className="block text-[10px] font-black uppercase tracking-widest opacity-60 mb-2">Sala Base (Turma)</label>
+            <input type="text" value={localFormData.room || ''} onChange={e => setLocalFormData({...localFormData, room: e.target.value})} placeholder="Ex: Sala 10, Lab 1" className={`w-full px-3 py-2.5 rounded-xl border focus:ring-2 focus:ring-indigo-500 font-bold transition-all ${isDarkMode ? 'bg-slate-900 border-slate-700' : 'bg-slate-50 border-slate-200'}`} />
           </div>
           <div>
             <label className="block text-[10px] font-black uppercase tracking-widest opacity-60 mb-2">Ano Letivo</label>
@@ -439,6 +455,7 @@ function ClassesTab({ isDarkMode, matrices, classes, setClasses, generateId, aca
                     <th className="p-3">Disciplina (Matriz)</th>
                     <th className="p-3">C.H.</th>
                     <th className="p-3">Professor(es) Atribuídos <span className="opacity-50 normal-case tracking-normal">(separados por vírgula)</span></th>
+                    <th className="p-3">Sala / Ambiente <span className="opacity-50 normal-case tracking-normal">(Opcional)</span></th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-200 dark:divide-slate-800">
@@ -447,6 +464,7 @@ function ClassesTab({ isDarkMode, matrices, classes, setClasses, generateId, aca
                   )}
                   {disciplinesToAssign.map(disc => {
                     const assignedProfs = localFormData.professorAssignments?.[disc.id] || [];
+                    const assignedRoom = localFormData.roomAssignments?.[disc.id] || '';
                     const profStr = assignedProfs.join(', ');
                     return (
                       <tr key={disc.id}>
@@ -458,6 +476,15 @@ function ClassesTab({ isDarkMode, matrices, classes, setClasses, generateId, aca
                             value={profStr} 
                             onChange={e => handleProfChange(disc.id, e.target.value)} 
                             placeholder="Ex: Prof. Silva, Prof. Costa" 
+                            className={`w-full p-2.5 rounded-lg border font-bold transition-all ${isDarkMode ? 'bg-slate-800 border-slate-700 focus:bg-slate-700' : 'bg-white border-slate-300'}`} 
+                          />
+                        </td>
+                        <td className="p-2">
+                          <input 
+                            type="text" 
+                            value={assignedRoom} 
+                            onChange={e => handleRoomChange(disc.id, e.target.value)} 
+                            placeholder="Ex: Lab. Info 1, Quadra" 
                             className={`w-full p-2.5 rounded-lg border font-bold transition-all ${isDarkMode ? 'bg-slate-800 border-slate-700 focus:bg-slate-700' : 'bg-white border-slate-300'}`} 
                           />
                         </td>
