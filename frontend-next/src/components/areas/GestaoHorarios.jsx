@@ -1,7 +1,8 @@
 import React from 'react';
 import { 
   Upload, Link as LinkIcon, FileText, Trash2,
-  MessageSquare, Clock, CheckCircle2, XCircle, Send, AlertCircle
+  MessageSquare, Clock, CheckCircle2, XCircle, Send, AlertCircle,
+  Database, ClipboardList, Settings
 } from 'lucide-react';
 import { AdminStatsPanel } from '../ui/AdminStatsPanel';
 import { ScheduleConfigPanel } from '../ui/admin/ScheduleConfigPanel';
