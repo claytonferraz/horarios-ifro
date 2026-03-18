@@ -17,6 +17,17 @@ export function CurriculumManager({ isDarkMode, academicYearsMeta, groupedDiscip
     setModalConfig({ title, message, onConfirm, type });
   };
 
+  const refreshGlobalTeachers = async () => {
+    try {
+      const dbTeachers = await apiClient.fetchTeachers();
+      setGlobalTeachers(dbTeachers || []);
+      return dbTeachers;
+    } catch (e) {
+      console.error("Erro ao atualizar professores:", e);
+      return [];
+    }
+  };
+
   // Load initial data
   useEffect(() => {
     async function load() {
@@ -25,11 +36,10 @@ export function CurriculumManager({ isDarkMode, academicYearsMeta, groupedDiscip
         const [loadedMatrices, loadedClasses, dbTeachers] = await Promise.all([
           apiClient.fetchCurriculum('matrix'),
           apiClient.fetchCurriculum('class'),
-          apiClient.fetchTeachers()
+          refreshGlobalTeachers()
         ]);
         setMatrices(loadedMatrices || []);
         setClasses(loadedClasses || []);
-        setGlobalTeachers(dbTeachers || []);
       } catch (e) {
         console.error("Erro ao carregar currículos:", e);
       }
@@ -108,7 +118,7 @@ export function CurriculumManager({ isDarkMode, academicYearsMeta, groupedDiscip
           <>
             {activeTab === 'matrices' && <MatricesTab isDarkMode={isDarkMode} matrices={matrices} setMatrices={setMatrices} generateId={generateId} groupedDisciplinesBySerie={groupedDisciplinesBySerie} academicYearsMeta={academicYearsMeta} showConfirm={showConfirm} />}
             {activeTab === 'classes' && <ClassesTab isDarkMode={isDarkMode} matrices={matrices} classes={classes} setClasses={setClasses} generateId={generateId} academicYearsMeta={academicYearsMeta} globalTeachers={globalTeachers} showConfirm={showConfirm} />}
-            {activeTab === 'teachers' && <UsersManager isDarkMode={isDarkMode} showConfirm={showConfirm} />}
+            {activeTab === 'teachers' && <UsersManager isDarkMode={isDarkMode} showConfirm={showConfirm} refreshGlobalTeachers={refreshGlobalTeachers} />}
           </>
         )}
       </div>
@@ -171,8 +181,7 @@ function MatricesTab({ isDarkMode, matrices, setMatrices, generateId, groupedDis
       setLocalFormData(null);
       
       // Refresh global teachers in case names were changed in another tab
-      const dbTeachers = await apiClient.fetchTeachers();
-      setGlobalTeachers(dbTeachers || []);
+      refreshGlobalTeachers();
     }
   };
 
@@ -495,8 +504,7 @@ function ClassesTab({ isDarkMode, matrices, classes, setClasses, generateId, aca
       setLocalFormData(null);
 
       // Refresh global teachers to ensure sync
-      const dbTeachers = await apiClient.fetchTeachers();
-      if (dbTeachers) setGlobalTeachers(dbTeachers);
+      refreshGlobalTeachers();
     }
   };
 

@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { User, Users, Search, Plus, Trash2, RotateCcw, Save, ShieldCheck, ShieldAlert, FileText, Upload } from 'lucide-react';
 import { apiClient } from '@/lib/apiClient';
 
-export function UsersManager({ isDarkMode, showConfirm }) {
+export function UsersManager({ isDarkMode, showConfirm, refreshGlobalTeachers }) {
   const [teachers, setTeachers] = useState([]);
   const [originalTeachers, setOriginalTeachers] = useState([]); // Keep track of original state for changes
   const [loading, setLoading] = useState(true);
@@ -16,7 +16,7 @@ export function UsersManager({ isDarkMode, showConfirm }) {
   const load = async () => {
     setLoading(true);
     try {
-      let dbTeachers = await apiClient.fetchTeachers();
+      let dbTeachers = await refreshGlobalTeachers();
       dbTeachers.sort((a,b) => a.nome_completo.localeCompare(b.nome_completo));
       // Add a client-only id for new unsaved objects tracking
       const mapped = dbTeachers.map(t => ({ ...t, oldSiape: t.siape, _clientId: t.siape }));
@@ -95,8 +95,9 @@ export function UsersManager({ isDarkMode, showConfirm }) {
 
       const res = await apiClient.saveTeachersBatch(payload);
       if (res.success) {
-        alert("Alterações salvas com sucesso!");
-        load();
+        showConfirm("Sucesso", "Todas as alterações foram salvas. Os nomes agora estão sincronizados em todas as turmas.", () => {}, 'info');
+        await refreshGlobalTeachers();
+        await load();
       }
     } catch(e) {
       alert("Erro ao salvar: " + e.message);
