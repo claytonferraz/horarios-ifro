@@ -115,3 +115,28 @@ A entidade Config (`config` table) armazena a propriedade JSON `intervals`: `[{ 
    - Todo slot base sequencial assume uma **duração pedagógica exata de 50 minutos**.
    - O sistema checa ativamente o array `intervals`. Caso exista um intervalo (ex: position 3, após a 3ª aula), a duração do slot do intervalo (ex: `20` minutos) é acrescido ao relógio universal (`minutesCounter`) *antes* do cálculo matemático da próxima aula.
 - **Renderer da Grade em PortalView**: O intervalo se funde de forma visual (UI) à grade sem agendar slots fantasmas. Ao renderizar a grade da semana (`PortalView.jsx` em ViewMode Turma), após o desenho de cada linha de horário, o algoritmo intercepta a renderização para verificar a propriedade iterativa `classPositionInShift`. Se o `posição` bater com um Recreio, ele despacha dinamicamente uma tag `<tr>` horizontal fundida alertando visualmente o término da aula com a hora do recreio somada.
+
+## Segurança e Infraestrutura (Auditoria 360º)
+
+1. **Proteção de Acesso e Headers (Helmet & XSS-Clean)**
+   - O servidor Node.js/Express foi blindado com o middleware `helmet`, que oculta informações do servidor e injeta cabeçalhos rígidos de HSTS e permissões de conteúdo.
+   - Implementado `xss-clean` de forma global para bloquear e sanitizar injeções de scripts maliciosos (XSS) via `req.body`, `req.query` e `req.params`.
+
+2. **CORS Restritivo (Cross-Origin Resource Sharing)**
+   - Abandonado o uso de `app.use(cors())` universal. A nova política de CORS admite exclusivamente as origens listadas no vetor `allowedOrigins`.
+   - Válidos: `http://localhost:3000`, `http://localhost:3001` e o ambiente de produção `https://horarios-ifro.vercel.app`.
+   - Tentativas de requisições disparadas por domínios não-oficiais receberão bloqueio imediato com a mensagem `CORS Policy: Access Blocked`.
+
+3. **Defesa Contra Ataques de Negação de Serviço (DDoS e Brute Force)**
+   - Instalado o `express-rate-limit` para regular de forma severa a quantidade máxima de chamadas à API originárias do mesmo IP.
+   - **Trafego Geral:** 1000 requisições permitidas a cada 15 minutos.
+   - **Camada de Autenticação (`/api/auth/*`):** Uma janela de 60 minutos tolerando no máximo 20 requisições (Prevenção eficaz contra Force Brute Attack de senhas/logins automatizados).
+
+4. **Extinção do LocalStorage Fantasma (Split-Brain Fix)**
+   - O cliente de requisições assíncronas principal (`apiClient.js`) sofreu uma refatoração contundente. Todas as rotinas que utilizavam `try...catch` para interceptar quedas de rede do backend e "mascarar" o erro salvando objetos sensíveis no `localStorage` sob o prefixo `sqlite_mock_` foram extirpadas.
+   - O estado da aplicação (Schedules, Curriculums, Teachers) agora despacha _Exceptions_ rigorosas em caso de offline/falha de API. O React agora utiliza 100% de `Global State`, com validação direta do banco via Promises rejeitadas sem "salvamentos falsos-positivos".
+   - O `localStorage` passará a abrigar primordialmente o suporte às escolhas de modo de exibição (ex: Dark/Light Mode e visibilidade de abas).
+
+5. **Otimização do Master Grid e Bug do 'Efeito Fantasma'**
+   - O fluxo de navegação para `/gestao-dinamica` convergiu definitivamente para dentro de `/admin` (a guia `Master Grid`), dispensando rotas avulsas inalcançáveis e unificando o Guard (Auth Check) da página administrativa.
+   - O algoritmo assíncrono do _Drag-and-Drop_ (`PortalView.jsx` - `onDragEnd`) foi corrigido com a tática _Optimistic UI Rotation_. Diferente de aguardar o round-trip do backend para confirmar as posições da aula movida, agora o React atualiza ativamente o _Active Data_ referencialmente em memória (resolvendo o glitch "fantasma"/snap-back). Somente após sincronizar a visão, o backend consolida a readequação `apiClient.updateScheduleRecord`. Caso este último falhe, a tela rola de volta com segurança.
