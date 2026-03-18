@@ -168,7 +168,20 @@ export const apiClient = {
   async login(username, password) {
     try {
       const res = await fetch(`${API_URL}/auth/login`, { method: 'POST', headers: getHeaders(), body: JSON.stringify({ username, password }) });
-      if (!res.ok) { const err = await res.json(); throw new Error(err.error || "Credenciais inválidas"); }
+      
+      if (!res.ok) { 
+        let errorMsg = "Credenciais inválidas";
+        try {
+          const err = await res.json(); 
+          errorMsg = err.error || errorMsg;
+        } catch (e) {
+          // Se não for JSON, tenta pegar como texto ou usa o statusText
+          const text = await res.text().catch(() => "");
+          errorMsg = text || `Erro ${res.status}: ${res.statusText}`;
+        }
+        throw new Error(errorMsg); 
+      }
+      
       return await res.json(); 
     } catch (e) {
       if (e.message.includes("fetch") && typeof window !== 'undefined') {
