@@ -319,5 +319,51 @@ export const apiClient = {
       if(res.status === 401 || res.status === 403) throw new Error("Não autorizado. Faça login novamente.");
       throw new Error("Falha ao deletar semana");
     }
+  },
+
+  async fetchCurriculum(type) {
+    try {
+      const res = await fetch(`${API_URL}/admin/curriculum/${type}`);
+      if (!res.ok) throw new Error(`Falha ao carregar ${type}`);
+      return await res.json();
+    } catch (e) {
+      if (typeof window !== 'undefined') {
+        return JSON.parse(localStorage.getItem(`sqlite_mock_curriculum_${type}`) || '[]');
+      }
+      return [];
+    }
+  },
+
+  async saveCurriculum(type, data) {
+    try {
+      const res = await fetch(`${API_URL}/admin/curriculum/${type}`, { method: 'PUT', headers: getHeaders(), body: JSON.stringify(data) });
+      if (!res.ok) throw new Error(`Falha ao salvar ${type}`);
+      return await res.json();
+    } catch (e) {
+      if (typeof window !== 'undefined') {
+        const current = JSON.parse(localStorage.getItem(`sqlite_mock_curriculum_${type}`) || '[]');
+        const existingIdx = current.findIndex(c => c.id === data.id);
+        if (existingIdx > -1) current[existingIdx] = data;
+        else current.push(data);
+        localStorage.setItem(`sqlite_mock_curriculum_${type}`, JSON.stringify(current));
+        return { success: true, id: data.id };
+      }
+      throw e;
+    }
+  },
+
+  async deleteCurriculum(type, id) {
+    try {
+      const res = await fetch(`${API_URL}/admin/curriculum/${type}/${id}`, { method: 'DELETE', headers: getHeaders() });
+      if (!res.ok) throw new Error(`Falha ao remover ${type}`);
+      return await res.json();
+    } catch (e) {
+      if (typeof window !== 'undefined') {
+        const current = JSON.parse(localStorage.getItem(`sqlite_mock_curriculum_${type}`) || '[]');
+        localStorage.setItem(`sqlite_mock_curriculum_${type}`, JSON.stringify(current.filter(c => c.id !== id)));
+        return { success: true };
+      }
+      throw e;
+    }
   }
 };

@@ -76,6 +76,12 @@ db.serialize(() => {
     totalDays INTEGER,
     currentDays INTEGER
   )`);
+  
+  db.run(`CREATE TABLE IF NOT EXISTS curriculum_data (
+    id TEXT PRIMARY KEY,
+    dataType TEXT,
+    payload TEXT
+  )`);
 });
 
 // Middleware de Proteção (Segurança com JWT)
@@ -413,6 +419,45 @@ app.put('/api/admin/academic-years', verifyToken, (req, res) => {
       res.json({ success: true });
     }
   );
+});
+
+// --- CURRICULUM MANAGEMENT ---
+app.get('/api/admin/curriculum/:type', (req, res) => {
+  const { type } = req.params;
+  if (!['matrix', 'class'].includes(type)) return res.status(400).json({ error: 'Invalid type' });
+  
+  db.all("SELECT id, payload FROM curriculum_data WHERE dataType = ?", [type], (err, rows) => {
+    if (err) return res.status(500).json({ error: err.message });
+    const records = rows.map(r => {
+      try { return JSON.parse(r.payload); } catch (e) { return null; }
+    }).filter(Boolean);
+    res.json(records);
+  });
+});
+
+app.put('/api/admin/curriculum/:type', verifyToken, (req, res) => {
+  const { type } = req.params;
+  if (!['matrix', 'class'].includes(type)) return res.status(400).json({ error: 'Invalid type' });
+  const payloadStr = JSON.stringify(req.body);
+  const idStr = String(req.body.id);
+  
+  db.run(`INSERT OR REPLACE INTO curriculum_data (id, dataType, payload) VALUES (?, ?, ?)`,
+    [idStr, type, payloadStr],
+    (err) => {
+      if (err) return res.status(500).json({ error: err.message });
+      lastUpdateTimestamp = Date.now();
+      res.json({ success: true, id: idStr });
+    }
+  );
+});
+
+app.delete('/api/admin/curriculum/:type/:id', verifyToken, (req, res) => {
+  const { type, id } = req.params;
+  db.run("DELETE FROM curriculum_data WHERE id = ? AND dataType = ?", [id, type], (err) => {
+    if (err) return res.status(500).json({ error: err.message });
+    lastUpdateTimestamp = Date.now();
+    res.json({ success: true });
+  });
 });
 
 app.listen(3000, () => console.log('Backend rodando na porta 3000'));

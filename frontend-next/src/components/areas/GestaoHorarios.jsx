@@ -7,6 +7,7 @@ import { AdminStatsPanel } from '../ui/AdminStatsPanel';
 import { ScheduleConfigPanel } from '../ui/admin/ScheduleConfigPanel';
 import { AcademicWeeksPanel } from '../ui/admin/AcademicWeeksPanel';
 import { AcademicYearsManager } from '../ui/admin/AcademicYearsManager';
+import { CurriculumManager } from '../ui/admin/CurriculumManager';
 import { MultiSelect } from '../ui/MultiSelect';
 import { InlineInput } from '../ui/InlineInput';
 import { apiClient } from '@/lib/apiClient';
@@ -150,118 +151,12 @@ export function GestaoHorarios({
           </div>
         )}
 
-        {/* ABA 2: DETALHAMENTO DE DISCIPLINAS */}
+        {/* ABA 2: DETALHAMENTO DE DISCIPLINAS (Agora Gestão Curricular) */}
         {adminTab === 'disciplinas' && (
-          <div className={`rounded-2xl shadow-sm border overflow-hidden ${isDarkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'}`}>
-            <div className={`text-white px-6 py-4 flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4 border-b ${isDarkMode ? 'bg-slate-950 border-slate-800' : 'bg-slate-900 border-slate-800'}`}>
-              <div className="flex items-center gap-3">
-                <ClipboardList size={18} className="text-indigo-400" />
-                <h2 className="font-black text-xs uppercase tracking-[0.2em]">Detalhamento de Disciplinas</h2>
-              </div>
-              <p className="text-[9px] text-slate-400 uppercase tracking-widest font-bold">Calculado sobre a Base Oficial Consolidada</p>
-            </div>
-            
-            {/* FILTROS DA ABA DE DISCIPLINAS */}
-            <div className={`p-4 border-b grid grid-cols-1 md:grid-cols-2 gap-4 ${isDarkMode ? 'bg-slate-900/50 border-slate-700' : 'bg-slate-50 border-slate-100'}`}>
-              <div className="space-y-1">
-                <label className="text-[9px] font-black tracking-[0.2em] text-slate-400 uppercase ml-1">Filtrar Cursos</label>
-                <MultiSelect 
-                  isDarkMode={isDarkMode} 
-                  options={adminAvailableCourses} 
-                  values={adminFilterCourses} 
-                  onChange={setAdminFilterCourses} 
-                  colorClass={isDarkMode ? 'bg-slate-800 border-slate-700 text-slate-200 shadow-sm' : 'bg-white border-slate-200 text-slate-800 shadow-sm'} 
-                  placeholder="Todos os Cursos" 
-                />
-              </div>
-              <div className="space-y-1">
-                <label className="text-[9px] font-black tracking-[0.2em] text-slate-400 uppercase ml-1">Filtrar Turmas</label>
-                <MultiSelect 
-                  isDarkMode={isDarkMode} 
-                  options={adminAvailableClasses} 
-                  values={adminFilterClasses} 
-                  onChange={setAdminFilterClasses} 
-                  colorClass={isDarkMode ? 'bg-slate-800 border-slate-700 text-slate-200 shadow-sm' : 'bg-white border-slate-200 text-slate-800 shadow-sm'} 
-                  placeholder="Todas as Turmas" 
-                />
-              </div>
-            </div>
-
-            <div className="overflow-x-auto">
-              <table className="w-full text-left border-collapse text-[10px]">
-                <thead>
-                  <tr className={`border-b uppercase tracking-widest font-black ${isDarkMode ? 'bg-slate-800/50 text-slate-400 border-slate-700' : 'bg-slate-50 text-slate-500 border-slate-200'}`}>
-                    <th className="py-4 px-4 border-r dark:border-slate-700 w-32">Curso</th>
-                    <th className="py-4 px-4 border-r dark:border-slate-700 w-24">Turma</th>
-                    <th className="py-4 px-4 border-r dark:border-slate-700">Disciplina</th>
-                    <th className="py-4 px-4 border-r dark:border-slate-700">Professor(es)</th>
-                    <th className="py-4 px-3 text-center border-r dark:border-slate-700">Carga Horária<br/>Total</th>
-                    <th className="py-4 px-3 text-center border-r dark:border-slate-700">CH<br/>Ministrada</th>
-                    <th className="py-4 px-3 text-center border-r dark:border-slate-700">Aulas<br/>no SUAP</th>
-                    <th className="py-4 px-3 text-center">Para<br/>Lançar</th>
-                  </tr>
-                </thead>
-                <tbody className={`divide-y ${isDarkMode ? 'divide-slate-700' : 'divide-slate-100'}`}>
-                  {Object.keys(groupedDisciplinesBySerie).length > 0 ? (
-                    Object.keys(groupedDisciplinesBySerie).sort().map(serie => (
-                      <React.Fragment key={serie}>
-                        <tr className={`${isDarkMode ? 'bg-slate-900/80' : 'bg-slate-100/80'}`}>
-                          <td colSpan={8} className="py-2 px-4 font-black uppercase tracking-widest text-indigo-600 dark:text-indigo-400 text-xs shadow-inner">
-                            {serie === 'Outras' ? 'Outras Turmas' : `${serie}º Ano / Série`}
-                          </td>
-                        </tr>
-                        {groupedDisciplinesBySerie[serie].map((item) => {
-                          const metaKey = `${item.course}|${item.className}|${item.subject}`;
-                          const meta = subjectHoursMeta[metaKey] || { total: '', current: '' };
-                          const diff = (parseInt(meta.current) || 0) - item.taught;
-                          const hasDiscrepancy = diff !== 0 && meta.current !== '';
-
-                          return (
-                            <tr key={item.id} className={`transition-colors ${isDarkMode ? 'hover:bg-slate-800/80' : 'hover:bg-slate-50'}`}>
-                              <td className="py-3 px-4 border-r dark:border-slate-700 font-bold">{item.course}</td>
-                              <td className="py-3 px-4 border-r dark:border-slate-700 whitespace-nowrap">{item.className}</td>
-                              <td className="py-3 px-4 border-r dark:border-slate-700 font-bold">{item.subject}</td>
-                              <td className="py-3 px-4 border-r dark:border-slate-700 opacity-80">{item.teachersList}</td>
-                              <td className="py-2 px-3 border-r dark:border-slate-700">
-                                <InlineInput 
-                                  isDarkMode={isDarkMode} 
-                                  value={meta.total} 
-                                  placeholder="0" 
-                                  onSave={(val) => apiClient.saveSubjectHoursMeta(metaKey, { total: val, current: meta.current }).then(() => loadAdminMetadata())} 
-                                />
-                              </td>
-                              <td className="py-2 px-3 border-r dark:border-slate-700 text-center text-lg font-black text-emerald-500">
-                                {item.taught}
-                              </td>
-                              <td className={`py-2 px-3 border-r dark:border-slate-700 transition-colors ${hasDiscrepancy ? (isDarkMode?'bg-rose-900/10':'bg-rose-50') : ''}`}>
-                                <InlineInput 
-                                  isDarkMode={isDarkMode} 
-                                  value={meta.current} 
-                                  placeholder="0" 
-                                  onSave={(val) => apiClient.saveSubjectHoursMeta(metaKey, { total: meta.total, current: val }).then(() => loadAdminMetadata())} 
-                                />
-                              </td>
-                              <td className="py-3 px-3 text-center">
-                                {meta.current !== '' ? (
-                                  hasDiscrepancy ? (
-                                    <span className={`font-black uppercase tracking-widest px-2 py-1 rounded-lg text-[9px] ${diff > 0 ? 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400' : 'bg-rose-100 text-rose-700 dark:bg-rose-900/30 dark:text-rose-400'}`}>
-                                      {diff > 0 ? `+${diff}` : diff}
-                                    </span>
-                                  ) : (
-                                    <span className="font-black text-slate-300 dark:text-slate-600">Ok</span>
-                                  )
-                                ) : <span className="text-slate-300 dark:text-slate-600">-</span>}
-                              </td>
-                            </tr>
-                          );
-                        })}
-                      </React.Fragment>
-                    ))
-                  ) : <tr><td colSpan={8} className="py-8 text-center text-slate-400 font-black uppercase tracking-widest text-xs">Nenhum horário oficial encontrado com os filtros atuais.</td></tr>}
-                </tbody>
-              </table>
-            </div>
-          </div>
+          <CurriculumManager 
+            isDarkMode={isDarkMode} 
+            academicYearsMeta={academicYearsMeta} 
+          />
         )}
 
         {adminTab === 'ano_letivo' && (
