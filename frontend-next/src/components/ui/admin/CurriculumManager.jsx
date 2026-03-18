@@ -121,14 +121,19 @@ function MatricesTab({ isDarkMode, matrices, setMatrices, generateId }) {
   };
 
   const addSerie = () => {
-    const sName = prompt("Nome da Série (ex: 1º Ano)?");
-    if (!sName) return;
     setLocalFormData(prev => ({ 
       ...prev, 
-      series: [...(prev.series || []), { id: generateId(), name: sName, disciplines: [] }] 
+      series: [...(prev.series || []), { id: generateId(), name: 'Nova Série', disciplines: [] }] 
     }));
   };
   
+  const updateSerieName = (sId, newName) => {
+    setLocalFormData(prev => ({
+      ...prev,
+      series: prev.series.map(s => s.id === sId ? { ...s, name: newName } : s)
+    }));
+  };
+
   const removeSerie = (sId) => {
     if (!window.confirm("Remover esta série e todas as disciplinas dela?")) return;
     setLocalFormData(prev => ({ 
@@ -138,13 +143,11 @@ function MatricesTab({ isDarkMode, matrices, setMatrices, generateId }) {
   };
 
   const addDiscipline = (sId) => {
-    const dName = prompt("Nome da Disciplina?");
-    if (!dName) return;
     setLocalFormData(prev => ({
       ...prev,
       series: prev.series.map(s => {
         if (s.id !== sId) return s;
-        return { ...s, disciplines: [...s.disciplines, { id: generateId(), name: dName, code: '', hours: 0, color: 'bg-indigo-500' }] };
+        return { ...s, disciplines: [...s.disciplines, { id: generateId(), name: 'Nova Disciplina', code: '', hours: 0, color: 'bg-indigo-500' }] };
       })
     }));
   };
@@ -179,8 +182,8 @@ function MatricesTab({ isDarkMode, matrices, setMatrices, generateId }) {
         <div className="flex items-center justify-between pb-4 border-b">
           <h3 className="text-lg font-black uppercase tracking-widest">{editingId === 'new' ? 'Nova Matriz Curricular' : 'Editando Matriz'}</h3>
           <div className="flex gap-2">
-            <button onClick={handleCancelEdit} className="px-3 py-1.5 rounded-lg text-xs font-bold bg-slate-200 text-slate-700 hover:bg-slate-300 dark:bg-slate-700 dark:text-slate-300 dark:hover:bg-slate-600 transition-colors uppercase tracking-widest">Cancelar</button>
-            <button onClick={handleSaveMatrix} className="px-4 py-1.5 rounded-lg text-xs font-black bg-blue-600 text-white hover:bg-blue-700 transition-colors flex items-center gap-1.5 uppercase tracking-widest"><Save size={14} /> Salvar Matriz</button>
+            <button type="button" onClick={handleCancelEdit} className="px-3 py-1.5 rounded-lg text-xs font-bold bg-slate-200 text-slate-700 hover:bg-slate-300 dark:bg-slate-700 dark:text-slate-300 dark:hover:bg-slate-600 transition-colors uppercase tracking-widest">Cancelar</button>
+            <button type="button" onClick={handleSaveMatrix} className="px-4 py-1.5 rounded-lg text-xs font-black bg-blue-600 text-white hover:bg-blue-700 transition-colors flex items-center gap-1.5 uppercase tracking-widest"><Save size={14} /> Salvar Matriz</button>
           </div>
         </div>
 
@@ -202,7 +205,7 @@ function MatricesTab({ isDarkMode, matrices, setMatrices, generateId }) {
         <div className="pt-4">
           <div className="flex items-center justify-between mb-4">
             <h4 className="font-black text-sm uppercase tracking-widest flex items-center gap-2"><Settings2 size={16}/> Séries (Anos Letivos da Matriz)</h4>
-            <button onClick={addSerie} className={`px-3 py-1.5 rounded-lg text-[10px] font-black flex items-center gap-1 uppercase tracking-widest shadow-sm transition-all active:scale-95 ${isDarkMode ? 'bg-indigo-600 hover:bg-indigo-500 text-white' : 'bg-indigo-100 text-indigo-700 hover:bg-indigo-200'}`}><Plus size={14}/> Nova Série</button>
+            <button type="button" onClick={addSerie} className={`px-3 py-1.5 rounded-lg text-[10px] font-black flex items-center gap-1 uppercase tracking-widest shadow-sm transition-all active:scale-95 ${isDarkMode ? 'bg-indigo-600 hover:bg-indigo-500 text-white' : 'bg-indigo-100 text-indigo-700 hover:bg-indigo-200'}`}><Plus size={14}/> Nova Série</button>
           </div>
 
           <div className="space-y-6">
@@ -211,11 +214,16 @@ function MatricesTab({ isDarkMode, matrices, setMatrices, generateId }) {
                 <div className="flex items-center justify-between border-b pb-3 mb-3 border-slate-200 dark:border-slate-800">
                   <div className="flex items-center gap-3">
                     <span className={`px-2 py-0.5 rounded text-[10px] font-black uppercase tracking-widest ${isDarkMode ? 'bg-indigo-900/50 text-indigo-400' : 'bg-indigo-100 text-indigo-600'}`}>SÉRIE</span>
-                    <h5 className="font-black text-base">{serie.name}</h5>
+                    <input 
+                      type="text" 
+                      value={serie.name} 
+                      onChange={e => updateSerieName(serie.id, e.target.value)}
+                      className="font-black text-base bg-transparent border-b-2 border-transparent hover:border-slate-300 focus:border-indigo-500 focus:outline-none transition-colors w-48 px-1"
+                    />
                   </div>
                   <div className="flex gap-2">
-                    <button onClick={() => addDiscipline(serie.id)} className={`px-2 py-1 rounded text-[9px] font-black uppercase tracking-widest flex items-center gap-1 transition-all ${isDarkMode ? 'bg-emerald-900/50 text-emerald-400 hover:bg-emerald-800/80' : 'bg-emerald-100 text-emerald-700 hover:bg-emerald-200'}`}><Plus size={12}/> Disciplina</button>
-                    <button onClick={() => removeSerie(serie.id)} className={`px-2 py-1 rounded text-[9px] font-black uppercase tracking-widest flex items-center gap-1 transition-all ${isDarkMode ? 'bg-rose-900/30 text-rose-400 hover:bg-rose-800/50' : 'bg-rose-100 text-rose-700 hover:bg-rose-200'}`}><Trash2 size={12}/></button>
+                    <button type="button" onClick={() => addDiscipline(serie.id)} className={`px-2 py-1 rounded text-[9px] font-black uppercase tracking-widest flex items-center gap-1 transition-all ${isDarkMode ? 'bg-emerald-900/50 text-emerald-400 hover:bg-emerald-800/80' : 'bg-emerald-100 text-emerald-700 hover:bg-emerald-200'}`}><Plus size={12}/> Disciplina</button>
+                    <button type="button" onClick={() => removeSerie(serie.id)} className={`px-2 py-1 rounded text-[9px] font-black uppercase tracking-widest flex items-center gap-1 transition-all ${isDarkMode ? 'bg-rose-900/30 text-rose-400 hover:bg-rose-800/50' : 'bg-rose-100 text-rose-700 hover:bg-rose-200'}`}><Trash2 size={12}/></button>
                   </div>
                 </div>
 
@@ -242,10 +250,10 @@ function MatricesTab({ isDarkMode, matrices, setMatrices, generateId }) {
                               <input type="text" value={disc.code} onChange={e => updateDiscipline(serie.id, disc.id, 'code', e.target.value)} placeholder="Ex: MAT1" className={`w-full p-1.5 rounded-md border font-bold uppercase ${isDarkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-300'}`} />
                             </td>
                             <td className="py-2 px-2">
-                              <input type="number" value={disc.hours} onChange={e => updateDiscipline(serie.id, disc.id, 'hours', e.target.value)} className={`w-full p-1.5 rounded-md border font-bold ${isDarkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-300'}`} />
+                              <input type="number" value={disc.hours} onChange={e => updateDiscipline(serie.id, disc.id, 'hours', Number(e.target.value))} className={`w-full p-1.5 rounded-md border font-bold ${isDarkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-300'}`} />
                             </td>
                             <td className="py-2 pl-2">
-                              <button onClick={() => removeDiscipline(serie.id, disc.id)} className={`p-1.5 rounded-md transition-colors ${isDarkMode ? 'text-rose-400 hover:bg-rose-900/50' : 'text-rose-600 hover:bg-rose-100'}`}><Trash2 size={14}/></button>
+                              <button type="button" onClick={() => removeDiscipline(serie.id, disc.id)} className={`p-1.5 rounded-md transition-colors ${isDarkMode ? 'text-rose-400 hover:bg-rose-900/50' : 'text-rose-600 hover:bg-rose-100'}`}><Trash2 size={14}/></button>
                             </td>
                           </tr>
                         ))}
