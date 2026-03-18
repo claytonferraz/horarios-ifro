@@ -666,6 +666,7 @@ app.post('/api/admin/teachers/batch', verifyToken, async (req, res) => {
         stmtCheck.get([targetSiape], async (err, row) => {
           if (err) return reject(err);
           let exigirTroca = exigir_troca_senha !== undefined ? exigir_troca_senha : (row ? row.exigir_troca_senha : 1);
+          let finalHash = row ? row.senha_hash : null;
           if (!finalHash) {
             finalHash = await bcrypt.hash(`prof@${new Date().getFullYear()}`, 10);
             exigirTroca = 1;
