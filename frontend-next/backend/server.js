@@ -709,19 +709,39 @@ app.get('/api/requests', (req, res) => {
   });
 });
 
-app.post('/api/requests', verifyToken, (req, res) => {
+app.post('/api/professor/request', verifyToken, (req, res) => {
   const { week_id, description, original_slot, proposed_slot } = req.body;
   const siape = req.userId;
   const now = new Date().toISOString();
-  
-  db.run(
-    "INSERT INTO change_requests (siape, week_id, description, original_slot, proposed_slot, createdAt) VALUES (?, ?, ?, ?, ?, ?)",
-    [siape, week_id, description, JSON.stringify(original_slot), JSON.stringify(proposed_slot), now],
-    function(err) {
-      if (err) return res.status(500).json({ error: err.message });
-      res.json({ id: this.lastID, success: true });
-    }
-  );
+
+  const insertRequest = () => {
+    db.run(
+      "INSERT INTO change_requests (siape, week_id, description, original_slot, proposed_slot, createdAt) VALUES (?, ?, ?, ?, ?, ?)",
+      [siape, week_id, description, JSON.stringify(original_slot), JSON.stringify(proposed_slot), now],
+      function(err) {
+        if (err) return res.status(500).json({ error: err.message });
+        res.json({ id: this.lastID, success: true });
+      }
+    );
+  };
+
+  // Anti-choque de horários
+  if (proposed_slot && proposed_slot.day && proposed_slot.time) {
+    db.get("SELECT records FROM schedules WHERE id = ?", [week_id], (err, row) => {
+      if (err) return res.status(500).json({ error: "Erro ao buscar a semana" });
+      if (row && row.records) {
+        let records = [];
+        try { records = JSON.parse(row.records); } catch(e){}
+        const conflict = records.find(r => r.teacher === siape && r.day === proposed_slot.day && r.time === proposed_slot.time);
+        if (conflict) {
+          return res.status(400).json({ error: `Choque de Horários: Você já possui aula de ${conflict.subject} na turma ${conflict.className} neste horário.` });
+        }
+      }
+      insertRequest();
+    });
+  } else {
+    insertRequest();
+  }
 });
 
 app.put('/api/requests/:id', verifyToken, (req, res) => {

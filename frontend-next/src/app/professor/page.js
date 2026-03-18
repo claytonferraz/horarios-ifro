@@ -13,7 +13,7 @@ export default function ProfessorPage() {
   // Use generic window.location for simplicity, or router if imported
   if (!isLoadingAuth && !isUnlocked) {
     if (typeof window !== 'undefined') {
-      window.location.href = '/';
+      window.location.href = '/login';
       return null;
     }
   }

@@ -443,12 +443,15 @@ export const apiClient = {
   },
 
   async submitRequest(data) {
-    const res = await fetch(`${API_URL}/requests`, {
+    const res = await fetch(`${API_URL}/professor/request`, {
       method: 'POST',
       headers: getHeaders(),
       body: JSON.stringify(data)
     });
-    if (!res.ok) throw new Error('Falha ao enviar solicitação');
+    if (!res.ok) {
+       const err = await res.json().catch(() => ({}));
+       throw new Error(err.error || 'Falha ao enviar solicitação');
+    }
     return await res.json();
   },
 

@@ -202,6 +202,7 @@ export function HomeApp({ appMode }) {
                     appMode="professor" isDarkMode={isDarkMode}
                     userRole={userRole} rawData={rawData} loadAdminMetadata={loadAdminMetadata}
                     intervals={intervals}
+                    siape={siape}
                     {...scheduleState}
                     handlePrint={executePrint} getColorHash={getColorHash} isTeacherPending={isTeacherPending}
                 />

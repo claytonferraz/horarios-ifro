@@ -13,7 +13,7 @@ import { useData } from '@/contexts/DataContext';
 import { apiClient } from '@/lib/apiClient';
 
 export function PortalView({
-  appMode, isDarkMode, viewMode, setViewMode, scheduleMode, setScheduleMode, userRole,
+  appMode, isDarkMode, viewMode, setViewMode, scheduleMode, setScheduleMode, userRole, siape,
   selectedCourse, setSelectedCourse, selectedClass, setSelectedClass, selectedTeacher, setSelectedTeacher,
   totalFilterYear, setTotalFilterYear, totalFilterTeacher, setTotalFilterTeacher, totalFilterClass, setTotalFilterClass, totalFilterSubject, setTotalFilterSubject,
   courses, classesList, globalTeachersList, availableYearsForTotal, availableTeachersForTotal, availableClassesForTotal, availableSubjectsForTotal,
@@ -36,19 +36,54 @@ export function PortalView({
     }
   }, [scheduleMode, selectedWeek, appMode, userRole]);
 
+  const [draggingRecord, setDraggingRecord] = useState(null);
+
+  const checkConflict = (record, dDay, dTime, dCls) => {
+    if (!record || !record.teacher || record.teacher === 'A Definir' || record.teacher === '-') return null;
+    const sameTeacherOtherClass = activeData.find(r => r.id !== record.id && r.teacher === record.teacher && r.day === dDay && r.time === dTime && r.className !== dCls);
+    if (sameTeacherOtherClass) return 'Choque de horário';
+    
+    // Check 3 turnos
+    const timeObj = safeTimes.find(t => t.timeStr === dTime);
+    if (timeObj) {
+      const shift = timeObj.shift;
+      const todayRecords = activeData.filter(r => r.id !== record.id && r.teacher === record.teacher && r.day === dDay);
+      const shifts = new Set(todayRecords.map(r => safeTimes.find(t => t.timeStr === r.time)?.shift).filter(Boolean));
+      shifts.add(shift);
+      if (shifts.size > 2) return 'Professor em 3 turnos';
+    }
+
+    // Check sala (se tiver room)
+    if (record.room && record.room !== '-') {
+      const roomOccupied = activeData.find(r => r.id !== record.id && r.room === record.room && r.day === dDay && r.time === dTime && r.className !== dCls);
+      if (roomOccupied) return 'Ocupação de sala';
+    }
+    return null;
+  };
+
+  const onDragStart = (start) => {
+    const record = activeData.find(r => r.id === start.draggableId);
+    setDraggingRecord(record || null);
+  };
+
   const onDragEnd = async (result) => {
+    setDraggingRecord(null);
     if (!result.destination) return;
     const { source, destination, draggableId } = result;
     if (source.droppableId === destination.droppableId) return;
 
-    // source: "day|time|className"
-    // destination: "day|time|className"
-    const [sDay, sTime, sCls] = source.droppableId.split('|');
-    const [dDay, dTime, dCls] = destination.droppableId.split('|');
-    
     const recordId = draggableId;
     const record = activeData.find(r => r.id === recordId);
     if (!record) return;
+
+    let dDay, dTime, dCls;
+    if (destination.droppableId === 'unallocated') {
+      dDay = 'A Definir';
+      dTime = 'A Definir';
+      dCls = record.className;
+    } else {
+      [dDay, dTime, dCls] = destination.droppableId.split('|');
+    }
 
     try {
       const updatedRecord = { 
@@ -508,7 +543,9 @@ export function PortalView({
 
                   {/* GRADE DE HORÁRIO (Visão Curso MATRIZ) */}
                   {viewMode === 'curso' && (
-                    <div className="space-y-6 animate-in zoom-in-95 duration-500">
+                    <DragDropContext onDragStart={onDragStart} onDragEnd={onDragEnd}>
+                    <div className="flex flex-col lg:flex-row gap-4 animate-in zoom-in-95 duration-500">
+                      <div className="flex-1 space-y-6">
                       {(() => {
                         const availableCourses = courses.filter(c => c !== 'Todos').sort((a,b) => a.localeCompare(b));
 
@@ -665,26 +702,45 @@ export function PortalView({
                                                     return (
                                                     <td 
                                                       key={`${cls}-${time}`} 
-                                                      onClick={() => {
-                                                         if (['admin','gestao'].includes(userRole)) {
-                                                            setEditorModal({ cls, day, time, tObj: timeObj });
-                                                         }
-                                                      }}
-                                                      className={`p-1.5 border-r-[3px] last:border-r-0 align-top min-w-[140px] transition-all
-                                                      ${['admin','gestao'].includes(userRole) ? 'cursor-pointer hover:ring-2 hover:ring-indigo-500 hover:z-30 relative' : ''}
-                                                      ${isDarkMode ? 'border-slate-700 group-hover:bg-slate-700/30 bg-slate-800/20' : 'border-slate-300 group-hover:bg-slate-50/50 bg-slate-50/20'}`}
+                                                      className={`p-1 border-r-[3px] last:border-r-0 align-top min-w-[140px] transition-all ${isDarkMode ? 'border-slate-700' : 'border-slate-300'}`}
                                                     >
-                                                        {records.length > 0 ? records.map(r => {
-                                                          const isPending = isTeacherPending(r.teacher);
-                                                          return (
-                                                            <div key={r.id} className={`print-clean-card p-2 rounded-xl border shadow-sm flex flex-col justify-center min-h-[50px] transition-all hover:scale-[1.02] hover:shadow-md active:scale-95 ${isPending ? (isDarkMode ? 'bg-red-900/30 border-red-800/50 text-red-300' : 'bg-red-50 border-red-300 text-red-800') : getColorHash(r.subject, isDarkMode)}`}>
-                                                              <p className={`subject font-medium text-[10px] leading-tight text-center ${isDarkMode ? 'text-slate-200' : 'text-slate-700'}`}>
-                                                                {r.subject} <span className={`font-medium opacity-80 ${isPending ? (isDarkMode ? 'text-red-400 font-bold' : 'text-red-600 font-bold') : ''}`}>- {resolveTeacherName(r.teacher, globalTeachers)}</span>
-                                                              </p>
-                                                            </div>
-                                                          );
-                                                        }) : <div className={`h-[50px] flex items-center justify-center font-black text-[9px] tracking-widest uppercase select-none ${isDarkMode ? 'opacity-20' : 'opacity-5'}`}>-</div>}
-                                                      </td>
+                                                       <Droppable droppableId={`${day}|${time}|${cls}`}>
+                                                          {(provided, snapshot) => {
+                                                             let conflictMsg = null;
+                                                             if (draggingRecord && snapshot.isDraggingOver) {
+                                                                conflictMsg = checkConflict(draggingRecord, day, time, cls);
+                                                             }
+                                                             return (
+                                                               <div ref={provided.innerRef} {...provided.droppableProps} 
+                                                                 onClick={() => {
+                                                                     if (['admin','gestao'].includes(userRole)) setEditorModal({ cls, day, time, tObj: timeObj });
+                                                                 }}
+                                                                 className={`w-full h-full min-h-[50px] p-0.5 rounded-lg transition-colors ${['admin','gestao'].includes(userRole) ? 'cursor-pointer hover:ring-2 hover:ring-indigo-500 hover:z-30 relative' : ''} ${conflictMsg ? 'bg-red-500/20 ring-2 ring-red-500 !bg-red-500/20' : snapshot.isDraggingOver ? (isDarkMode ? 'bg-slate-700/50' : 'bg-slate-100') : (isDarkMode ? 'group-hover:bg-slate-700/30 bg-slate-800/20' : 'group-hover:bg-slate-50/50 bg-slate-50/20')}`}
+                                                               >
+                                                                  {conflictMsg && snapshot.isDraggingOver && <div className="absolute -top-6 left-0 bg-red-600 text-white text-[9px] font-black uppercase px-2 py-0.5 rounded z-50 whitespace-nowrap shadow-md">{conflictMsg}</div>}
+                                                                  {records.length > 0 ? records.map((r, rIndex) => {
+                                                                     const isPending = isTeacherPending(r.teacher);
+                                                                     return (
+                                                                        <Draggable key={r.id} draggableId={r.id} index={rIndex} isDragDisabled={!(scheduleMode === 'previa' && ['admin','gestao'].includes(userRole))}>
+                                                                           {(prov2, snap2) => (
+                                                                             <div ref={prov2.innerRef} {...prov2.draggableProps} {...prov2.dragHandleProps} 
+                                                                               className={`print-clean-card p-2 rounded-xl border shadow-sm flex flex-col justify-center min-h-[50px] transition-all mb-1 last:mb-0 hover:scale-[1.02] hover:shadow-md ${snap2.isDragging ? 'shadow-xl scale-105 z-50' : ''} ${isPending ? (isDarkMode ? 'bg-red-900/30 border-red-800/50 text-red-300' : 'bg-red-50 border-red-300 text-red-800') : getColorHash(r.subject, isDarkMode)}`}
+                                                                             >
+                                                                                <p className={`subject font-medium text-[10px] leading-tight text-center ${isDarkMode ? 'text-slate-200' : 'text-slate-700'}`}>
+                                                                                  {r.subject} <span className={`font-medium opacity-80 ${isPending ? (isDarkMode ? 'text-red-400 font-bold' : 'text-red-600 font-bold') : ''}`}>- {resolveTeacherName(r.teacher, globalTeachers)}</span>
+                                                                                </p>
+                                                                                {r.room && <span className={`mt-1 bg-black/10 text-center px-1 py-0.5 rounded text-[8px] uppercase tracking-widest`}>{r.room}</span>}
+                                                                             </div>
+                                                                           )}
+                                                                        </Draggable>
+                                                                     );
+                                                                  }) : <div className={`h-[50px] flex items-center justify-center font-black text-[9px] tracking-widest uppercase select-none pointer-events-none ${isDarkMode ? 'opacity-20' : 'opacity-5'}`}>-</div>}
+                                                                  {provided.placeholder}
+                                                               </div>
+                                                             );
+                                                          }}
+                                                       </Droppable>
+                                                    </td>
                                                     );
                                                   })}
                                                 </tr>
@@ -831,7 +887,37 @@ export function PortalView({
                           );
                         });
                       })()}
+                     </div>
+
+                      {/* Sidebar de Elementos Nao Alocados */}
+                      {['admin','gestao'].includes(userRole) && scheduleMode === 'previa' && (
+                        <div className={`w-full lg:w-72 shrink-0 rounded-2xl border shadow-sm p-4 h-fit sticky top-20 ${isDarkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'}`}>
+                          <h3 className={`text-sm font-black uppercase tracking-widest mb-4 flex items-center gap-2 ${isDarkMode ? 'text-slate-200' : 'text-slate-700'}`}>
+                            <ListTodo size={16}/> Pendentes
+                          </h3>
+                          <Droppable droppableId="unallocated">
+                            {(provided, snapshot) => (
+                              <div ref={provided.innerRef} {...provided.droppableProps} className={`space-y-2 min-h-[300px] p-2 rounded-xl transition-colors ${snapshot.isDraggingOver ? (isDarkMode ? 'bg-slate-700' : 'bg-slate-50') : 'bg-transparent'}`}>
+                                {activeData.filter(r => r.day === 'A Definir' || !r.day || r.day === '-').map((r, index) => (
+                                  <Draggable key={r.id} draggableId={r.id} index={index}>
+                                    {(prov2, snap2) => (
+                                      <div ref={prov2.innerRef} {...prov2.draggableProps} {...prov2.dragHandleProps} className={`p-3 rounded-xl border shadow-sm transition-all ${snap2.isDragging ? 'shadow-xl scale-105 z-50' : ''} ${getColorHash(r.subject, isDarkMode)}`}>
+                                        <p className={`font-black text-xs leading-tight ${isDarkMode ? 'text-white' : 'text-slate-800'}`}>{r.subject}</p>
+                                        <p className={`text-[10px] font-bold mt-1 opacity-80 uppercase tracking-widest ${isDarkMode ? 'text-slate-200' : 'text-slate-700'}`}>{r.className} - {resolveTeacherName(r.teacher, globalTeachers)}</p>
+                                        {r.room && <span className={`inline-block mt-2 bg-black/10 text-center px-1.5 py-0.5 rounded text-[8px] uppercase tracking-widest`}>{r.room}</span>}
+                                      </div>
+                                    )}
+                                  </Draggable>
+                                ))}
+                                {provided.placeholder}
+                              </div>
+                            )}
+                          </Droppable>
+                        </div>
+                      )}
+
                     </div>
+                    </DragDropContext>
                   )}
 
                   {/* GRADE DE HORÁRIO DO PROFESSOR (Separada por Curso) */}
@@ -1461,17 +1547,19 @@ export function PortalView({
           siape={selectedTeacher}
           selectedWeek={selectedWeek}
           weekData={recordsForWeek.filter(r => r.teacher === selectedTeacher)}
+          activeDays={activeDays}
+          classTimes={classTimes}
         />
       )}
     </>
   );
 }
 
-function TeacherRequestsSection({ isDarkMode, siape, selectedWeek, weekData }) {
+function TeacherRequestsSection({ isDarkMode, siape, selectedWeek, weekData, activeDays, classTimes }) {
   const [requests, setRequests] = useState([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [newRequest, setNewRequest] = useState({ description: '', original_slot: '', proposed_slot: '' });
+  const [newRequest, setNewRequest] = useState({ description: '', original_slot: '', proposed_day: '', proposed_time: '', proposed_type: 'Regular' });
 
   const loadRequests = async () => {
     try {
@@ -1495,9 +1583,9 @@ function TeacherRequestsSection({ isDarkMode, siape, selectedWeek, weekData }) {
         week_id: selectedWeek,
         description: newRequest.description,
         original_slot: newRequest.original_slot,
-        proposed_slot: newRequest.proposed_slot
+        proposed_slot: { day: newRequest.proposed_day, time: newRequest.proposed_time, classType: newRequest.proposed_type }
       });
-      setNewRequest({ description: '', original_slot: '', proposed_slot: '' });
+      setNewRequest({ description: '', original_slot: '', proposed_day: '', proposed_time: '', proposed_type: 'Regular' });
       setIsModalOpen(false);
       loadRequests();
     } catch (err) {
@@ -1616,24 +1704,42 @@ function TeacherRequestsSection({ isDarkMode, siape, selectedWeek, weekData }) {
 
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-1.5">
-                  <label className="text-[10px] font-black uppercase tracking-widest text-slate-500 ml-1">Horário Original</label>
-                  <input 
-                    type="text"
-                    placeholder="Ex: Seg - 07:30"
+                  <label className="text-[10px] font-black uppercase tracking-widest text-slate-500 ml-1">Horário Original (Selecione o slot atual)</label>
+                  <select 
+                    required
                     className={`w-full p-3.5 rounded-xl border text-xs font-bold focus:ring-2 focus:ring-indigo-500 transition-all outline-none ${isDarkMode ? 'bg-slate-950 border-slate-700 text-white' : 'bg-white border-slate-200 text-slate-900'}`}
                     value={newRequest.original_slot}
                     onChange={e => setNewRequest({...newRequest, original_slot: e.target.value})}
-                  />
+                  >
+                     <option value="">Selecione a aula atual</option>
+                     {weekData.map(r => (
+                        <option key={r.id} value={`${r.day} ${r.time} - ${r.className} (${r.subject})`}>
+                           {r.day} {r.time} | Turma: {r.className} | {r.subject}
+                        </option>
+                     ))}
+                  </select>
                 </div>
-                <div className="space-y-1.5">
+                <div className="space-y-1.5 flex flex-col gap-2">
                   <label className="text-[10px] font-black uppercase tracking-widest text-slate-500 ml-1">Horário Proposto</label>
-                  <input 
-                    type="text"
-                    placeholder="Ex: Ter - 08:20"
-                    className={`w-full p-3.5 rounded-xl border text-xs font-bold focus:ring-2 focus:ring-indigo-500 transition-all outline-none ${isDarkMode ? 'bg-slate-950 border-slate-700 text-white' : 'bg-white border-slate-200 text-slate-900'}`}
-                    value={newRequest.proposed_slot}
-                    onChange={e => setNewRequest({...newRequest, proposed_slot: e.target.value})}
-                  />
+                  <div className="flex gap-2">
+                     <select required className={`w-1/2 p-2.5 rounded-xl border text-xs font-bold outline-none ${isDarkMode ? 'bg-slate-950 border-slate-700 text-white' : 'bg-white border-slate-200 text-slate-900'}`}
+                       value={newRequest.proposed_day} onChange={e => setNewRequest({...newRequest, proposed_day: e.target.value})}
+                     >
+                       <option value="">Selecione o Dia</option>
+                       {activeDays?.map(d => <option key={d} value={d}>{d}</option>)}
+                     </select>
+                     <select required className={`w-1/2 p-2.5 rounded-xl border text-xs font-bold outline-none ${isDarkMode ? 'bg-slate-950 border-slate-700 text-white' : 'bg-white border-slate-200 text-slate-900'}`}
+                       value={newRequest.proposed_time} onChange={e => setNewRequest({...newRequest, proposed_time: e.target.value})}
+                     >
+                       <option value="">Selecione a Hora</option>
+                       {classTimes?.map(t => <option key={t.timeStr} value={t.timeStr}>{t.timeStr} ({t.shift})</option>)}
+                     </select>
+                  </div>
+                  <select required className={`w-full p-2.5 rounded-xl border text-xs font-bold outline-none mt-1 ${isDarkMode ? 'bg-slate-950 border-slate-700 text-white' : 'bg-white border-slate-200 text-slate-900'}`}
+                    value={newRequest.proposed_type} onChange={e => setNewRequest({...newRequest, proposed_type: e.target.value})}
+                  >
+                    {['Regular', 'Recuperação', 'Exame', 'Atendimento'].map(t => <option key={t} value={t}>{t}</option>)}
+                  </select>
                 </div>
               </div>
 
