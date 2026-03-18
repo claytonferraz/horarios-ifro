@@ -1566,9 +1566,9 @@ export function PortalView({
             timeObj={editorModal.tObj}
             courseRecords={getCellRecords ? getCellRecords(editorModal.cls, editorModal.day, editorModal.time) : []} 
             weekData={rawData} 
-            matrixData={[]} // TODO
-            classesData={[]} // TODO
-            usersList={[]} // TODO
+            matrixData={[]}
+            classesData={classesList || []}
+            usersList={globalTeachersList || []}
             classTimes={classTimes}
          />
       )}
