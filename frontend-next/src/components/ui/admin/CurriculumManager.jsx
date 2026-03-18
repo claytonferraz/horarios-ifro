@@ -116,8 +116,8 @@ export function CurriculumManager({ isDarkMode, academicYearsMeta, groupedDiscip
           <div className="text-center p-12 text-blue-500 font-bold animate-pulse">Carregando dados estruturais...</div>
         ) : (
           <>
-            {activeTab === 'matrices' && <MatricesTab isDarkMode={isDarkMode} matrices={matrices} setMatrices={setMatrices} generateId={generateId} groupedDisciplinesBySerie={groupedDisciplinesBySerie} academicYearsMeta={academicYearsMeta} showConfirm={showConfirm} />}
-            {activeTab === 'classes' && <ClassesTab isDarkMode={isDarkMode} matrices={matrices} classes={classes} setClasses={setClasses} generateId={generateId} academicYearsMeta={academicYearsMeta} globalTeachers={globalTeachers} showConfirm={showConfirm} />}
+            {activeTab === 'matrices' && <MatricesTab isDarkMode={isDarkMode} matrices={matrices} setMatrices={setMatrices} generateId={generateId} groupedDisciplinesBySerie={groupedDisciplinesBySerie} academicYearsMeta={academicYearsMeta} showConfirm={showConfirm} refreshGlobalTeachers={refreshGlobalTeachers} />}
+            {activeTab === 'classes' && <ClassesTab isDarkMode={isDarkMode} matrices={matrices} classes={classes} setClasses={setClasses} generateId={generateId} academicYearsMeta={academicYearsMeta} globalTeachers={globalTeachers} showConfirm={showConfirm} refreshGlobalTeachers={refreshGlobalTeachers} />}
             {activeTab === 'teachers' && <UsersManager isDarkMode={isDarkMode} showConfirm={showConfirm} refreshGlobalTeachers={refreshGlobalTeachers} />}
           </>
         )}
@@ -129,7 +129,7 @@ export function CurriculumManager({ isDarkMode, academicYearsMeta, groupedDiscip
 // ==========================================
 // 1. ABA DE MATRIZES
 // ==========================================
-function MatricesTab({ isDarkMode, matrices, setMatrices, generateId, groupedDisciplinesBySerie, academicYearsMeta }) {
+function MatricesTab({ isDarkMode, matrices, setMatrices, generateId, groupedDisciplinesBySerie, academicYearsMeta, showConfirm, refreshGlobalTeachers }) {
   const [editingId, setEditingId] = useState(null);
   const [localFormData, setLocalFormData] = useState(null);
   const [filterYear, setFilterYear] = useState('');
@@ -451,7 +451,7 @@ function MatricesTab({ isDarkMode, matrices, setMatrices, generateId, groupedDis
 // ==========================================
 // 2. ABA DE TURMAS
 // ==========================================
-function ClassesTab({ isDarkMode, matrices, classes, setClasses, generateId, academicYearsMeta, globalTeachers = [], showConfirm }) {
+function ClassesTab({ isDarkMode, matrices, classes, setClasses, generateId, academicYearsMeta, globalTeachers = [], showConfirm, refreshGlobalTeachers }) {
   const [editingId, setEditingId] = useState(null);
   const [localFormData, setLocalFormData] = useState(null);
 
