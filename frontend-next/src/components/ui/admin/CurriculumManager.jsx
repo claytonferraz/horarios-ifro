@@ -135,7 +135,6 @@ function MatricesTab({ isDarkMode, matrices, setMatrices, generateId, groupedDis
   };
 
   const removeSerie = (sId) => {
-    if (!window.confirm("Remover esta série e todas as disciplinas dela?")) return;
     setLocalFormData(prev => ({ 
       ...prev, 
       series: prev.series.filter(s => s.id !== sId) 
@@ -171,7 +170,6 @@ function MatricesTab({ isDarkMode, matrices, setMatrices, generateId, groupedDis
   };
 
   const removeDiscipline = (sId, dId) => {
-    if (!window.confirm("Remover disciplina?")) return;
     setLocalFormData(prev => ({
       ...prev,
       series: prev.series.map(s => {
