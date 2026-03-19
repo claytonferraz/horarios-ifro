@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { CalendarDays, GripVertical, AlertCircle, Save, Filter, MapPin, Loader2, Download, X, Check, Layers, Trash2 } from 'lucide-react';
+import { CalendarDays, GripVertical, AlertCircle, Save, Filter, MapPin, Loader2, Download, X, Check, Layers, Trash2, Eye, EyeOff } from 'lucide-react';
 import { useData } from '@/contexts/DataContext';
 import { MAP_DAYS, getColorHash, resolveTeacherName } from '@/lib/dates';
 import { apiClient, getHeaders } from '@/lib/apiClient';
@@ -9,6 +9,7 @@ export function MasterGrid({ isDarkMode, ...props }) {
   
   const [selectedCourses, setSelectedCourses] = useState([]);
   const [isCoursesOpen, setIsCoursesOpen] = useState(false);
+  const [hiddenClasses, setHiddenClasses] = useState([]);
   const [aulasNeutras, setAulasNeutras] = useState([]);
   const [grade, setGrade] = useState({});
 
@@ -275,8 +276,15 @@ export function MasterGrid({ isDarkMode, ...props }) {
                    </div>
                  </>
              )}
-          </div>
-          <button onClick={() => setModalMode('import')} disabled={selectedCourses.length === 0} className="flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 text-white disabled:opacity-50 px-4 py-2.5 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all w-full sm:w-auto shadow-sm">
+           </div>
+           
+           {hiddenClasses.length > 0 && (
+             <button onClick={() => setHiddenClasses([])} className="flex items-center justify-center gap-1.5 bg-rose-500/10 hover:bg-rose-500/20 text-rose-600 dark:text-rose-400 px-3 py-2 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all w-full sm:w-auto shadow-sm">
+                 <Eye size={14} /> Restaurar {hiddenClasses.length} Oculta(s)
+             </button>
+           )}
+
+           <button onClick={() => setModalMode('import')} disabled={selectedCourses.length === 0} className="flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 text-white disabled:opacity-50 px-4 py-2.5 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all w-full sm:w-auto shadow-sm">
              <Download size={14} /> Importar Grade
           </button>
           <button onClick={() => setModalMode('save')} disabled={selectedCourses.length === 0} className="flex items-center justify-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white disabled:opacity-50 px-5 py-2.5 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all w-full sm:w-auto shadow-sm">
@@ -305,7 +313,10 @@ export function MasterGrid({ isDarkMode, ...props }) {
               </div>
             )}
 
-            {Object.entries(neutrasPorTurma).map(([nomeTurma, aulas]) => (
+            {Object.entries(neutrasPorTurma).filter(([nomeTurma]) => {
+                const turmaObj = turmasDoCurso.find(t => t.name === nomeTurma);
+                return turmaObj && !hiddenClasses.includes(turmaObj.id);
+            }).map(([nomeTurma, aulas]) => (
               <div key={nomeTurma} className="mb-2">
                 <div className="text-[10px] font-bold text-slate-400 mb-2 uppercase tracking-wider">{nomeTurma}</div>
                 <div className="flex flex-col gap-2">
@@ -345,9 +356,14 @@ export function MasterGrid({ isDarkMode, ...props }) {
               <thead className="sticky top-0 z-10 bg-inherit shadow-sm">
                 <tr>
                   <th className="py-2 px-2 w-20 bg-inherit"></th>
-                  {turmasDoCurso.map(turma => (
-                    <th key={turma.id} className={`py-2 px-2 text-center text-[11px] font-black uppercase tracking-widest border-b-2 border-slate-700/50 bg-inherit`}>
-                      {turma.name}
+                  {turmasDoCurso.filter(t => !hiddenClasses.includes(t.id)).map(turma => (
+                    <th key={turma.id} className={`py-2 px-2 text-center text-[11px] font-black uppercase tracking-widest border-b-2 border-slate-700/50 bg-inherit group/th`}>
+                      <div className="flex items-center justify-center gap-2 relative">
+                         <span className="truncate">{turma.name}</span>
+                         <button onClick={() => setHiddenClasses(prev => [...prev, turma.id])} title="Ocultar da Tela" className="opacity-0 group-hover/th:opacity-100 hover:text-rose-500 transition-opacity absolute -right-2 text-slate-400 cursor-pointer">
+                            <EyeOff size={11} />
+                         </button>
+                      </div>
                     </th>
                   ))}
                 </tr>
@@ -359,7 +375,7 @@ export function MasterGrid({ isDarkMode, ...props }) {
                   <React.Fragment key={diaId}>
                     {/* Linha Divisória do Dia */}
                     <tr>
-                      <td colSpan={turmasDoCurso.length + 1} className={`py-1 px-3 text-[10px] font-black uppercase tracking-widest mt-4 ${isDarkMode ? 'bg-slate-700/50 text-emerald-400' : 'bg-emerald-50 text-emerald-700'}`}>
+                      <td colSpan={turmasDoCurso.filter(t => !hiddenClasses.includes(t.id)).length + 1} className={`py-1 px-3 text-[10px] font-black uppercase tracking-widest mt-4 ${isDarkMode ? 'bg-slate-700/50 text-emerald-400' : 'bg-emerald-50 text-emerald-700'}`}>
                         {diaNome}
                       </td>
                     </tr>
@@ -372,7 +388,7 @@ export function MasterGrid({ isDarkMode, ...props }) {
                         </td>
                         
                         {/* Colunas das Turmas */}
-                        {turmasDoCurso.map(turma => {
+                        {turmasDoCurso.filter(t => !hiddenClasses.includes(t.id)).map(turma => {
                           const slotKey = `${turma.id}|${diaId}|${hora}`;
                           const aulaNesteSlot = grade[slotKey];
 
