@@ -8,6 +8,7 @@ export function MasterGrid({ isDarkMode, ...props }) {
   const { globalTeachers: globalTeachersList, activeDays, classTimes, academicWeeks, selectedConfigYear, setSelectedConfigYear, academicYearsMeta } = useData();
   
   const [selectedCourses, setSelectedCourses] = useState([]);
+  const [isCoursesOpen, setIsCoursesOpen] = useState(false);
   const [aulasNeutras, setAulasNeutras] = useState([]);
   const [grade, setGrade] = useState({});
 
@@ -245,26 +246,35 @@ export function MasterGrid({ isDarkMode, ...props }) {
              </select>
           </div>
 
-          <div className="flex items-center gap-2 px-3 py-2 rounded border bg-slate-50 dark:bg-slate-900 border-slate-300 dark:border-slate-700 relative group cursor-pointer">
-             <Filter size={16} className="text-slate-400" />
-             <div className="bg-transparent text-xs font-bold w-48 flex items-center justify-between">
-                <span>{selectedCourses.length === 0 ? '-- Selecionar Cursos --' : `${selectedCourses.length} Curso(s) da Matriz`}</span>
-                <span className="text-[9px] opacity-50">▼</span>
+          <div className="relative">
+             <div 
+               className="flex items-center gap-2 px-3 py-2 rounded border bg-slate-50 dark:bg-slate-900 border-slate-300 dark:border-slate-700 cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+               onClick={() => setIsCoursesOpen(!isCoursesOpen)}
+             >
+                <Filter size={16} className="text-slate-400" />
+                <div className="bg-transparent text-xs font-bold w-48 flex items-center justify-between">
+                   <span>{selectedCourses.length === 0 ? '-- Selecionar Cursos --' : `${selectedCourses.length} Curso(s) da Matriz`}</span>
+                   <span className="text-[9px] opacity-50">{isCoursesOpen ? '▲' : '▼'}</span>
+                </div>
              </div>
              
-             <div className="absolute top-10 w-64 p-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg shadow-xl hidden group-hover:flex flex-col z-50 max-h-60 overflow-y-auto gap-1 right-0 sm:left-0 sm:right-auto">
-                {courses?.map(c => (
-                 <label key={c.id} className="flex items-center gap-2 text-[10px] font-bold cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-700 px-2 py-1.5 rounded transition-colors group/label">
-                   <input type="checkbox" className="accent-emerald-500 w-3 h-3" checked={selectedCourses.includes(String(c.id))} onChange={(e) => {
-                     setGrade({}); setAulasNeutras([]); // Reset ao trocar (pode otimizar)
-                     if (e.target.checked) setSelectedCourses(p => [...p, String(c.id)]);
-                     else setSelectedCourses(p => p.filter(id => id !== String(c.id)));
-                   }} />
-                   <span className="group-hover/label:text-emerald-600 dark:group-hover/label:text-emerald-400">{c.name}</span>
-                 </label>
-               ))}
-               {courses?.length === 0 && <span className="text-xs p-2 opacity-50">Nenhum curso.</span>}
-             </div>
+             {isCoursesOpen && (
+                 <>
+                   <div className="fixed inset-0 z-40" onClick={() => setIsCoursesOpen(false)} />
+                   <div className="absolute top-12 w-64 p-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg shadow-xl flex flex-col z-50 max-h-60 overflow-y-auto gap-1 right-0 sm:left-0 sm:right-auto">
+                      {courses?.map(c => (
+                       <label key={c.id} className="flex items-center gap-2 text-[10px] font-bold cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-700 px-2 py-1.5 rounded transition-colors group/label z-50 relative">
+                         <input type="checkbox" className="accent-emerald-500 w-3 h-3 cursor-pointer" checked={selectedCourses.includes(String(c.id))} onChange={(e) => {
+                           if (e.target.checked) setSelectedCourses(p => [...p, String(c.id)]);
+                           else setSelectedCourses(p => p.filter(id => id !== String(c.id)));
+                         }} />
+                         <span className="group-hover/label:text-emerald-600 dark:group-hover/label:text-emerald-400">{c.name}</span>
+                       </label>
+                     ))}
+                     {courses?.length === 0 && <span className="text-xs p-2 opacity-50">Nenhum curso.</span>}
+                   </div>
+                 </>
+             )}
           </div>
           <button onClick={() => setModalMode('import')} disabled={selectedCourses.length === 0} className="flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 text-white disabled:opacity-50 px-4 py-2.5 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all w-full sm:w-auto shadow-sm">
              <Download size={14} /> Importar Grade
