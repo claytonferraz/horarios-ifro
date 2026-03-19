@@ -191,6 +191,8 @@ db.serialize(() => {
   db.run("ALTER TABLE schedules ADD COLUMN teacherId TEXT", () => {});
   db.run("ALTER TABLE schedules ADD COLUMN disciplineId TEXT", () => {});
   db.run("ALTER TABLE schedules ADD COLUMN room TEXT", () => {});
+  db.run("ALTER TABLE schedules ADD COLUMN week_id TEXT", () => {});
+  db.run("ALTER TABLE schedules ADD COLUMN academic_year TEXT", () => {});
 });
 
 // Middleware de Proteção (Segurança com JWT)
