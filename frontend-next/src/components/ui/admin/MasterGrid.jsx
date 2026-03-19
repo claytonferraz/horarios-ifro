@@ -10,8 +10,11 @@ export function MasterGrid({ isDarkMode, ...props }) {
   const [selectedCourses, setSelectedCourses] = useState([]);
   const [isCoursesOpen, setIsCoursesOpen] = useState(false);
   const [hiddenClasses, setHiddenClasses] = useState([]);
+ 
   const [aulasNeutras, setAulasNeutras] = useState([]);
   const [grade, setGrade] = useState({});
+  
+  // ESTADO DA TELA PRINCIPAL (O que o usuário está visualizando)
   const [selectedType, setSelectedType] = useState('padrao'); 
   const [selectedWeek, setSelectedWeek] = useState('');
 
@@ -102,6 +105,7 @@ export function MasterGrid({ isDarkMode, ...props }) {
   }, [selectedCourses, classesList]);
 
  // Estrutura do Grid Baseado no Estado Global de Schedules + Alocação Neutra
+// Estrutura do Grid Baseado no Estado Global de Schedules + Alocação Neutra
   useEffect(() => {
     if (selectedCourses.length === 0 || turmasDoCurso.length === 0 || !curriculumData) {
       setAulasNeutras([]);
@@ -126,9 +130,10 @@ export function MasterGrid({ isDarkMode, ...props }) {
     }));
 
     const initialGrade = {};
+    const aulasAlocadasIds = [];
 
     if (schedules && schedules.length > 0) {
-      // AQUI ESTÁ A MÁGICA: Filtramos usando os novos seletores da UI (selectedType e selectedWeek)
+      // Filtro Inteligente: Busca no banco apenas o Tipo e Semana que estão na tela
       const filtered = schedules.filter(s => 
         selectedCourses.includes(String(s.courseId)) && 
         s.type === selectedType && 
@@ -138,27 +143,28 @@ export function MasterGrid({ isDarkMode, ...props }) {
 
       filtered.forEach(schedule => {
         let referenceCard;
-        if (schedule.disciplineId) {
-             referenceCard = aulasReais.find(a => String(a.id) === String(schedule.disciplineId));
-        }
-        if (!referenceCard) {
-             referenceCard = aulasReais.find(a => String(a.classId) === String(schedule.classId) && String(a.teacherId) === String(schedule.teacherId));
-        }
+        if (schedule.disciplineId) referenceCard = aulasReais.find(a => String(a.id) === String(schedule.disciplineId));
+        if (!referenceCard) referenceCard = aulasReais.find(a => String(a.classId) === String(schedule.classId) && String(a.teacherId) === String(schedule.teacherId));
         
         if (referenceCard) {
              initialGrade[`${schedule.classId}|${schedule.dayOfWeek}|${schedule.slotId}`] = {
                ...referenceCard,
                sala: schedule.room || referenceCard.sala
              };
+             aulasAlocadasIds.push(String(referenceCard.id));
         }
       });
     }
 
-    // Pendentes/Neutras guardam TODAS as aulas (o frontend conta na tela quantas faltam).
-    // Se o banco estiver vazio, o sistema automaticamente fará o "Cold Start" perfeito aqui!
-    setAulasNeutras(aulasReais);
+    // REGRA 1 (Cold Start): O que não foi encontrado no banco, vai para as pendentes (Lateral Esquerda)
+    const pendentes = [];
+    aulasReais.forEach(d => {
+      if (!aulasAlocadasIds.includes(String(d.id))) pendentes.push(d);
+    });
+
+    setAulasNeutras(pendentes);
     setGrade(initialGrade);
-  }, [selectedCourses, turmasDoCurso, curriculumData, globalTeachersList, schedules, selectedConfigYear, selectedType, selectedWeek]);
+  }, [selectedCourses, turmasDoCurso, curriculumData, globalTeachersList, schedules, selectedType, selectedWeek, selectedConfigYear]);
 
   // Agrupa as aulas pendentes por Turma (Ordenadas Alfabeticamente)
   const neutrasPorTurma = useMemo(() => {
@@ -415,7 +421,29 @@ export function MasterGrid({ isDarkMode, ...props }) {
                )}
              </select>
           </div>
+          {/* SELETORES DE VISUALIZAÇÃO */}
+          <div className="flex flex-col sm:flex-row items-center gap-2 px-2">
+             <select 
+               value={selectedType} onChange={e => setSelectedType(e.target.value)} 
+               className={`px-3 py-2 rounded-lg border shadow-sm outline-none cursor-pointer text-xs font-bold uppercase tracking-wider text-indigo-600 dark:text-indigo-400 ${isDarkMode ? 'bg-slate-900 border-slate-700' : 'bg-slate-50 border-slate-300'}`}
+             >
+                 <option value="padrao">Padrão Anual</option>
+                 <option value="previa">Prévia Semanal</option>
+                 <option value="atual">Horário Atual</option>
+                 <option value="oficial">Histórico Oficial</option>
+             </select>
 
+             {selectedType !== 'padrao' && (
+               <select
+                 value={selectedWeek} onChange={(e) => setSelectedWeek(e.target.value)}
+                 className={`px-3 py-2 rounded-lg border shadow-sm outline-none cursor-pointer text-xs font-bold uppercase tracking-wider text-amber-600 dark:text-amber-400 ${isDarkMode ? 'bg-slate-900 border-slate-700' : 'bg-slate-50 border-slate-300'}`}
+               >
+                 <option value="">-- Semana --</option>
+                 {academicWeeks?.filter(w => w.academic_year === selectedConfigYear).map(w => <option key={w.id} value={w.id}>{w.name}</option>)}
+               </select>
+             )}
+          </div>
+          
           <div className="relative">
              <div 
                className="flex items-center gap-2 px-3 py-2 rounded border bg-slate-50 dark:bg-slate-900 border-slate-300 dark:border-slate-700 cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
@@ -737,8 +765,9 @@ export function MasterGrid({ isDarkMode, ...props }) {
            isDarkMode={isDarkMode} grade={grade} selectedCourses={selectedCourses} courses={courses} 
            saveOptions={saveOptions} setSaveOptions={setSaveOptions} 
            academicWeeks={academicWeeks} schedules={schedules} selectedConfigYear={selectedConfigYear}
+           loadedType={selectedType} loadedWeek={selectedWeek} 
            onClose={() => setModalMode(null)} 
-           onSuccess={() => { setModalMode(null); alert("Grade armazenada com sucesso!"); }} 
+           onSuccess={() => { setModalMode(null); alert("Grade armazenada com sucesso!"); fetchData(); }} 
          />
       )}
 
@@ -759,44 +788,48 @@ export function MasterGrid({ isDarkMode, ...props }) {
 // -------------------------------------------------------------
 // SUB-COMPONENTES DE AÇÃO (SALVAR E IMPORTAR)
 // -------------------------------------------------------------
-function SaveMatrixModal({ isDarkMode, grade, selectedCourses, courses, saveOptions, setSaveOptions, academicWeeks, schedules, selectedConfigYear, onClose, onSuccess }) {
+function SaveMatrixModal({ isDarkMode, grade, selectedCourses, courses, saveOptions, setSaveOptions, academicWeeks, schedules, selectedConfigYear, loadedType, loadedWeek, onClose, onSuccess }) {
   const [isSaving, setIsSaving] = useState(false);
   const currentYearWeeks = useMemo(() => academicWeeks?.filter(w => String(w.academic_year) === String(selectedConfigYear)) || [], [academicWeeks, selectedConfigYear]);
 
-  const statusCalc = useMemo(() => {
-     const choques = [];
-     const payload = [];
-     Object.entries(grade).forEach(([key, aula]) => {
-         const [classId, dayOfWeek, slotId] = key.split('|');
-         payload.push({ courseId: aula.courseId, classId, dayOfWeek, slotId, teacherId: aula.teacherId, disciplineId: aula.id.split('_')[1], room: aula.sala });
-         
-         const prof = aula.teacherId;
-         if (prof && prof !== 'A Definir' && prof !== '-') {
-             // Verificar em schedules buscando de outros cursos!
-             schedules?.forEach(s => {
-                 if (!selectedCourses.includes(String(s.courseId))) {
-                     // Somente avalia choque se for da mesma categoria e da mesma semana (se não for Padrão)
-                     if (s.type === saveOptions.type && (saveOptions.type === 'padrao' || String(s.week_id) === String(saveOptions.weekId))) {
-                        if (String(s.teacherId) === String(prof) && String(s.dayOfWeek) === String(dayOfWeek) && String(s.slotId) === String(slotId)) {
-                             const originCourseName = courses?.find(c => String(c.id) === String(s.courseId))?.name || 'Outro Curso';
-                             choques.push({ aula, turma: aula.className, msg: `${originCourseName} - ${MAP_DAYS[dayOfWeek]} às ${slotId}` });
-                        }
-                     }
-                 }
-             });
-         }
-     });
-     return { payload, choques };
-  }, [grade, schedules, selectedCourses, saveOptions, courses]);
+  // REGRAS DA PIPELINE (O que pode ser salvo depende do que foi carregado)
+  const availableOptions = useMemo(() => {
+      if (loadedType === 'padrao') return [
+          { value: 'padrao', label: 'Atualizar: Padrão Anual' },
+          { value: 'previa', label: 'Criar Nova: Prévia Semanal' }
+      ];
+      if (loadedType === 'previa') return [
+          { value: 'previa', label: 'Atualizar: Prévia Semanal' },
+          { value: 'atual', label: 'Promover para: Horário Atual' }
+      ];
+      if (loadedType === 'atual') return [
+          { value: 'atual', label: 'Atualizar: Horário Atual' },
+          { value: 'oficial', label: 'Promover para: Histórico Oficial' }
+      ];
+      if (loadedType === 'oficial') return [
+          { value: 'oficial', label: 'Retificar: Histórico Oficial' }
+      ];
+      return [{ value: 'padrao', label: 'Padrão Anual' }];
+  }, [loadedType]);
+
+  useEffect(() => {
+      setSaveOptions({ type: availableOptions[0].value, weekId: loadedWeek });
+  }, [loadedType, loadedWeek, availableOptions]);
 
   const handleConfirmSave = async () => {
-    if (saveOptions.type === 'oficial') {
-        const confirm = window.confirm("⚠️ RETIFICAÇÃO DE HORÁRIO OFICIAL ⚠️\n\nVocê está prestes a alterar um histórico consolidado. Continuar?");
+      const payload = Object.entries(grade).map(([key, aula]) => {
+         const [classId, dayOfWeek, slotId] = key.split('|');
+         return { courseId: aula.courseId, classId, dayOfWeek, slotId, teacherId: aula.teacherId, disciplineId: aula.id.split('_')[1] || aula.id, room: aula.sala };
+      });
+
+      if (payload.length === 0) return alert('Nenhuma aula lançada na tela!');
+      if (saveOptions.type !== 'padrao' && !saveOptions.weekId) return alert('Selecione uma semana letiva obrigatória!');
+      
+      if (saveOptions.type === 'oficial') {
+        const confirm = window.confirm("⚠️ RETIFICAÇÃO DE HORÁRIO OFICIAL ⚠️\n\nVocê está prestes a alterar/promover um histórico consolidado. Continuar?");
         if (!confirm) return;
       }
-      if (statusCalc.payload.length === 0) return alert('Nenhuma aula lançada na matriz!');
-      if (saveOptions.type !== 'padrao' && !saveOptions.weekId) return alert('Selecione uma semana letiva!');
-      if (saveOptions.type === 'padrao' && !saveOptions.weekId) return alert('Informe uma versão (Ex: v1) para a grade Padrão!');
+
       setIsSaving(true);
       try {
           const resp = await fetch('/api/schedules/bulk-course', {
@@ -807,7 +840,7 @@ function SaveMatrixModal({ isDarkMode, grade, selectedCourses, courses, saveOpti
                type: saveOptions.type,
                weekId: saveOptions.weekId || null,
                academicYear: selectedConfigYear,
-               schedules: statusCalc.payload
+               schedules: payload
             })
           });
           if(!resp.ok) {
@@ -823,76 +856,39 @@ function SaveMatrixModal({ isDarkMode, grade, selectedCourses, courses, saveOpti
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in zoom-in duration-200">
-      <div className={`w-full max-w-3xl rounded-2xl shadow-2xl p-6 flex flex-col max-h-[90vh] ${isDarkMode ? 'bg-slate-900 border border-slate-700' : 'bg-white'}`}>
-         
-         <div className="flex justify-between items-center mb-6 pb-4 border-b border-slate-200 dark:border-slate-800">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
+      <div className={`w-full max-w-2xl rounded-xl p-6 ${isDarkMode ? 'bg-slate-900 border border-slate-700' : 'bg-white'}`}>
+         <h2 className="text-lg font-black uppercase mb-4">Pipeline de Salvamento</h2>
+         <div className="grid grid-cols-2 gap-4 mb-6">
             <div>
-              <h2 className="text-lg font-black uppercase tracking-widest flex items-center gap-2"><Save size={18} className="text-emerald-500"/> Salvar Matriz do Curso</h2>
-              <p className="text-[10px] font-bold opacity-60 uppercase tracking-widest mt-1">Configure o ciclo de vida desta grade</p>
+              <label className="block text-[10px] font-black uppercase opacity-60 mb-2">Ação de Gravação Permitida</label>
+              <select value={saveOptions.type} onChange={e => setSaveOptions(p => ({...p, type: e.target.value}))} className={`w-full p-3 rounded border text-xs font-bold uppercase tracking-wider outline-none ${isDarkMode ? 'bg-slate-800 border-slate-700 text-emerald-400' : 'bg-slate-50 border-slate-300 text-emerald-700'}`}>
+                 {availableOptions.map(opt => (
+                     <option key={opt.value} value={opt.value}>{opt.label}</option>
+                 ))}
+              </select>
             </div>
-            <button onClick={onClose} className="p-2 rounded-full bg-slate-100/50 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 transition-colors"><X size={16}/></button>
-         </div>
-
-         <div className="flex-1 overflow-y-auto space-y-6 pr-2">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {saveOptions.type === 'padrao' ? (
               <div>
-                <label className="block text-[10px] font-black uppercase tracking-widest opacity-60 mb-2">Categoria da Matriz</label>
-                <select value={saveOptions.type} onChange={e => setSaveOptions(p => ({...p, type: e.target.value}))} className={`w-full px-3 py-3 rounded-xl border focus:ring-2 focus:ring-emerald-500 font-bold transition-all text-xs outline-none ${isDarkMode ? 'bg-slate-800 border-slate-700' : 'bg-slate-50 border-slate-200'}`}>
-                   <option value="padrao">Padrão / Template do Ano</option>
-   <option value="previa">Prévia Semanal</option>
-   <option value="atual">Horário Atual</option>
-   <option value="oficial">Horário Oficial / Consolidado</option>
+                <label className="block text-[10px] font-black uppercase opacity-60 mb-2">Versão (Opcional)</label>
+                <input type="text" placeholder="Ex: v1.0" value={saveOptions.weekId} onChange={e => setSaveOptions(p => ({...p, weekId: e.target.value}))} className={`w-full p-3 rounded border text-xs outline-none ${isDarkMode ? 'bg-slate-800 border-slate-700' : 'bg-slate-50'}`} />
+              </div>
+            ) : (
+              <div>
+                <label className="block text-[10px] font-black uppercase opacity-60 mb-2">Semana Letiva Destino</label>
+                <select value={saveOptions.weekId} onChange={e => setSaveOptions(p => ({...p, weekId: e.target.value}))} className={`w-full p-3 rounded border text-xs outline-none ${isDarkMode ? 'bg-slate-800 border-slate-700' : 'bg-slate-50'}`}>
+                   <option value="">Selecione a Semana...</option>
+                   {currentYearWeeks.map(w => <option key={w.id} value={w.id}>{w.name}</option>)}
                 </select>
               </div>
-              {saveOptions.type === 'padrao' ? (
-                <div>
-                  <label className="block text-[10px] font-black uppercase tracking-widest opacity-60 mb-2 text-emerald-600 dark:text-emerald-400">Versão da Matriz Padrão (Sem Semana)</label>
-                  <input type="text" placeholder="Ex: v1.0, Inicial, Ajuste 2" value={saveOptions.weekId} onChange={e => setSaveOptions(p => ({...p, weekId: e.target.value}))} className={`w-full px-3 py-3 rounded-xl border focus:ring-2 focus:ring-emerald-500 font-bold transition-all text-xs outline-none ${isDarkMode ? 'bg-slate-800 border-slate-700 focus:bg-slate-700' : 'bg-slate-50 border-slate-200 focus:bg-white'}`} />
-                </div>
-              ) : (
-                <div>
-                  <label className="block text-[10px] font-black uppercase tracking-widest opacity-60 mb-2">Qual Semana Letiva?</label>
-                  <select value={saveOptions.weekId} onChange={e => setSaveOptions(p => ({...p, weekId: e.target.value}))} className={`w-full px-3 py-3 rounded-xl border focus:ring-2 focus:ring-emerald-500 font-bold transition-all text-xs outline-none ${isDarkMode ? 'bg-slate-800 border-slate-700' : 'bg-slate-50 border-slate-200'}`}>
-                     <option value="">Selecione...</option>
-                     {currentYearWeeks.map(w => <option key={w.id} value={w.id}>{w.name} ({w.start_date.split('-').reverse().join('/')})</option>)}
-                  </select>
-                </div>
-              )}
-            </div>
-
-            <div className={`rounded-xl border p-4 ${isDarkMode ? 'bg-slate-900/50 border-slate-800' : 'bg-slate-50 border-slate-200'}`}>
-               <h3 className="text-xs font-black uppercase tracking-widest mb-3 flex items-center justify-between">
-                 <span className="flex items-center gap-2"><MapPin size={14}/> Resumo da Operação</span>
-                 <span className="text-[10px] bg-slate-200 dark:bg-slate-700 px-2 py-0.5 rounded">{statusCalc.payload.length} Lançamentos</span>
-               </h3>
-               
-               {statusCalc.choques.length > 0 ? (
-                  <div className="mt-4 p-4 rounded-xl border-l-4 border-amber-500 bg-amber-50 dark:bg-amber-900/10 dark:border-amber-600">
-                     <p className="text-xs font-bold text-amber-800 dark:text-amber-400 mb-2 flex items-center gap-2"><AlertCircle size={14} /> Detectado alerta de choques na matriz {saveOptions.type.toUpperCase()}:</p>
-                     <ul className="text-[10px] text-amber-700 dark:text-amber-300 space-y-1 font-medium list-disc pl-4">
-                        {statusCalc.choques.map((c, i) => (
-                           <li key={i}>
-                             Prof(a) <strong className="font-black">{c.aula.professor}</strong> está atribuído em <strong className="font-black">{c.msg}</strong> e na <strong className="font-black">{c.turma}</strong> ao mesmo tempo.
-                           </li>
-                        ))}
-                     </ul>
-                  </div>
-               ) : (
-                  <div className="mt-4 p-4 rounded-xl bg-emerald-50 text-emerald-700 dark:bg-emerald-900/20 dark:text-emerald-400 text-xs font-bold flex items-center gap-2 border border-emerald-100 dark:border-emerald-800/50">
-                    <Check size={16}/> Excelente! Nenhum choque global detectado com esta configuração.
-                  </div>
-               )}
-            </div>
+            )}
          </div>
-
-         <div className="grid grid-cols-2 gap-3 mt-6 pt-4 border-t border-slate-200 dark:border-slate-800">
-             <button onClick={onClose} className="py-3 rounded-xl text-[10px] font-black bg-slate-200 text-slate-700 hover:bg-slate-300 dark:bg-slate-800 dark:text-slate-400 dark:hover:bg-slate-700 transition-colors uppercase tracking-widest">
-               Voltar à Grade
-             </button>
-             <button onClick={handleConfirmSave} disabled={isSaving} className="py-3 rounded-xl text-[10px] font-black bg-emerald-600 text-white hover:bg-emerald-700 transition-colors uppercase tracking-widest flex items-center justify-center gap-2 shadow-lg disabled:opacity-50 disabled:cursor-not-allowed">
-               {isSaving ? <Loader2 size={14} className="animate-spin" /> : <Layers size={14}/> } Confirmar Gravação
-             </button>
+         <div className="bg-blue-50 dark:bg-blue-900/10 p-3 rounded-lg border border-blue-100 dark:border-blue-800 mb-4 text-xs text-blue-700 dark:text-blue-400">
+             O sistema segue a hierarquia: <strong>Padrão → Prévia → Atual → Oficial</strong>.
+         </div>
+         <div className="flex justify-end gap-3 mt-4 border-t border-slate-200 dark:border-slate-800 pt-4">
+             <button onClick={onClose} className="px-4 py-2 font-bold text-xs bg-slate-200 dark:bg-slate-800 rounded text-slate-700 dark:text-slate-300">Cancelar</button>
+             <button onClick={handleConfirmSave} disabled={isSaving} className="px-4 py-2 font-bold text-xs bg-emerald-600 text-white rounded shadow-lg">{isSaving ? 'Aguarde...' : 'Confirmar Gravação'}</button>
          </div>
       </div>
     </div>
@@ -904,39 +900,24 @@ function ImportMatrixModal({ isDarkMode, selectedCourses, importOptions, setImpo
   
   const handleConfirmImport = () => {
      if (importOptions.type !== 'padrao' && !importOptions.weekId) return alert('Selecione a semana de origem para importar!');
-     if (importOptions.type === 'padrao' && !importOptions.weekId) return alert('Digite a versão correta do plano padrão (Ex: v1.0) que deseja buscar!');
 
      const filtrado = schedules.filter(s => selectedCourses.includes(String(s.courseId)) && s.type === importOptions.type && (importOptions.type === 'padrao' || String(s.week_id) === String(importOptions.weekId)));
-     
-     if (filtrado.length === 0) {
-       alert("Infelizmente não há nenhuma grade gravada com esses parâmetros para importar.");
-       return;
-     }
-
-     if(!window.confirm("Essa ação vai sobreescrever o que está desenhado agora na grade. Continuar?")) return;
+     if (filtrado.length === 0) return alert("Nenhuma grade gravada com esses parâmetros.");
+     if(!window.confirm("Essa ação vai sobreescrever o que está desenhado na tela. Continuar?")) return;
      
      const newGrade = {};
      const usedIds = new Set();
-     
      filtrado.forEach(s => {
          const slotKey = `${s.classId}|${s.dayOfWeek}|${s.slotId}`;
-         const matchingAulas = curriculumData.filter(c => String(c.classId) === String(s.classId) && !usedIds.has(c.id) && (c.id.includes(`_${s.disciplineId}_`) || (s.disciplineId == null && c.teacherId === s.teacherId)));
-         
+         const matchingAulas = curriculumData.filter(c => String(c.classId) === String(s.classId) && !usedIds.has(c.id) && (c.id.includes(`_${s.disciplineId}`) || c.teacherId === s.teacherId));
          if (matchingAulas.length > 0) {
              const aulaReal = matchingAulas[0];
              usedIds.add(aulaReal.id);
-             newGrade[slotKey] = { 
-               ...aulaReal, 
-               cor: getColorHash(aulaReal.subjectName), 
-               disciplina: aulaReal.subjectName, 
-               professor: resolveTeacherName(s.teacherId || aulaReal.teacherId, globalTeachersList), 
-               sala: s.room || aulaReal.room, 
-               teacherId: s.teacherId || aulaReal.teacherId 
-             };
+             newGrade[slotKey] = { ...aulaReal, cor: getColorHash(aulaReal.subjectName), disciplina: aulaReal.subjectName, professor: resolveTeacherName(s.teacherId || aulaReal.teacherId, globalTeachersList), sala: s.room || aulaReal.room, teacherId: s.teacherId || aulaReal.teacherId };
          }
      });
-     
      setGrade(newGrade);
+     
      const pendentes = curriculumData.filter(c => !usedIds.has(c.id)).map(aula => ({
        ...aula, cor: getColorHash(aula.subjectName), disciplina: aula.subjectName, professor: resolveTeacherName(aula.teacherId, globalTeachersList), sala: aula.room
      }));
@@ -945,31 +926,16 @@ function ImportMatrixModal({ isDarkMode, selectedCourses, importOptions, setImpo
   };
 
   const handleDeleteMatrix = async () => {
-    if (importOptions.type === 'oficial') return alert("Bloqueio: Horários Oficiais NÃO podem ser excluídos, apenas retificados salvando por cima.");
-    if (importOptions.type === 'atual') return alert("Bloqueio: O Horário Atual não pode ser excluído.");
+    if (importOptions.type === 'oficial') return alert("Bloqueio Definitivo: Horários Oficiais NÃO podem ser excluídos, apenas retificados salvando por cima.");
+    if (importOptions.type === 'atual') return alert("Bloqueio Definitivo: O Horário Atual não pode ser excluído.");
+    if (importOptions.type !== 'padrao' && !importOptions.weekId) return alert('Selecione primeiro qual semana você quer apagar!');
+    
     if (importOptions.type === 'padrao') {
        const padroes = schedules.filter(s => selectedCourses.includes(String(s.courseId)) && s.type === 'padrao');
        const isUnico = padroes.every(s => String(s.week_id) === String(importOptions.weekId) || !s.week_id);
        if (isUnico) return alert("Negado: Esta é a ÚNICA matriz Padrão do Curso. Ela não pode ser deletada.");
     }
-    if (importOptions.type === 'oficial') {
-        return alert("Bloqueio Definitivo: Matrizes Oficiais/Consolidadas NÃO podem ser totalmente excluídas, pois elas garantem o histórico das aulas ativas e concluídas. Em caso de erros, você deve apenas Importá-la, sobrescrever os horários na tela e Salvar novamente como retificação.");
-    }
-    if (importOptions.type !== 'padrao' && !importOptions.weekId) return alert('Selecione primeiro qual semana letiva você quer apagar!');
-    if (importOptions.type === 'padrao' && !importOptions.weekId) return alert('Digite o nome da versão (Ex: v1.0) que você quer apagar!');
-
-    const filtrado = schedules.filter(s => selectedCourses.includes(String(s.courseId)) && s.type === importOptions.type && (importOptions.type === 'padrao' || String(s.week_id) === String(importOptions.weekId)));
-    if (filtrado.length === 0) return alert("Nenhum registro real encontrado com esses parâmetros para excluir.");
-
-    if (importOptions.type === 'padrao') {
-       const padroesGerais = schedules.filter(s => selectedCourses.includes(String(s.courseId)) && s.type === 'padrao');
-       const versaoUnica = padroesGerais.every(s => String(s.week_id) === String(importOptions.weekId) || !s.week_id);
-       if (versaoUnica) {
-          return alert("Negado: Esta é a ÚNICA matriz Padrão do Curso para este Ano Letivo. Ela não pode ser excluída, apenas retificada. Deixe pelo menos uma Matriz Base.");
-       }
-    }
-
-    if (!window.confirm(`ATENÇÃO ABSOLUTA!\n\nA matriz [${importOptions.type.toUpperCase()}] selecionada será EXCLUÍDA PERMANENTEMENTE para todos os ${selectedCourses.length} cursos selecionados.\nDeseja mesmo apagar?`)) return;
+    if (!window.confirm(`ATENÇÃO! Deseja EXCLUIR PERMANENTEMENTE esta matriz [${importOptions.type.toUpperCase()}]?`)) return;
 
     try {
         const url = new URL('/api/schedules/bulk-course', window.location.origin);
@@ -979,68 +945,45 @@ function ImportMatrixModal({ isDarkMode, selectedCourses, importOptions, setImpo
         if (importOptions.weekId) url.searchParams.append('weekId', importOptions.weekId);
 
         const resp = await fetch(url, { method: 'DELETE', headers: getHeaders() });
-        if(!resp.ok) {
-           const err = await resp.json().catch(()=>({}));
-           throw new Error(err.error || 'Falha ao excluir matriz do banco.');
-        }
-        alert("Matriz desestruturada com sucesso!");
-        window.location.reload(); // Hard reload do admin pra refresh cache brutal
-    } catch(e) {
-        alert(e.message);
-    }
+        if(!resp.ok) throw new Error('Falha ao excluir matriz do banco.');
+        alert("Matriz excluída com sucesso!");
+        window.location.reload(); 
+    } catch(e) { alert(e.message); }
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in zoom-in duration-200">
-      <div className={`w-full max-w-xl rounded-2xl shadow-2xl p-6 flex flex-col max-h-[90vh] ${isDarkMode ? 'bg-slate-900 border border-slate-700' : 'bg-white'}`}>
-         <div className="flex justify-between items-center mb-6 pb-4 border-b border-slate-200 dark:border-slate-800">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
+      <div className={`w-full max-w-2xl rounded-xl p-6 ${isDarkMode ? 'bg-slate-900 border border-slate-700' : 'bg-white'}`}>
+         <h2 className="text-lg font-black uppercase mb-4">Gerir Matrizes Anteriores</h2>
+         <div className="grid grid-cols-2 gap-4 mb-6">
             <div>
-              <h2 className="text-lg font-black uppercase tracking-widest flex items-center gap-2"><Download size={18} className="text-blue-500"/> Restaurar Matriz</h2>
-              <p className="text-[10px] font-bold opacity-60 uppercase tracking-widest mt-1">Carregue um plano de horário salvo anteriormente</p>
+              <label className="block text-[10px] font-black uppercase opacity-60 mb-2">Fonte da Matriz</label>
+              <select value={importOptions.type} onChange={e => setImportOptions(p => ({...p, type: e.target.value}))} className={`w-full p-3 rounded border text-xs outline-none ${isDarkMode ? 'bg-slate-800 border-slate-700' : 'bg-slate-50'}`}>
+                 <option value="padrao">Padrão Anual</option>
+                 <option value="previa">Prévia Semanal</option>
+                 <option value="atual">Horário Atual</option>
+                 <option value="oficial">Histórico Consolidado</option>
+              </select>
             </div>
-            <button onClick={onClose} className="p-2 rounded-full bg-slate-100/50 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 transition-colors"><X size={16}/></button>
-         </div>
-
-         <div className="flex-1 overflow-y-auto space-y-6 pr-2">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {importOptions.type === 'padrao' ? (
               <div>
-                <label className="block text-[10px] font-black uppercase tracking-widest opacity-60 mb-2">Fonte da Matriz</label>
-                <select value={importOptions.type} onChange={e => setImportOptions(p => ({...p, type: e.target.value}))} className={`w-full px-3 py-3 rounded-xl border focus:ring-2 focus:ring-blue-500 font-bold transition-all text-xs outline-none ${isDarkMode ? 'bg-slate-800 border-slate-700' : 'bg-slate-50 border-slate-200'}`}>
-                   <option value="padrao">Padrão / Template</option>
-                   <option value="previa">Prévia Semanal (Teste)</option>
-                   <option value="oficial">Horário Oficial / Consolidado</option>
+                <label className="block text-[10px] font-black uppercase opacity-60 mb-2">Versão</label>
+                <input type="text" value={importOptions.weekId} onChange={e => setImportOptions(p => ({...p, weekId: e.target.value}))} className={`w-full p-3 rounded border text-xs outline-none ${isDarkMode ? 'bg-slate-800' : 'bg-slate-50'}`} />
+              </div>
+            ) : (
+              <div>
+                <label className="block text-[10px] font-black uppercase opacity-60 mb-2">Semana Base</label>
+                <select value={importOptions.weekId} onChange={e => setImportOptions(p => ({...p, weekId: e.target.value}))} className={`w-full p-3 rounded border text-xs outline-none ${isDarkMode ? 'bg-slate-800' : 'bg-slate-50'}`}>
+                   <option value="">Selecione...</option>
+                   {currentYearWeeks.map(w => <option key={w.id} value={w.id}>{w.name}</option>)}
                 </select>
               </div>
-              {importOptions.type === 'padrao' ? (
-                <div>
-                  <label className="block text-[10px] font-black uppercase tracking-widest opacity-60 mb-2 text-blue-600 dark:text-blue-400">Buscar Versão (Matriz Padrão)</label>
-                  <input type="text" placeholder="Ex: v1.0, Inicial, Ajuste 2" value={importOptions.weekId} onChange={e => setImportOptions(p => ({...p, weekId: e.target.value}))} className={`w-full px-3 py-3 rounded-xl border focus:ring-2 focus:ring-blue-500 font-bold transition-all text-xs outline-none ${isDarkMode ? 'bg-slate-800 border-slate-700 focus:bg-slate-700' : 'bg-slate-50 border-slate-200 focus:bg-white'}`} />
-                </div>
-              ) : (
-                <div>
-                  <label className="block text-[10px] font-black uppercase tracking-widest opacity-60 mb-2">Semana Base</label>
-                  <select value={importOptions.weekId} onChange={e => setImportOptions(p => ({...p, weekId: e.target.value}))} className={`w-full px-3 py-3 rounded-xl border focus:ring-2 focus:ring-blue-500 font-bold transition-all text-xs outline-none ${isDarkMode ? 'bg-slate-800 border-slate-700' : 'bg-slate-50 border-slate-200'}`}>
-                     <option value="">Selecione...</option>
-                     {currentYearWeeks.map(w => <option key={w.id} value={w.id}>{w.name} ({w.start_date.split('-').reverse().join('/')})</option>)}
-                  </select>
-                </div>
-              )}
-            </div>
-            <div className="bg-blue-50 dark:bg-blue-900/10 border border-blue-100 dark:border-blue-800/40 p-4 rounded-xl">
-               <p className="text-xs font-bold text-blue-700 dark:text-blue-400">Ao clicar em confirmar, a grade da tela será <strong className="font-black text-rose-500">sobreescrita e reordenada</strong> com a distribuição salva anteriormente nos termos escolhidos acima.</p>
-            </div>
+            )}
          </div>
-
-         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mt-6 pt-4 border-t border-slate-200 dark:border-slate-800">
-             <button onClick={handleDeleteMatrix} className="py-3 rounded-xl text-[10px] font-black bg-rose-100/50 text-rose-700 hover:bg-rose-200 dark:bg-rose-900/20 dark:text-rose-400 dark:hover:bg-rose-900/40 transition-colors uppercase tracking-widest flex items-center justify-center gap-2">
-                 <Trash2 size={14}/> Excluir Fonte
-             </button>
-             <button onClick={onClose} className="py-3 rounded-xl text-[10px] font-black bg-slate-200 text-slate-700 hover:bg-slate-300 dark:bg-slate-800 dark:text-slate-400 dark:hover:bg-slate-700 transition-colors uppercase tracking-widest">
-                 Cancelar
-             </button>
-             <button onClick={handleConfirmImport} className="py-3 rounded-xl text-[10px] font-black bg-blue-600 text-white hover:bg-blue-700 transition-colors uppercase tracking-widest flex items-center justify-center gap-2 shadow-lg">
-               <Download size={14}/> Efetivar Carregamento
-             </button>
+         <div className="flex justify-end gap-3 mt-4 border-t border-slate-800 pt-4">
+             <button onClick={handleDeleteMatrix} className="px-4 py-2 font-bold text-xs bg-rose-100 text-rose-700 rounded">Excluir Base</button>
+             <button onClick={onClose} className="px-4 py-2 font-bold text-xs bg-slate-200 text-slate-700 rounded">Cancelar</button>
+             <button onClick={handleConfirmImport} className="px-4 py-2 font-bold text-xs bg-blue-600 text-white rounded">Carregar para a Tela</button>
          </div>
       </div>
     </div>
