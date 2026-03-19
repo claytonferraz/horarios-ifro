@@ -1,15 +1,19 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { CalendarDays, GripVertical, AlertCircle, Save, Filter, MapPin, Loader2 } from 'lucide-react';
+import { CalendarDays, GripVertical, AlertCircle, Save, Filter, MapPin, Loader2, Download, X, Check, Layers } from 'lucide-react';
 import { useData } from '@/contexts/DataContext';
 import { MAP_DAYS, getColorHash, resolveTeacherName } from '@/lib/dates';
 import { apiClient, getHeaders } from '@/lib/apiClient';
 
 export function MasterGrid({ isDarkMode, ...props }) {
-  const { globalTeachers: globalTeachersList, activeDays, classTimes } = useData();
+  const { globalTeachers: globalTeachersList, activeDays, classTimes, academicWeeks } = useData();
   
   const [selectedCourse, setSelectedCourse] = useState('');
   const [aulasNeutras, setAulasNeutras] = useState([]);
   const [grade, setGrade] = useState({});
+
+  const [modalMode, setModalMode] = useState(null); // 'save' | 'import' | null
+  const [saveOptions, setSaveOptions] = useState({ type: 'padrao', weekId: '' });
+  const [importOptions, setImportOptions] = useState({ type: 'padrao', weekId: '' });
 
   const [classesList, setClassesList] = useState([]);
   const [courses, setCourses] = useState([]);
@@ -228,8 +232,11 @@ export function MasterGrid({ isDarkMode, ...props }) {
                {courses?.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
              </select>
           </div>
-          <button className="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white px-6 py-2 rounded-lg text-xs font-black uppercase tracking-widest transition-all">
-            <Save size={16} /> Salvar Matriz Completa
+          <button onClick={() => setModalMode('import')} disabled={!selectedCourse} className="flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 text-white disabled:opacity-50 px-4 py-2.5 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all w-full sm:w-auto shadow-sm">
+             <Download size={14} /> Importar Grade
+          </button>
+          <button onClick={() => setModalMode('save')} disabled={!selectedCourse} className="flex items-center justify-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white disabled:opacity-50 px-5 py-2.5 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all w-full sm:w-auto shadow-sm">
+            <Save size={14} /> Salvar Definitivo
           </button>
         </div>
       </div>
@@ -369,6 +376,244 @@ export function MasterGrid({ isDarkMode, ...props }) {
           )}
         </div>
 
+      </div>
+
+      {/* COMPONENTES DE MODAL INLINE PARA MASTERGRID */}
+      {modalMode === 'save' && (
+         <SaveMatrixModal 
+           isDarkMode={isDarkMode} grade={grade} selectedCourse={selectedCourse} courses={courses} 
+           saveOptions={saveOptions} setSaveOptions={setSaveOptions} 
+           academicWeeks={academicWeeks} schedules={schedules}
+           onClose={() => setModalMode(null)} 
+           onSuccess={() => { setModalMode(null); alert("Grade armazenada com sucesso!"); }} 
+         />
+      )}
+
+      {modalMode === 'import' && (
+         <ImportMatrixModal 
+           isDarkMode={isDarkMode} selectedCourse={selectedCourse}
+           importOptions={importOptions} setImportOptions={setImportOptions}
+           academicWeeks={academicWeeks} schedules={schedules}
+           curriculumData={curriculumData} globalTeachersList={globalTeachersList}
+           setGrade={setGrade} setAulasNeutras={setAulasNeutras}
+           onClose={() => setModalMode(null)} 
+         />
+      )}
+    </div>
+  );
+}
+
+// -------------------------------------------------------------
+// SUB-COMPONENTES DE AÇÃO (SALVAR E IMPORTAR)
+// -------------------------------------------------------------
+function SaveMatrixModal({ isDarkMode, grade, selectedCourse, courses, saveOptions, setSaveOptions, academicWeeks, schedules, onClose, onSuccess }) {
+  const [isSaving, setIsSaving] = useState(false);
+
+  const statusCalc = useMemo(() => {
+     const choques = [];
+     const payload = [];
+     Object.entries(grade).forEach(([key, aula]) => {
+         const [classId, dayOfWeek, slotId] = key.split('|');
+         payload.push({ classId, dayOfWeek, slotId, teacherId: aula.teacherId, disciplineId: aula.id.split('_')[1], room: aula.sala });
+         
+         const prof = aula.teacherId;
+         if (prof && prof !== 'A Definir' && prof !== '-') {
+             // Verificar em schedules buscando de outros cursos!
+             schedules?.forEach(s => {
+                 if (String(s.courseId) !== String(selectedCourse)) {
+                     // Somente avalia choque se for da mesma categoria e da mesma semana (se não for Padrão)
+                     if (s.type === saveOptions.type && (saveOptions.type === 'padrao' || String(s.week_id) === String(saveOptions.weekId))) {
+                        if (String(s.teacherId) === String(prof) && String(s.dayOfWeek) === String(dayOfWeek) && String(s.slotId) === String(slotId)) {
+                             const originCourseName = courses?.find(c => String(c.id) === String(s.courseId))?.name || 'Outro Curso';
+                             choques.push({ aula, turma: aula.className, msg: `${originCourseName} - ${MAP_DAYS[dayOfWeek]} às ${slotId}` });
+                        }
+                     }
+                 }
+             });
+         }
+     });
+     return { payload, choques };
+  }, [grade, schedules, selectedCourse, saveOptions, courses]);
+
+  const handleConfirmSave = async () => {
+      if (statusCalc.payload.length === 0) return alert('Nenhuma aula lançada na matriz!');
+      if (saveOptions.type !== 'padrao' && !saveOptions.weekId) return alert('Selecione uma semana letiva!');
+      setIsSaving(true);
+      try {
+          const resp = await fetch('/api/schedules/bulk-course', {
+            method: 'POST',
+            headers: getHeaders(),
+            body: JSON.stringify({
+               courseId: selectedCourse,
+               type: saveOptions.type,
+               weekId: saveOptions.weekId || null,
+               schedules: statusCalc.payload
+            })
+          });
+          if(!resp.ok) {
+             const r = await resp.json().catch(()=>({}));
+             throw new Error(r.error || 'Erro Crítico no Backend!');
+          }
+          onSuccess();
+      } catch(e) { 
+          alert(e.message); 
+      } finally {
+          setIsSaving(false);
+      }
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in zoom-in duration-200">
+      <div className={`w-full max-w-3xl rounded-2xl shadow-2xl p-6 flex flex-col max-h-[90vh] ${isDarkMode ? 'bg-slate-900 border border-slate-700' : 'bg-white'}`}>
+         
+         <div className="flex justify-between items-center mb-6 pb-4 border-b border-slate-200 dark:border-slate-800">
+            <div>
+              <h2 className="text-lg font-black uppercase tracking-widest flex items-center gap-2"><Save size={18} className="text-emerald-500"/> Salvar Matriz do Curso</h2>
+              <p className="text-[10px] font-bold opacity-60 uppercase tracking-widest mt-1">Configure o ciclo de vida desta grade</p>
+            </div>
+            <button onClick={onClose} className="p-2 rounded-full bg-slate-100/50 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 transition-colors"><X size={16}/></button>
+         </div>
+
+         <div className="flex-1 overflow-y-auto space-y-6 pr-2">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-[10px] font-black uppercase tracking-widest opacity-60 mb-2">Categoria da Matriz</label>
+                <select value={saveOptions.type} onChange={e => setSaveOptions(p => ({...p, type: e.target.value}))} className={`w-full px-3 py-3 rounded-xl border focus:ring-2 focus:ring-emerald-500 font-bold transition-all text-xs outline-none ${isDarkMode ? 'bg-slate-800 border-slate-700' : 'bg-slate-50 border-slate-200'}`}>
+                   <option value="padrao">Padrão / Template do Ano</option>
+                   <option value="previa">Prévia Semanal (Em Avaliação)</option>
+                   <option value="oficial">Horário Oficial / Consolidado</option>
+                </select>
+              </div>
+              <div className={`${saveOptions.type === 'padrao' ? 'opacity-30 pointer-events-none' : ''}`}>
+                <label className="block text-[10px] font-black uppercase tracking-widest opacity-60 mb-2">Qual Semana Letiva?</label>
+                <select value={saveOptions.weekId} onChange={e => setSaveOptions(p => ({...p, weekId: e.target.value}))} className={`w-full px-3 py-3 rounded-xl border focus:ring-2 focus:ring-emerald-500 font-bold transition-all text-xs outline-none ${isDarkMode ? 'bg-slate-800 border-slate-700' : 'bg-slate-50 border-slate-200'}`}>
+                   <option value="">Selecione...</option>
+                   {academicWeeks?.map(w => <option key={w.id} value={w.id}>{w.name} ({w.start_date.split('-').reverse().join('/')})</option>)}
+                </select>
+              </div>
+            </div>
+
+            <div className={`rounded-xl border p-4 ${isDarkMode ? 'bg-slate-900/50 border-slate-800' : 'bg-slate-50 border-slate-200'}`}>
+               <h3 className="text-xs font-black uppercase tracking-widest mb-3 flex items-center justify-between">
+                 <span className="flex items-center gap-2"><MapPin size={14}/> Resumo da Operação</span>
+                 <span className="text-[10px] bg-slate-200 dark:bg-slate-700 px-2 py-0.5 rounded">{statusCalc.payload.length} Lançamentos</span>
+               </h3>
+               
+               {statusCalc.choques.length > 0 ? (
+                  <div className="mt-4 p-4 rounded-xl border-l-4 border-amber-500 bg-amber-50 dark:bg-amber-900/10 dark:border-amber-600">
+                     <p className="text-xs font-bold text-amber-800 dark:text-amber-400 mb-2 flex items-center gap-2"><AlertCircle size={14} /> Detectado alerta de choques na matriz {saveOptions.type.toUpperCase()}:</p>
+                     <ul className="text-[10px] text-amber-700 dark:text-amber-300 space-y-1 font-medium list-disc pl-4">
+                        {statusCalc.choques.map((c, i) => (
+                           <li key={i}>
+                             Prof(a) <strong className="font-black">{c.aula.professor}</strong> está atribuído em <strong className="font-black">{c.msg}</strong> e na <strong className="font-black">{c.turma}</strong> ao mesmo tempo.
+                           </li>
+                        ))}
+                     </ul>
+                  </div>
+               ) : (
+                  <div className="mt-4 p-4 rounded-xl bg-emerald-50 text-emerald-700 dark:bg-emerald-900/20 dark:text-emerald-400 text-xs font-bold flex items-center gap-2 border border-emerald-100 dark:border-emerald-800/50">
+                    <Check size={16}/> Excelente! Nenhum choque global detectado com esta configuração.
+                  </div>
+               )}
+            </div>
+         </div>
+
+         <div className="grid grid-cols-2 gap-3 mt-6 pt-4 border-t border-slate-200 dark:border-slate-800">
+             <button onClick={onClose} className="py-3 rounded-xl text-[10px] font-black bg-slate-200 text-slate-700 hover:bg-slate-300 dark:bg-slate-800 dark:text-slate-400 dark:hover:bg-slate-700 transition-colors uppercase tracking-widest">
+               Voltar à Grade
+             </button>
+             <button onClick={handleConfirmSave} disabled={isSaving} className="py-3 rounded-xl text-[10px] font-black bg-emerald-600 text-white hover:bg-emerald-700 transition-colors uppercase tracking-widest flex items-center justify-center gap-2 shadow-lg disabled:opacity-50 disabled:cursor-not-allowed">
+               {isSaving ? <Loader2 size={14} className="animate-spin" /> : <Layers size={14}/> } Confirmar Gravação
+             </button>
+         </div>
+      </div>
+    </div>
+  );
+}
+
+function ImportMatrixModal({ isDarkMode, selectedCourse, importOptions, setImportOptions, academicWeeks, schedules, curriculumData, globalTeachersList, setGrade, setAulasNeutras, onClose }) {
+  
+  const handleConfirmImport = () => {
+     if (importOptions.type !== 'padrao' && !importOptions.weekId) return alert('Selecione a semana de origem para importar!');
+
+     const filtrado = schedules.filter(s => String(s.courseId) === String(selectedCourse) && s.type === importOptions.type && (importOptions.type === 'padrao' || String(s.week_id) === String(importOptions.weekId)));
+     
+     if (filtrado.length === 0) {
+       alert("Infelizmente não há nenhuma grade gravada com esses parâmetros para importar.");
+       return;
+     }
+
+     if(!window.confirm("Essa ação vai sobreescrever o que está desenhado agora na grade. Continuar?")) return;
+     
+     const newGrade = {};
+     const usedIds = new Set();
+     
+     filtrado.forEach(s => {
+         const slotKey = `${s.classId}|${s.dayOfWeek}|${s.slotId}`;
+         const matchingAulas = curriculumData.filter(c => String(c.classId) === String(s.classId) && !usedIds.has(c.id) && (c.id.includes(`_${s.disciplineId}_`) || (s.disciplineId == null && c.teacherId === s.teacherId)));
+         
+         if (matchingAulas.length > 0) {
+             const aulaReal = matchingAulas[0];
+             usedIds.add(aulaReal.id);
+             newGrade[slotKey] = { 
+               ...aulaReal, 
+               cor: getColorHash(aulaReal.subjectName), 
+               disciplina: aulaReal.subjectName, 
+               professor: resolveTeacherName(s.teacherId || aulaReal.teacherId, globalTeachersList), 
+               sala: s.room || aulaReal.room, 
+               teacherId: s.teacherId || aulaReal.teacherId 
+             };
+         }
+     });
+     
+     setGrade(newGrade);
+     const pendentes = curriculumData.filter(c => !usedIds.has(c.id)).map(aula => ({
+       ...aula, cor: getColorHash(aula.subjectName), disciplina: aula.subjectName, professor: resolveTeacherName(aula.teacherId, globalTeachersList), sala: aula.room
+     }));
+     setAulasNeutras(pendentes);
+     onClose();
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in zoom-in duration-200">
+      <div className={`w-full max-w-xl rounded-2xl shadow-2xl p-6 flex flex-col max-h-[90vh] ${isDarkMode ? 'bg-slate-900 border border-slate-700' : 'bg-white'}`}>
+         <div className="flex justify-between items-center mb-6 pb-4 border-b border-slate-200 dark:border-slate-800">
+            <div>
+              <h2 className="text-lg font-black uppercase tracking-widest flex items-center gap-2"><Download size={18} className="text-blue-500"/> Restaurar Matriz</h2>
+              <p className="text-[10px] font-bold opacity-60 uppercase tracking-widest mt-1">Carregue um plano de horário salvo anteriormente</p>
+            </div>
+            <button onClick={onClose} className="p-2 rounded-full bg-slate-100/50 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 transition-colors"><X size={16}/></button>
+         </div>
+
+         <div className="flex-1 overflow-y-auto space-y-6 pr-2">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-[10px] font-black uppercase tracking-widest opacity-60 mb-2">Fonte da Matriz</label>
+                <select value={importOptions.type} onChange={e => setImportOptions(p => ({...p, type: e.target.value}))} className={`w-full px-3 py-3 rounded-xl border focus:ring-2 focus:ring-blue-500 font-bold transition-all text-xs outline-none ${isDarkMode ? 'bg-slate-800 border-slate-700' : 'bg-slate-50 border-slate-200'}`}>
+                   <option value="padrao">Padrão / Template</option>
+                   <option value="previa">Prévia Semanal (Teste)</option>
+                   <option value="oficial">Horário Oficial / Consolidado</option>
+                </select>
+              </div>
+              <div className={`${importOptions.type === 'padrao' ? 'opacity-30 pointer-events-none' : ''}`}>
+                <label className="block text-[10px] font-black uppercase tracking-widest opacity-60 mb-2">Semana Base</label>
+                <select value={importOptions.weekId} onChange={e => setImportOptions(p => ({...p, weekId: e.target.value}))} className={`w-full px-3 py-3 rounded-xl border focus:ring-2 focus:ring-blue-500 font-bold transition-all text-xs outline-none ${isDarkMode ? 'bg-slate-800 border-slate-700' : 'bg-slate-50 border-slate-200'}`}>
+                   <option value="">Selecione...</option>
+                   {academicWeeks?.map(w => <option key={w.id} value={w.id}>{w.name} ({w.start_date.split('-').reverse().join('/')})</option>)}
+                </select>
+              </div>
+            </div>
+            <div className="bg-blue-50 dark:bg-blue-900/10 border border-blue-100 dark:border-blue-800/40 p-4 rounded-xl">
+               <p className="text-xs font-bold text-blue-700 dark:text-blue-400">Ao clicar em confirmar, a grade da tela será <strong className="font-black text-rose-500">sobreescrita e reordenada</strong> com a distribuição salva anteriormente nos termos escolhidos acima.</p>
+            </div>
+         </div>
+
+         <div className="grid grid-cols-2 gap-3 mt-6 pt-4 border-t border-slate-200 dark:border-slate-800">
+             <button onClick={onClose} className="py-3 rounded-xl text-[10px] font-black bg-slate-200 text-slate-700 hover:bg-slate-300 dark:bg-slate-800 dark:text-slate-400 dark:hover:bg-slate-700 transition-colors uppercase tracking-widest">Cancelar</button>
+             <button onClick={handleConfirmImport} className="py-3 rounded-xl text-[10px] font-black bg-blue-600 text-white hover:bg-blue-700 transition-colors uppercase tracking-widest flex items-center justify-center gap-2 shadow-lg">
+               <Download size={14}/> Efetivar Carregamento
+             </button>
+         </div>
       </div>
     </div>
   );
