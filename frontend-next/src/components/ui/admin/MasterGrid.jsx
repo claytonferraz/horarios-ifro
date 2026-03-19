@@ -7,7 +7,7 @@ import { apiClient, getHeaders } from '@/lib/apiClient';
 export function MasterGrid({ isDarkMode, ...props }) {
   const { globalTeachers: globalTeachersList, activeDays, classTimes, academicWeeks, selectedConfigYear, setSelectedConfigYear, academicYearsMeta } = useData();
   
-  const [selectedCourse, setSelectedCourse] = useState('');
+  const [selectedCourses, setSelectedCourses] = useState([]);
   const [aulasNeutras, setAulasNeutras] = useState([]);
   const [grade, setGrade] = useState({});
 
@@ -80,15 +80,15 @@ export function MasterGrid({ isDarkMode, ...props }) {
     loadAdminData();
   }, [selectedConfigYear]); // Recarrega os dados caso o usuário mude o ano letivo na interface
 
-  // Pega todas as turmas do curso selecionado
+  // Pega todas as turmas dos cursos selecionados
   const turmasDoCurso = useMemo(() => {
-    if (!selectedCourse) return [];
-    return classesList?.filter(cls => String(cls.courseId) === String(selectedCourse)) || [];
-  }, [selectedCourse, classesList]);
+    if (selectedCourses.length === 0) return [];
+    return classesList?.filter(cls => selectedCourses.includes(String(cls.courseId))) || [];
+  }, [selectedCourses, classesList]);
 
-  // Carrega as disciplinas do curso inteiro na Área Neutra
+  // Carrega as disciplinas dos cursos inteiros na Área Neutra
   useEffect(() => {
-    if (!selectedCourse || turmasDoCurso.length === 0 || !curriculumData) {
+    if (selectedCourses.length === 0 || turmasDoCurso.length === 0 || !curriculumData) {
       setAulasNeutras([]);
       setGrade({});
       return;
@@ -100,6 +100,7 @@ export function MasterGrid({ isDarkMode, ...props }) {
     const aulasReais = disciplinasDoCurso.map(disciplina => ({
       id: disciplina.id || Math.random().toString(),
       classId: String(disciplina.classId),
+      courseId: String(disciplina.courseId),
       className: turmasDoCurso.find(t => String(t.id) === String(disciplina.classId))?.name || 'Turma',
       disciplina: disciplina.subjectName,
       teacherId: disciplina.teacherId,
@@ -110,7 +111,7 @@ export function MasterGrid({ isDarkMode, ...props }) {
 
     setAulasNeutras(aulasReais);
     setGrade({});
-  }, [selectedCourse, turmasDoCurso, curriculumData, globalTeachersList]);
+  }, [selectedCourses, turmasDoCurso, curriculumData, globalTeachersList]);
 
   // Agrupa as aulas pendentes por Turma
   const neutrasPorTurma = useMemo(() => {
@@ -227,7 +228,7 @@ export function MasterGrid({ isDarkMode, ...props }) {
              <select 
                value={String(selectedConfigYear)} 
                onChange={(e) => {
-                 setSelectedCourse(''); 
+                 setSelectedCourses([]); 
                  setGrade({}); 
                  setAulasNeutras([]); 
                  setSelectedConfigYear(e.target.value);
@@ -244,22 +245,32 @@ export function MasterGrid({ isDarkMode, ...props }) {
              </select>
           </div>
 
-          <div className="flex items-center gap-2 px-3 py-2 rounded border bg-slate-50 dark:bg-slate-900 border-slate-300 dark:border-slate-700">
+          <div className="flex items-center gap-2 px-3 py-2 rounded border bg-slate-50 dark:bg-slate-900 border-slate-300 dark:border-slate-700 relative group cursor-pointer">
              <Filter size={16} className="text-slate-400" />
-             <select 
-               value={selectedCourse} 
-               onChange={(e) => setSelectedCourse(e.target.value)}
-               className="bg-transparent text-sm font-bold outline-none cursor-pointer w-48"
-             >
-               <option value="">-- Selecione o Curso --</option>
-               {courses?.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-             </select>
+             <div className="bg-transparent text-xs font-bold w-48 flex items-center justify-between">
+                <span>{selectedCourses.length === 0 ? '-- Selecionar Cursos --' : `${selectedCourses.length} Curso(s) da Matriz`}</span>
+                <span className="text-[9px] opacity-50">▼</span>
+             </div>
+             
+             <div className="absolute top-10 w-64 p-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg shadow-xl hidden group-hover:flex flex-col z-50 max-h-60 overflow-y-auto gap-1 right-0 sm:left-0 sm:right-auto">
+                {courses?.map(c => (
+                 <label key={c.id} className="flex items-center gap-2 text-[10px] font-bold cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-700 px-2 py-1.5 rounded transition-colors group/label">
+                   <input type="checkbox" className="accent-emerald-500 w-3 h-3" checked={selectedCourses.includes(String(c.id))} onChange={(e) => {
+                     setGrade({}); setAulasNeutras([]); // Reset ao trocar (pode otimizar)
+                     if (e.target.checked) setSelectedCourses(p => [...p, String(c.id)]);
+                     else setSelectedCourses(p => p.filter(id => id !== String(c.id)));
+                   }} />
+                   <span className="group-hover/label:text-emerald-600 dark:group-hover/label:text-emerald-400">{c.name}</span>
+                 </label>
+               ))}
+               {courses?.length === 0 && <span className="text-xs p-2 opacity-50">Nenhum curso.</span>}
+             </div>
           </div>
-          <button onClick={() => setModalMode('import')} disabled={!selectedCourse} className="flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 text-white disabled:opacity-50 px-4 py-2.5 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all w-full sm:w-auto shadow-sm">
+          <button onClick={() => setModalMode('import')} disabled={selectedCourses.length === 0} className="flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 text-white disabled:opacity-50 px-4 py-2.5 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all w-full sm:w-auto shadow-sm">
              <Download size={14} /> Importar Grade
           </button>
-          <button onClick={() => setModalMode('save')} disabled={!selectedCourse} className="flex items-center justify-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white disabled:opacity-50 px-5 py-2.5 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all w-full sm:w-auto shadow-sm">
-            <Save size={14} /> Salvar Definitivo
+          <button onClick={() => setModalMode('save')} disabled={selectedCourses.length === 0} className="flex items-center justify-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white disabled:opacity-50 px-5 py-2.5 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all w-full sm:w-auto shadow-sm">
+             <Save size={14} /> Salvar Definitivo
           </button>
         </div>
       </div>
@@ -278,9 +289,9 @@ export function MasterGrid({ isDarkMode, ...props }) {
           </h3>
           
           <div className="flex flex-col gap-4">
-            {!selectedCourse && (
+            {selectedCourses.length === 0 && (
               <div className="text-center text-slate-400 text-xs mt-10 p-4 border-2 border-dashed border-slate-300 dark:border-slate-700 rounded-lg">
-                Selecione um Curso para carregar.
+                Selecione os Cursos para carregar as disciplinas.
               </div>
             )}
 
@@ -315,7 +326,7 @@ export function MasterGrid({ isDarkMode, ...props }) {
 
         {/* GRADE MATRIZ PRINCIPAL (As Turmas lado a lado) */}
         <div className={`lg:col-span-4 p-4 rounded-xl border shadow-sm h-[75vh] overflow-auto ${isDarkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'}`}>
-          {!selectedCourse ? (
+          {selectedCourses.length === 0 ? (
              <div className="flex items-center justify-center h-full text-slate-400 font-bold">
                Nenhum curso selecionado.
              </div>
@@ -404,7 +415,7 @@ export function MasterGrid({ isDarkMode, ...props }) {
       {/* COMPONENTES DE MODAL INLINE PARA MASTERGRID */}
       {modalMode === 'save' && (
          <SaveMatrixModal 
-           isDarkMode={isDarkMode} grade={grade} selectedCourse={selectedCourse} courses={courses} 
+           isDarkMode={isDarkMode} grade={grade} selectedCourses={selectedCourses} courses={courses} 
            saveOptions={saveOptions} setSaveOptions={setSaveOptions} 
            academicWeeks={academicWeeks} schedules={schedules} selectedConfigYear={selectedConfigYear}
            onClose={() => setModalMode(null)} 
@@ -414,7 +425,7 @@ export function MasterGrid({ isDarkMode, ...props }) {
 
       {modalMode === 'import' && (
          <ImportMatrixModal 
-           isDarkMode={isDarkMode} selectedCourse={selectedCourse}
+           isDarkMode={isDarkMode} selectedCourses={selectedCourses}
            importOptions={importOptions} setImportOptions={setImportOptions}
            academicWeeks={academicWeeks} schedules={schedules} selectedConfigYear={selectedConfigYear}
            curriculumData={curriculumData} globalTeachersList={globalTeachersList}
@@ -429,7 +440,7 @@ export function MasterGrid({ isDarkMode, ...props }) {
 // -------------------------------------------------------------
 // SUB-COMPONENTES DE AÇÃO (SALVAR E IMPORTAR)
 // -------------------------------------------------------------
-function SaveMatrixModal({ isDarkMode, grade, selectedCourse, courses, saveOptions, setSaveOptions, academicWeeks, schedules, selectedConfigYear, onClose, onSuccess }) {
+function SaveMatrixModal({ isDarkMode, grade, selectedCourses, courses, saveOptions, setSaveOptions, academicWeeks, schedules, selectedConfigYear, onClose, onSuccess }) {
   const [isSaving, setIsSaving] = useState(false);
   const currentYearWeeks = useMemo(() => academicWeeks?.filter(w => String(w.academic_year) === String(selectedConfigYear)) || [], [academicWeeks, selectedConfigYear]);
 
@@ -438,13 +449,13 @@ function SaveMatrixModal({ isDarkMode, grade, selectedCourse, courses, saveOptio
      const payload = [];
      Object.entries(grade).forEach(([key, aula]) => {
          const [classId, dayOfWeek, slotId] = key.split('|');
-         payload.push({ classId, dayOfWeek, slotId, teacherId: aula.teacherId, disciplineId: aula.id.split('_')[1], room: aula.sala });
+         payload.push({ courseId: aula.courseId, classId, dayOfWeek, slotId, teacherId: aula.teacherId, disciplineId: aula.id.split('_')[1], room: aula.sala });
          
          const prof = aula.teacherId;
          if (prof && prof !== 'A Definir' && prof !== '-') {
              // Verificar em schedules buscando de outros cursos!
              schedules?.forEach(s => {
-                 if (String(s.courseId) !== String(selectedCourse)) {
+                 if (!selectedCourses.includes(String(s.courseId))) {
                      // Somente avalia choque se for da mesma categoria e da mesma semana (se não for Padrão)
                      if (s.type === saveOptions.type && (saveOptions.type === 'padrao' || String(s.week_id) === String(saveOptions.weekId))) {
                         if (String(s.teacherId) === String(prof) && String(s.dayOfWeek) === String(dayOfWeek) && String(s.slotId) === String(slotId)) {
@@ -457,7 +468,7 @@ function SaveMatrixModal({ isDarkMode, grade, selectedCourse, courses, saveOptio
          }
      });
      return { payload, choques };
-  }, [grade, schedules, selectedCourse, saveOptions, courses]);
+  }, [grade, schedules, selectedCourses, saveOptions, courses]);
 
   const handleConfirmSave = async () => {
       if (statusCalc.payload.length === 0) return alert('Nenhuma aula lançada na matriz!');
@@ -469,7 +480,7 @@ function SaveMatrixModal({ isDarkMode, grade, selectedCourse, courses, saveOptio
             method: 'POST',
             headers: getHeaders(),
             body: JSON.stringify({
-               courseId: selectedCourse,
+               courseIds: selectedCourses,
                type: saveOptions.type,
                weekId: saveOptions.weekId || null,
                academicYear: selectedConfigYear,
@@ -564,14 +575,14 @@ function SaveMatrixModal({ isDarkMode, grade, selectedCourse, courses, saveOptio
   );
 }
 
-function ImportMatrixModal({ isDarkMode, selectedCourse, importOptions, setImportOptions, academicWeeks, schedules, selectedConfigYear, curriculumData, globalTeachersList, setGrade, setAulasNeutras, onClose }) {
+function ImportMatrixModal({ isDarkMode, selectedCourses, importOptions, setImportOptions, academicWeeks, schedules, selectedConfigYear, curriculumData, globalTeachersList, setGrade, setAulasNeutras, onClose }) {
   const currentYearWeeks = useMemo(() => academicWeeks?.filter(w => String(w.academic_year) === String(selectedConfigYear)) || [], [academicWeeks, selectedConfigYear]);
   
   const handleConfirmImport = () => {
      if (importOptions.type !== 'padrao' && !importOptions.weekId) return alert('Selecione a semana de origem para importar!');
      if (importOptions.type === 'padrao' && !importOptions.weekId) return alert('Digite a versão correta do plano padrão (Ex: v1.0) que deseja buscar!');
 
-     const filtrado = schedules.filter(s => String(s.courseId) === String(selectedCourse) && s.type === importOptions.type && (importOptions.type === 'padrao' || String(s.week_id) === String(importOptions.weekId)));
+     const filtrado = schedules.filter(s => selectedCourses.includes(String(s.courseId)) && s.type === importOptions.type && (importOptions.type === 'padrao' || String(s.week_id) === String(importOptions.weekId)));
      
      if (filtrado.length === 0) {
        alert("Infelizmente não há nenhuma grade gravada com esses parâmetros para importar.");
@@ -616,22 +627,22 @@ function ImportMatrixModal({ isDarkMode, selectedCourse, importOptions, setImpor
     if (importOptions.type !== 'padrao' && !importOptions.weekId) return alert('Selecione primeiro qual semana letiva você quer apagar!');
     if (importOptions.type === 'padrao' && !importOptions.weekId) return alert('Digite o nome da versão (Ex: v1.0) que você quer apagar!');
 
-    const filtrado = schedules.filter(s => String(s.courseId) === String(selectedCourse) && s.type === importOptions.type && (importOptions.type === 'padrao' || String(s.week_id) === String(importOptions.weekId)));
+    const filtrado = schedules.filter(s => selectedCourses.includes(String(s.courseId)) && s.type === importOptions.type && (importOptions.type === 'padrao' || String(s.week_id) === String(importOptions.weekId)));
     if (filtrado.length === 0) return alert("Nenhum registro real encontrado com esses parâmetros para excluir.");
 
     if (importOptions.type === 'padrao') {
-       const padroesGerais = schedules.filter(s => String(s.courseId) === String(selectedCourse) && s.type === 'padrao');
+       const padroesGerais = schedules.filter(s => selectedCourses.includes(String(s.courseId)) && s.type === 'padrao');
        const versaoUnica = padroesGerais.every(s => String(s.week_id) === String(importOptions.weekId) || !s.week_id);
        if (versaoUnica) {
           return alert("Negado: Esta é a ÚNICA matriz Padrão do Curso para este Ano Letivo. Ela não pode ser excluída, apenas retificada. Deixe pelo menos uma Matriz Base.");
        }
     }
 
-    if (!window.confirm(`ATENÇÃO ABSOLUTA!\n\nA matriz [${importOptions.type.toUpperCase()}] selecionada será EXCLUÍDA PERMANENTEMENTE para este curso.\nDeseja mesmo apagar?`)) return;
+    if (!window.confirm(`ATENÇÃO ABSOLUTA!\n\nA matriz [${importOptions.type.toUpperCase()}] selecionada será EXCLUÍDA PERMANENTEMENTE para todos os ${selectedCourses.length} cursos selecionados.\nDeseja mesmo apagar?`)) return;
 
     try {
         const url = new URL('/api/schedules/bulk-course', window.location.origin);
-        url.searchParams.append('courseId', selectedCourse);
+        url.searchParams.append('courseIds', selectedCourses.join(','));
         url.searchParams.append('type', importOptions.type);
         url.searchParams.append('academicYear', selectedConfigYear || '');
         if (importOptions.weekId) url.searchParams.append('weekId', importOptions.weekId);

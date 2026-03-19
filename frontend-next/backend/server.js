@@ -359,11 +359,13 @@ app.get('/api/schedules', (req, res) => {
 });
 
 const bulkScheduleSchema = z.object({
-  courseId: z.union([z.string(), z.number()]).transform(String),
+  courseIds: z.array(z.union([z.string(), z.number()]).transform(String)).optional(),
+  courseId: z.union([z.string(), z.number()]).transform(String).optional(),
   type: z.string().default('padrao'),
   weekId: z.string().optional().nullable(),
   academicYear: z.string().optional().nullable(),
   schedules: z.array(z.object({
+    courseId: z.union([z.string(), z.number()]).transform(String).optional(),
     classId: z.union([z.string(), z.number()]).transform(String),
     dayOfWeek: z.string(),
     slotId: z.string(),
@@ -375,10 +377,15 @@ const bulkScheduleSchema = z.object({
 
 app.post('/api/schedules/bulk-course', verifyToken, (req, res) => {
   try {
-    const { courseId, type, weekId, academicYear, schedules } = bulkScheduleSchema.parse(req.body);
+    const { courseIds, courseId, type, weekId, academicYear, schedules } = bulkScheduleSchema.parse(req.body);
+    const coursesToClear = (courseIds && courseIds.length > 0) ? courseIds : (courseId ? [courseId] : []);
+    if (coursesToClear.length === 0) return res.status(400).json({ error: "Nenhum curso especificado para gravação." });
+
+    const placeholders = coursesToClear.map(() => '?').join(',');
+    const cond = coursesToClear.length > 0 ? `courseId NOT IN (${placeholders})` : `1=1`;
 
     // Validação Global de Conflitos
-    db.all("SELECT * FROM schedules WHERE (courseId != ? OR courseId IS NULL) AND type = ?", [courseId, type], (err, existingRows) => {
+    db.all(`SELECT * FROM schedules WHERE (${cond} OR courseId IS NULL) AND type = ?`, [...coursesToClear, type], (err, existingRows) => {
       if (err) return res.status(500).json({ error: err.message });
 
       // Se for um horário específico de uma semana (previa ou oficial), validar apenas com a mesma semana
@@ -389,7 +396,7 @@ app.post('/api/schedules/bulk-course', verifyToken, (req, res) => {
         
         for (const row of relevantRows) {
           if (row.teacherId === slot.teacherId && row.dayOfWeek === slot.dayOfWeek && row.slotId === slot.slotId) {
-             return res.status(400).json({ error: `Conflito Global: O professor já possui aula de outro curso em ${slot.dayOfWeek} às ${slot.slotId} no tipo ${type}.` });
+             return res.status(400).json({ error: `Conflito Global: O professor já possui aula de outro curso externo em ${slot.dayOfWeek} às ${slot.slotId} na matriz tipo ${type}.` });
           }
           if (row.records) {
             try {
@@ -409,9 +416,9 @@ app.post('/api/schedules/bulk-course', verifyToken, (req, res) => {
         db.run("BEGIN TRANSACTION");
         
         if (weekId) {
-            db.run("DELETE FROM schedules WHERE courseId = ? AND type = ? AND (week_id = ? OR week_id IS NULL) AND (academic_year = ? OR academic_year IS NULL)", [courseId, type, weekId, academicYear || '']);
+            db.run(`DELETE FROM schedules WHERE courseId IN (${placeholders}) AND type = ? AND (week_id = ? OR week_id IS NULL) AND (academic_year = ? OR academic_year IS NULL)`, [...coursesToClear, type, weekId, academicYear || '']);
         } else {
-            db.run("DELETE FROM schedules WHERE courseId = ? AND type = ? AND (academic_year = ? OR academic_year IS NULL)", [courseId, type, academicYear || '']);
+            db.run(`DELETE FROM schedules WHERE courseId IN (${placeholders}) AND type = ? AND (academic_year = ? OR academic_year IS NULL)`, [...coursesToClear, type, academicYear || '']);
         }
 
         const stmt = db.prepare("INSERT INTO schedules (id, courseId, academic_year, classId, dayOfWeek, slotId, teacherId, disciplineId, room, type, week_id, updatedAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
@@ -419,14 +426,15 @@ app.post('/api/schedules/bulk-course', verifyToken, (req, res) => {
 
         for (const slot of schedules) {
           const id = `s_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
-          stmt.run([id, courseId, academicYear || null, slot.classId, slot.dayOfWeek, slot.slotId, slot.teacherId, slot.disciplineId || null, slot.room || null, type, weekId || null, now]);
+          const targetCourse = slot.courseId || coursesToClear[0];
+          stmt.run([id, targetCourse, academicYear || null, slot.classId, slot.dayOfWeek, slot.slotId, slot.teacherId, slot.disciplineId || null, slot.room || null, type, weekId || null, now]);
         }
         
         stmt.finalize();
         db.run("COMMIT", (errCommit) => {
           if (errCommit) return res.status(500).json({ error: errCommit.message });
           io.emit('schedule_updated');
-          res.json({ success: true, message: 'Grade do curso cadastrada com sucesso!' });
+          res.json({ success: true, message: 'Grades gravadas com sucesso!' });
         });
       });
     });
@@ -441,29 +449,37 @@ app.post('/api/schedules/bulk-course', verifyToken, (req, res) => {
 
 app.delete('/api/schedules/bulk-course', verifyToken, (req, res) => {
   try {
-    const courseId = req.query.courseId;
     const type = req.query.type;
     const weekId = req.query.weekId;
     const academicYear = req.query.academicYear;
+    
+    let courseIds = [];
+    if (req.query.courseIds) {
+      courseIds = req.query.courseIds.split(',');
+    } else if (req.query.courseId) {
+      courseIds = [req.query.courseId];
+    }
 
-    if (!courseId || !type) return res.status(400).json({ error: "Faltam parâmetros básicos (courseId ou type)." });
+    if (courseIds.length === 0 || !type) return res.status(400).json({ error: "Faltam parâmetros básicos (courseId/courseIds ou type)." });
     
     if (type === 'oficial') {
       return res.status(403).json({ error: "Bloqueio do Sistema: Um horário oficial ou consolidado jamais poderá ser totalmente apagado, pos já serve como cálculo para aulas lecionadas. Caso precise, você deve Apenas Retificá-lo sobreescrevendo as aulas." });
     }
 
+    const placeholders = courseIds.map(() => '?').join(',');
+
     db.serialize(() => {
         db.run("BEGIN TRANSACTION");
         if (weekId) {
-            db.run("DELETE FROM schedules WHERE courseId = ? AND type = ? AND (week_id = ? OR week_id IS NULL) AND (academic_year = ? OR academic_year IS NULL)", [courseId, type, weekId, academicYear || '']);
+            db.run(`DELETE FROM schedules WHERE courseId IN (${placeholders}) AND type = ? AND (week_id = ? OR week_id IS NULL) AND (academic_year = ? OR academic_year IS NULL)`, [...courseIds, type, weekId, academicYear || '']);
         } else {
-            db.run("DELETE FROM schedules WHERE courseId = ? AND type = ? AND (academic_year = ? OR academic_year IS NULL)", [courseId, type, academicYear || '']);
+            db.run(`DELETE FROM schedules WHERE courseId IN (${placeholders}) AND type = ? AND (academic_year = ? OR academic_year IS NULL)`, [...courseIds, type, academicYear || '']);
         }
         
         db.run("COMMIT", (errCommit) => {
           if (errCommit) return res.status(500).json({ error: errCommit.message });
           io.emit('schedule_updated');
-          res.json({ success: true, message: 'Matriz formatada completamente!' });
+          res.json({ success: true, message: 'Matrizes formatadas completamente!' });
         });
     });
   } catch(e) {
