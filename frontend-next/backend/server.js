@@ -182,6 +182,15 @@ db.serialize(() => {
     timestamp TEXT,
     details TEXT
   )`);
+
+  // Migrações dinâmicas para o novo MasterGrid da Matriz (ignoram erros se já existirem)
+  db.run("ALTER TABLE schedules ADD COLUMN courseId TEXT", () => {});
+  db.run("ALTER TABLE schedules ADD COLUMN classId TEXT", () => {});
+  db.run("ALTER TABLE schedules ADD COLUMN dayOfWeek TEXT", () => {});
+  db.run("ALTER TABLE schedules ADD COLUMN slotId TEXT", () => {});
+  db.run("ALTER TABLE schedules ADD COLUMN teacherId TEXT", () => {});
+  db.run("ALTER TABLE schedules ADD COLUMN disciplineId TEXT", () => {});
+  db.run("ALTER TABLE schedules ADD COLUMN room TEXT", () => {});
 });
 
 // Middleware de Proteção (Segurança com JWT)
@@ -329,9 +338,92 @@ app.get('/api/auth/me', verifyToken, (req, res) => {
 // ROTAS DE HORÁRIOS
 // ==========================================
 app.get('/api/schedules', (req, res) => {
-  db.all("SELECT * FROM schedules", (err, rows) => {
+  const courseId = req.query.courseId;
+  let q = "SELECT * FROM schedules";
+  let params = [];
+  if (courseId) {
+    q += " WHERE courseId = ?";
+    params.push(courseId);
+  }
+  db.all(q, params, (err, rows) => {
+    if (err) return res.status(500).json({ error: err.message });
     res.json(rows || []);
   });
+});
+
+const bulkScheduleSchema = z.object({
+  courseId: z.union([z.string(), z.number()]).transform(String),
+  schedules: z.array(z.object({
+    classId: z.union([z.string(), z.number()]).transform(String),
+    dayOfWeek: z.string(),
+    slotId: z.string(),
+    teacherId: z.string(),
+    disciplineId: z.string().optional().nullable(),
+    room: z.string().optional().nullable(),
+    type: z.string().optional().nullable()
+  }))
+});
+
+app.post('/api/schedules/bulk-course', verifyToken, (req, res) => {
+  try {
+    const { courseId, schedules } = bulkScheduleSchema.parse(req.body);
+
+    // Validação Global de Conflitos
+    db.all("SELECT * FROM schedules WHERE courseId != ? OR courseId IS NULL", [courseId], (err, existingRows) => {
+      if (err) return res.status(500).json({ error: err.message });
+
+      for (const slot of schedules) {
+        if (!slot.teacherId || slot.teacherId === 'A Definir' || slot.teacherId === '-') continue;
+        
+        for (const row of existingRows) {
+          // Se for row individual novo formato:
+          if (row.teacherId === slot.teacherId && row.dayOfWeek === slot.dayOfWeek && row.slotId === slot.slotId) {
+             return res.status(400).json({ error: `Conflito Global: O professor já possui aula de outro curso em ${slot.dayOfWeek} às ${slot.slotId}.` });
+          }
+          // Se for row antigo com JSON records:
+          if (row.records) {
+            try {
+              const parsed = JSON.parse(row.records);
+              for (const r of parsed) {
+                // Tolerância cruzada (nomes e ids): checamos teacher, dayOfWeek e slotId
+                if (r.teacher === slot.teacherId && String(r.day) === String(slot.dayOfWeek) && String(r.time) === String(slot.slotId)) {
+                  return res.status(400).json({ error: `Conflito Global (Legado): O professor já possui aula alocada em ${slot.dayOfWeek} às ${slot.slotId}.` });
+                }
+              }
+            } catch (e) {}
+          }
+        }
+      }
+
+      // No conflicts! Faz a transação massiva: Delete velhos -> Insere Novos
+      db.serialize(() => {
+        db.run("BEGIN TRANSACTION");
+        db.run("DELETE FROM schedules WHERE courseId = ?", [courseId]);
+
+        const stmt = db.prepare("INSERT INTO schedules (id, courseId, classId, dayOfWeek, slotId, teacherId, disciplineId, room, type, updatedAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
+        const now = new Date().toISOString();
+
+        for (const slot of schedules) {
+          // Garante que o slot id seja único com salt aleatório rápido
+          const id = `s_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
+          stmt.run([id, courseId, slot.classId, slot.dayOfWeek, slot.slotId, slot.teacherId, slot.disciplineId || null, slot.room || null, slot.type || 'previa', now]);
+        }
+        
+        stmt.finalize();
+        db.run("COMMIT", (errCommit) => {
+          if (errCommit) return res.status(500).json({ error: errCommit.message });
+          io.emit('schedule_updated');
+          res.json({ success: true, message: 'Grade do curso cadastrada com sucesso!' });
+        });
+      });
+    });
+
+  } catch (e) {
+    if (e instanceof z.ZodError) {
+      return res.status(400).json({ error: "Dados inválidos: " + e.errors.map(err => err.message).join(', ') });
+    }
+    return res.status(400).json({ error: e.message });
+  }
 });
 
 app.get('/api/config', (req, res) => {

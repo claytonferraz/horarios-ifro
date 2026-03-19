@@ -1,85 +1,113 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { CalendarDays, GripVertical, AlertCircle, Save, Trash2 } from 'lucide-react';
+import { CalendarDays, GripVertical, AlertCircle, Save, Filter, MapPin } from 'lucide-react';
 import { useData } from '@/contexts/DataContext';
-import { getColorHash, MAP_DAYS } from '@/lib/dates';
-import { apiClient } from '@/lib/apiClient';
+import { MAP_DAYS, getColorHash, resolveTeacherName } from '@/lib/dates';
 
-export function MasterGrid({ isDarkMode, subjectHoursMeta, activeData, selectedWeek, scheduleMode, ...props }) {
-  const { classTimes, activeDays, refreshData } = useData();
-
-  // 1. ESTADO: Aulas na Área Neutra (Aguardando alocação)
+export function MasterGrid({ isDarkMode, ...props }) {
+  const { curriculumData, classesList, courses, globalTeachersList, schedules } = useData();
+  
+  const [selectedCourse, setSelectedCourse] = useState('');
   const [aulasNeutras, setAulasNeutras] = useState([]);
-
-  // 2. ESTADO: Aulas já alocadas na Grade (Mapeamento Dia-Hora -> Aula)
   const [grade, setGrade] = useState({});
 
-  // 3. Inicialização e extração das informações reais
+  const horarios = ['07:30 - 08:20', '08:20 - 09:10', '09:10 - 10:00', '10:20 - 11:10', '11:10 - 12:00'];
+
+  // Pega todas as turmas do curso selecionado
+  const turmasDoCurso = useMemo(() => {
+    if (!selectedCourse) return [];
+    return classesList?.filter(cls => String(cls.courseId) === String(selectedCourse)) || [];
+  }, [selectedCourse, classesList]);
+
+  // Carrega as disciplinas do curso inteiro na Área Neutra
   useEffect(() => {
-    if (activeData && Array.isArray(activeData)) {
-      const g = {};
-      const neutras = [];
-      
-      activeData.forEach(r => {
-        const aulaInfo = {
-          id: r.id,
-          disciplina: r.subject,
-          professor: r.teacher,
-          className: r.className,
-          cor: getColorHash(r.subject, isDarkMode),
-          originalRecord: r
-        };
-
-        if (r.day && r.time && r.day !== 'A Definir' && r.time !== 'A Definir' && r.day !== '-') {
-          g[`${r.day}_${r.time}`] = aulaInfo;
-        } else {
-          neutras.push(aulaInfo);
-        }
-      });
-      
-      setGrade(g);
-      setAulasNeutras(neutras);
+    if (!selectedCourse || turmasDoCurso.length === 0 || !curriculumData) {
+      setAulasNeutras([]);
+      setGrade({});
+      return;
     }
-  }, [activeData, isDarkMode]);
 
-  // 4. Mapeamento Real dos Dias (MAP_DAYS) usando activeDays do banco (ou Segunda a Sexta por padrão)
-  const diasSemana = useMemo(() => {
-    const days = (activeDays && activeDays.length > 0) ? activeDays : ['Segunda-feira', 'Terça-feira', 'Quarta-feira', 'Quinta-feira', 'Sexta-feira'];
-    return [...days].sort((a,b) => MAP_DAYS.indexOf(a) - MAP_DAYS.indexOf(b));
-  }, [activeDays]);
+    const idsTurmas = turmasDoCurso.map(t => String(t.id));
+    const disciplinasDoCurso = curriculumData.filter(c => idsTurmas.includes(String(c.classId)));
+    
+    const aulasReais = disciplinasDoCurso.map(disciplina => ({
+      id: disciplina.id || Math.random().toString(),
+      classId: String(disciplina.classId),
+      className: turmasDoCurso.find(t => String(t.id) === String(disciplina.classId))?.name || 'Turma',
+      disciplina: disciplina.subjectName,
+      teacherId: disciplina.teacherId,
+      professor: resolveTeacherName(disciplina.teacherId, globalTeachersList),
+      sala: disciplina.room || '', 
+      cor: getColorHash(disciplina.subjectName)
+    }));
 
-  // 5. Mapeamento Real dos Horários e Turnos
-  const horarios = useMemo(() => {
-    if (!classTimes || classTimes.length === 0) return ['07:30 - 08:20', '08:20 - 09:10', '09:10 - 10:00', '10:20 - 11:10', '11:10 - 12:00'];
-    const order = { 'Matutino': 1, 'Vespertino': 2, 'Noturno': 3 };
-    return [...classTimes].sort((a,b) => {
-      const oA = order[a.shift] || 99;
-      const oB = order[b.shift] || 99;
-      if (oA !== oB) return oA - oB;
-      return a.timeStr.localeCompare(b.timeStr);
-    }).map(t => t.timeStr);
-  }, [classTimes]);
+    setAulasNeutras(aulasReais);
+    setGrade({});
+  }, [selectedCourse, turmasDoCurso, curriculumData, globalTeachersList]);
+
+  // Agrupa as aulas pendentes por Turma
+  const neutrasPorTurma = useMemo(() => {
+    return aulasNeutras.reduce((acc, aula) => {
+      if (!acc[aula.className]) acc[aula.className] = [];
+      acc[aula.className].push(aula);
+      return acc;
+    }, {});
+  }, [aulasNeutras]);
+
+  // === MOTOR DE PREVENÇÃO DE CONFLITOS (CHOQUE DE HORÁRIO) ===
+  const verificarChoqueHorario = (teacherId, diaId, hora, currentClassId) => {
+    // 1. Verifica na grade que está sendo editada na tela agora (CORRIGIDO AQUI)
+    for (const [key, aula] of Object.entries(grade)) {
+      const [kClassId, kDiaId, kHora] = key.split('|');
+      if (kDiaId === String(diaId) && kHora === hora && aula.teacherId === teacherId && kClassId !== String(currentClassId)) {
+        return `CHOQUE NA TELA!\nO professor já está na turma ${aula.className} neste mesmo horário.`;
+      }
+    }
+
+    // 2. Verifica no banco global (outros cursos)
+    const conflitoGlobal = schedules?.find(s => 
+      String(s.teacherId) === String(teacherId) && 
+      String(s.dayOfWeek) === String(diaId) && 
+      s.slotId === hora && 
+      String(s.classId) !== String(currentClassId)
+    );
+
+    if (conflitoGlobal) {
+      const turmaConflito = classesList.find(c => String(c.id) === String(conflitoGlobal.classId));
+      return `CHOQUE NO BANCO!\nEste professor já está alocado na turma "${turmaConflito?.name || 'Desconhecida'}" neste horário.`;
+    }
+    return null;
+  };
 
   // === FUNÇÕES DE DRAG AND DROP ===
-
   const handleDragStart = (e, aula, origem) => {
     e.dataTransfer.setData('application/json', JSON.stringify({ aula, origem }));
   };
 
-  const handleDragOver = (e) => {
-    e.preventDefault();
-  };
+  const handleDragOver = (e) => e.preventDefault();
 
-  const handleDropSlot = (e, dia, hora) => {
+  const handleDropSlot = (e, classId, diaId, hora) => {
     e.preventDefault();
     const data = e.dataTransfer.getData('application/json');
     if (!data) return;
 
     const { aula, origem } = JSON.parse(data);
-    const slotKey = `${dia}_${hora}`;
+    
+    if (String(aula.classId) !== String(classId)) {
+      alert(`Erro: Você está tentando colocar uma aula da ${aula.className} na coluna de outra turma!`);
+      return;
+    }
+
+    const slotKey = `${classId}|${diaId}|${hora}`;
 
     if (grade[slotKey]) {
-      alert("Este horário já está ocupado! Remova a aula atual primeiro.");
+      alert("Este horário já está ocupado por outra disciplina desta turma!");
       return;
+    }
+
+    const mensagemConflito = verificarChoqueHorario(aula.teacherId, diaId, hora, classId);
+    if (mensagemConflito) {
+      alert(mensagemConflito);
+      return; 
     }
 
     setGrade(prev => ({ ...prev, [slotKey]: aula }));
@@ -99,7 +127,6 @@ export function MasterGrid({ isDarkMode, subjectHoursMeta, activeData, selectedW
     e.preventDefault();
     const data = e.dataTransfer.getData('application/json');
     if (!data) return;
-
     const { aula, origem } = JSON.parse(data);
 
     if (origem !== 'neutra') {
@@ -112,181 +139,165 @@ export function MasterGrid({ isDarkMode, subjectHoursMeta, activeData, selectedW
     }
   };
 
-  // === SALVAR GRADE NO BANCO ===
-  const handleSave = async () => {
-    if (!selectedWeek || !activeData) {
-      alert("Selecione uma semana com dados antes de salvar.");
-      return;
-    }
-
-    try {
-      const allUpdatedRecords = activeData.map(record => {
-        let foundInGrid = null;
-        for (const [key, gradeItem] of Object.entries(grade)) {
-          if (gradeItem.id === record.id) {
-            foundInGrid = key;
-            break;
-          }
-        }
-
-        if (foundInGrid) {
-          const splitIndex = foundInGrid.indexOf('_');
-          const dia = foundInGrid.substring(0, splitIndex);
-          const hora = foundInGrid.substring(splitIndex + 1);
-          return { ...record, day: dia, time: hora };
-        } 
-        
-        // Se ela foi parar na área neutra
-        const foundInNeutro = aulasNeutras.find(n => n.id === record.id);
-        if (foundInNeutro) {
-          return { ...record, day: 'A Definir', time: 'A Definir' };
-        }
-
-        // Se não mudou, retorna original
-        return record;
-      });
-
-      const fileName = `MasterGrid_${Date.now()}`;
-      
-      const payload = {
-        id: selectedWeek,
-        week: selectedWeek,
-        type: scheduleMode || 'previa',
-        fileName: fileName,
-        records: JSON.stringify(allUpdatedRecords)
-      };
-
-      await apiClient.saveSchedule(payload);
-      alert("Grade salva com sucesso!");
-      if (refreshData) refreshData();
-    } catch (err) {
-      alert("Erro ao salvar: " + err.message);
-    }
-  };
-
   return (
-    <div className={`flex flex-col gap-6 animate-in fade-in duration-300 ${isDarkMode ? 'text-slate-200' : 'text-slate-800'}`}>
+    <div className={`flex flex-col gap-4 animate-in fade-in duration-300 ${isDarkMode ? 'text-slate-200' : 'text-slate-800'}`}>
       
       {/* CABEÇALHO */}
-      <div className={`p-4 rounded-xl border shadow-sm flex justify-between items-center ${isDarkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'}`}>
+      <div className={`p-4 rounded-xl border shadow-sm flex flex-col xl:flex-row justify-between items-center gap-4 ${isDarkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'}`}>
         <div className="flex items-center gap-3">
           <CalendarDays className="text-emerald-500" size={24} />
           <div>
-            <h2 className="text-lg font-black uppercase tracking-widest">Montagem de Horários</h2>
-            <p className="text-xs text-slate-400 font-bold tracking-wider">Arraste as disciplinas para os horários correspondentes</p>
+            <h2 className="text-lg font-black uppercase tracking-widest">Matriz do Curso</h2>
+            <p className="text-xs text-slate-400 font-bold tracking-wider">Visão simultânea de todas as turmas</p>
           </div>
         </div>
-        <button 
-          onClick={handleSave}
-          className="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-lg text-xs font-black uppercase tracking-widest transition-all shadow-sm"
-        >
-          <Save size={16} /> Salvar Grade
-        </button>
+
+        <div className="flex items-center gap-3 w-full xl:w-auto">
+          <div className="flex items-center gap-2 px-3 py-2 rounded border bg-slate-50 dark:bg-slate-900 border-slate-300 dark:border-slate-700">
+             <Filter size={16} className="text-slate-400" />
+             <select 
+               value={selectedCourse} 
+               onChange={(e) => setSelectedCourse(e.target.value)}
+               className="bg-transparent text-sm font-bold outline-none cursor-pointer w-48"
+             >
+               <option value="">-- Selecione o Curso --</option>
+               {courses?.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+             </select>
+          </div>
+          <button className="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white px-6 py-2 rounded-lg text-xs font-black uppercase tracking-widest transition-all">
+            <Save size={16} /> Salvar Matriz Completa
+          </button>
+        </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-5 gap-4">
         
-        {/* ÁREA NEUTRA (Aulas aguardando alocação) */}
+        {/* ÁREA NEUTRA (Lateral Esquerda) */}
         <div 
-          className={`lg:col-span-1 p-4 rounded-xl border shadow-sm flex flex-col ${isDarkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'}`}
+          className={`lg:col-span-1 p-3 rounded-xl border shadow-sm flex flex-col h-[75vh] overflow-y-auto ${isDarkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'}`}
           onDragOver={handleDragOver}
           onDrop={handleDropNeutra}
         >
-          <h3 className="text-xs font-black uppercase tracking-widest text-slate-500 mb-4 flex items-center justify-between border-b pb-2 border-slate-700/50">
-            <span className="flex items-center gap-2"><AlertCircle size={14} /> Aguardando</span>
-            <span className="text-[10px] bg-slate-200 dark:bg-slate-700 px-2 py-1 rounded">{aulasNeutras.length}</span>
+          <h3 className="text-[11px] font-black uppercase tracking-widest text-slate-500 mb-4 flex items-center justify-between border-b pb-2 border-slate-700/50">
+            <span className="flex items-center gap-2"><AlertCircle size={14} /> Pendentes</span>
+            <span className="bg-slate-200 dark:bg-slate-700 px-2 py-0.5 rounded">{aulasNeutras.length}</span>
           </h3>
           
-          <div className="flex-1 flex flex-col gap-2 min-h-[400px]">
-            {aulasNeutras.length === 0 && (
+          <div className="flex flex-col gap-4">
+            {!selectedCourse && (
               <div className="text-center text-slate-400 text-xs mt-10 p-4 border-2 border-dashed border-slate-300 dark:border-slate-700 rounded-lg">
-                Nenhuma aula pendente. <br/>Arraste aulas da grade para cá para removê-las.
+                Selecione um Curso para carregar.
               </div>
             )}
 
-            {aulasNeutras.map((aula) => (
-              <div 
-                key={aula.id}
-                draggable
-                onDragStart={(e) => handleDragStart(e, aula, 'neutra')}
-                className={`p-3 rounded border flex items-center gap-3 cursor-grab active:cursor-grabbing hover:ring-2 ring-emerald-500 transition-all shadow-sm ${isDarkMode ? 'bg-slate-700 border-slate-600' : 'bg-slate-50 border-slate-200'}`}
-              >
-                <GripVertical size={16} className="text-slate-400" />
-                <div className="flex-1 overflow-hidden">
-                  <div className={`text-[10px] font-black uppercase tracking-widest truncate px-2 py-0.5 rounded border ${aula.cor}`}>{aula.disciplina}</div>
-                  <div className="text-xs font-bold mt-1 truncate">{aula.professor}</div>
-                  {aula.className && <div className="text-[9px] text-slate-500 uppercase tracking-widest mt-1 truncate">{aula.className}</div>}
+            {Object.entries(neutrasPorTurma).map(([nomeTurma, aulas]) => (
+              <div key={nomeTurma} className="mb-2">
+                <div className="text-[10px] font-bold text-slate-400 mb-2 uppercase tracking-wider">{nomeTurma}</div>
+                <div className="flex flex-col gap-2">
+                  {aulas.map(aula => (
+                    <div 
+                      key={aula.id}
+                      draggable
+                      onDragStart={(e) => handleDragStart(e, aula, 'neutra')}
+                      className={`p-2 rounded border flex flex-col gap-1 cursor-grab hover:ring-2 ring-emerald-500 transition-all ${isDarkMode ? 'bg-slate-700 border-slate-600' : 'bg-slate-50 border-slate-200'}`}
+                    >
+                      <div className="flex items-center gap-1">
+                         <GripVertical size={12} className="text-slate-400 shrink-0" />
+                         <div className={`text-[9px] font-black uppercase tracking-widest text-${aula.cor}-500 dark:text-${aula.cor}-400 leading-tight line-clamp-1`}>
+                           {aula.disciplina}
+                         </div>
+                      </div>
+                      <div className="text-[9px] font-bold text-slate-500 pl-4 truncate">{aula.professor}</div>
+                      <div className="text-[8px] text-slate-400 pl-4 flex items-center gap-1">
+                        <MapPin size={8} /> {aula.sala || 'Sem Sala'}
+                      </div>
+                    </div>
+                  ))}
                 </div>
               </div>
             ))}
           </div>
         </div>
 
-        {/* A GRADE PRINCIPAL */}
-        <div className={`lg:col-span-3 p-4 rounded-xl border shadow-sm overflow-x-auto ${isDarkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'}`}>
-          <table className="w-full text-left border-collapse min-w-[600px]">
-            <thead>
-              <tr>
-                <th className="py-2 px-3 w-24"></th>
-                {diasSemana.map(dia => (
-                  <th key={dia} className="py-3 px-2 text-center text-xs font-black uppercase tracking-widest border-b border-slate-700/50 w-1/5">
-                    {dia}
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {horarios.map((hora) => (
-                <tr key={hora}>
-                  <td className="py-4 px-2 text-center text-[10px] font-bold text-slate-400 border-r border-slate-700/30 whitespace-nowrap">
-                    {hora}
-                  </td>
-                  
-                  {diasSemana.map(dia => {
-                    const slotKey = `${dia}_${hora}`;
-                    const aulaNesteSlot = grade[slotKey];
-
-                    return (
-                      <td 
-                        key={slotKey} 
-                        className="p-1 border border-slate-700/30 w-1/5"
-                        onDragOver={handleDragOver}
-                        onDrop={(e) => handleDropSlot(e, dia, hora)}
-                      >
-                        {aulaNesteSlot ? (
-                          // CARD DA AULA DENTRO DA GRADE
-                          <div 
-                            draggable
-                            onDragStart={(e) => handleDragStart(e, aulaNesteSlot, slotKey)}
-                            className={`w-full h-16 rounded border flex flex-col items-center justify-center cursor-grab active:cursor-grabbing shadow-sm hover:ring-2 ring-emerald-500 transition-all overflow-hidden ${isDarkMode ? 'bg-slate-800 border-slate-600' : 'bg-white border-slate-300'}`}
-                          >
-                            <span className={`text-[9px] w-full text-center truncate px-1 font-black uppercase tracking-widest ${aulaNesteSlot.cor || 'text-slate-500'}`}>
-                              {aulaNesteSlot.disciplina}
-                            </span>
-                            <span className="text-[9px] font-bold text-slate-500 dark:text-slate-300 truncate w-full text-center px-1">
-                              {aulaNesteSlot.professor}
-                            </span>
-                            {aulaNesteSlot.className && (
-                              <span className="text-[8px] font-bold text-slate-400 dark:text-slate-500 truncate w-full text-center px-1 mt-0.5">
-                                {aulaNesteSlot.className}
-                              </span>
-                            )}
-                          </div>
-                        ) : (
-                          // SLOT VAZIO
-                          <div className={`w-full h-16 rounded border-2 border-dashed flex items-center justify-center transition-colors ${isDarkMode ? 'border-slate-700 bg-slate-900/30 hover:bg-slate-700/50' : 'border-slate-200 bg-slate-50 hover:bg-slate-100'}`}>
-                            <span className="text-[9px] text-slate-500 font-bold uppercase tracking-widest opacity-0 hover:opacity-100 transition-opacity">
-                              Soltar Aqui
-                            </span>
-                          </div>
-                        )}
-                      </td>
-                    );
-                  })}
+        {/* GRADE MATRIZ PRINCIPAL (As Turmas lado a lado) */}
+        <div className={`lg:col-span-4 p-4 rounded-xl border shadow-sm h-[75vh] overflow-auto ${isDarkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'}`}>
+          {!selectedCourse ? (
+             <div className="flex items-center justify-center h-full text-slate-400 font-bold">
+               Nenhum curso selecionado.
+             </div>
+          ) : (
+            <table className="w-full text-left border-collapse min-w-[800px]">
+              <thead className="sticky top-0 z-10 bg-inherit shadow-sm">
+                <tr>
+                  <th className="py-2 px-2 w-20 bg-inherit"></th>
+                  {turmasDoCurso.map(turma => (
+                    <th key={turma.id} className={`py-2 px-2 text-center text-[11px] font-black uppercase tracking-widest border-b-2 border-slate-700/50 bg-inherit`}>
+                      {turma.name}
+                    </th>
+                  ))}
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {Object.entries(MAP_DAYS).map(([diaId, diaNome]) => (
+                  <React.Fragment key={diaId}>
+                    {/* Linha Divisória do Dia */}
+                    <tr>
+                      <td colSpan={turmasDoCurso.length + 1} className={`py-1 px-3 text-[10px] font-black uppercase tracking-widest mt-4 ${isDarkMode ? 'bg-slate-700/50 text-emerald-400' : 'bg-emerald-50 text-emerald-700'}`}>
+                        {diaNome}
+                      </td>
+                    </tr>
+                    
+                    {/* Horários do Dia */}
+                    {horarios.map((hora) => (
+                      <tr key={`${diaId}-${hora}`}>
+                        <td className="py-2 px-2 text-center text-[9px] font-bold text-slate-400 border-r border-slate-700/30 whitespace-nowrap align-middle">
+                          {hora}
+                        </td>
+                        
+                        {/* Colunas das Turmas */}
+                        {turmasDoCurso.map(turma => {
+                          const slotKey = `${turma.id}|${diaId}|${hora}`;
+                          const aulaNesteSlot = grade[slotKey];
+
+                          return (
+                            <td 
+                              key={slotKey} 
+                              className="p-1 border border-slate-700/30 min-w-[140px]"
+                              onDragOver={handleDragOver}
+                              onDrop={(e) => handleDropSlot(e, turma.id, diaId, hora)}
+                            >
+                              {aulaNesteSlot ? (
+                                <div 
+                                  draggable
+                                  onDragStart={(e) => handleDragStart(e, aulaNesteSlot, slotKey)}
+                                  className={`w-full h-14 rounded border flex flex-col justify-center px-1.5 cursor-grab hover:ring-2 ring-emerald-500 transition-all shadow-sm ${isDarkMode ? 'bg-slate-700 border-slate-500' : 'bg-white border-slate-300'}`}
+                                >
+                                  <span className={`text-[9px] font-black uppercase tracking-widest text-${aulaNesteSlot.cor}-500 dark:text-${aulaNesteSlot.cor}-400 leading-tight truncate`}>
+                                    {aulaNesteSlot.disciplina}
+                                  </span>
+                                  <span className="text-[8px] font-bold text-slate-500 dark:text-slate-300 truncate mt-0.5">
+                                    {aulaNesteSlot.professor}
+                                  </span>
+                                  {aulaNesteSlot.sala && (
+                                    <span className="text-[7.5px] font-bold text-slate-400 mt-0.5 flex items-center gap-1">
+                                      <MapPin size={8} /> {aulaNesteSlot.sala}
+                                    </span>
+                                  )}
+                                </div>
+                              ) : (
+                                <div className={`w-full h-14 rounded border border-dashed flex items-center justify-center transition-colors ${isDarkMode ? 'border-slate-700/50 hover:bg-slate-700/30' : 'border-slate-200 hover:bg-slate-50'}`}>
+                                </div>
+                              )}
+                            </td>
+                          );
+                        })}
+                      </tr>
+                    ))}
+                  </React.Fragment>
+                ))}
+              </tbody>
+            </table>
+          )}
         </div>
 
       </div>
