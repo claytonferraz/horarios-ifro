@@ -4,13 +4,17 @@ const sqlite3 = require('sqlite3').verbose();
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const helmet = require('helmet');
-const xss = require('xss-clean');
+// const xss = require('xss-clean'); (Incompatível com Express 5)
 const rateLimit = require('express-rate-limit');
 const { z } = require('zod');
 
 const app = express();
 const http = require('http');
 const { Server } = require('socket.io');
+
+// Restrição Extrema de CORS: Apenas o domínio Next.js oficial operando em produção ou local
+const allowedOrigins = ['http://localhost:3001', 'http://localhost:3000', 'https://horarios-ifro.vercel.app'];
+
 const server = http.createServer(app);
 const io = new Server(server, {
   cors: {
@@ -24,12 +28,9 @@ const io = new Server(server, {
 // Helmet protege cabeçalhos HTTP
 app.use(helmet());
 
-// XSS-Clean sanitiza query, body e params mitigando injeções
-app.use(xss());
+// app.use(xss()); // Comentado pois o pacote xss-clean v0.1.4 ainda quebra no Express 5 (req.query sem setter)
 
-// Restrição Extrema de CORS: Apenas o domínio Next.js oficial operando em produção ou local
-const allowedOrigins = ['http://localhost:3001', 'http://localhost:3000', 'https://horarios-ifro.vercel.app'];
-app.options('*', cors());
+app.options(/.*/, cors());
 app.use(cors({
   origin: function(origin, callback) {
     if(!origin) return callback(null, true); // Mobile / Postman
