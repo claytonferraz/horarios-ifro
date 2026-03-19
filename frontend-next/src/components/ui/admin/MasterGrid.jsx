@@ -60,6 +60,8 @@ export function MasterGrid({ isDarkMode, ...props }) {
              let numAulas = 1;
              if (disc.aulas_semanais !== undefined && disc.aulas_semanais !== null && disc.aulas_semanais > 0) {
                  numAulas = Number(disc.aulas_semanais);
+             } else if (disc.hours && disc.hours > 0) {
+                 numAulas = Math.floor(disc.hours / 40);
              } else if (disc.workload && disc.workload > 0) {
                  numAulas = Math.floor(disc.workload / 40);
              }
@@ -133,15 +135,18 @@ export function MasterGrid({ isDarkMode, ...props }) {
 
   // === MOTOR DE PREVENÇÃO DE CONFLITOS (CHOQUE DE HORÁRIO) ===
   const verificarChoqueHorario = (teacherId, sala, diaId, hora, currentClassId) => {
+    let pMsg = null;
+    let sMsg = null;
+
     // 1. Verifica na grade que está sendo editada na tela agora (CORRIGIDO AQUI)
     for (const [key, aula] of Object.entries(grade)) {
       const [kClassId, kDiaId, kHora] = key.split('|');
       if (kDiaId === String(diaId) && kHora === hora && kClassId !== String(currentClassId)) {
          if (teacherId && teacherId !== 'A Definir' && teacherId !== '-' && aula.teacherId === teacherId) {
-            return `CHOQUE DE PROFESSOR NA TELA!\nO professor já está na turma ${aula.className} neste mesmo horário.`;
+            pMsg = `O professor já está na turma ${aula.className}.`;
          }
          if (sala && aula.sala && aula.sala === sala) {
-            return `CHOQUE DE SALA NA TELA!\nO espaço/sala "${sala}" já está alocado para a turma ${aula.className} neste mesmo horário.`;
+            sMsg = `O ambiente "${sala}" já está alocado para a turma ${aula.className}.`;
          }
       }
     }
@@ -151,13 +156,15 @@ export function MasterGrid({ isDarkMode, ...props }) {
     for (const row of relRows) {
        if (teacherId && teacherId !== 'A Definir' && teacherId !== '-' && String(row.teacherId) === String(teacherId)) {
           const turmaConflito = classesList?.find(c => String(c.id) === String(row.classId));
-          return `CHOQUE DE PROFESSOR GLOBAL!\nEste professor já está alocado na turma "${turmaConflito?.name || 'Externa'}" neste horário.`;
+          pMsg = `Este professor já está alocado na turma externa "${turmaConflito?.name || 'Desconhecida'}".`;
        }
        if (sala && row.room && row.room === sala) {
           const turmaConflito = classesList?.find(c => String(c.id) === String(row.classId));
-          return `CHOQUE DE SALA GLOBAL!\nO espaço/sala "${sala}" já está sendo usado pela turma "${turmaConflito?.name || 'Externa'}" neste horário.`;
+          sMsg = `O espaço/sala "${sala}" já está sendo usado pela turma "${turmaConflito?.name || 'Externa'}".`;
        }
     }
+    
+    if (pMsg || sMsg) return { profMsg: pMsg, salaMsg: sMsg };
     return null;
   };
 
@@ -188,9 +195,10 @@ export function MasterGrid({ isDarkMode, ...props }) {
     }
 
     let globalIgnore = false;
-    const mensagemConflito = verificarChoqueHorario(aula.teacherId, aula.sala, diaId, hora, classId);
-    if (mensagemConflito) {
-      if (!window.confirm(`${mensagemConflito}\n\nDeseja forçar a alocação ignorando este aviso?\n(Obs: O sistema de Matriz Padrão, futuramente, não deixará você salvar este choque transversal).`)) {
+    const checkObj = verificarChoqueHorario(aula.teacherId, aula.sala, diaId, hora, classId);
+    if (checkObj) {
+      const msgs = [checkObj.profMsg, checkObj.salaMsg].filter(Boolean).join('\n\n');
+      if (!window.confirm(`ATENÇÃO DE CHOQUE!\n\n${msgs}\n\nDeseja forçar a alocação ignorando este aviso?\n(Obs: O sistema de Matriz Padrão, futuramente, não deixará você salvar este choque transversal).`)) {
          return; 
       }
       globalIgnore = true;
@@ -226,9 +234,10 @@ export function MasterGrid({ isDarkMode, ...props }) {
                      novaGrade[slotK] = aula;
                      placed++;
                 } else if (!novaGrade[slotK]) {
-                     const slotErrorMsg = verificarChoqueHorario(aula.teacherId, aula.sala, diaId, targetHora, classId);
-                     if (slotErrorMsg && !ignoreAlerts) {
-                        if (!window.confirm(`${slotErrorMsg}\n\nConflito detectado na continuação automática das próximas aulas. Deseja forçar e ignorar todos os avisos em cadeia agora?`)) {
+                     const slotCheck = verificarChoqueHorario(aula.teacherId, aula.sala, diaId, targetHora, classId);
+                     if (slotCheck && !ignoreAlerts) {
+                        const slotMsg = [slotCheck.profMsg, slotCheck.salaMsg].filter(Boolean).join('\n\n');
+                        if (!window.confirm(`ALERTA: ${slotMsg}\n\nConflito detectado na continuação automática das próximas aulas. Deseja forçar e ignorar todos os avisos em cadeia agora?`)) {
                             break;
                         } else {
                             ignoreAlerts = true;
@@ -275,9 +284,15 @@ export function MasterGrid({ isDarkMode, ...props }) {
       if (aula && aula.teacherId && aula.teacherId !== 'A Definir' && aula.teacherId !== '-') {
          const strConflito = verificarChoqueHorario(aula.teacherId, aula.sala, diaId, hora, classId);
          if (strConflito) {
-            const cleanErr = "Choque: " + strConflito.replace('\n', ' ');
-            cellAlerts[slotKey].push(cleanErr);
-            alerts.push(`[${MAP_DAYS[diaId]} às ${hora} | Turma: ${aula.className}] - ${cleanErr}`);
+            if (strConflito.profMsg) {
+                cellAlerts[slotKey].profAlert = true;
+                alerts.push(`[${MAP_DAYS[diaId]} às ${hora} | Turma: ${aula.className}] - Choque de Professor: ${strConflito.profMsg}`);
+            }
+            if (strConflito.salaMsg) {
+                cellAlerts[slotKey].salaAlert = true;
+                cellAlerts[slotKey].salaText = strConflito.salaMsg;
+                alerts.push(`[${MAP_DAYS[diaId]} às ${hora} | Turma: ${aula.className}] - Choque de Ambiente: ${strConflito.salaMsg}`);
+            }
          }
 
          const profSlots = new Set();
@@ -293,7 +308,9 @@ export function MasterGrid({ isDarkMode, ...props }) {
          const afternoonStarts = horariosExibidos.find(h => { const v = parseInt(h.split(':')[0],10); return v >= 12 && v < 18; });
          if (profSlots.has(morningEnds) && profSlots.has(afternoonStarts) && (hora === morningEnds || hora === afternoonStarts)) {
              const noRest = "Sem descanso (Manhã -> Tarde).";
-             cellAlerts[slotKey].push(noRest);
+             if (!cellAlerts[slotKey].profAlertMsg) cellAlerts[slotKey].profAlertMsg = [];
+             cellAlerts[slotKey].profAlertMsg.push(noRest);
+             cellAlerts[slotKey].profAlert = true;
              if (!alerts.some(a => a.includes(`[${MAP_DAYS[diaId]}] Professor(a) ${aula.professor.split(' ')[0]} leciona sem descanso`))) {
                  alerts.push(`[${MAP_DAYS[diaId]}] Professor(a) ${aula.professor.split(' ')[0]} leciona sem descanso entre Turnos (M->T).`);
              }
@@ -305,7 +322,9 @@ export function MasterGrid({ isDarkMode, ...props }) {
          });
          if (m && t && n) {
             const threeShifts = "Alocado em 3 Turnos no dia.";
-            cellAlerts[slotKey].push(threeShifts);
+            if (!cellAlerts[slotKey].profAlertMsg) cellAlerts[slotKey].profAlertMsg = [];
+            cellAlerts[slotKey].profAlertMsg.push(threeShifts);
+            cellAlerts[slotKey].profAlert = true;
             if (!alerts.some(a => a.includes(`[${MAP_DAYS[diaId]}] Professor(a) ${aula.professor.split(' ')[0]} atua`))) {
                  alerts.push(`[${MAP_DAYS[diaId]}] Professor(a) ${aula.professor.split(' ')[0]} atua em 3 Turnos diferentes.`);
             }
@@ -540,8 +559,11 @@ export function MasterGrid({ isDarkMode, ...props }) {
                           const aulaNesteSlot = grade[slotKey];
                           
                           // Busca dos alertas pré-computados
-                          const profAlerts = dashboardAlerts.perCell[slotKey] || [];
-
+                          const alertasObj = dashboardAlerts.perCell[slotKey] || { profAlert: false, profAlertMsg: [], salaAlert: false, salaText: '' };
+                          const temAlertaProf = alertasObj.profAlert;
+                          const profMsgText = alertasObj.profAlertMsg?.length > 0 ? alertasObj.profAlertMsg.join('\n') : 'Conflito de Professor.';
+                          const temAlertaSala = alertasObj.salaAlert;
+                          
                           return (
                             <td 
                               key={slotKey} 
@@ -566,13 +588,13 @@ export function MasterGrid({ isDarkMode, ...props }) {
                                   <span className={`text-[9px] w-[80%] font-black uppercase tracking-widest text-${aulaNesteSlot.cor}-500 dark:text-${aulaNesteSlot.cor}-400 leading-none truncate mt-1`} title={`${aulaNesteSlot.disciplina} - ${aulaNesteSlot.className}`}>
                                     {aulaNesteSlot.disciplina} <span className="text-[7px] ml-1 opacity-60 font-bold tracking-normal">- {aulaNesteSlot.className}</span>
                                   </span>
-                                  <div className="flex justify-between items-center mt-1 gap-1 overflow-hidden" title={profAlerts.length > 0 ? profAlerts.join('\n') : "Professor e Local"}>
-                                    <span className={`text-[8px] font-bold truncate max-w-[80px] ${profAlerts.length > 0 ? 'text-red-500 dark:text-red-400 bg-red-500/10 px-0.5 rounded border border-red-500/20' : 'text-slate-500 dark:text-slate-300'}`}>
-                                      {profAlerts.length > 0 && <AlertTriangle size={8} className="inline mr-0.5 mb-[1px]" />} {aulaNesteSlot.professor?.split(' ')[0]}
+                                  <div className="flex justify-between items-center mt-1 gap-1 overflow-hidden" title={temAlertaProf ? profMsgText : "Professor e Local"}>
+                                    <span className={`text-[8px] font-bold truncate max-w-[80px] ${temAlertaProf ? 'text-red-500 dark:text-red-400 bg-red-500/10 px-0.5 rounded border border-red-500/20' : 'text-slate-500 dark:text-slate-300'}`}>
+                                      {temAlertaProf && <AlertTriangle size={8} className="inline mr-0.5 mb-[1px]" />} {aulaNesteSlot.professor?.split(' ')[0]}
                                     </span>
                                     {aulaNesteSlot.sala && (
-                                      <span className="text-[8px] font-bold text-slate-400 flex items-center gap-0.5 truncate bg-black/5 dark:bg-white/5 px-1 py-[1px] rounded" title="Local da Aula">
-                                        <MapPin size={6} /> {aulaNesteSlot.sala.slice(0, 8)}
+                                      <span className={`text-[8px] font-bold flex items-center gap-0.5 truncate px-1 py-[1px] rounded ${temAlertaSala ? 'bg-amber-500/20 text-amber-600 border border-amber-500/30' : 'bg-black/5 dark:bg-white/5 text-slate-400'}`} title={temAlertaSala ? alertasObj.salaText : "Local da Aula"}>
+                                        {temAlertaSala ? <AlertTriangle size={6} className="shrink-0" /> : <MapPin size={6} className="shrink-0" />} {aulaNesteSlot.sala.slice(0, 8)}
                                       </span>
                                     )}
                                   </div>
