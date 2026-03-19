@@ -166,6 +166,7 @@ export function GestaoHorarios({
               {...props}
            />
         )}
+        {/* PortalView removido definitivamente */}
 
         {/* ABA: GESTÃO ESCOLAR */}
         {adminTab === 'disciplinas' && (
