@@ -6,6 +6,7 @@ const jwt = require('jsonwebtoken');
 const helmet = require('helmet');
 const xss = require('xss-clean');
 const rateLimit = require('express-rate-limit');
+const { z } = require('zod');
 
 const app = express();
 
@@ -50,13 +51,12 @@ app.use('/api/auth/', authLimiter);
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ limit: '50mb', extended: true }));
 
+require('dotenv').config();
 const path = require('path');
-const JWT_SECRET = 'SUA_CHAVE_SECRETA_AQUI_MUITO_SEGURA_2026';
-const dbPath = path.join(__dirname, 'horarios.db');
+const JWT_SECRET = process.env.JWT_SECRET || 'SUA_CHAVE_SECRETA_AQUI_MUITO_SEGURA_2026';
+const dbPath = path.join(__dirname, process.env.DB_FILENAME || 'horarios.db');
 const db = new sqlite3.Database(dbPath);
 console.log('Banco de dados conectado em:', dbPath);
-
-// ==========================================
 // CONTROLE DE SMART POLLING
 // ==========================================
 // Registra o tempo exato da última alteração no banco. 
@@ -336,17 +336,33 @@ app.get('/api/config', (req, res) => {
   });
 });
 
+const schedulePayloadSchema = z.object({
+  id: z.string().min(1, "ID é obrigatório"),
+  week: z.string().min(1, "Semana é obrigatória"),
+  type: z.enum(['oficial', 'previa', 'padrao']),
+  fileName: z.string().optional(),
+  records: z.string().min(2, "Records deve ser uma string JSON válida")
+});
+
 app.post('/api/schedules', verifyToken, (req, res) => {
-  const { id, week, type, fileName, records } = req.body;
-  const now = new Date().toISOString();
-  db.run(`INSERT OR REPLACE INTO schedules (id, week, type, fileName, records, updatedAt) VALUES (?, ?, ?, ?, ?, ?)`, 
-    [id, week, type, fileName, records, now], 
-    (err) => {
-      if (err) return res.status(500).json({ error: err.message });
-      lastUpdateTimestamp = Date.now(); // Dispara o Smart Polling do front
-      res.json({ success: true });
+  try {
+    const validatedData = schedulePayloadSchema.parse(req.body);
+    const { id, week, type, fileName, records } = validatedData;
+    const now = new Date().toISOString();
+    db.run(`INSERT OR REPLACE INTO schedules (id, week, type, fileName, records, updatedAt) VALUES (?, ?, ?, ?, ?, ?)`, 
+      [id, week, type, fileName, records, now], 
+      (err) => {
+        if (err) return res.status(500).json({ error: err.message });
+        lastUpdateTimestamp = Date.now(); // Dispara o Smart Polling do front
+        res.json({ success: true });
+      }
+    );
+  } catch (e) {
+    if (e instanceof z.ZodError) {
+      return res.status(400).json({ error: "Dados inválidos: " + e.errors.map(err => err.message).join(', ') });
     }
-  );
+    return res.status(400).json({ error: e.message });
+  }
 });
 
 app.delete('/api/schedules/:id', verifyToken, (req, res) => {
