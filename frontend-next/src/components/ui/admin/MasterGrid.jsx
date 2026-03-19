@@ -5,7 +5,7 @@ import { MAP_DAYS, getColorHash, resolveTeacherName } from '@/lib/dates';
 import { apiClient, getHeaders } from '@/lib/apiClient';
 
 export function MasterGrid({ isDarkMode, ...props }) {
-  const { globalTeachers: globalTeachersList } = useData();
+  const { globalTeachers: globalTeachersList, activeDays, classTimes } = useData();
   
   const [selectedCourse, setSelectedCourse] = useState('');
   const [aulasNeutras, setAulasNeutras] = useState([]);
@@ -17,7 +17,9 @@ export function MasterGrid({ isDarkMode, ...props }) {
   const [schedules, setSchedules] = useState([]);
   const [loadingInitial, setLoadingInitial] = useState(true);
 
-  const horarios = ['07:30 - 08:20', '08:20 - 09:10', '09:10 - 10:00', '10:20 - 11:10', '11:10 - 12:00'];
+  const rawHorarios = classTimes && classTimes.length > 0 ? classTimes : ['07:30 - 08:20', '08:20 - 09:10', '09:10 - 10:00', '10:20 - 11:10', '11:10 - 12:00'];
+  const horariosExibidos = rawHorarios.map(h => typeof h === 'string' ? h : h.timeStr);
+  const diasExibidos = activeDays && activeDays.length > 0 ? activeDays : ['Segunda-feira', 'Terça-feira', 'Quarta-feira', 'Quinta-feira', 'Sexta-feira'];
 
   // Carrega os currículos e turmas direto da fonte
   useEffect(() => {
@@ -300,7 +302,9 @@ export function MasterGrid({ isDarkMode, ...props }) {
                 </tr>
               </thead>
               <tbody>
-                {Object.entries(MAP_DAYS).map(([diaId, diaNome]) => (
+                {diasExibidos.map((diaNome) => {
+                  const diaId = String(MAP_DAYS.indexOf(diaNome));
+                  return (
                   <React.Fragment key={diaId}>
                     {/* Linha Divisória do Dia */}
                     <tr>
@@ -310,7 +314,7 @@ export function MasterGrid({ isDarkMode, ...props }) {
                     </tr>
                     
                     {/* Horários do Dia */}
-                    {horarios.map((hora) => (
+                    {horariosExibidos.map((hora) => (
                       <tr key={`${diaId}-${hora}`}>
                         <td className="py-2 px-2 text-center text-[9px] font-bold text-slate-400 border-r border-slate-700/30 whitespace-nowrap align-middle">
                           {hora}
@@ -358,7 +362,8 @@ export function MasterGrid({ isDarkMode, ...props }) {
                       </tr>
                     ))}
                   </React.Fragment>
-                ))}
+                  );
+                })}
               </tbody>
             </table>
           )}
