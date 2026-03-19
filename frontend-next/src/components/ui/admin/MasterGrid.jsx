@@ -5,11 +5,11 @@ import {
   Calendar, UserCircle, Layers, AlertTriangle, BarChart3, ListTodo
 } from 'lucide-react';
 import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd';
-import { SearchableSelect } from '../ui/SearchableSelect';
-import { InlineInput } from '../ui/InlineInput';
-import { ScheduleEditorModal } from '../ui/admin/ScheduleEditorModal';
-import { TeacherExchangeModal } from '../ui/TeacherExchangeModal';
-import { ScheduleNotifications } from '../ui/admin/ScheduleNotifications';
+import { SearchableSelect } from '../SearchableSelect';
+import { InlineInput } from '../InlineInput';
+import { ScheduleEditorModal } from './ScheduleEditorModal';
+import { TeacherExchangeModal } from '../TeacherExchangeModal';
+import { ScheduleNotifications } from './ScheduleNotifications';
 import { MAP_DAYS, getColorHash, isTeacherPending, resolveTeacherName } from '@/lib/dates';
 import { useData } from '@/contexts/DataContext';
 import { apiClient } from '@/lib/apiClient';
