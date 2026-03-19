@@ -4,6 +4,7 @@ import {
   MessageSquare, Clock, CheckCircle2, XCircle, Send, AlertCircle,
   Database, ClipboardList, Settings
 } from 'lucide-react';
+import { MasterGrid } from '../ui/admin/MasterGrid';
 import { AdminStatsPanel } from '../ui/AdminStatsPanel';
 import { ScheduleConfigPanel } from '../ui/admin/ScheduleConfigPanel';
 import { AcademicWeeksPanel } from '../ui/admin/AcademicWeeksPanel';
@@ -166,7 +167,8 @@ export function GestaoHorarios({
               {...props}
            />
         )}
-        {/* PortalView removido definitivamente */}
+
+        
 
         {/* ABA: GESTÃO ESCOLAR */}
         {adminTab === 'disciplinas' && (
