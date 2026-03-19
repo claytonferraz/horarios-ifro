@@ -432,6 +432,38 @@ app.post('/api/schedules/bulk-course', verifyToken, (req, res) => {
   }
 });
 
+app.delete('/api/schedules/bulk-course', verifyToken, (req, res) => {
+  try {
+    const courseId = req.query.courseId;
+    const type = req.query.type;
+    const weekId = req.query.weekId;
+    const academicYear = req.query.academicYear;
+
+    if (!courseId || !type) return res.status(400).json({ error: "Faltam parâmetros básicos (courseId ou type)." });
+    
+    if (type === 'oficial') {
+      return res.status(403).json({ error: "Bloqueio do Sistema: Um horário oficial ou consolidado jamais poderá ser totalmente apagado, pos já serve como cálculo para aulas lecionadas. Caso precise, você deve Apenas Retificá-lo sobreescrevendo as aulas." });
+    }
+
+    db.serialize(() => {
+        db.run("BEGIN TRANSACTION");
+        if (weekId) {
+            db.run("DELETE FROM schedules WHERE courseId = ? AND type = ? AND (week_id = ? OR week_id IS NULL) AND (academic_year = ? OR academic_year IS NULL)", [courseId, type, weekId, academicYear || '']);
+        } else {
+            db.run("DELETE FROM schedules WHERE courseId = ? AND type = ? AND (academic_year = ? OR academic_year IS NULL)", [courseId, type, academicYear || '']);
+        }
+        
+        db.run("COMMIT", (errCommit) => {
+          if (errCommit) return res.status(500).json({ error: errCommit.message });
+          io.emit('schedule_updated');
+          res.json({ success: true, message: 'Matriz formatada completamente!' });
+        });
+    });
+  } catch(e) {
+    return res.status(500).json({ error: e.message });
+  }
+});
+
 app.get('/api/config', (req, res) => {
   const year = req.query.year || new Date().getFullYear().toString();
   const configId = `config_${year}`;

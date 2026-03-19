@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { CalendarDays, GripVertical, AlertCircle, Save, Filter, MapPin, Loader2, Download, X, Check, Layers } from 'lucide-react';
+import { CalendarDays, GripVertical, AlertCircle, Save, Filter, MapPin, Loader2, Download, X, Check, Layers, Trash2 } from 'lucide-react';
 import { useData } from '@/contexts/DataContext';
 import { MAP_DAYS, getColorHash, resolveTeacherName } from '@/lib/dates';
 import { apiClient, getHeaders } from '@/lib/apiClient';
@@ -586,6 +586,45 @@ function ImportMatrixModal({ isDarkMode, selectedCourse, importOptions, setImpor
      onClose();
   };
 
+  const handleDeleteMatrix = async () => {
+    if (importOptions.type === 'oficial') {
+        return alert("Bloqueio Definitivo: Matrizes Oficiais/Consolidadas NÃO podem ser totalmente excluídas, pois elas garantem o histórico das aulas ativas e concluídas. Em caso de erros, você deve apenas Importá-la, sobrescrever os horários na tela e Salvar novamente como retificação.");
+    }
+    if (importOptions.type !== 'padrao' && !importOptions.weekId) return alert('Selecione primeiro qual semana letiva você quer apagar!');
+    if (importOptions.type === 'padrao' && !importOptions.weekId) return alert('Digite o nome da versão (Ex: v1.0) que você quer apagar!');
+
+    const filtrado = schedules.filter(s => String(s.courseId) === String(selectedCourse) && s.type === importOptions.type && (importOptions.type === 'padrao' || String(s.week_id) === String(importOptions.weekId)));
+    if (filtrado.length === 0) return alert("Nenhum registro real encontrado com esses parâmetros para excluir.");
+
+    if (importOptions.type === 'padrao') {
+       const padroesGerais = schedules.filter(s => String(s.courseId) === String(selectedCourse) && s.type === 'padrao');
+       const versaoUnica = padroesGerais.every(s => String(s.week_id) === String(importOptions.weekId) || !s.week_id);
+       if (versaoUnica) {
+          return alert("Negado: Esta é a ÚNICA matriz Padrão do Curso para este Ano Letivo. Ela não pode ser excluída, apenas retificada. Deixe pelo menos uma Matriz Base.");
+       }
+    }
+
+    if (!window.confirm(`ATENÇÃO ABSOLUTA!\n\nA matriz [${importOptions.type.toUpperCase()}] selecionada será EXCLUÍDA PERMANENTEMENTE para este curso.\nDeseja mesmo apagar?`)) return;
+
+    try {
+        const url = new URL('/api/schedules/bulk-course', window.location.origin);
+        url.searchParams.append('courseId', selectedCourse);
+        url.searchParams.append('type', importOptions.type);
+        url.searchParams.append('academicYear', selectedConfigYear || '');
+        if (importOptions.weekId) url.searchParams.append('weekId', importOptions.weekId);
+
+        const resp = await fetch(url, { method: 'DELETE', headers: getHeaders() });
+        if(!resp.ok) {
+           const err = await resp.json().catch(()=>({}));
+           throw new Error(err.error || 'Falha ao excluir matriz do banco.');
+        }
+        alert("Matriz desestruturada com sucesso!");
+        window.location.reload(); // Hard reload do admin pra refresh cache brutal
+    } catch(e) {
+        alert(e.message);
+    }
+  };
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in zoom-in duration-200">
       <div className={`w-full max-w-xl rounded-2xl shadow-2xl p-6 flex flex-col max-h-[90vh] ${isDarkMode ? 'bg-slate-900 border border-slate-700' : 'bg-white'}`}>
@@ -627,8 +666,13 @@ function ImportMatrixModal({ isDarkMode, selectedCourse, importOptions, setImpor
             </div>
          </div>
 
-         <div className="grid grid-cols-2 gap-3 mt-6 pt-4 border-t border-slate-200 dark:border-slate-800">
-             <button onClick={onClose} className="py-3 rounded-xl text-[10px] font-black bg-slate-200 text-slate-700 hover:bg-slate-300 dark:bg-slate-800 dark:text-slate-400 dark:hover:bg-slate-700 transition-colors uppercase tracking-widest">Cancelar</button>
+         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mt-6 pt-4 border-t border-slate-200 dark:border-slate-800">
+             <button onClick={handleDeleteMatrix} className="py-3 rounded-xl text-[10px] font-black bg-rose-100/50 text-rose-700 hover:bg-rose-200 dark:bg-rose-900/20 dark:text-rose-400 dark:hover:bg-rose-900/40 transition-colors uppercase tracking-widest flex items-center justify-center gap-2">
+                 <Trash2 size={14}/> Excluir Fonte
+             </button>
+             <button onClick={onClose} className="py-3 rounded-xl text-[10px] font-black bg-slate-200 text-slate-700 hover:bg-slate-300 dark:bg-slate-800 dark:text-slate-400 dark:hover:bg-slate-700 transition-colors uppercase tracking-widest">
+                 Cancelar
+             </button>
              <button onClick={handleConfirmImport} className="py-3 rounded-xl text-[10px] font-black bg-blue-600 text-white hover:bg-blue-700 transition-colors uppercase tracking-widest flex items-center justify-center gap-2 shadow-lg">
                <Download size={14}/> Efetivar Carregamento
              </button>
