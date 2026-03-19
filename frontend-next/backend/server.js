@@ -172,6 +172,15 @@ db.serialize(() => {
     severity TEXT, -- 'Bloqueio', 'Aviso'
     createdAt TEXT
   )`);
+
+  // Tabela de Auditoria (Audit Logs)
+  db.run(`CREATE TABLE IF NOT EXISTS audit_logs (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id TEXT,
+    action TEXT,
+    timestamp TEXT,
+    details TEXT
+  )`);
 });
 
 // Middleware de Proteção (Segurança com JWT)
@@ -403,8 +412,14 @@ app.post('/api/schedules', verifyToken, (req, res) => {
       [id, week, type, fileName, recordsStr, now], 
       (err) => {
         if (err) return res.status(500).json({ error: err.message });
-        io.emit('schedule_updated');
-        res.json({ success: true });
+        // Grava Auditoria da Ação
+        db.run(`INSERT INTO audit_logs (user_id, action, timestamp, details) VALUES (?, ?, ?, ?)`, 
+          [req.userId, 'SAVE_SCHEDULE', now, `Salvo horário ID: ${id} da semana: ${week}`],
+          () => {
+            io.emit('schedule_updated');
+            res.json({ success: true });
+          }
+        );
       }
     );
   } catch (e) {
