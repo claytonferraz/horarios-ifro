@@ -134,7 +134,10 @@ db.serialize(() => {
   db.run(`CREATE TABLE IF NOT EXISTS curriculum_data (
     id TEXT PRIMARY KEY,
     dataType TEXT,
-    payload TEXT -- Contém matrizes e turmas (referência de professores por SIAPE)
+    academic_year TEXT,
+    course_id TEXT,
+    matrix_id TEXT,
+    payload TEXT
   )`);
 
   // Tabela de Solicitações de Mudança (Portal do Professor)
@@ -638,8 +641,12 @@ app.put('/api/admin/curriculum/:type', verifyToken, (req, res) => {
   const payloadStr = JSON.stringify(req.body);
   const idStr = String(req.body.id);
   
-  db.run(`INSERT OR REPLACE INTO curriculum_data (id, dataType, payload) VALUES (?, ?, ?)`,
-    [idStr, type, payloadStr],
+  let academic_year = req.body.academicYear || null;
+  let course_id = req.body.course || req.body.courseAcronym || null;
+  let matrix_id = req.body.matrixId || (type === 'matrix' ? idStr : null);
+  
+  db.run(`INSERT OR REPLACE INTO curriculum_data (id, dataType, academic_year, course_id, matrix_id, payload) VALUES (?, ?, ?, ?, ?, ?)`,
+    [idStr, type, academic_year, course_id, matrix_id, payloadStr],
     (err) => {
       if (err) return res.status(500).json({ error: err.message });
       lastUpdateTimestamp = Date.now();
