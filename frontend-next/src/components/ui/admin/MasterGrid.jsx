@@ -56,18 +56,18 @@ export function MasterGrid({ isDarkMode, ...props }) {
              const teacher = (profs && profs.length > 0) ? profs[0] : 'A Definir';
              const classRoom = cls.roomAssignments?.[disc.id] || cls.room || '';
              
-             // Cria as "fichas de aula" para a Área Neutra de acordo com a carga (Ex: 2 aulas semanais = 2 cards)
-             const numAulas = disc.aulas_semanais || 1;
-             for(let i = 0; i < numAulas; i++) {
-               flatData.push({
-                  id: `${cls.id}_${disc.id}_${i}`,
+             // Calcula a quantidade padrao esperada na matriz
+             const numAulas = (disc.workload && disc.workload > 0) ? Math.floor(disc.workload / 40) : (disc.aulas_semanais || 1);
+             flatData.push({
+                  id: `${cls.id}_${disc.id}`,
                   classId: String(cls.id),
+                  courseId: cls.matrixId,
                   className: cls.name,
                   subjectName: disc.name,
                   teacherId: String(teacher),
-                  room: classRoom
-               });
-             }
+                  room: classRoom,
+                  numAulas: numAulas
+             });
           });
         });
         setCurriculumData(flatData);
@@ -108,7 +108,8 @@ export function MasterGrid({ isDarkMode, ...props }) {
       teacherId: disciplina.teacherId,
       professor: resolveTeacherName(disciplina.teacherId, globalTeachersList),
       sala: disciplina.room || '', 
-      cor: getColorHash(disciplina.subjectName)
+      cor: getColorHash(disciplina.subjectName),
+      numAulas: disciplina.numAulas || 1
     }));
 
     setAulasNeutras(aulasReais);
@@ -181,24 +182,44 @@ export function MasterGrid({ isDarkMode, ...props }) {
       return; 
     }
 
-    setGrade(prev => ({ ...prev, [slotKey]: aula }));
-
-    if (origem === 'neutra') {
-      setAulasNeutras(prev => prev.filter(item => item.id !== aula.id));
-    } else {
-      setGrade(prev => {
-        const novaGrade = { ...prev };
+    setGrade(prev => {
+      const novaGrade = { ...prev };
+      
+      if (origem !== 'neutra') {
         delete novaGrade[origem];
-        return novaGrade;
-      });
-    }
+        novaGrade[slotKey] = aula;
+      } else {
+        const startIndex = horariosExibidos.indexOf(hora);
+        if (startIndex !== -1) {
+            let placed = 0;
+            let currentIdx = startIndex;
+            const aulasAmount = aula.numAulas || 1;
+            while (placed < aulasAmount && currentIdx < horariosExibidos.length) {
+                const targetHora = horariosExibidos[currentIdx];
+                const slotK = `${classId}|${diaId}|${targetHora}`;
+                if (placed === 0) {
+                     novaGrade[slotK] = aula;
+                     placed++;
+                } else if (!novaGrade[slotK]) {
+                     const slotErrorMsg = verificarChoqueHorario(aula.teacherId, diaId, targetHora, classId);
+                     if (!slotErrorMsg) {
+                        novaGrade[slotK] = aula;
+                        placed++;
+                     }
+                }
+                currentIdx++;
+            }
+        }
+      }
+      return novaGrade;
+    });
   };
 
   const handleDropNeutra = (e) => {
     e.preventDefault();
     const data = e.dataTransfer.getData('application/json');
     if (!data) return;
-    const { aula, origem } = JSON.parse(data);
+    const { origem } = JSON.parse(data);
 
     if (origem !== 'neutra') {
       setGrade(prev => {
@@ -206,7 +227,6 @@ export function MasterGrid({ isDarkMode, ...props }) {
         delete novaGrade[origem];
         return novaGrade;
       });
-      setAulasNeutras(prev => [...prev, aula]);
     }
   };
 
@@ -320,25 +340,36 @@ export function MasterGrid({ isDarkMode, ...props }) {
               <div key={nomeTurma} className="mb-2">
                 <div className="text-[10px] font-bold text-slate-400 mb-2 uppercase tracking-wider">{nomeTurma}</div>
                 <div className="flex flex-col gap-2">
-                  {aulas.map(aula => (
-                    <div 
-                      key={aula.id}
-                      draggable
-                      onDragStart={(e) => handleDragStart(e, aula, 'neutra')}
-                      className={`w-[70%] p-1 rounded border flex flex-col gap-0.5 cursor-grab hover:ring-2 ring-emerald-500 transition-all ${isDarkMode ? 'bg-slate-700 border-slate-600' : 'bg-slate-50 border-slate-200'}`}
-                    >
-                      <div className="flex items-center gap-1">
-                         <GripVertical size={12} className="text-slate-400 shrink-0" />
-                         <div className={`text-[9px] font-black uppercase tracking-widest text-${aula.cor}-500 dark:text-${aula.cor}-400 leading-tight line-clamp-1`}>
-                           {aula.disciplina}
+                  {aulas.map(aula => {
+                    const countInGrid = Object.values(grade).filter(g => String(g.classId) === String(aula.classId) && String(g.id) === String(aula.id)).length;
+                    const qtyPadrao = aula.numAulas || 1;
+                    const isZero = countInGrid === 0;
+
+                    return (
+                      <div 
+                        key={aula.id}
+                        draggable
+                        onDragStart={(e) => handleDragStart(e, aula, 'neutra')}
+                        className={`w-full p-2 max-w-[95%] rounded border shadow-sm flex flex-col gap-1 cursor-grab hover:ring-2 hover:border-emerald-500 ring-emerald-500 transition-all ${(isZero && isDarkMode) ? 'bg-amber-950/20 border-amber-600/50' : (isZero ? 'bg-orange-50/60 border-orange-300' : (isDarkMode ? 'bg-slate-750 border-slate-600 border-l-4 border-l-emerald-500' : 'bg-slate-50 border-slate-200 border-l-4 border-l-emerald-500'))}`}
+                      >
+                       <div className="flex justify-between items-start gap-1">
+                         <div className="flex items-start gap-1 overflow-hidden pt-0.5">
+                           <GripVertical size={12} className={`shrink-0 ${isZero ? 'text-amber-500' : 'text-slate-400'}`} />
+                           <div className={`text-[10px] font-black uppercase tracking-widest ${isZero ? 'text-amber-600 dark:text-amber-500' : `text-${aula.cor}-500 dark:text-${aula.cor}-400`} leading-tight`}>
+                             {aula.disciplina}
+                           </div>
                          </div>
+                         <span title="Aulas Alocadas na Tela / Limite Recomendado" className={`text-[9px] font-black px-1 py-0.5 rounded flex-shrink-0 ${isZero ? 'bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-400' : 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400'}`}>
+                           {countInGrid} / {qtyPadrao}
+                         </span>
+                       </div>
+                       <div className="flex justify-between items-center pl-4 pr-1 mt-1">
+                          <span className="text-[9px] font-bold text-slate-500 truncate max-w-[80px]">{aula.professor?.split(' ')[0]}</span>
+                          <span className="text-[9px] text-slate-400 flex items-center gap-0.5 truncate bg-black/5 dark:bg-white/5 px-1 py-[1px] rounded"><MapPin size={8} /> {aula.sala ? aula.sala.slice(0, 8) : 'S/Sala'}</span>
+                       </div>
                       </div>
-                      <div className="text-[9px] font-bold text-slate-500 pl-4 truncate">{aula.professor}</div>
-                      <div className="text-[8px] text-slate-400 pl-4 flex items-center gap-1">
-                        <MapPin size={8} /> {aula.sala || 'Sem Sala'}
-                      </div>
-                    </div>
-                  ))}
+                    )
+                  })}
                 </div>
               </div>
             ))}
@@ -403,17 +434,21 @@ export function MasterGrid({ isDarkMode, ...props }) {
                                 <div 
                                   draggable
                                   onDragStart={(e) => handleDragStart(e, aulaNesteSlot, slotKey)}
-                                  className={`w-[70%] mx-auto h-[26px] rounded border flex flex-col justify-center px-1 cursor-grab hover:ring-2 ring-emerald-500 transition-all shadow-sm overflow-hidden ${isDarkMode ? 'bg-slate-700 border-slate-500' : 'bg-white border-slate-300'}`}
+                                  className={`w-[85%] sm:w-[75%] mx-auto min-h-[30px] rounded border flex flex-col justify-center px-1.5 py-0.5 cursor-grab hover:ring-2 ring-emerald-500 transition-all shadow-sm overflow-hidden relative ${isDarkMode ? 'bg-slate-700 border-slate-500' : 'bg-white border-slate-300'}`}
                                 >
-                                  <span className={`text-[9px] font-black uppercase tracking-widest text-${aulaNesteSlot.cor}-500 dark:text-${aulaNesteSlot.cor}-400 leading-none truncate`}>
+                                  <span className="absolute top-0 right-0 bg-slate-200 dark:bg-slate-600 text-slate-500 dark:text-slate-300 font-bold px-1 rounded-bl-md text-[7px]" title={`Qtd Total desta Aula no Horário da Turma`}>
+                                     {Object.values(grade).filter(g => String(g.classId) === String(aulaNesteSlot.classId) && String(g.id) === String(aulaNesteSlot.id)).length}/{aulaNesteSlot.numAulas || 1}
+                                  </span>
+
+                                  <span className={`text-[9px] w-[80%] font-black uppercase tracking-widest text-${aulaNesteSlot.cor}-500 dark:text-${aulaNesteSlot.cor}-400 leading-none truncate mt-1`}>
                                     {aulaNesteSlot.disciplina}
                                   </span>
-                                  <div className="flex justify-between items-center mt-0.5 gap-1">
-                                    <span className="text-[7px] font-bold text-slate-500 dark:text-slate-300 truncate">
-                                      {aulaNesteSlot.professor.split(' ')[0]} {/* Reduzido ao primeiro nome */}
+                                  <div className="flex justify-between items-center mt-1 gap-1">
+                                    <span className="text-[8px] font-bold text-slate-500 dark:text-slate-300 truncate">
+                                      {aulaNesteSlot.professor?.split(' ')[0]}
                                     </span>
                                     {aulaNesteSlot.sala && (
-                                      <span className="text-[7px] font-bold text-slate-400 flex items-center gap-0.5 truncate">
+                                      <span className="text-[8px] font-bold text-slate-400 flex items-center gap-0.5 truncate bg-black/5 dark:bg-white/5 px-1 py-[1px] rounded" title="Local da Aula">
                                         <MapPin size={6} /> {aulaNesteSlot.sala.slice(0, 8)}
                                       </span>
                                     )}
