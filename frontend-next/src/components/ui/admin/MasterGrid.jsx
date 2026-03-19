@@ -338,7 +338,7 @@ export function MasterGrid({ isDarkMode, ...props }) {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-5 gap-4">
+      <div className="grid grid-cols-1 lg:grid-cols-4 gap-4">
         
         {/* ÁREA NEUTRA (Lateral Esquerda) */}
         <div 
@@ -375,25 +375,26 @@ export function MasterGrid({ isDarkMode, ...props }) {
                         key={aula.id}
                         draggable
                         onDragStart={(e) => handleDragStart(e, aula, 'neutra')}
-                        className={`w-full p-2 max-w-[95%] rounded border shadow-sm flex flex-col gap-1 cursor-grab hover:ring-2 hover:border-emerald-500 ring-emerald-500 transition-all ${(isZero && isDarkMode) ? 'bg-amber-950/20 border-amber-600/50' : (isZero ? 'bg-orange-50/60 border-orange-300' : (isDarkMode ? 'bg-slate-750 border-slate-600 border-l-4 border-l-emerald-500' : 'bg-slate-50 border-slate-200 border-l-4 border-l-emerald-500'))}`}
+                        className={`w-full p-2 rounded border shadow-sm flex flex-col gap-1 cursor-grab hover:ring-2 hover:border-emerald-500 ring-emerald-500 transition-all ${(isZero && isDarkMode) ? 'bg-amber-950/20 border-amber-600/50' : (isZero ? 'bg-orange-50/60 border-orange-300' : (isDarkMode ? 'bg-slate-750 border-slate-600 border-l-4 border-l-emerald-500' : 'bg-slate-50 border-slate-200 border-l-4 border-l-emerald-500'))}`}
                       >
                        <div className="flex justify-between items-start gap-1">
                          <div className="flex items-start gap-1 overflow-hidden pt-0.5">
                            <GripVertical size={12} className={`shrink-0 ${isZero ? 'text-amber-500' : 'text-slate-400'}`} />
-                           <div className={`text-[10px] font-black uppercase tracking-widest ${isZero ? 'text-amber-600 dark:text-amber-500' : `text-${aula.cor}-500 dark:text-${aula.cor}-400`} leading-tight truncate`} title={`${aula.disciplina} - ${aula.className}`}>
-                             {aula.disciplina} <span className="text-[7px] ml-1 opacity-60 font-bold tracking-normal">- {aula.className}</span>
+                           <div className={`text-[9px] font-black uppercase tracking-widest ${isZero ? 'text-amber-600 dark:text-amber-500' : `text-${aula.cor}-500 dark:text-${aula.cor}-400`} leading-tight truncate`} title={`${aula.disciplina} - ${aula.className}`}>
+                             {aula.disciplina} <span className="text-[6.5px] ml-1 opacity-70 font-bold tracking-normal">- {aula.className}</span>
                            </div>
                          </div>
-                         <div title="Meta de Aulas Semanais Recomendadas / Aulas Já Alocadas" className={`flex items-center gap-1.5 text-[8px] font-black px-1.5 py-[2px] rounded flex-shrink-0 shadow-sm ${isZero ? 'bg-amber-100 text-amber-700 dark:bg-amber-950/50 dark:text-amber-400' : 'bg-emerald-100 text-emerald-750 dark:bg-emerald-900/40 dark:text-emerald-400'}`}>
-                           <span className="flex items-center gap-0.5" title="Carga Horária Semanal"><Target size={10} /> {qtyPadrao}</span>
+                         <div title="Meta de Aulas Semanais Recomendadas / Aulas Já Alocadas" className={`flex items-center gap-1.5 text-[7px] font-black px-1 py-[2px] rounded flex-shrink-0 shadow-sm ${isZero ? 'bg-amber-100 text-amber-700 dark:bg-amber-950/50 dark:text-amber-400' : 'bg-emerald-100 text-emerald-750 dark:bg-emerald-900/40 dark:text-emerald-400'}`}>
+                           <span className="flex items-center gap-0.5" title="Carga Horária Semanal"><Target size={8} /> {qtyPadrao}</span>
                            <span className="opacity-40 font-light">/</span>
-                           <span className={`flex items-center gap-0.5 ${countInGrid >= qtyPadrao && countInGrid > 0 ? (isDarkMode ? 'text-emerald-300' : 'text-emerald-600') : ''}`} title="Alocadas neste Horário"><CheckCircle2 size={10} /> {countInGrid}</span>
+                           <span className={`flex items-center gap-0.5 ${countInGrid >= qtyPadrao && countInGrid > 0 ? (isDarkMode ? 'text-emerald-300' : 'text-emerald-600') : ''}`} title="Alocadas neste Horário"><CheckCircle2 size={8} /> {countInGrid}</span>
                          </div>
                        </div>
                        <div className="flex justify-between items-center pl-4 pr-1 mt-1">
-                          <span className="text-[9px] font-bold text-slate-500 truncate max-w-[80px]">{aula.professor?.split(' ')[0]}</span>
-                          <span className="text-[9px] text-slate-400 flex items-center gap-0.5 truncate bg-black/5 dark:bg-white/5 px-1 py-[1px] rounded"><MapPin size={8} /> {aula.sala ? aula.sala.slice(0, 8) : 'S/Sala'}</span>
+                          <span className="text-[8px] font-bold text-slate-500 truncate max-w-[80px]">{aula.professor?.split(' ')[0]}</span>
+                          <span className="text-[8px] text-slate-400 flex items-center gap-0.5 truncate bg-black/5 dark:bg-white/5 px-1 py-[1px] rounded"><MapPin size={8} /> {aula.sala ? aula.sala.slice(0, 8) : 'S/Sala'}</span>
                        </div>
+
                       </div>
                     )
                   })}
@@ -404,7 +405,7 @@ export function MasterGrid({ isDarkMode, ...props }) {
         </div>
 
         {/* GRADE MATRIZ PRINCIPAL (As Turmas lado a lado) */}
-        <div className={`lg:col-span-4 p-4 rounded-xl border shadow-sm h-[75vh] overflow-auto ${isDarkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'}`}>
+        <div className={`lg:col-span-3 p-4 rounded-xl border shadow-sm h-[75vh] overflow-auto ${isDarkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'}`}>
           {selectedCourses.length === 0 ? (
              <div className="flex items-center justify-center h-full text-slate-400 font-bold">
                Nenhum curso selecionado.
