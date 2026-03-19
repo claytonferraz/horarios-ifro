@@ -14,7 +14,7 @@ import { MAP_DAYS, getColorHash, isTeacherPending, resolveTeacherName } from '@/
 import { useData } from '@/contexts/DataContext';
 import { apiClient } from '@/lib/apiClient';
 
-export function PortalView({
+export function MasterGrid({
   appMode, isDarkMode, viewMode, setViewMode, scheduleMode, setScheduleMode, userRole, siape,
   selectedCourse, setSelectedCourse, selectedClass, setSelectedClass, selectedTeacher, setSelectedTeacher,
   totalFilterYear, setTotalFilterYear, totalFilterTeacher, setTotalFilterTeacher, totalFilterClass, setTotalFilterClass, totalFilterSubject, setTotalFilterSubject,

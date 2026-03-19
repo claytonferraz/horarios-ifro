@@ -1,6 +1,6 @@
 import React from 'react';
-import { PortalView } from './PortalView';
+import { MasterGrid } from '../ui/admin/MasterGrid';
 
 export function ProfessorView(props) {
-  return <PortalView appMode="professor" {...props} />;
+  return <MasterGrid appMode="professor" {...props} />;
 }

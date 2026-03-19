@@ -13,7 +13,7 @@ import { MultiSelect } from '../ui/MultiSelect';
 import { InlineInput } from '../ui/InlineInput';
 import { apiClient } from '@/lib/apiClient';
 import { useData } from '@/contexts/DataContext';
-import { PortalView } from './PortalView';
+import { MasterGrid } from '../ui/admin/MasterGrid';
 import { CalendarDays } from 'lucide-react';
 import { AdminRequestsManager } from '../ui/admin/AdminRequestsManager';
 
@@ -160,7 +160,7 @@ export function GestaoHorarios({
 
         {/* ABA: MASTER GRID */}
         {adminTab === 'master_grid' && ['admin','gestao'].includes(userRole) && (
-           <PortalView
+           <MasterGrid
               appMode="admin"
               isDarkMode={isDarkMode}
               userRole={userRole}

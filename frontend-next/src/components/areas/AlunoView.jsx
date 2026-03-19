@@ -1,6 +1,6 @@
 import React from 'react';
-import { PortalView } from './PortalView';
+import { MasterGrid } from '../ui/admin/MasterGrid';
 
 export function AlunoView(props) {
-  return <PortalView appMode="aluno" {...props} />;
+  return <MasterGrid appMode="aluno" {...props} />;
 }

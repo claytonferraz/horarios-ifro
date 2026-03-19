@@ -22,6 +22,13 @@ db.serialize(() => {
           db.run("INSERT INTO users (siape, nome_completo, nome_exibicao, email, senha_hash, perfis, atua_como_docente) VALUES (?, ?, ?, ?, ?, ?, ?)",
           ['admin', 'Administrador do Sistema', 'Admin', adminUser.username, adminUser.password_hash, '["admin"]', 0]);
         }
+        db.run(`CREATE TABLE IF NOT EXISTS audit_logs (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          user_id TEXT,
+          action TEXT,
+          timestamp TEXT,
+          details TEXT
+        )`);
         console.log("Migration done");
       }
       db.close();
