@@ -355,6 +355,7 @@ const bulkScheduleSchema = z.object({
   courseId: z.union([z.string(), z.number()]).transform(String),
   type: z.string().default('padrao'),
   weekId: z.string().optional().nullable(),
+  academicYear: z.string().optional().nullable(),
   schedules: z.array(z.object({
     classId: z.union([z.string(), z.number()]).transform(String),
     dayOfWeek: z.string(),
@@ -367,14 +368,14 @@ const bulkScheduleSchema = z.object({
 
 app.post('/api/schedules/bulk-course', verifyToken, (req, res) => {
   try {
-    const { courseId, type, weekId, schedules } = bulkScheduleSchema.parse(req.body);
+    const { courseId, type, weekId, academicYear, schedules } = bulkScheduleSchema.parse(req.body);
 
     // Validação Global de Conflitos
     db.all("SELECT * FROM schedules WHERE (courseId != ? OR courseId IS NULL) AND type = ?", [courseId, type], (err, existingRows) => {
       if (err) return res.status(500).json({ error: err.message });
 
       // Se for um horário específico de uma semana (previa ou oficial), validar apenas com a mesma semana
-      const relevantRows = existingRows.filter(r => !weekId || r.week_id === weekId);
+      const relevantRows = existingRows.filter(r => (!weekId || r.week_id === weekId) && (!academicYear || r.academic_year === academicYear));
 
       for (const slot of schedules) {
         if (!slot.teacherId || slot.teacherId === 'A Definir' || slot.teacherId === '-') continue;
@@ -401,17 +402,17 @@ app.post('/api/schedules/bulk-course', verifyToken, (req, res) => {
         db.run("BEGIN TRANSACTION");
         
         if (weekId) {
-            db.run("DELETE FROM schedules WHERE courseId = ? AND type = ? AND (week_id = ? OR week_id IS NULL)", [courseId, type, weekId]);
+            db.run("DELETE FROM schedules WHERE courseId = ? AND type = ? AND (week_id = ? OR week_id IS NULL) AND (academic_year = ? OR academic_year IS NULL)", [courseId, type, weekId, academicYear || '']);
         } else {
-            db.run("DELETE FROM schedules WHERE courseId = ? AND type = ?", [courseId, type]);
+            db.run("DELETE FROM schedules WHERE courseId = ? AND type = ? AND (academic_year = ? OR academic_year IS NULL)", [courseId, type, academicYear || '']);
         }
 
-        const stmt = db.prepare("INSERT INTO schedules (id, courseId, classId, dayOfWeek, slotId, teacherId, disciplineId, room, type, week_id, updatedAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
+        const stmt = db.prepare("INSERT INTO schedules (id, courseId, academic_year, classId, dayOfWeek, slotId, teacherId, disciplineId, room, type, week_id, updatedAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
         const now = new Date().toISOString();
 
         for (const slot of schedules) {
           const id = `s_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
-          stmt.run([id, courseId, slot.classId, slot.dayOfWeek, slot.slotId, slot.teacherId, slot.disciplineId || null, slot.room || null, type, weekId || null, now]);
+          stmt.run([id, courseId, academicYear || null, slot.classId, slot.dayOfWeek, slot.slotId, slot.teacherId, slot.disciplineId || null, slot.room || null, type, weekId || null, now]);
         }
         
         stmt.finalize();

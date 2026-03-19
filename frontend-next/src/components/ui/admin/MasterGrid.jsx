@@ -5,7 +5,7 @@ import { MAP_DAYS, getColorHash, resolveTeacherName } from '@/lib/dates';
 import { apiClient, getHeaders } from '@/lib/apiClient';
 
 export function MasterGrid({ isDarkMode, ...props }) {
-  const { globalTeachers: globalTeachersList, activeDays, classTimes, academicWeeks } = useData();
+  const { globalTeachers: globalTeachersList, activeDays, classTimes, academicWeeks, selectedConfigYear } = useData();
   
   const [selectedCourse, setSelectedCourse] = useState('');
   const [aulasNeutras, setAulasNeutras] = useState([]);
@@ -383,7 +383,7 @@ export function MasterGrid({ isDarkMode, ...props }) {
          <SaveMatrixModal 
            isDarkMode={isDarkMode} grade={grade} selectedCourse={selectedCourse} courses={courses} 
            saveOptions={saveOptions} setSaveOptions={setSaveOptions} 
-           academicWeeks={academicWeeks} schedules={schedules}
+           academicWeeks={academicWeeks} schedules={schedules} selectedConfigYear={selectedConfigYear}
            onClose={() => setModalMode(null)} 
            onSuccess={() => { setModalMode(null); alert("Grade armazenada com sucesso!"); }} 
          />
@@ -393,7 +393,7 @@ export function MasterGrid({ isDarkMode, ...props }) {
          <ImportMatrixModal 
            isDarkMode={isDarkMode} selectedCourse={selectedCourse}
            importOptions={importOptions} setImportOptions={setImportOptions}
-           academicWeeks={academicWeeks} schedules={schedules}
+           academicWeeks={academicWeeks} schedules={schedules} selectedConfigYear={selectedConfigYear}
            curriculumData={curriculumData} globalTeachersList={globalTeachersList}
            setGrade={setGrade} setAulasNeutras={setAulasNeutras}
            onClose={() => setModalMode(null)} 
@@ -406,8 +406,9 @@ export function MasterGrid({ isDarkMode, ...props }) {
 // -------------------------------------------------------------
 // SUB-COMPONENTES DE AÇÃO (SALVAR E IMPORTAR)
 // -------------------------------------------------------------
-function SaveMatrixModal({ isDarkMode, grade, selectedCourse, courses, saveOptions, setSaveOptions, academicWeeks, schedules, onClose, onSuccess }) {
+function SaveMatrixModal({ isDarkMode, grade, selectedCourse, courses, saveOptions, setSaveOptions, academicWeeks, schedules, selectedConfigYear, onClose, onSuccess }) {
   const [isSaving, setIsSaving] = useState(false);
+  const currentYearWeeks = useMemo(() => academicWeeks?.filter(w => String(w.academic_year) === String(selectedConfigYear)) || [], [academicWeeks, selectedConfigYear]);
 
   const statusCalc = useMemo(() => {
      const choques = [];
@@ -438,6 +439,7 @@ function SaveMatrixModal({ isDarkMode, grade, selectedCourse, courses, saveOptio
   const handleConfirmSave = async () => {
       if (statusCalc.payload.length === 0) return alert('Nenhuma aula lançada na matriz!');
       if (saveOptions.type !== 'padrao' && !saveOptions.weekId) return alert('Selecione uma semana letiva!');
+      if (saveOptions.type === 'padrao' && !saveOptions.weekId) return alert('Informe uma versão (Ex: v1) para a grade Padrão!');
       setIsSaving(true);
       try {
           const resp = await fetch('/api/schedules/bulk-course', {
@@ -447,6 +449,7 @@ function SaveMatrixModal({ isDarkMode, grade, selectedCourse, courses, saveOptio
                courseId: selectedCourse,
                type: saveOptions.type,
                weekId: saveOptions.weekId || null,
+               academicYear: selectedConfigYear,
                schedules: statusCalc.payload
             })
           });
@@ -484,13 +487,20 @@ function SaveMatrixModal({ isDarkMode, grade, selectedCourse, courses, saveOptio
                    <option value="oficial">Horário Oficial / Consolidado</option>
                 </select>
               </div>
-              <div className={`${saveOptions.type === 'padrao' ? 'opacity-30 pointer-events-none' : ''}`}>
-                <label className="block text-[10px] font-black uppercase tracking-widest opacity-60 mb-2">Qual Semana Letiva?</label>
-                <select value={saveOptions.weekId} onChange={e => setSaveOptions(p => ({...p, weekId: e.target.value}))} className={`w-full px-3 py-3 rounded-xl border focus:ring-2 focus:ring-emerald-500 font-bold transition-all text-xs outline-none ${isDarkMode ? 'bg-slate-800 border-slate-700' : 'bg-slate-50 border-slate-200'}`}>
-                   <option value="">Selecione...</option>
-                   {academicWeeks?.map(w => <option key={w.id} value={w.id}>{w.name} ({w.start_date.split('-').reverse().join('/')})</option>)}
-                </select>
-              </div>
+              {saveOptions.type === 'padrao' ? (
+                <div>
+                  <label className="block text-[10px] font-black uppercase tracking-widest opacity-60 mb-2 text-emerald-600 dark:text-emerald-400">Versão da Matriz Padrão (Sem Semana)</label>
+                  <input type="text" placeholder="Ex: v1.0, Inicial, Ajuste 2" value={saveOptions.weekId} onChange={e => setSaveOptions(p => ({...p, weekId: e.target.value}))} className={`w-full px-3 py-3 rounded-xl border focus:ring-2 focus:ring-emerald-500 font-bold transition-all text-xs outline-none ${isDarkMode ? 'bg-slate-800 border-slate-700 focus:bg-slate-700' : 'bg-slate-50 border-slate-200 focus:bg-white'}`} />
+                </div>
+              ) : (
+                <div>
+                  <label className="block text-[10px] font-black uppercase tracking-widest opacity-60 mb-2">Qual Semana Letiva?</label>
+                  <select value={saveOptions.weekId} onChange={e => setSaveOptions(p => ({...p, weekId: e.target.value}))} className={`w-full px-3 py-3 rounded-xl border focus:ring-2 focus:ring-emerald-500 font-bold transition-all text-xs outline-none ${isDarkMode ? 'bg-slate-800 border-slate-700' : 'bg-slate-50 border-slate-200'}`}>
+                     <option value="">Selecione...</option>
+                     {currentYearWeeks.map(w => <option key={w.id} value={w.id}>{w.name} ({w.start_date.split('-').reverse().join('/')})</option>)}
+                  </select>
+                </div>
+              )}
             </div>
 
             <div className={`rounded-xl border p-4 ${isDarkMode ? 'bg-slate-900/50 border-slate-800' : 'bg-slate-50 border-slate-200'}`}>
@@ -531,10 +541,12 @@ function SaveMatrixModal({ isDarkMode, grade, selectedCourse, courses, saveOptio
   );
 }
 
-function ImportMatrixModal({ isDarkMode, selectedCourse, importOptions, setImportOptions, academicWeeks, schedules, curriculumData, globalTeachersList, setGrade, setAulasNeutras, onClose }) {
+function ImportMatrixModal({ isDarkMode, selectedCourse, importOptions, setImportOptions, academicWeeks, schedules, selectedConfigYear, curriculumData, globalTeachersList, setGrade, setAulasNeutras, onClose }) {
+  const currentYearWeeks = useMemo(() => academicWeeks?.filter(w => String(w.academic_year) === String(selectedConfigYear)) || [], [academicWeeks, selectedConfigYear]);
   
   const handleConfirmImport = () => {
      if (importOptions.type !== 'padrao' && !importOptions.weekId) return alert('Selecione a semana de origem para importar!');
+     if (importOptions.type === 'padrao' && !importOptions.weekId) return alert('Digite a versão correta do plano padrão (Ex: v1.0) que deseja buscar!');
 
      const filtrado = schedules.filter(s => String(s.courseId) === String(selectedCourse) && s.type === importOptions.type && (importOptions.type === 'padrao' || String(s.week_id) === String(importOptions.weekId)));
      
@@ -595,13 +607,20 @@ function ImportMatrixModal({ isDarkMode, selectedCourse, importOptions, setImpor
                    <option value="oficial">Horário Oficial / Consolidado</option>
                 </select>
               </div>
-              <div className={`${importOptions.type === 'padrao' ? 'opacity-30 pointer-events-none' : ''}`}>
-                <label className="block text-[10px] font-black uppercase tracking-widest opacity-60 mb-2">Semana Base</label>
-                <select value={importOptions.weekId} onChange={e => setImportOptions(p => ({...p, weekId: e.target.value}))} className={`w-full px-3 py-3 rounded-xl border focus:ring-2 focus:ring-blue-500 font-bold transition-all text-xs outline-none ${isDarkMode ? 'bg-slate-800 border-slate-700' : 'bg-slate-50 border-slate-200'}`}>
-                   <option value="">Selecione...</option>
-                   {academicWeeks?.map(w => <option key={w.id} value={w.id}>{w.name} ({w.start_date.split('-').reverse().join('/')})</option>)}
-                </select>
-              </div>
+              {importOptions.type === 'padrao' ? (
+                <div>
+                  <label className="block text-[10px] font-black uppercase tracking-widest opacity-60 mb-2 text-blue-600 dark:text-blue-400">Buscar Versão (Matriz Padrão)</label>
+                  <input type="text" placeholder="Ex: v1.0, Inicial, Ajuste 2" value={importOptions.weekId} onChange={e => setImportOptions(p => ({...p, weekId: e.target.value}))} className={`w-full px-3 py-3 rounded-xl border focus:ring-2 focus:ring-blue-500 font-bold transition-all text-xs outline-none ${isDarkMode ? 'bg-slate-800 border-slate-700 focus:bg-slate-700' : 'bg-slate-50 border-slate-200 focus:bg-white'}`} />
+                </div>
+              ) : (
+                <div>
+                  <label className="block text-[10px] font-black uppercase tracking-widest opacity-60 mb-2">Semana Base</label>
+                  <select value={importOptions.weekId} onChange={e => setImportOptions(p => ({...p, weekId: e.target.value}))} className={`w-full px-3 py-3 rounded-xl border focus:ring-2 focus:ring-blue-500 font-bold transition-all text-xs outline-none ${isDarkMode ? 'bg-slate-800 border-slate-700' : 'bg-slate-50 border-slate-200'}`}>
+                     <option value="">Selecione...</option>
+                     {currentYearWeeks.map(w => <option key={w.id} value={w.id}>{w.name} ({w.start_date.split('-').reverse().join('/')})</option>)}
+                  </select>
+                </div>
+              )}
             </div>
             <div className="bg-blue-50 dark:bg-blue-900/10 border border-blue-100 dark:border-blue-800/40 p-4 rounded-xl">
                <p className="text-xs font-bold text-blue-700 dark:text-blue-400">Ao clicar em confirmar, a grade da tela será <strong className="font-black text-rose-500">sobreescrita e reordenada</strong> com a distribuição salva anteriormente nos termos escolhidos acima.</p>
