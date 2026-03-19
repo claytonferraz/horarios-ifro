@@ -13,6 +13,9 @@ export function MasterGrid({ isDarkMode, ...props }) {
   const [aulasNeutras, setAulasNeutras] = useState([]);
   const [grade, setGrade] = useState({});
 
+  const [pendingDrop, setPendingDrop] = useState(null); // Modal DND 
+  const [dropAlert, setDropAlert] = useState(null); // Alerta Simples
+
   const [modalMode, setModalMode] = useState(null); // 'save' | 'import' | null
   const [saveOptions, setSaveOptions] = useState({ type: 'padrao', weekId: '' });
   const [importOptions, setImportOptions] = useState({ type: 'padrao', weekId: '' });
@@ -124,13 +127,19 @@ export function MasterGrid({ isDarkMode, ...props }) {
     setGrade({});
   }, [selectedCourses, turmasDoCurso, curriculumData, globalTeachersList]);
 
-  // Agrupa as aulas pendentes por Turma
+  // Agrupa as aulas pendentes por Turma (Ordenadas Alfabeticamente)
   const neutrasPorTurma = useMemo(() => {
-    return aulasNeutras.reduce((acc, aula) => {
+    const agrupado = aulasNeutras.reduce((acc, aula) => {
       if (!acc[aula.className]) acc[aula.className] = [];
       acc[aula.className].push(aula);
       return acc;
     }, {});
+    
+    Object.keys(agrupado).forEach(turma => {
+      agrupado[turma].sort((a, b) => a.disciplina.localeCompare(b.disciplina));
+    });
+
+    return agrupado;
   }, [aulasNeutras]);
 
   // === MOTOR DE PREVENÇÃO DE CONFLITOS (CHOQUE DE HORÁRIO) ===
@@ -183,78 +192,79 @@ export function MasterGrid({ isDarkMode, ...props }) {
     const { aula, origem } = JSON.parse(data);
     
     if (String(aula.classId) !== String(classId)) {
-      alert(`Erro: Você está tentando colocar uma aula da ${aula.className} na coluna de outra turma!`);
+      setDropAlert(`Ação bloqueada: Tentativa de alocar turma ${aula.className} em coluna de outra turma.`);
       return;
     }
 
     const slotKey = `${classId}|${diaId}|${hora}`;
 
-    if (grade[slotKey]) {
-      alert("Este horário já está ocupado por outra disciplina desta turma!");
+    if (grade[slotKey] && origem === 'neutra') {
+      setDropAlert("Este card já está ocupado por outra disciplina desta turma!");
       return;
     }
 
-    let globalIgnore = false;
-    const checkObj = verificarChoqueHorario(aula.teacherId, aula.sala, diaId, hora, classId);
-    if (checkObj) {
-      const msgs = [checkObj.profMsg, checkObj.salaMsg].filter(Boolean).join('\n\n');
-      if (!window.confirm(`ATENÇÃO DE CHOQUE!\n\n${msgs}\n\nDeseja forçar a alocação ignorando este aviso?\n(Obs: O sistema de Matriz Padrão, futuramente, não deixará você salvar este choque transversal).`)) {
-         return; 
-      }
-      globalIgnore = true;
+    // Calcula de antemão os slots que tentará preencher
+    const dropsToMake = [];
+    if (origem !== 'neutra') {
+       dropsToMake.push({ slotKey, hora });
+    } else {
+         const countInGrid = Object.values(grade).filter(g => String(g.classId) === String(aula.classId) && String(g.id) === String(aula.id)).length;
+         const maxEsperado = aula.numAulas || 1;
+         const faltando = maxEsperado - countInGrid;
+         const aulasAmount = faltando > 0 ? faltando : 1;
+         
+         const startIndex = horariosExibidos.indexOf(hora);
+         if (startIndex !== -1) {
+             let placed = 0;
+             let currentIdx = startIndex;
+             while (placed < aulasAmount && currentIdx < horariosExibidos.length) {
+                 const targetHora = horariosExibidos[currentIdx];
+                 const slotK = `${classId}|${diaId}|${targetHora}`;
+                 
+                 // Pode pular um slot ocupado para continuar preenchendo? A lógica era apenas parar se confirmar 'não', mas prechia se não ocupado...
+                 if (!grade[slotK] || placed === 0) {
+                     dropsToMake.push({ slotKey: slotK, hora: targetHora });
+                     placed++;
+                 }
+                 currentIdx++;
+             }
+         }
     }
 
-    setGrade(prev => {
-      const novaGrade = { ...prev };
-      
-      if (origem !== 'neutra') {
-        delete novaGrade[origem];
-        novaGrade[slotKey] = aula;
-      } else {
-        const startIndex = horariosExibidos.indexOf(hora);
-        if (startIndex !== -1) {
-            let placed = 0;
-            let currentIdx = startIndex;
-
-            // Calcula quantas aulas restam matematicamente (Carga Semanal Max - Já Alocadas na Tela)
-            const countInGrid = Object.values(novaGrade).filter(g => String(g.classId) === String(aula.classId) && String(g.id) === String(aula.id)).length;
-            const maxEsperado = aula.numAulas || 1;
-            const faltando = maxEsperado - countInGrid;
-            
-            // Faltando <= 0 significa que já atingiu a meta semanal. Neste caso, lança apenas 1 por vez para correções cirurgicas.
-            const aulasAmount = faltando > 0 ? faltando : 1;
-
-            let ignoreAlerts = globalIgnore;
-
-            while (placed < aulasAmount && currentIdx < horariosExibidos.length) {
-                const targetHora = horariosExibidos[currentIdx];
-                const slotK = `${classId}|${diaId}|${targetHora}`;
-
-                if (placed === 0) {
-                     novaGrade[slotK] = aula;
-                     placed++;
-                } else if (!novaGrade[slotK]) {
-                     const slotCheck = verificarChoqueHorario(aula.teacherId, aula.sala, diaId, targetHora, classId);
-                     if (slotCheck && !ignoreAlerts) {
-                        const slotMsg = [slotCheck.profMsg, slotCheck.salaMsg].filter(Boolean).join('\n\n');
-                        if (!window.confirm(`ALERTA: ${slotMsg}\n\nConflito detectado na continuação automática das próximas aulas. Deseja forçar e ignorar todos os avisos em cadeia agora?`)) {
-                            break;
-                        } else {
-                            ignoreAlerts = true;
-                            novaGrade[slotK] = aula;
-                            placed++;
-                        }
-                     } else {
-                        novaGrade[slotK] = aula;
-                        placed++;
-                     }
-                }
-                currentIdx++;
-            }
+    // Identifica todos os conflitos dos drops agrupados
+    const conflicts = [];
+    for (const drop of dropsToMake) {
+        const check = verificarChoqueHorario(aula.teacherId, aula.sala, diaId, drop.hora, classId);
+        if (check) {
+           conflicts.push(`[${drop.hora}] ${[check.profMsg, check.salaMsg].filter(Boolean).join(' | ')}`);
         }
-      }
-      return novaGrade;
-    });
+    }
+
+    if (conflicts.length > 0) {
+       setPendingDrop({
+          aula, origem, classId, diaId,
+          dropsToMake,
+          conflicts
+       });
+    } else {
+       executeDrop(aula, origem, dropsToMake);
+    }
+  };
+
+  const executeDrop = (aula, origem, dropsToMake) => {
+      setGrade(prev => {
+         const novaGrade = { ...prev };
+         if (origem !== 'neutra') {
+            delete novaGrade[origem];
+            novaGrade[dropsToMake[0].slotKey] = aula;
+         } else {
+            dropsToMake.forEach(d => {
+               novaGrade[d.slotKey] = aula;
+            });
+         }
+         return novaGrade;
+      });
+      setPendingDrop(null);
   };
 
   const handleDropNeutra = (e) => {
@@ -620,6 +630,53 @@ export function MasterGrid({ isDarkMode, ...props }) {
       </div>
 
       {/* COMPONENTES DE MODAL INLINE PARA MASTERGRID */}
+      {dropAlert && (
+         <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+            <div className={`w-full max-w-sm rounded-xl p-5 shadow-2xl ${isDarkMode ? 'bg-slate-800 border border-slate-700 text-slate-200' : 'bg-white border border-slate-200 text-slate-800'}`}>
+               <div className="flex flex-col gap-4 text-center items-center">
+                  <AlertCircle size={40} className="text-amber-500" />
+                  <h2 className="text-lg font-bold">Ação Bloqueada</h2>
+                  <p className="text-xs opacity-80">{dropAlert}</p>
+                  <button onClick={() => setDropAlert(null)} className="mt-2 w-full bg-slate-200 dark:bg-slate-700 py-2 rounded-lg font-bold hover:bg-slate-300 dark:hover:bg-slate-600 transition-colors">Entendi</button>
+               </div>
+            </div>
+         </div>
+      )}
+
+      {pendingDrop && (
+         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-in fade-in duration-200">
+            <div className={`w-full max-w-lg rounded-xl shadow-2xl flex flex-col overflow-hidden ${isDarkMode ? 'bg-slate-800 border border-slate-700' : 'bg-white border border-slate-200'}`}>
+               <div className="bg-rose-500/10 p-5 flex border-b border-rose-500/20">
+                  <AlertTriangle size={24} className="text-rose-500 shrink-0 mr-3 mt-1" />
+                  <div>
+                    <h2 className={`font-black uppercase tracking-widest ${isDarkMode ? 'text-rose-400' : 'text-rose-600'}`}>Atenção: Choque Detectado</h2>
+                    <p className={`text-[11px] font-bold mt-1 leading-snug ${isDarkMode ? 'text-rose-300/70' : 'text-rose-800/70'}`}>A matriz relatará incorreções operacionais e os registros podem não aprovar caso estes choques sejam salvos como Oficiais e Transversais.</p>
+                  </div>
+               </div>
+               
+               <div className="p-5 overflow-y-auto max-h-[40vh] bg-slate-50/50 dark:bg-slate-900/20">
+                  <ul className="flex flex-col gap-2">
+                     {pendingDrop.conflicts.map((c, i) => (
+                        <li key={i} className={`text-[11px] font-bold flex gap-2 p-2.5 rounded whitespace-pre-wrap ${isDarkMode ? 'bg-slate-900 text-slate-300' : 'bg-white text-slate-600 border shadow-sm'}`}>
+                           <span className="text-rose-500 font-black shrink-0">•</span>
+                           <span>{c}</span>
+                        </li>
+                     ))}
+                  </ul>
+               </div>
+
+               <div className={`p-4 border-t flex flex-col sm:flex-row items-center justify-end gap-3 ${isDarkMode ? 'bg-slate-800 border-slate-700' : 'bg-slate-50 border-slate-200'}`}>
+                  <button onClick={() => setPendingDrop(null)} className={`w-full sm:w-auto px-4 py-2.5 rounded font-bold text-xs transition-colors ${isDarkMode ? 'bg-slate-700 hover:bg-slate-600 text-slate-300' : 'bg-white border hover:bg-slate-50 text-slate-600 border-slate-300'}`}>
+                     Cancelar Soltura e Voltar
+                  </button>
+                  <button onClick={() => executeDrop(pendingDrop.aula, pendingDrop.origem, pendingDrop.dropsToMake)} className="w-full sm:w-auto px-5 py-2.5 bg-rose-500 hover:bg-rose-600 text-white rounded font-bold text-xs shadow hover:shadow-lg transition-all">
+                     Forçar Alocação Completa
+                  </button>
+               </div>
+            </div>
+         </div>
+      )}
+
       {modalMode === 'save' && (
          <SaveMatrixModal 
            isDarkMode={isDarkMode} grade={grade} selectedCourses={selectedCourses} courses={courses} 
