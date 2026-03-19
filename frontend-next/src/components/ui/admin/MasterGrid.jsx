@@ -79,7 +79,7 @@ export function MasterGrid({ isDarkMode, ...props }) {
           });
         });
         setCurriculumData(flatData);
-        setSchedules(dbSchedules);
+        setSchedules(Array.isArray(dbSchedules) ? dbSchedules : []);
 
       } catch (err) {
         console.warn("Erro ao buscar currículo para MasterGrid:", err);
