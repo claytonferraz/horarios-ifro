@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { CalendarDays, GripVertical, AlertCircle, Save, Filter, MapPin, Loader2, Download, X, Check, Layers, Trash2, Eye, EyeOff } from 'lucide-react';
+import { CalendarDays, GripVertical, AlertCircle, Save, Filter, MapPin, Loader2, Download, X, Check, Layers, Trash2, Eye, EyeOff, Target, CheckCircle2 } from 'lucide-react';
 import { useData } from '@/contexts/DataContext';
 import { MAP_DAYS, getColorHash, resolveTeacherName } from '@/lib/dates';
 import { apiClient, getHeaders } from '@/lib/apiClient';
@@ -378,9 +378,11 @@ export function MasterGrid({ isDarkMode, ...props }) {
                              {aula.disciplina}
                            </div>
                          </div>
-                         <span title="Aulas Alocadas na Tela / Limite Recomendado" className={`text-[9px] font-black px-1 py-0.5 rounded flex-shrink-0 ${isZero ? 'bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-400' : 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400'}`}>
-                           {countInGrid} / {qtyPadrao}
-                         </span>
+                         <div title="Meta de Aulas Semanais Recomendadas / Aulas Já Alocadas" className={`flex items-center gap-1.5 text-[8px] font-black px-1.5 py-[2px] rounded flex-shrink-0 shadow-sm ${isZero ? 'bg-amber-100 text-amber-700 dark:bg-amber-950/50 dark:text-amber-400' : 'bg-emerald-100 text-emerald-750 dark:bg-emerald-900/40 dark:text-emerald-400'}`}>
+                           <span className="flex items-center gap-0.5" title="Carga Horária Semanal"><Target size={10} /> {qtyPadrao}</span>
+                           <span className="opacity-40 font-light">/</span>
+                           <span className={`flex items-center gap-0.5 ${countInGrid >= qtyPadrao && countInGrid > 0 ? (isDarkMode ? 'text-emerald-300' : 'text-emerald-600') : ''}`} title="Alocadas neste Horário"><CheckCircle2 size={10} /> {countInGrid}</span>
+                         </div>
                        </div>
                        <div className="flex justify-between items-center pl-4 pr-1 mt-1">
                           <span className="text-[9px] font-bold text-slate-500 truncate max-w-[80px]">{aula.professor?.split(' ')[0]}</span>
