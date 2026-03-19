@@ -108,14 +108,10 @@ export function MasterGrid({ isDarkMode, ...props }) {
 // Estrutura do Grid Baseado no Estado Global de Schedules + Alocação Neutra
   useEffect(() => {
     if (selectedCourses.length === 0 || turmasDoCurso.length === 0 || !curriculumData) {
-      setAulasNeutras([]);
-      setGrade({});
-      return;
+      setAulasNeutras([]); setGrade({}); return;
     }
-
     const idsTurmas = turmasDoCurso.map(t => String(t.id));
     const disciplinasDoCurso = curriculumData.filter(c => idsTurmas.includes(String(c.classId)));
-    
     const aulasReais = disciplinasDoCurso.map(disciplina => ({
       id: disciplina.id || Math.random().toString(),
       classId: String(disciplina.classId),
@@ -128,42 +124,27 @@ export function MasterGrid({ isDarkMode, ...props }) {
       cor: getColorHash(disciplina.subjectName),
       numAulas: disciplina.numAulas || 1
     }));
-
-    const initialGrade = {};
-    const aulasAlocadasIds = [];
-
+    const initialGrade = {}; const aulasAlocadasIds = [];
     if (schedules && schedules.length > 0) {
-      // Filtro Inteligente: Busca no banco apenas o Tipo e Semana que estão na tela
       const filtered = schedules.filter(s => 
         selectedCourses.includes(String(s.courseId)) && 
         s.type === selectedType && 
         (s.academic_year === selectedConfigYear || !s.academic_year) && 
-        (selectedType === 'padrao' || String(s.week_id) === String(selectedWeek))
+        (selectedType === 'padrao' ? true : String(s.week_id) === String(selectedWeek))
       );
-
       filtered.forEach(schedule => {
-        let referenceCard;
-        if (schedule.disciplineId) referenceCard = aulasReais.find(a => String(a.id) === String(schedule.disciplineId));
-        if (!referenceCard) referenceCard = aulasReais.find(a => String(a.classId) === String(schedule.classId) && String(a.teacherId) === String(schedule.teacherId));
-        
-        if (referenceCard) {
-             initialGrade[`${schedule.classId}|${schedule.dayOfWeek}|${schedule.slotId}`] = {
-               ...referenceCard,
-               sala: schedule.room || referenceCard.sala
-             };
-             aulasAlocadasIds.push(String(referenceCard.id));
+        let refCard;
+        if (schedule.disciplineId) refCard = aulasReais.find(a => String(a.id) === String(schedule.disciplineId));
+        if (!refCard) refCard = aulasReais.find(a => String(a.classId) === String(schedule.classId) && String(a.teacherId) === String(schedule.teacherId));
+        if (refCard) {
+             initialGrade[`${schedule.classId}|${schedule.dayOfWeek}|${schedule.slotId}`] = { ...refCard, sala: schedule.room || refCard.sala };
+             aulasAlocadasIds.push(String(refCard.id));
         }
       });
     }
-
-    // REGRA 1 (Cold Start): O que não foi encontrado no banco, vai para as pendentes (Lateral Esquerda)
     const pendentes = [];
-    aulasReais.forEach(d => {
-      if (!aulasAlocadasIds.includes(String(d.id))) pendentes.push(d);
-    });
-
-    setAulasNeutras(pendentes);
-    setGrade(initialGrade);
+    aulasReais.forEach(d => { if (!aulasAlocadasIds.includes(String(d.id))) pendentes.push(d); });
+    setAulasNeutras(pendentes); setGrade(initialGrade);
   }, [selectedCourses, turmasDoCurso, curriculumData, globalTeachersList, schedules, selectedType, selectedWeek, selectedConfigYear]);
 
   // Agrupa as aulas pendentes por Turma (Ordenadas Alfabeticamente)
@@ -481,11 +462,21 @@ export function MasterGrid({ isDarkMode, ...props }) {
              </button>
            )}
 
-           <button onClick={() => setModalMode('import')} disabled={selectedCourses.length === 0} className="flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 text-white disabled:opacity-50 px-4 py-2.5 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all w-full sm:w-auto shadow-sm">
-             <Download size={14} /> Importar Grade
+           <button 
+             onClick={() => {
+                 if(window.confirm('Limpar grade da tela para criar do zero? (O banco NÃO será apagado até você salvar)')) {
+                     const pendentesAtuais = [...aulasNeutras];
+                     Object.values(grade).forEach(aula => pendentesAtuais.push(aula));
+                     setGrade({}); setAulasNeutras(pendentesAtuais);
+                 }
+             }} 
+             disabled={selectedCourses.length === 0} className="flex items-center justify-center gap-2 bg-amber-100 text-amber-700 hover:bg-amber-200 disabled:opacity-50 px-4 py-2.5 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all w-full sm:w-auto shadow-sm"
+          >
+             <AlertCircle size={14} /> Limpar Tela
           </button>
-          <button onClick={() => setModalMode('save')} disabled={selectedCourses.length === 0} className="flex items-center justify-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white disabled:opacity-50 px-5 py-2.5 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all w-full sm:w-auto shadow-sm">
-             <Save size={14} /> Salvar Definitivo
+
+          <button onClick={() => { setSaveOptions({ type: selectedType, weekId: selectedWeek }); setModalMode('save'); }} disabled={selectedCourses.length === 0} className="flex items-center justify-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white disabled:opacity-50 px-5 py-2.5 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all w-full sm:w-auto shadow-sm">
+             <Save size={14} /> Salvar Pipeline
           </button>
         
         <div className="flex flex-col sm:flex-row items-center gap-2 mr-4">
@@ -788,33 +779,19 @@ export function MasterGrid({ isDarkMode, ...props }) {
 // -------------------------------------------------------------
 // SUB-COMPONENTES DE AÇÃO (SALVAR E IMPORTAR)
 // -------------------------------------------------------------
-function SaveMatrixModal({ isDarkMode, grade, selectedCourses, courses, saveOptions, setSaveOptions, academicWeeks, schedules, selectedConfigYear, loadedType, loadedWeek, onClose, onSuccess }) {
+function SaveMatrixModal({ isDarkMode, grade, selectedCourses, saveOptions, setSaveOptions, academicWeeks, selectedConfigYear, loadedType, loadedWeek, onClose, onSuccess }) {
   const [isSaving, setIsSaving] = useState(false);
   const currentYearWeeks = useMemo(() => academicWeeks?.filter(w => String(w.academic_year) === String(selectedConfigYear)) || [], [academicWeeks, selectedConfigYear]);
 
-  // REGRAS DA PIPELINE (O que pode ser salvo depende do que foi carregado)
   const availableOptions = useMemo(() => {
-      if (loadedType === 'padrao') return [
-          { value: 'padrao', label: 'Atualizar: Padrão Anual' },
-          { value: 'previa', label: 'Criar Nova: Prévia Semanal' }
-      ];
-      if (loadedType === 'previa') return [
-          { value: 'previa', label: 'Atualizar: Prévia Semanal' },
-          { value: 'atual', label: 'Promover para: Horário Atual' }
-      ];
-      if (loadedType === 'atual') return [
-          { value: 'atual', label: 'Atualizar: Horário Atual' },
-          { value: 'oficial', label: 'Promover para: Histórico Oficial' }
-      ];
-      if (loadedType === 'oficial') return [
-          { value: 'oficial', label: 'Retificar: Histórico Oficial' }
-      ];
-      return [{ value: 'padrao', label: 'Padrão Anual' }];
+      if (loadedType === 'padrao') return [{ value: 'padrao', label: '1. Atualizar: Padrão Anual' }, { value: 'previa', label: '2. Criar: Prévia Semanal' }];
+      if (loadedType === 'previa') return [{ value: 'previa', label: '2. Atualizar: Prévia' }, { value: 'atual', label: '3. Promover para: Atual' }];
+      if (loadedType === 'atual') return [{ value: 'atual', label: '3. Atualizar: Atual' }, { value: 'oficial', label: '4. Promover para: Oficial' }];
+      if (loadedType === 'oficial') return [{ value: 'oficial', label: '4. Retificar: Oficial' }];
+      return [{ value: 'padrao', label: '1. Padrão Anual' }];
   }, [loadedType]);
 
-  useEffect(() => {
-      setSaveOptions({ type: availableOptions[0].value, weekId: loadedWeek });
-  }, [loadedType, loadedWeek, availableOptions]);
+  useEffect(() => { setSaveOptions({ type: availableOptions[0].value, weekId: loadedWeek }); }, [loadedType, loadedWeek, availableOptions]);
 
   const handleConfirmSave = async () => {
       const payload = Object.entries(grade).map(([key, aula]) => {
@@ -822,168 +799,49 @@ function SaveMatrixModal({ isDarkMode, grade, selectedCourses, courses, saveOpti
          return { courseId: aula.courseId, classId, dayOfWeek, slotId, teacherId: aula.teacherId, disciplineId: aula.id.split('_')[1] || aula.id, room: aula.sala };
       });
 
-      if (payload.length === 0) return alert('Nenhuma aula lançada na tela!');
-      if (saveOptions.type !== 'padrao' && !saveOptions.weekId) return alert('Selecione uma semana letiva obrigatória!');
-      
-      if (saveOptions.type === 'oficial') {
-        const confirm = window.confirm("⚠️ RETIFICAÇÃO DE HORÁRIO OFICIAL ⚠️\n\nVocê está prestes a alterar/promover um histórico consolidado. Continuar?");
-        if (!confirm) return;
-      }
+      if (saveOptions.type !== 'padrao' && !saveOptions.weekId) return alert('Selecione uma semana letiva!');
+      if (saveOptions.type === 'oficial' && !window.confirm("⚠️ Você está prestes a salvar um histórico Oficial. Continuar?")) return;
 
       setIsSaving(true);
       try {
           const resp = await fetch('/api/schedules/bulk-course', {
-            method: 'POST',
-            headers: getHeaders(),
-            body: JSON.stringify({
-               courseIds: selectedCourses,
-               type: saveOptions.type,
-               weekId: saveOptions.weekId || null,
-               academicYear: selectedConfigYear,
-               schedules: payload
-            })
+            method: 'POST', headers: getHeaders(),
+            body: JSON.stringify({ courseIds: selectedCourses, type: saveOptions.type, weekId: saveOptions.weekId || null, academicYear: selectedConfigYear, schedules: payload })
           });
-          if(!resp.ok) {
-             const r = await resp.json().catch(()=>({}));
-             throw new Error(r.error || 'Erro Crítico no Backend!');
-          }
+          if(!resp.ok) throw new Error('Erro Crítico no Backend!');
           onSuccess();
-      } catch(e) { 
-          alert(e.message); 
-      } finally {
-          setIsSaving(false);
-      }
+      } catch(e) { alert(e.message); } finally { setIsSaving(false); }
   };
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
-      <div className={`w-full max-w-2xl rounded-xl p-6 ${isDarkMode ? 'bg-slate-900 border border-slate-700' : 'bg-white'}`}>
-         <h2 className="text-lg font-black uppercase mb-4">Pipeline de Salvamento</h2>
+      <div className={`w-full max-w-2xl rounded-xl p-6 ${isDarkMode ? 'bg-slate-900 text-white' : 'bg-white'}`}>
+         <h2 className="text-lg font-black uppercase mb-4">Pipeline de Aprovação</h2>
          <div className="grid grid-cols-2 gap-4 mb-6">
             <div>
-              <label className="block text-[10px] font-black uppercase opacity-60 mb-2">Ação de Gravação Permitida</label>
-              <select value={saveOptions.type} onChange={e => setSaveOptions(p => ({...p, type: e.target.value}))} className={`w-full p-3 rounded border text-xs font-bold uppercase tracking-wider outline-none ${isDarkMode ? 'bg-slate-800 border-slate-700 text-emerald-400' : 'bg-slate-50 border-slate-300 text-emerald-700'}`}>
-                 {availableOptions.map(opt => (
-                     <option key={opt.value} value={opt.value}>{opt.label}</option>
-                 ))}
+              <label className="block text-[10px] font-black uppercase opacity-60 mb-2">Ação Permitida</label>
+              <select value={saveOptions.type} onChange={e => setSaveOptions(p => ({...p, type: e.target.value}))} className="w-full p-3 rounded border text-xs font-bold text-black">
+                 {availableOptions.map(opt => <option key={opt.value} value={opt.value}>{opt.label}</option>)}
               </select>
             </div>
             {saveOptions.type === 'padrao' ? (
               <div>
-                <label className="block text-[10px] font-black uppercase opacity-60 mb-2">Versão (Opcional)</label>
-                <input type="text" placeholder="Ex: v1.0" value={saveOptions.weekId} onChange={e => setSaveOptions(p => ({...p, weekId: e.target.value}))} className={`w-full p-3 rounded border text-xs outline-none ${isDarkMode ? 'bg-slate-800 border-slate-700' : 'bg-slate-50'}`} />
+                <label className="block text-[10px] font-black uppercase opacity-60 mb-2">Versão (Ex: v1.0)</label>
+                <input type="text" value={saveOptions.weekId} onChange={e => setSaveOptions(p => ({...p, weekId: e.target.value}))} className="w-full p-3 rounded border text-black text-xs" />
               </div>
             ) : (
               <div>
-                <label className="block text-[10px] font-black uppercase opacity-60 mb-2">Semana Letiva Destino</label>
-                <select value={saveOptions.weekId} onChange={e => setSaveOptions(p => ({...p, weekId: e.target.value}))} className={`w-full p-3 rounded border text-xs outline-none ${isDarkMode ? 'bg-slate-800 border-slate-700' : 'bg-slate-50'}`}>
-                   <option value="">Selecione a Semana...</option>
-                   {currentYearWeeks.map(w => <option key={w.id} value={w.id}>{w.name}</option>)}
-                </select>
-              </div>
-            )}
-         </div>
-         <div className="bg-blue-50 dark:bg-blue-900/10 p-3 rounded-lg border border-blue-100 dark:border-blue-800 mb-4 text-xs text-blue-700 dark:text-blue-400">
-             O sistema segue a hierarquia: <strong>Padrão → Prévia → Atual → Oficial</strong>.
-         </div>
-         <div className="flex justify-end gap-3 mt-4 border-t border-slate-200 dark:border-slate-800 pt-4">
-             <button onClick={onClose} className="px-4 py-2 font-bold text-xs bg-slate-200 dark:bg-slate-800 rounded text-slate-700 dark:text-slate-300">Cancelar</button>
-             <button onClick={handleConfirmSave} disabled={isSaving} className="px-4 py-2 font-bold text-xs bg-emerald-600 text-white rounded shadow-lg">{isSaving ? 'Aguarde...' : 'Confirmar Gravação'}</button>
-         </div>
-      </div>
-    </div>
-  );
-}
-
-function ImportMatrixModal({ isDarkMode, selectedCourses, importOptions, setImportOptions, academicWeeks, schedules, selectedConfigYear, curriculumData, globalTeachersList, setGrade, setAulasNeutras, onClose }) {
-  const currentYearWeeks = useMemo(() => academicWeeks?.filter(w => String(w.academic_year) === String(selectedConfigYear)) || [], [academicWeeks, selectedConfigYear]);
-  
-  const handleConfirmImport = () => {
-     if (importOptions.type !== 'padrao' && !importOptions.weekId) return alert('Selecione a semana de origem para importar!');
-
-     const filtrado = schedules.filter(s => selectedCourses.includes(String(s.courseId)) && s.type === importOptions.type && (importOptions.type === 'padrao' || String(s.week_id) === String(importOptions.weekId)));
-     if (filtrado.length === 0) return alert("Nenhuma grade gravada com esses parâmetros.");
-     if(!window.confirm("Essa ação vai sobreescrever o que está desenhado na tela. Continuar?")) return;
-     
-     const newGrade = {};
-     const usedIds = new Set();
-     filtrado.forEach(s => {
-         const slotKey = `${s.classId}|${s.dayOfWeek}|${s.slotId}`;
-         const matchingAulas = curriculumData.filter(c => String(c.classId) === String(s.classId) && !usedIds.has(c.id) && (c.id.includes(`_${s.disciplineId}`) || c.teacherId === s.teacherId));
-         if (matchingAulas.length > 0) {
-             const aulaReal = matchingAulas[0];
-             usedIds.add(aulaReal.id);
-             newGrade[slotKey] = { ...aulaReal, cor: getColorHash(aulaReal.subjectName), disciplina: aulaReal.subjectName, professor: resolveTeacherName(s.teacherId || aulaReal.teacherId, globalTeachersList), sala: s.room || aulaReal.room, teacherId: s.teacherId || aulaReal.teacherId };
-         }
-     });
-     setGrade(newGrade);
-     
-     const pendentes = curriculumData.filter(c => !usedIds.has(c.id)).map(aula => ({
-       ...aula, cor: getColorHash(aula.subjectName), disciplina: aula.subjectName, professor: resolveTeacherName(aula.teacherId, globalTeachersList), sala: aula.room
-     }));
-     setAulasNeutras(pendentes);
-     onClose();
-  };
-
-  const handleDeleteMatrix = async () => {
-    if (importOptions.type === 'oficial') return alert("Bloqueio Definitivo: Horários Oficiais NÃO podem ser excluídos, apenas retificados salvando por cima.");
-    if (importOptions.type === 'atual') return alert("Bloqueio Definitivo: O Horário Atual não pode ser excluído.");
-    if (importOptions.type !== 'padrao' && !importOptions.weekId) return alert('Selecione primeiro qual semana você quer apagar!');
-    
-    if (importOptions.type === 'padrao') {
-       const padroes = schedules.filter(s => selectedCourses.includes(String(s.courseId)) && s.type === 'padrao');
-       const isUnico = padroes.every(s => String(s.week_id) === String(importOptions.weekId) || !s.week_id);
-       if (isUnico) return alert("Negado: Esta é a ÚNICA matriz Padrão do Curso. Ela não pode ser deletada.");
-    }
-    if (!window.confirm(`ATENÇÃO! Deseja EXCLUIR PERMANENTEMENTE esta matriz [${importOptions.type.toUpperCase()}]?`)) return;
-
-    try {
-        const url = new URL('/api/schedules/bulk-course', window.location.origin);
-        url.searchParams.append('courseIds', selectedCourses.join(','));
-        url.searchParams.append('type', importOptions.type);
-        url.searchParams.append('academicYear', selectedConfigYear || '');
-        if (importOptions.weekId) url.searchParams.append('weekId', importOptions.weekId);
-
-        const resp = await fetch(url, { method: 'DELETE', headers: getHeaders() });
-        if(!resp.ok) throw new Error('Falha ao excluir matriz do banco.');
-        alert("Matriz excluída com sucesso!");
-        window.location.reload(); 
-    } catch(e) { alert(e.message); }
-  };
-
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
-      <div className={`w-full max-w-2xl rounded-xl p-6 ${isDarkMode ? 'bg-slate-900 border border-slate-700' : 'bg-white'}`}>
-         <h2 className="text-lg font-black uppercase mb-4">Gerir Matrizes Anteriores</h2>
-         <div className="grid grid-cols-2 gap-4 mb-6">
-            <div>
-              <label className="block text-[10px] font-black uppercase opacity-60 mb-2">Fonte da Matriz</label>
-              <select value={importOptions.type} onChange={e => setImportOptions(p => ({...p, type: e.target.value}))} className={`w-full p-3 rounded border text-xs outline-none ${isDarkMode ? 'bg-slate-800 border-slate-700' : 'bg-slate-50'}`}>
-                 <option value="padrao">Padrão Anual</option>
-                 <option value="previa">Prévia Semanal</option>
-                 <option value="atual">Horário Atual</option>
-                 <option value="oficial">Histórico Consolidado</option>
-              </select>
-            </div>
-            {importOptions.type === 'padrao' ? (
-              <div>
-                <label className="block text-[10px] font-black uppercase opacity-60 mb-2">Versão</label>
-                <input type="text" value={importOptions.weekId} onChange={e => setImportOptions(p => ({...p, weekId: e.target.value}))} className={`w-full p-3 rounded border text-xs outline-none ${isDarkMode ? 'bg-slate-800' : 'bg-slate-50'}`} />
-              </div>
-            ) : (
-              <div>
-                <label className="block text-[10px] font-black uppercase opacity-60 mb-2">Semana Base</label>
-                <select value={importOptions.weekId} onChange={e => setImportOptions(p => ({...p, weekId: e.target.value}))} className={`w-full p-3 rounded border text-xs outline-none ${isDarkMode ? 'bg-slate-800' : 'bg-slate-50'}`}>
+                <label className="block text-[10px] font-black uppercase opacity-60 mb-2">Semana Destino</label>
+                <select value={saveOptions.weekId} onChange={e => setSaveOptions(p => ({...p, weekId: e.target.value}))} className="w-full p-3 rounded border text-xs text-black">
                    <option value="">Selecione...</option>
                    {currentYearWeeks.map(w => <option key={w.id} value={w.id}>{w.name}</option>)}
                 </select>
               </div>
             )}
          </div>
-         <div className="flex justify-end gap-3 mt-4 border-t border-slate-800 pt-4">
-             <button onClick={handleDeleteMatrix} className="px-4 py-2 font-bold text-xs bg-rose-100 text-rose-700 rounded">Excluir Base</button>
+         <div className="flex justify-end gap-3 border-t pt-4">
              <button onClick={onClose} className="px-4 py-2 font-bold text-xs bg-slate-200 text-slate-700 rounded">Cancelar</button>
-             <button onClick={handleConfirmImport} className="px-4 py-2 font-bold text-xs bg-blue-600 text-white rounded">Carregar para a Tela</button>
+             <button onClick={handleConfirmSave} disabled={isSaving} className="px-4 py-2 font-bold text-xs bg-emerald-600 text-white rounded">{isSaving ? 'Aguarde...' : 'Confirmar Gravação'}</button>
          </div>
       </div>
     </div>

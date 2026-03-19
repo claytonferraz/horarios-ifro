@@ -467,21 +467,13 @@ app.delete('/api/schedules/bulk-course', verifyToken, (req, res) => {
     else if (req.body.courseIds) courseIds = req.body.courseIds;
     else if (req.body.courseId) courseIds = [req.body.courseId];
 
-    if (courseIds.length === 0 || !type) return res.status(400).json({ error: "Faltam parâmetros básicos." });
+    if (courseIds.length === 0 || !type) return res.status(400).json({ error: "Faltam parâmetros." });
     
-    // REGRAS RIGOROSAS DE NEGÓCIO
-    if (type === 'oficial') {
-      return res.status(403).json({ error: "Um horário Oficial não pode ser excluído para não quebrar o histórico. Edite-o salvando por cima." });
-    }
-    if (type === 'atual') {
-      return res.status(403).json({ error: "O Horário Atual não pode ser excluído, apenas retificado." });
-    }
-    if (type !== 'padrao' && !weekId) {
-      return res.status(400).json({ error: "Para excluir matrizes não padronizadas, a semana é obrigatória." });
-    }
+    if (type === 'oficial') return res.status(403).json({ error: "O Histórico Oficial não pode ser excluído." });
+    if (type === 'atual') return res.status(403).json({ error: "O Horário Atual não pode ser excluído." });
+    if (type !== 'padrao' && !weekId) return res.status(400).json({ error: "A semana é obrigatória para prévias." });
 
     const placeholders = courseIds.map(() => '?').join(',');
-
     db.serialize(() => {
         db.run("BEGIN TRANSACTION");
         if (weekId) {
@@ -489,16 +481,12 @@ app.delete('/api/schedules/bulk-course', verifyToken, (req, res) => {
         } else {
             db.run(`DELETE FROM schedules WHERE courseId IN (${placeholders}) AND type = ? AND (academic_year = ? OR academic_year IS NULL)`, [...courseIds, type, academicYear || '']);
         }
-        
-        db.run("COMMIT", (errCommit) => {
-          if (errCommit) return res.status(500).json({ error: errCommit.message });
-          io.emit('schedule_updated');
-          res.json({ success: true, message: 'Matrizes excluídas com sucesso!' });
+        db.run("COMMIT", (err) => {
+          if (err) return res.status(500).json({ error: err.message });
+          res.json({ success: true, message: 'Matrizes limpas com sucesso!' });
         });
     });
-  } catch(e) {
-    return res.status(500).json({ error: e.message });
-  }
+  } catch(e) { return res.status(500).json({ error: e.message }); }
 });
 
 app.get('/api/config', (req, res) => {
