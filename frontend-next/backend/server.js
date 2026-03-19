@@ -452,23 +452,29 @@ app.post('/api/schedules/bulk-course', verifyToken, (req, res) => {
   }
 });
 
+// ROTINA MELHORADA E PROTEGIDA: Exclusão de Matrizes
 app.delete('/api/schedules/bulk-course', verifyToken, (req, res) => {
   try {
-    const type = req.query.type;
-    const weekId = req.query.weekId;
-    const academicYear = req.query.academicYear;
+    const type = req.query.type || req.body.type;
+    const weekId = req.query.weekId || req.body.weekId;
+    const academicYear = req.query.academicYear || req.body.academicYear;
     
     let courseIds = [];
-    if (req.query.courseIds) {
-      courseIds = req.query.courseIds.split(',');
-    } else if (req.query.courseId) {
-      courseIds = [req.query.courseId];
-    }
+    if (req.query.courseIds) courseIds = req.query.courseIds.split(',');
+    else if (req.body.courseIds) courseIds = req.body.courseIds;
+    else if (req.body.courseId) courseIds = [req.body.courseId];
 
-    if (courseIds.length === 0 || !type) return res.status(400).json({ error: "Faltam parâmetros básicos (courseId/courseIds ou type)." });
+    if (courseIds.length === 0 || !type) return res.status(400).json({ error: "Faltam parâmetros básicos." });
     
+    // REGRAS RIGOROSAS DE NEGÓCIO
     if (type === 'oficial') {
-      return res.status(403).json({ error: "Bloqueio do Sistema: Um horário oficial ou consolidado jamais poderá ser totalmente apagado, pos já serve como cálculo para aulas lecionadas. Caso precise, você deve Apenas Retificá-lo sobreescrevendo as aulas." });
+      return res.status(403).json({ error: "Um horário Oficial não pode ser excluído para não quebrar o histórico. Edite-o salvando por cima." });
+    }
+    if (type === 'atual') {
+      return res.status(403).json({ error: "O Horário Atual não pode ser excluído, apenas retificado." });
+    }
+    if (type !== 'padrao' && !weekId) {
+      return res.status(400).json({ error: "Para excluir matrizes não padronizadas, a semana é obrigatória." });
     }
 
     const placeholders = courseIds.map(() => '?').join(',');
@@ -484,7 +490,7 @@ app.delete('/api/schedules/bulk-course', verifyToken, (req, res) => {
         db.run("COMMIT", (errCommit) => {
           if (errCommit) return res.status(500).json({ error: errCommit.message });
           io.emit('schedule_updated');
-          res.json({ success: true, message: 'Matrizes formatadas completamente!' });
+          res.json({ success: true, message: 'Matrizes excluídas com sucesso!' });
         });
     });
   } catch(e) {

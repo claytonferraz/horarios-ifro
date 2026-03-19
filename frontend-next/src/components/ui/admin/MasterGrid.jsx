@@ -12,6 +12,8 @@ export function MasterGrid({ isDarkMode, ...props }) {
   const [hiddenClasses, setHiddenClasses] = useState([]);
   const [aulasNeutras, setAulasNeutras] = useState([]);
   const [grade, setGrade] = useState({});
+  const [selectedType, setSelectedType] = useState('padrao'); 
+  const [selectedWeek, setSelectedWeek] = useState('');
 
   const [pendingDrop, setPendingDrop] = useState(null); // Modal DND 
   const [dropAlert, setDropAlert] = useState(null); // Alerta Simples
@@ -99,7 +101,7 @@ export function MasterGrid({ isDarkMode, ...props }) {
     return classesList?.filter(cls => selectedCourses.includes(String(cls.courseId))) || [];
   }, [selectedCourses, classesList]);
 
-  // Carrega as disciplinas dos cursos inteiros na Área Neutra
+ // Estrutura do Grid Baseado no Estado Global de Schedules + Alocação Neutra
   useEffect(() => {
     if (selectedCourses.length === 0 || turmasDoCurso.length === 0 || !curriculumData) {
       setAulasNeutras([]);
@@ -123,9 +125,40 @@ export function MasterGrid({ isDarkMode, ...props }) {
       numAulas: disciplina.numAulas || 1
     }));
 
+    const initialGrade = {};
+
+    if (schedules && schedules.length > 0) {
+      // AQUI ESTÁ A MÁGICA: Filtramos usando os novos seletores da UI (selectedType e selectedWeek)
+      const filtered = schedules.filter(s => 
+        selectedCourses.includes(String(s.courseId)) && 
+        s.type === selectedType && 
+        (s.academic_year === selectedConfigYear || !s.academic_year) && 
+        (selectedType === 'padrao' || String(s.week_id) === String(selectedWeek))
+      );
+
+      filtered.forEach(schedule => {
+        let referenceCard;
+        if (schedule.disciplineId) {
+             referenceCard = aulasReais.find(a => String(a.id) === String(schedule.disciplineId));
+        }
+        if (!referenceCard) {
+             referenceCard = aulasReais.find(a => String(a.classId) === String(schedule.classId) && String(a.teacherId) === String(schedule.teacherId));
+        }
+        
+        if (referenceCard) {
+             initialGrade[`${schedule.classId}|${schedule.dayOfWeek}|${schedule.slotId}`] = {
+               ...referenceCard,
+               sala: schedule.room || referenceCard.sala
+             };
+        }
+      });
+    }
+
+    // Pendentes/Neutras guardam TODAS as aulas (o frontend conta na tela quantas faltam).
+    // Se o banco estiver vazio, o sistema automaticamente fará o "Cold Start" perfeito aqui!
     setAulasNeutras(aulasReais);
-    setGrade({});
-  }, [selectedCourses, turmasDoCurso, curriculumData, globalTeachersList]);
+    setGrade(initialGrade);
+  }, [selectedCourses, turmasDoCurso, curriculumData, globalTeachersList, schedules, selectedConfigYear, selectedType, selectedWeek]);
 
   // Agrupa as aulas pendentes por Turma (Ordenadas Alfabeticamente)
   const neutrasPorTurma = useMemo(() => {
@@ -426,7 +459,29 @@ export function MasterGrid({ isDarkMode, ...props }) {
           <button onClick={() => setModalMode('save')} disabled={selectedCourses.length === 0} className="flex items-center justify-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white disabled:opacity-50 px-5 py-2.5 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all w-full sm:w-auto shadow-sm">
              <Save size={14} /> Salvar Definitivo
           </button>
-        </div>
+        
+        <div className="flex flex-col sm:flex-row items-center gap-2 mr-4">
+             <select 
+               value={selectedType} onChange={e => setSelectedType(e.target.value)} 
+               className={`px-3 py-2 rounded-lg border shadow-sm outline-none cursor-pointer text-xs font-bold uppercase tracking-wider text-indigo-600 dark:text-indigo-400 ${isDarkMode ? 'bg-slate-900 border-slate-700' : 'bg-slate-50 border-slate-300'}`}
+             >
+                 <option value="padrao">Padrão Anual</option>
+                 <option value="previa">Prévia Semanal</option>
+                 <option value="atual">Horário Atual</option>
+                 <option value="oficial">Histórico Oficial</option>
+             </select>
+
+             {selectedType !== 'padrao' && (
+               <select
+                 value={selectedWeek} onChange={(e) => setSelectedWeek(e.target.value)}
+                 className={`px-3 py-2 rounded-lg border shadow-sm outline-none cursor-pointer text-xs font-bold uppercase tracking-wider text-amber-600 dark:text-amber-400 ${isDarkMode ? 'bg-slate-900 border-slate-700' : 'bg-slate-50 border-slate-300'}`}
+               >
+                 <option value="">-- Semana --</option>
+                 {academicWeeks?.filter(w => w.academic_year === selectedConfigYear).map(w => <option key={w.id} value={w.id}>{w.name}</option>)}
+               </select>
+             )}
+          </div>
+          </div>
       </div>
 
       {dashboardAlerts.list.length > 0 && (
@@ -735,6 +790,10 @@ function SaveMatrixModal({ isDarkMode, grade, selectedCourses, courses, saveOpti
   }, [grade, schedules, selectedCourses, saveOptions, courses]);
 
   const handleConfirmSave = async () => {
+    if (saveOptions.type === 'oficial') {
+        const confirm = window.confirm("⚠️ RETIFICAÇÃO DE HORÁRIO OFICIAL ⚠️\n\nVocê está prestes a alterar um histórico consolidado. Continuar?");
+        if (!confirm) return;
+      }
       if (statusCalc.payload.length === 0) return alert('Nenhuma aula lançada na matriz!');
       if (saveOptions.type !== 'padrao' && !saveOptions.weekId) return alert('Selecione uma semana letiva!');
       if (saveOptions.type === 'padrao' && !saveOptions.weekId) return alert('Informe uma versão (Ex: v1) para a grade Padrão!');
@@ -781,8 +840,9 @@ function SaveMatrixModal({ isDarkMode, grade, selectedCourses, courses, saveOpti
                 <label className="block text-[10px] font-black uppercase tracking-widest opacity-60 mb-2">Categoria da Matriz</label>
                 <select value={saveOptions.type} onChange={e => setSaveOptions(p => ({...p, type: e.target.value}))} className={`w-full px-3 py-3 rounded-xl border focus:ring-2 focus:ring-emerald-500 font-bold transition-all text-xs outline-none ${isDarkMode ? 'bg-slate-800 border-slate-700' : 'bg-slate-50 border-slate-200'}`}>
                    <option value="padrao">Padrão / Template do Ano</option>
-                   <option value="previa">Prévia Semanal (Em Avaliação)</option>
-                   <option value="oficial">Horário Oficial / Consolidado</option>
+   <option value="previa">Prévia Semanal</option>
+   <option value="atual">Horário Atual</option>
+   <option value="oficial">Horário Oficial / Consolidado</option>
                 </select>
               </div>
               {saveOptions.type === 'padrao' ? (
@@ -885,6 +945,13 @@ function ImportMatrixModal({ isDarkMode, selectedCourses, importOptions, setImpo
   };
 
   const handleDeleteMatrix = async () => {
+    if (importOptions.type === 'oficial') return alert("Bloqueio: Horários Oficiais NÃO podem ser excluídos, apenas retificados salvando por cima.");
+    if (importOptions.type === 'atual') return alert("Bloqueio: O Horário Atual não pode ser excluído.");
+    if (importOptions.type === 'padrao') {
+       const padroes = schedules.filter(s => selectedCourses.includes(String(s.courseId)) && s.type === 'padrao');
+       const isUnico = padroes.every(s => String(s.week_id) === String(importOptions.weekId) || !s.week_id);
+       if (isUnico) return alert("Negado: Esta é a ÚNICA matriz Padrão do Curso. Ela não pode ser deletada.");
+    }
     if (importOptions.type === 'oficial') {
         return alert("Bloqueio Definitivo: Matrizes Oficiais/Consolidadas NÃO podem ser totalmente excluídas, pois elas garantem o histórico das aulas ativas e concluídas. Em caso de erros, você deve apenas Importá-la, sobrescrever os horários na tela e Salvar novamente como retificação.");
     }
