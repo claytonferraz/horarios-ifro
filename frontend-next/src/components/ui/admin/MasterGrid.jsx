@@ -263,6 +263,60 @@ export function MasterGrid({ isDarkMode, ...props }) {
     }
   };
 
+  // === CONCENTRADOR GLOBAL DE ALERTAS ===
+  const dashboardAlerts = useMemo(() => {
+    const alerts = [];
+    const cellAlerts = {}; 
+
+    Object.entries(grade).forEach(([slotKey, aula]) => {
+      const [classId, diaId, hora] = slotKey.split('|');
+      cellAlerts[slotKey] = [];
+
+      if (aula && aula.teacherId && aula.teacherId !== 'A Definir' && aula.teacherId !== '-') {
+         const strConflito = verificarChoqueHorario(aula.teacherId, aula.sala, diaId, hora, classId);
+         if (strConflito) {
+            const cleanErr = "Choque: " + strConflito.replace('\n', ' ');
+            cellAlerts[slotKey].push(cleanErr);
+            alerts.push(`[${MAP_DAYS[diaId]} às ${hora} | Turma: ${aula.className}] - ${cleanErr}`);
+         }
+
+         const profSlots = new Set();
+         for (const [k, dObj] of Object.entries(grade)) {
+             if (k.split('|')[1] === diaId && dObj.teacherId === aula.teacherId) profSlots.add(k.split('|')[2]);
+         }
+         schedules?.forEach(s => {
+             if (String(s.dayOfWeek) === diaId && s.teacherId === aula.teacherId) profSlots.add(s.slotId);
+         });
+
+         let m = false; let t = false; let n = false;
+         const morningEnds = horariosExibidos.filter(h => parseInt(h.split(':')[0], 10) < 12).pop();
+         const afternoonStarts = horariosExibidos.find(h => { const v = parseInt(h.split(':')[0],10); return v >= 12 && v < 18; });
+         if (profSlots.has(morningEnds) && profSlots.has(afternoonStarts) && (hora === morningEnds || hora === afternoonStarts)) {
+             const noRest = "Sem descanso (Manhã -> Tarde).";
+             cellAlerts[slotKey].push(noRest);
+             if (!alerts.some(a => a.includes(`[${MAP_DAYS[diaId]}] Professor(a) ${aula.professor.split(' ')[0]} leciona sem descanso`))) {
+                 alerts.push(`[${MAP_DAYS[diaId]}] Professor(a) ${aula.professor.split(' ')[0]} leciona sem descanso entre Turnos (M->T).`);
+             }
+         }
+
+         profSlots.forEach(pt => {
+            const val = parseInt(pt.split(':')[0], 10);
+            if (val < 12) m = true; else if (val >= 12 && val < 18) t = true; else n = true;
+         });
+         if (m && t && n) {
+            const threeShifts = "Alocado em 3 Turnos no dia.";
+            cellAlerts[slotKey].push(threeShifts);
+            if (!alerts.some(a => a.includes(`[${MAP_DAYS[diaId]}] Professor(a) ${aula.professor.split(' ')[0]} atua`))) {
+                 alerts.push(`[${MAP_DAYS[diaId]}] Professor(a) ${aula.professor.split(' ')[0]} atua em 3 Turnos diferentes.`);
+            }
+         }
+      }
+    });
+    // Remove duplicados gerais de alerts
+    return { list: [...new Set(alerts)], perCell: cellAlerts };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [grade, schedules, horariosExibidos]);
+
   return (
     <div className={`flex flex-col gap-4 animate-in fade-in duration-300 ${isDarkMode ? 'text-slate-200' : 'text-slate-800'}`}>
       
@@ -345,6 +399,21 @@ export function MasterGrid({ isDarkMode, ...props }) {
           </button>
         </div>
       </div>
+
+      {dashboardAlerts.list.length > 0 && (
+         <div className={`p-4 rounded-xl border flex flex-col gap-2 ${isDarkMode ? 'bg-red-500/10 border-red-500/20' : 'bg-red-50 border-red-200'}`}>
+            <h3 className={`text-[11px] font-black uppercase tracking-widest flex items-center gap-2 ${isDarkMode ? 'text-red-400' : 'text-red-600'}`}>
+               <AlertTriangle size={16} /> Relatório de Alertas Ativos na Grade de Edição ({dashboardAlerts.list.length})
+            </h3>
+            <ul className="flex flex-col gap-1.5 mt-1">
+               {dashboardAlerts.list.map((msg, i) => (
+                 <li key={i} className={`text-[11px] font-bold flex items-start gap-2 ${isDarkMode ? 'text-red-300/80' : 'text-red-800/80'}`}>
+                    <span className="mt-0.5">•</span> <span>{msg}</span>
+                 </li>
+               ))}
+            </ul>
+         </div>
+      )}
 
       <div className="flex flex-col lg:flex-row gap-4">
         
@@ -470,35 +539,8 @@ export function MasterGrid({ isDarkMode, ...props }) {
                           const slotKey = `${turma.id}|${diaId}|${hora}`;
                           const aulaNesteSlot = grade[slotKey];
                           
-                          // Análise de Ocupação Extra no Card
-                          const profAlerts = [];
-                          if (aulaNesteSlot && aulaNesteSlot.teacherId && aulaNesteSlot.teacherId !== 'A Definir' && aulaNesteSlot.teacherId !== '-') {
-                             const strConflito = verificarChoqueHorario(aulaNesteSlot.teacherId, null, diaId, hora, turma.id);
-                             if (strConflito) profAlerts.push("Choque Estrito: " + strConflito.replace('\n', ' '));
-                             
-                             const profSlots = new Set();
-                             for (const [k, dObj] of Object.entries(grade)) {
-                                 if (k.split('|')[1] === diaId && dObj.teacherId === aulaNesteSlot.teacherId) profSlots.add(k.split('|')[2]);
-                             }
-                             schedules?.forEach(s => {
-                                 if (String(s.dayOfWeek) === diaId && s.teacherId === aulaNesteSlot.teacherId) profSlots.add(s.slotId);
-                             });
-
-                             let m = false; let t = false; let n = false;
-                             const morningEnds = horariosExibidos.filter(h => parseInt(h.split(':')[0], 10) < 12).pop();
-                             const afternoonStarts = horariosExibidos.find(h => { const v = parseInt(h.split(':')[0],10); return v >= 12 && v < 18; });
-                             if (profSlots.has(morningEnds) && profSlots.has(afternoonStarts) && (hora === morningEnds || hora === afternoonStarts)) {
-                                 profAlerts.push("Professor leciona sem descanso entre Turnos (Última da Manhã -> Primeira da Tarde).");
-                             }
-
-                             profSlots.forEach(pt => {
-                                const val = parseInt(pt.split(':')[0], 10);
-                                if (val < 12) m = true; else if (val >= 12 && val < 18) t = true; else n = true;
-                             });
-                             if (m && t && n) {
-                                profAlerts.push("Professor está sobrecarregado atuando em 3 Turnos diferentes hoje.");
-                             }
-                          }
+                          // Busca dos alertas pré-computados
+                          const profAlerts = dashboardAlerts.perCell[slotKey] || [];
 
                           return (
                             <td 
@@ -517,12 +559,6 @@ export function MasterGrid({ isDarkMode, ...props }) {
                                     <X size={8} strokeWidth={4} />
                                   </button>
 
-                                  {profAlerts.length > 0 && (
-                                     <div className="absolute -top-1.5 -left-1.5 bg-red-500 text-white rounded-full p-[3px] shadow-sm animate-pulse z-20 cursor-help" title={profAlerts.join('\n')}>
-                                        <AlertTriangle size={8} strokeWidth={4} />
-                                     </div>
-                                  )}
-
                                   <span className="absolute top-0 right-0 bg-slate-200 dark:bg-slate-600 text-slate-500 dark:text-slate-300 font-bold px-1 rounded-bl-md text-[7px] group-hover/card:opacity-0 transition-opacity" title={`Qtd Total desta Aula no Horário da Turma`}>
                                      {Object.values(grade).filter(g => String(g.classId) === String(aulaNesteSlot.classId) && String(g.id) === String(aulaNesteSlot.id)).length}/{aulaNesteSlot.numAulas || 1}
                                   </span>
@@ -530,9 +566,9 @@ export function MasterGrid({ isDarkMode, ...props }) {
                                   <span className={`text-[9px] w-[80%] font-black uppercase tracking-widest text-${aulaNesteSlot.cor}-500 dark:text-${aulaNesteSlot.cor}-400 leading-none truncate mt-1`} title={`${aulaNesteSlot.disciplina} - ${aulaNesteSlot.className}`}>
                                     {aulaNesteSlot.disciplina} <span className="text-[7px] ml-1 opacity-60 font-bold tracking-normal">- {aulaNesteSlot.className}</span>
                                   </span>
-                                  <div className="flex justify-between items-center mt-1 gap-1">
-                                    <span className="text-[8px] font-bold text-slate-500 dark:text-slate-300 truncate">
-                                      {aulaNesteSlot.professor?.split(' ')[0]}
+                                  <div className="flex justify-between items-center mt-1 gap-1 overflow-hidden" title={profAlerts.length > 0 ? profAlerts.join('\n') : "Professor e Local"}>
+                                    <span className={`text-[8px] font-bold truncate max-w-[80px] ${profAlerts.length > 0 ? 'text-red-500 dark:text-red-400 bg-red-500/10 px-0.5 rounded border border-red-500/20' : 'text-slate-500 dark:text-slate-300'}`}>
+                                      {profAlerts.length > 0 && <AlertTriangle size={8} className="inline mr-0.5 mb-[1px]" />} {aulaNesteSlot.professor?.split(' ')[0]}
                                     </span>
                                     {aulaNesteSlot.sala && (
                                       <span className="text-[8px] font-bold text-slate-400 flex items-center gap-0.5 truncate bg-black/5 dark:bg-white/5 px-1 py-[1px] rounded" title="Local da Aula">
