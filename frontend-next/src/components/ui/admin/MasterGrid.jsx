@@ -56,8 +56,14 @@ export function MasterGrid({ isDarkMode, ...props }) {
              const teacher = (profs && profs.length > 0) ? profs[0] : 'A Definir';
              const classRoom = cls.roomAssignments?.[disc.id] || cls.room || '';
              
-             // Calcula a quantidade padrao esperada na matriz
-             const numAulas = (disc.workload && disc.workload > 0) ? Math.floor(disc.workload / 40) : (disc.aulas_semanais || 1);
+             // Calcula a quantidade padrao esperada na matriz (Prio 1: Aulas Semanais preenchidas. Prio 2: Cálculo por Carga Horária)
+             let numAulas = 1;
+             if (disc.aulas_semanais !== undefined && disc.aulas_semanais !== null && disc.aulas_semanais > 0) {
+                 numAulas = Number(disc.aulas_semanais);
+             } else if (disc.workload && disc.workload > 0) {
+                 numAulas = Math.floor(disc.workload / 40);
+             }
+
              flatData.push({
                   id: `${cls.id}_${disc.id}`,
                   classId: String(cls.id),
@@ -374,8 +380,8 @@ export function MasterGrid({ isDarkMode, ...props }) {
                        <div className="flex justify-between items-start gap-1">
                          <div className="flex items-start gap-1 overflow-hidden pt-0.5">
                            <GripVertical size={12} className={`shrink-0 ${isZero ? 'text-amber-500' : 'text-slate-400'}`} />
-                           <div className={`text-[10px] font-black uppercase tracking-widest ${isZero ? 'text-amber-600 dark:text-amber-500' : `text-${aula.cor}-500 dark:text-${aula.cor}-400`} leading-tight`}>
-                             {aula.disciplina}
+                           <div className={`text-[10px] font-black uppercase tracking-widest ${isZero ? 'text-amber-600 dark:text-amber-500' : `text-${aula.cor}-500 dark:text-${aula.cor}-400`} leading-tight truncate`} title={`${aula.disciplina} - ${aula.className}`}>
+                             {aula.disciplina} <span className="text-[7px] ml-1 opacity-60 font-bold tracking-normal">- {aula.className}</span>
                            </div>
                          </div>
                          <div title="Meta de Aulas Semanais Recomendadas / Aulas Já Alocadas" className={`flex items-center gap-1.5 text-[8px] font-black px-1.5 py-[2px] rounded flex-shrink-0 shadow-sm ${isZero ? 'bg-amber-100 text-amber-700 dark:bg-amber-950/50 dark:text-amber-400' : 'bg-emerald-100 text-emerald-750 dark:bg-emerald-900/40 dark:text-emerald-400'}`}>
@@ -461,8 +467,8 @@ export function MasterGrid({ isDarkMode, ...props }) {
                                      {Object.values(grade).filter(g => String(g.classId) === String(aulaNesteSlot.classId) && String(g.id) === String(aulaNesteSlot.id)).length}/{aulaNesteSlot.numAulas || 1}
                                   </span>
 
-                                  <span className={`text-[9px] w-[80%] font-black uppercase tracking-widest text-${aulaNesteSlot.cor}-500 dark:text-${aulaNesteSlot.cor}-400 leading-none truncate mt-1`}>
-                                    {aulaNesteSlot.disciplina}
+                                  <span className={`text-[9px] w-[80%] font-black uppercase tracking-widest text-${aulaNesteSlot.cor}-500 dark:text-${aulaNesteSlot.cor}-400 leading-none truncate mt-1`} title={`${aulaNesteSlot.disciplina} - ${aulaNesteSlot.className}`}>
+                                    {aulaNesteSlot.disciplina} <span className="text-[7px] ml-1 opacity-60 font-bold tracking-normal">- {aulaNesteSlot.className}</span>
                                   </span>
                                   <div className="flex justify-between items-center mt-1 gap-1">
                                     <span className="text-[8px] font-bold text-slate-500 dark:text-slate-300 truncate">
