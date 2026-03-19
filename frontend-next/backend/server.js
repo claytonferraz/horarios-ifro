@@ -339,12 +339,19 @@ app.get('/api/auth/me', verifyToken, (req, res) => {
 // ==========================================
 app.get('/api/schedules', (req, res) => {
   const courseId = req.query.courseId;
-  let q = "SELECT * FROM schedules";
+  const academicYear = req.query.academicYear;
+  
+  let q = "SELECT * FROM schedules WHERE 1=1";
   let params = [];
   if (courseId) {
-    q += " WHERE courseId = ?";
+    q += " AND courseId = ?";
     params.push(courseId);
   }
+  if (academicYear) {
+    q += " AND (academic_year = ? OR academic_year IS NULL)";
+    params.push(academicYear);
+  }
+  
   db.all(q, params, (err, rows) => {
     if (err) return res.status(500).json({ error: err.message });
     res.json(rows || []);

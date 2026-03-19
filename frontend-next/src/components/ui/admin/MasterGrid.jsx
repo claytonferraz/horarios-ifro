@@ -5,7 +5,7 @@ import { MAP_DAYS, getColorHash, resolveTeacherName } from '@/lib/dates';
 import { apiClient, getHeaders } from '@/lib/apiClient';
 
 export function MasterGrid({ isDarkMode, ...props }) {
-  const { globalTeachers: globalTeachersList, activeDays, classTimes, academicWeeks, selectedConfigYear } = useData();
+  const { globalTeachers: globalTeachersList, activeDays, classTimes, academicWeeks, selectedConfigYear, setSelectedConfigYear, academicYearsMeta } = useData();
   
   const [selectedCourse, setSelectedCourse] = useState('');
   const [aulasNeutras, setAulasNeutras] = useState([]);
@@ -33,7 +33,7 @@ export function MasterGrid({ isDarkMode, ...props }) {
         const [loadedMatrices, loadedClasses, dbSchedules] = await Promise.all([
           apiClient.fetchCurriculum('matrix'),
           apiClient.fetchCurriculum('class'),
-          fetch('/api/schedules', { headers: getHeaders() }).then(r => r.json()).catch(() => [])
+          fetch(`/api/schedules?academicYear=${selectedConfigYear}`, { headers: getHeaders() }).then(r => r.json()).catch(() => [])
         ]);
 
         const uniqueCourses = (loadedMatrices || []).map(m => ({ id: m.id, name: `${m.course} (${m.name})` }));
@@ -78,7 +78,7 @@ export function MasterGrid({ isDarkMode, ...props }) {
       }
     }
     loadAdminData();
-  }, []);
+  }, [selectedConfigYear]); // Recarrega os dados caso o usuário mude o ano letivo na interface
 
   // Pega todas as turmas do curso selecionado
   const turmasDoCurso = useMemo(() => {
@@ -221,6 +221,29 @@ export function MasterGrid({ isDarkMode, ...props }) {
         </div>
 
         <div className="flex items-center gap-3 w-full xl:w-auto">
+          {/* SELETOR DE ANO LETIVO */}
+          <div className="flex items-center gap-2 px-3 py-2 rounded border bg-slate-50 dark:bg-slate-900 border-slate-300 dark:border-slate-700">
+             <CalendarDays size={16} className="text-emerald-500" />
+             <select 
+               value={String(selectedConfigYear)} 
+               onChange={(e) => {
+                 setSelectedCourse(''); 
+                 setGrade({}); 
+                 setAulasNeutras([]); 
+                 setSelectedConfigYear(e.target.value);
+               }}
+               className="bg-transparent text-sm font-black outline-none cursor-pointer w-[60px] text-emerald-700 dark:text-emerald-400"
+             >
+               {academicYearsMeta && Object.keys(academicYearsMeta).length > 0 ? (
+                 Object.keys(academicYearsMeta).sort((a,b)=>b-a).map(yr => (
+                   <option key={yr} value={yr}>{yr}</option>
+                 ))
+               ) : (
+                 <option value={selectedConfigYear}>{selectedConfigYear}</option>
+               )}
+             </select>
+          </div>
+
           <div className="flex items-center gap-2 px-3 py-2 rounded border bg-slate-50 dark:bg-slate-900 border-slate-300 dark:border-slate-700">
              <Filter size={16} className="text-slate-400" />
              <select 
