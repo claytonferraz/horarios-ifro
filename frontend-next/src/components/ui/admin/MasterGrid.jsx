@@ -1,16 +1,78 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { CalendarDays, GripVertical, AlertCircle, Save, Filter, MapPin } from 'lucide-react';
+import { CalendarDays, GripVertical, AlertCircle, Save, Filter, MapPin, Loader2 } from 'lucide-react';
 import { useData } from '@/contexts/DataContext';
 import { MAP_DAYS, getColorHash, resolveTeacherName } from '@/lib/dates';
+import { apiClient, getHeaders } from '@/lib/apiClient';
 
 export function MasterGrid({ isDarkMode, ...props }) {
-  const { curriculumData, classesList, courses, globalTeachersList, schedules } = useData();
+  const { globalTeachers: globalTeachersList } = useData();
   
   const [selectedCourse, setSelectedCourse] = useState('');
   const [aulasNeutras, setAulasNeutras] = useState([]);
   const [grade, setGrade] = useState({});
 
+  const [classesList, setClassesList] = useState([]);
+  const [courses, setCourses] = useState([]);
+  const [curriculumData, setCurriculumData] = useState([]);
+  const [schedules, setSchedules] = useState([]);
+  const [loadingInitial, setLoadingInitial] = useState(true);
+
   const horarios = ['07:30 - 08:20', '08:20 - 09:10', '09:10 - 10:00', '10:20 - 11:10', '11:10 - 12:00'];
+
+  // Carrega os currículos e turmas direto da fonte
+  useEffect(() => {
+    async function loadAdminData() {
+      setLoadingInitial(true);
+      try {
+        const [loadedMatrices, loadedClasses, dbSchedules] = await Promise.all([
+          apiClient.fetchCurriculum('matrix'),
+          apiClient.fetchCurriculum('class'),
+          fetch('/api/schedules', { headers: getHeaders() }).then(r => r.json()).catch(() => [])
+        ]);
+
+        const uniqueCourses = (loadedMatrices || []).map(m => ({ id: m.id, name: `${m.course} (${m.name})` }));
+        setCourses(uniqueCourses);
+        
+        const safeClasses = loadedClasses || [];
+        setClassesList(safeClasses.map(c => ({ ...c, courseId: c.matrixId })));
+
+        const flatData = [];
+        safeClasses.forEach(cls => {
+          const matrix = (loadedMatrices || []).find(m => m.id === cls.matrixId);
+          if (!matrix) return;
+          const serie = matrix.series?.find(s => s.id === cls.serieId);
+          if (!serie) return;
+
+          serie.disciplines?.forEach(disc => {
+             const profs = cls.professorAssignments?.[disc.id];
+             const teacher = (profs && profs.length > 0) ? profs[0] : 'A Definir';
+             const classRoom = cls.roomAssignments?.[disc.id] || cls.room || '';
+             
+             // Cria as "fichas de aula" para a Área Neutra de acordo com a carga (Ex: 2 aulas semanais = 2 cards)
+             const numAulas = disc.aulas_semanais || 1;
+             for(let i = 0; i < numAulas; i++) {
+               flatData.push({
+                  id: `${cls.id}_${disc.id}_${i}`,
+                  classId: String(cls.id),
+                  className: cls.name,
+                  subjectName: disc.name,
+                  teacherId: String(teacher),
+                  room: classRoom
+               });
+             }
+          });
+        });
+        setCurriculumData(flatData);
+        setSchedules(dbSchedules);
+
+      } catch (err) {
+        console.warn("Erro ao buscar currículo para MasterGrid:", err);
+      } finally {
+        setLoadingInitial(false);
+      }
+    }
+    loadAdminData();
+  }, []);
 
   // Pega todas as turmas do curso selecionado
   const turmasDoCurso = useMemo(() => {
@@ -199,7 +261,7 @@ export function MasterGrid({ isDarkMode, ...props }) {
                       key={aula.id}
                       draggable
                       onDragStart={(e) => handleDragStart(e, aula, 'neutra')}
-                      className={`p-2 rounded border flex flex-col gap-1 cursor-grab hover:ring-2 ring-emerald-500 transition-all ${isDarkMode ? 'bg-slate-700 border-slate-600' : 'bg-slate-50 border-slate-200'}`}
+                      className={`w-[70%] p-1 rounded border flex flex-col gap-0.5 cursor-grab hover:ring-2 ring-emerald-500 transition-all ${isDarkMode ? 'bg-slate-700 border-slate-600' : 'bg-slate-50 border-slate-200'}`}
                     >
                       <div className="flex items-center gap-1">
                          <GripVertical size={12} className="text-slate-400 shrink-0" />
@@ -270,22 +332,24 @@ export function MasterGrid({ isDarkMode, ...props }) {
                                 <div 
                                   draggable
                                   onDragStart={(e) => handleDragStart(e, aulaNesteSlot, slotKey)}
-                                  className={`w-full h-14 rounded border flex flex-col justify-center px-1.5 cursor-grab hover:ring-2 ring-emerald-500 transition-all shadow-sm ${isDarkMode ? 'bg-slate-700 border-slate-500' : 'bg-white border-slate-300'}`}
+                                  className={`w-[70%] mx-auto h-[26px] rounded border flex flex-col justify-center px-1 cursor-grab hover:ring-2 ring-emerald-500 transition-all shadow-sm overflow-hidden ${isDarkMode ? 'bg-slate-700 border-slate-500' : 'bg-white border-slate-300'}`}
                                 >
-                                  <span className={`text-[9px] font-black uppercase tracking-widest text-${aulaNesteSlot.cor}-500 dark:text-${aulaNesteSlot.cor}-400 leading-tight truncate`}>
+                                  <span className={`text-[9px] font-black uppercase tracking-widest text-${aulaNesteSlot.cor}-500 dark:text-${aulaNesteSlot.cor}-400 leading-none truncate`}>
                                     {aulaNesteSlot.disciplina}
                                   </span>
-                                  <span className="text-[8px] font-bold text-slate-500 dark:text-slate-300 truncate mt-0.5">
-                                    {aulaNesteSlot.professor}
-                                  </span>
-                                  {aulaNesteSlot.sala && (
-                                    <span className="text-[7.5px] font-bold text-slate-400 mt-0.5 flex items-center gap-1">
-                                      <MapPin size={8} /> {aulaNesteSlot.sala}
+                                  <div className="flex justify-between items-center mt-0.5 gap-1">
+                                    <span className="text-[7px] font-bold text-slate-500 dark:text-slate-300 truncate">
+                                      {aulaNesteSlot.professor.split(' ')[0]} {/* Reduzido ao primeiro nome */}
                                     </span>
-                                  )}
+                                    {aulaNesteSlot.sala && (
+                                      <span className="text-[7px] font-bold text-slate-400 flex items-center gap-0.5 truncate">
+                                        <MapPin size={6} /> {aulaNesteSlot.sala.slice(0, 8)}
+                                      </span>
+                                    )}
+                                  </div>
                                 </div>
                               ) : (
-                                <div className={`w-full h-14 rounded border border-dashed flex items-center justify-center transition-colors ${isDarkMode ? 'border-slate-700/50 hover:bg-slate-700/30' : 'border-slate-200 hover:bg-slate-50'}`}>
+                                <div className={`w-[70%] mx-auto h-[26px] rounded border border-dashed flex items-center justify-center transition-colors ${isDarkMode ? 'border-slate-700/50 hover:bg-slate-700/30' : 'border-slate-200 hover:bg-slate-50'}`}>
                                 </div>
                               )}
                             </td>
