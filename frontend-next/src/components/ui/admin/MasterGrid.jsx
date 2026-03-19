@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { CalendarDays, GripVertical, AlertCircle, Save, Filter, MapPin, Loader2, Download, X, Check, Layers, Trash2, Eye, EyeOff, Target, CheckCircle2 } from 'lucide-react';
+import { CalendarDays, GripVertical, AlertCircle, Save, Filter, MapPin, Loader2, Download, X, Check, Layers, Trash2, Eye, EyeOff, Target, CheckCircle2, AlertTriangle } from 'lucide-react';
 import { useData } from '@/contexts/DataContext';
 import { MAP_DAYS, getColorHash, resolveTeacherName } from '@/lib/dates';
 import { apiClient, getHeaders } from '@/lib/apiClient';
@@ -448,16 +448,57 @@ export function MasterGrid({ isDarkMode, ...props }) {
                     </tr>
                     
                     {/* Horários do Dia */}
-                    {horariosExibidos.map((hora) => (
-                      <tr key={`${diaId}-${hora}`}>
-                        <td className="py-2 px-2 text-center text-[9px] font-bold text-slate-400 border-r border-slate-700/30 whitespace-nowrap align-middle">
-                          {hora}
-                        </td>
+                    {horariosExibidos.map((hora, index) => {
+                      const numHora = parseInt(hora.split(':')[0], 10);
+                      const isAfternoonStart = index > 0 && numHora >= 12 && parseInt(horariosExibidos[index-1].split(':')[0], 10) < 12;
+                      const isNightStart = index > 0 && numHora >= 18 && parseInt(horariosExibidos[index-1].split(':')[0], 10) < 18;
+                      
+                      return (
+                      <React.Fragment key={`${diaId}-${hora}`}>
+                        {(isAfternoonStart || isNightStart) && (
+                           <tr>
+                              <td colSpan={turmasDoCurso.filter(t => !hiddenClasses.includes(t.id)).length + 1} className="p-0 h-[3px] bg-slate-300 dark:bg-slate-700 border-none"></td>
+                           </tr>
+                        )}
+                        <tr key={`${diaId}-${hora}-row`}>
+                          <td className="py-2 px-2 text-center text-[9px] font-bold text-slate-400 border-r border-slate-700/30 whitespace-nowrap align-middle">
+                            {hora}
+                          </td>
                         
                         {/* Colunas das Turmas */}
                         {turmasDoCurso.filter(t => !hiddenClasses.includes(t.id)).map(turma => {
                           const slotKey = `${turma.id}|${diaId}|${hora}`;
                           const aulaNesteSlot = grade[slotKey];
+                          
+                          // Análise de Ocupação Extra no Card
+                          const profAlerts = [];
+                          if (aulaNesteSlot && aulaNesteSlot.teacherId && aulaNesteSlot.teacherId !== 'A Definir' && aulaNesteSlot.teacherId !== '-') {
+                             const strConflito = verificarChoqueHorario(aulaNesteSlot.teacherId, null, diaId, hora, turma.id);
+                             if (strConflito) profAlerts.push("Choque Estrito: " + strConflito.replace('\n', ' '));
+                             
+                             const profSlots = new Set();
+                             for (const [k, dObj] of Object.entries(grade)) {
+                                 if (k.split('|')[1] === diaId && dObj.teacherId === aulaNesteSlot.teacherId) profSlots.add(k.split('|')[2]);
+                             }
+                             schedules?.forEach(s => {
+                                 if (String(s.dayOfWeek) === diaId && s.teacherId === aulaNesteSlot.teacherId) profSlots.add(s.slotId);
+                             });
+
+                             let m = false; let t = false; let n = false;
+                             const morningEnds = horariosExibidos.filter(h => parseInt(h.split(':')[0], 10) < 12).pop();
+                             const afternoonStarts = horariosExibidos.find(h => { const v = parseInt(h.split(':')[0],10); return v >= 12 && v < 18; });
+                             if (profSlots.has(morningEnds) && profSlots.has(afternoonStarts) && (hora === morningEnds || hora === afternoonStarts)) {
+                                 profAlerts.push("Professor leciona sem descanso entre Turnos (Última da Manhã -> Primeira da Tarde).");
+                             }
+
+                             profSlots.forEach(pt => {
+                                const val = parseInt(pt.split(':')[0], 10);
+                                if (val < 12) m = true; else if (val >= 12 && val < 18) t = true; else n = true;
+                             });
+                             if (m && t && n) {
+                                profAlerts.push("Professor está sobrecarregado atuando em 3 Turnos diferentes hoje.");
+                             }
+                          }
 
                           return (
                             <td 
@@ -475,6 +516,12 @@ export function MasterGrid({ isDarkMode, ...props }) {
                                   <button onClick={(e) => { e.preventDefault(); e.stopPropagation(); setGrade(prev => { const n = {...prev}; delete n[slotKey]; return n; }); }} className="absolute top-0 right-0 bg-rose-500 hover:bg-rose-600 text-white font-bold p-1 rounded-bl-md z-20 opacity-0 group-hover/card:opacity-100 cursor-pointer transition-opacity shadow-sm" title="Remover Aula do Horário" >
                                     <X size={8} strokeWidth={4} />
                                   </button>
+
+                                  {profAlerts.length > 0 && (
+                                     <div className="absolute -top-1.5 -left-1.5 bg-red-500 text-white rounded-full p-[3px] shadow-sm animate-pulse z-20 cursor-help" title={profAlerts.join('\n')}>
+                                        <AlertTriangle size={8} strokeWidth={4} />
+                                     </div>
+                                  )}
 
                                   <span className="absolute top-0 right-0 bg-slate-200 dark:bg-slate-600 text-slate-500 dark:text-slate-300 font-bold px-1 rounded-bl-md text-[7px] group-hover/card:opacity-0 transition-opacity" title={`Qtd Total desta Aula no Horário da Turma`}>
                                      {Object.values(grade).filter(g => String(g.classId) === String(aulaNesteSlot.classId) && String(g.id) === String(aulaNesteSlot.id)).length}/{aulaNesteSlot.numAulas || 1}
@@ -502,7 +549,8 @@ export function MasterGrid({ isDarkMode, ...props }) {
                           );
                         })}
                       </tr>
-                    ))}
+                      </React.Fragment>
+                    )})}
                   </React.Fragment>
                   );
                 })}
