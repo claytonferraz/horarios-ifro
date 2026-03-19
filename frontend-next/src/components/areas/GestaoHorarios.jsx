@@ -160,14 +160,7 @@ export function GestaoHorarios({
 
         {/* ABA: MASTER GRID */}
         {adminTab === 'master_grid' && ['admin','gestao'].includes(userRole) && (
-           <MasterGrid
-              appMode="admin"
-              isDarkMode={isDarkMode}
-              userRole={userRole}
-              subjectHoursMeta={subjectHoursMeta}
-              loadAdminMetadata={loadAdminMetadata}
-              {...props}
-           />
+           <MasterGrid isDarkMode={isDarkMode} {...props} />
         )}
 
         {/* ABA: GESTÃO ESCOLAR */}
