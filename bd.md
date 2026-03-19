@@ -70,6 +70,9 @@ Gerencia informações ativas dos anos letivos (dias totais programados).
 Armazena os objetos complexos JSON para matrizes curriculares e turmas.
 *   `id` (TEXT, PRIMARY KEY): ID randômico (ex: 'a1b2c3d4').
 *   `dataType` (TEXT): Define se o registro é uma matriz ('matrix') ou uma turma ('class').
+*   `academic_year` (TEXT): Extraído do payload (ex: '2026'). Facilita filtragem indexada.
+*   `course_id` (TEXT): Sigla ou nome do curso vinculado.
+*   `matrix_id` (TEXT): Referência à matriz mãe para turmas (ou o próprio ID caso seja matriz).
 *   `payload` (TEXT): Objeto JSON serializado com todo o escopo de dados.
     *   No caso de `matrix`: `{ id, name, course, courseAcronym, series: [ {id, name, disciplines: [{id, name, code, hours}]} ] }`
     *   No caso de `class`: `{ id, name, room, academicYear, matrixId, serieId, professorAssignments: { [discId]: [nome_professor] } }`
