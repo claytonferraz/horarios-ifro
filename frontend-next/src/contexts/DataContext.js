@@ -4,6 +4,7 @@ import React, { createContext, useContext, useState, useEffect, useMemo } from "
 import { apiClient } from "@/lib/apiClient";
 
 const DataContext = createContext();
+import { io } from "socket.io-client";
 
 export function DataProvider({ children }) {
   const [rawData, setRawData] = useState([]);
@@ -78,6 +79,17 @@ export function DataProvider({ children }) {
 
   useEffect(() => {
     loadData();
+    
+    // Real-Time Socket Connection
+    const socket = io(process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3012');
+    socket.on('schedule_updated', () => {
+      console.log('Real-time: Schedule Updated Event Reached. Refreshing data...');
+      loadData();
+    });
+
+    return () => {
+      socket.disconnect();
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedConfigYear]);
 

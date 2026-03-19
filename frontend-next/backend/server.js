@@ -9,6 +9,16 @@ const rateLimit = require('express-rate-limit');
 const { z } = require('zod');
 
 const app = express();
+const http = require('http');
+const { Server } = require('socket.io');
+const server = http.createServer(app);
+const io = new Server(server, {
+  cors: {
+    origin: allowedOrigins,
+    methods: ["GET", "POST", "PUT", "DELETE"],
+    credentials: true
+  }
+});
 
 // 1. Segurança e Proteção Contra Ataques
 // Helmet protege cabeçalhos HTTP
@@ -61,7 +71,7 @@ console.log('Banco de dados conectado em:', dbPath);
 // ==========================================
 // Registra o tempo exato da última alteração no banco. 
 // O frontend pergunta essa variável a cada 5 min para saber se precisa baixar os dados.
-let lastUpdateTimestamp = Date.now();
+
 
 // ==========================================
 // CRIAÇÃO DAS TABELAS NO SQLITE
@@ -393,7 +403,7 @@ app.post('/api/schedules', verifyToken, (req, res) => {
       [id, week, type, fileName, recordsStr, now], 
       (err) => {
         if (err) return res.status(500).json({ error: err.message });
-        lastUpdateTimestamp = Date.now(); // Dispara o Smart Polling do front
+        io.emit('schedule_updated');
         res.json({ success: true });
       }
     );
@@ -410,7 +420,7 @@ app.delete('/api/schedules/:id', verifyToken, (req, res) => {
   const id = req.params.id; 
   db.run("DELETE FROM schedules WHERE id = ?", [id], (err) => {
     if (err) return res.status(500).json({ error: err.message });
-    lastUpdateTimestamp = Date.now(); // Dispara o Smart Polling do front
+    io.emit('schedule_updated');
     res.json({ success: true });
   });
 });
@@ -434,7 +444,7 @@ app.put('/api/config', verifyToken, (req, res) => {
     ], 
     (err) => {
       if (err) return res.status(500).json({ error: err.message });
-      lastUpdateTimestamp = Date.now();
+      io.emit('schedule_updated');
       res.json({ success: true });
     }
   );
@@ -516,7 +526,7 @@ app.post('/api/config/import', verifyToken, (req, res) => {
   });
 
   function finishImport(responseObj, partialErrors = false) {
-     lastUpdateTimestamp = Date.now();
+     io.emit('schedule_updated');
      responseObj.json({ success: true, message: partialErrors ? 'Importação concluída com alguns alertas na cópia de turmas.' : 'Importação da configuração base e duplicação da malha de turmas concluída com sucesso!' });
   }
 });
@@ -538,7 +548,7 @@ app.post('/api/academic-weeks', verifyToken, (req, res) => {
     [name, start_date, end_date, category || 'regular', school_days || 0, academic_year || null],
     function(err) {
       if (err) return res.status(500).json({ error: err.message });
-      lastUpdateTimestamp = Date.now();
+      io.emit('schedule_updated');
       res.json({ id: this.lastID, name, start_date, end_date, category: category || 'regular', school_days: school_days || 0, academic_year: academic_year || null });
     }
   );
@@ -551,7 +561,7 @@ app.put('/api/academic-weeks/:id', verifyToken, (req, res) => {
     [name, start_date, end_date, category || 'regular', school_days || 0, academic_year || null, req.params.id],
     (err) => {
       if (err) return res.status(500).json({ error: err.message });
-      lastUpdateTimestamp = Date.now();
+      io.emit('schedule_updated');
       res.json({ success: true });
     }
   );
@@ -560,7 +570,7 @@ app.put('/api/academic-weeks/:id', verifyToken, (req, res) => {
 app.delete('/api/academic-weeks/:id', verifyToken, (req, res) => {
   db.run("DELETE FROM academic_weeks WHERE id = ?", [req.params.id], (err) => {
     if (err) return res.status(500).json({ error: err.message });
-    lastUpdateTimestamp = Date.now();
+    io.emit('schedule_updated');
     res.json({ success: true });
   });
 });
@@ -585,7 +595,7 @@ app.put('/api/admin/disciplines', verifyToken, (req, res) => {
     [id, suapHours || null],
     (err) => {
       if (err) return res.status(500).json({ error: err.message });
-      lastUpdateTimestamp = Date.now(); // Dispara o Smart Polling do front
+      io.emit('schedule_updated');
       res.json({ success: true });
     }
   );
@@ -607,7 +617,7 @@ app.put('/api/admin/subject-hours', verifyToken, (req, res) => {
     [id, totalHours || null],
     (err) => {
       if (err) return res.status(500).json({ error: err.message });
-      lastUpdateTimestamp = Date.now(); // Dispara o Smart Polling do front
+      io.emit('schedule_updated');
       res.json({ success: true });
     }
   );
@@ -653,7 +663,7 @@ app.put('/api/admin/academic-years', verifyToken, (req, res) => {
     [year, totalDays || null, currentDays || null],
     (err) => {
       if (err) return res.status(500).json({ error: err.message });
-      lastUpdateTimestamp = Date.now(); // Dispara o Smart Polling do front
+      io.emit('schedule_updated');
       res.json({ success: true });
     }
   );
@@ -687,7 +697,7 @@ app.put('/api/admin/curriculum/:type', verifyToken, (req, res) => {
     [idStr, type, academic_year, course_id, matrix_id, payloadStr],
     (err) => {
       if (err) return res.status(500).json({ error: err.message });
-      lastUpdateTimestamp = Date.now();
+      io.emit('schedule_updated');
       res.json({ success: true, id: idStr });
     }
   );
@@ -697,7 +707,7 @@ app.delete('/api/admin/curriculum/:type/:id', verifyToken, (req, res) => {
   const { type, id } = req.params;
   db.run("DELETE FROM curriculum_data WHERE id = ? AND dataType = ?", [id, type], (err) => {
     if (err) return res.status(500).json({ error: err.message });
-    lastUpdateTimestamp = Date.now();
+    io.emit('schedule_updated');
     res.json({ success: true });
   });
 });
@@ -741,7 +751,7 @@ app.put('/api/admin/teachers', verifyToken, async (req, res) => {
       [siape, nome_exibicao || '', nome_completo, email || null, finalHash, status || 'ativo', perfisStr, atuaDoc, exigirTroca],
       (err2) => {
         if (err2) return res.status(500).json({ error: err2.message });
-        lastUpdateTimestamp = Date.now();
+        io.emit('schedule_updated');
         res.json({ success: true, siape });
       }
     );
@@ -800,7 +810,7 @@ app.post('/api/admin/teachers/batch', verifyToken, async (req, res) => {
       try {
         for (const item of users) await processItem(item);
         db.run("COMMIT");
-        lastUpdateTimestamp = Date.now();
+        io.emit('schedule_updated');
         res.json({ success: true, count: users.length });
       } catch (err) {
         db.run("ROLLBACK");
@@ -813,7 +823,7 @@ app.post('/api/admin/teachers/batch', verifyToken, async (req, res) => {
 app.delete('/api/admin/teachers/:siape', verifyToken, (req, res) => {
   db.run("DELETE FROM users WHERE siape = ?", [req.params.siape], (err) => {
     if (err) return res.status(500).json({ error: err.message });
-    lastUpdateTimestamp = Date.now();
+    io.emit('schedule_updated');
     res.json({ success: true });
   });
 });
@@ -880,4 +890,4 @@ app.put('/api/requests/:id', verifyToken, (req, res) => {
   );
 });
 
-app.listen(3012, () => console.log('Backend rodando na porta 3012'));
+server.listen(3012, () => console.log('Backend rodando na porta 3012'));
