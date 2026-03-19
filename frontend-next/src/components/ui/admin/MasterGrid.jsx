@@ -207,7 +207,15 @@ export function MasterGrid({ isDarkMode, ...props }) {
         if (startIndex !== -1) {
             let placed = 0;
             let currentIdx = startIndex;
-            const aulasAmount = aula.numAulas || 1;
+
+            // Calcula quantas aulas restam matematicamente (Carga Semanal Max - Já Alocadas na Tela)
+            const countInGrid = Object.values(novaGrade).filter(g => String(g.classId) === String(aula.classId) && String(g.id) === String(aula.id)).length;
+            const maxEsperado = aula.numAulas || 1;
+            const faltando = maxEsperado - countInGrid;
+            
+            // Faltando <= 0 significa que já atingiu a meta semanal. Neste caso, lança apenas 1 por vez para correções cirurgicas.
+            const aulasAmount = faltando > 0 ? faltando : 1;
+
             let ignoreAlerts = globalIgnore;
 
             while (placed < aulasAmount && currentIdx < horariosExibidos.length) {
@@ -338,11 +346,11 @@ export function MasterGrid({ isDarkMode, ...props }) {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-4 gap-4">
+      <div className="flex flex-col lg:flex-row gap-4">
         
         {/* ÁREA NEUTRA (Lateral Esquerda) */}
         <div 
-          className={`lg:col-span-1 p-3 rounded-xl border shadow-sm flex flex-col h-[75vh] overflow-y-auto ${isDarkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'}`}
+          className={`lg:w-[22.5%] shrink-0 p-3 rounded-xl border shadow-sm flex flex-col h-[75vh] overflow-y-auto ${isDarkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'}`}
           onDragOver={handleDragOver}
           onDrop={handleDropNeutra}
         >
@@ -405,7 +413,7 @@ export function MasterGrid({ isDarkMode, ...props }) {
         </div>
 
         {/* GRADE MATRIZ PRINCIPAL (As Turmas lado a lado) */}
-        <div className={`lg:col-span-3 p-4 rounded-xl border shadow-sm h-[75vh] overflow-auto ${isDarkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'}`}>
+        <div className={`w-full p-4 rounded-xl border shadow-sm h-[75vh] overflow-auto ${isDarkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'}`}>
           {selectedCourses.length === 0 ? (
              <div className="flex items-center justify-center h-full text-slate-400 font-bold">
                Nenhum curso selecionado.
