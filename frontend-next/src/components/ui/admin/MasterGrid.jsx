@@ -126,26 +126,31 @@ export function MasterGrid({ isDarkMode, ...props }) {
   }, [aulasNeutras]);
 
   // === MOTOR DE PREVENÇÃO DE CONFLITOS (CHOQUE DE HORÁRIO) ===
-  const verificarChoqueHorario = (teacherId, diaId, hora, currentClassId) => {
+  const verificarChoqueHorario = (teacherId, sala, diaId, hora, currentClassId) => {
     // 1. Verifica na grade que está sendo editada na tela agora (CORRIGIDO AQUI)
     for (const [key, aula] of Object.entries(grade)) {
       const [kClassId, kDiaId, kHora] = key.split('|');
-      if (kDiaId === String(diaId) && kHora === hora && aula.teacherId === teacherId && kClassId !== String(currentClassId)) {
-        return `CHOQUE NA TELA!\nO professor já está na turma ${aula.className} neste mesmo horário.`;
+      if (kDiaId === String(diaId) && kHora === hora && kClassId !== String(currentClassId)) {
+         if (teacherId && teacherId !== 'A Definir' && teacherId !== '-' && aula.teacherId === teacherId) {
+            return `CHOQUE DE PROFESSOR NA TELA!\nO professor já está na turma ${aula.className} neste mesmo horário.`;
+         }
+         if (sala && aula.sala && aula.sala === sala) {
+            return `CHOQUE DE SALA NA TELA!\nO espaço/sala "${sala}" já está alocado para a turma ${aula.className} neste mesmo horário.`;
+         }
       }
     }
 
     // 2. Verifica no banco global (outros cursos)
-    const conflitoGlobal = schedules?.find(s => 
-      String(s.teacherId) === String(teacherId) && 
-      String(s.dayOfWeek) === String(diaId) && 
-      s.slotId === hora && 
-      String(s.classId) !== String(currentClassId)
-    );
-
-    if (conflitoGlobal) {
-      const turmaConflito = classesList.find(c => String(c.id) === String(conflitoGlobal.classId));
-      return `CHOQUE NO BANCO!\nEste professor já está alocado na turma "${turmaConflito?.name || 'Desconhecida'}" neste horário.`;
+    const relRows = schedules?.filter(s => String(s.dayOfWeek) === String(diaId) && s.slotId === hora && String(s.classId) !== String(currentClassId)) || [];
+    for (const row of relRows) {
+       if (teacherId && teacherId !== 'A Definir' && teacherId !== '-' && String(row.teacherId) === String(teacherId)) {
+          const turmaConflito = classesList?.find(c => String(c.id) === String(row.classId));
+          return `CHOQUE DE PROFESSOR GLOBAL!\nEste professor já está alocado na turma "${turmaConflito?.name || 'Externa'}" neste horário.`;
+       }
+       if (sala && row.room && row.room === sala) {
+          const turmaConflito = classesList?.find(c => String(c.id) === String(row.classId));
+          return `CHOQUE DE SALA GLOBAL!\nO espaço/sala "${sala}" já está sendo usado pela turma "${turmaConflito?.name || 'Externa'}" neste horário.`;
+       }
     }
     return null;
   };
@@ -176,10 +181,13 @@ export function MasterGrid({ isDarkMode, ...props }) {
       return;
     }
 
-    const mensagemConflito = verificarChoqueHorario(aula.teacherId, diaId, hora, classId);
+    let globalIgnore = false;
+    const mensagemConflito = verificarChoqueHorario(aula.teacherId, aula.sala, diaId, hora, classId);
     if (mensagemConflito) {
-      alert(mensagemConflito);
-      return; 
+      if (!window.confirm(`${mensagemConflito}\n\nDeseja forçar a alocação ignorando este aviso?\n(Obs: O sistema de Matriz Padrão, futuramente, não deixará você salvar este choque transversal).`)) {
+         return; 
+      }
+      globalIgnore = true;
     }
 
     setGrade(prev => {
@@ -194,15 +202,26 @@ export function MasterGrid({ isDarkMode, ...props }) {
             let placed = 0;
             let currentIdx = startIndex;
             const aulasAmount = aula.numAulas || 1;
+            let ignoreAlerts = globalIgnore;
+
             while (placed < aulasAmount && currentIdx < horariosExibidos.length) {
                 const targetHora = horariosExibidos[currentIdx];
                 const slotK = `${classId}|${diaId}|${targetHora}`;
+
                 if (placed === 0) {
                      novaGrade[slotK] = aula;
                      placed++;
                 } else if (!novaGrade[slotK]) {
-                     const slotErrorMsg = verificarChoqueHorario(aula.teacherId, diaId, targetHora, classId);
-                     if (!slotErrorMsg) {
+                     const slotErrorMsg = verificarChoqueHorario(aula.teacherId, aula.sala, diaId, targetHora, classId);
+                     if (slotErrorMsg && !ignoreAlerts) {
+                        if (!window.confirm(`${slotErrorMsg}\n\nConflito detectado na continuação automática das próximas aulas. Deseja forçar e ignorar todos os avisos em cadeia agora?`)) {
+                            break;
+                        } else {
+                            ignoreAlerts = true;
+                            novaGrade[slotK] = aula;
+                            placed++;
+                        }
+                     } else {
                         novaGrade[slotK] = aula;
                         placed++;
                      }

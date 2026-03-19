@@ -388,25 +388,30 @@ app.post('/api/schedules/bulk-course', verifyToken, (req, res) => {
     db.all(`SELECT * FROM schedules WHERE (${cond} OR courseId IS NULL) AND type = ?`, [...coursesToClear, type], (err, existingRows) => {
       if (err) return res.status(500).json({ error: err.message });
 
-      // Se for um horário específico de uma semana (previa ou oficial), validar apenas com a mesma semana
-      const relevantRows = existingRows.filter(r => (!weekId || r.week_id === weekId) && (!academicYear || r.academic_year === academicYear));
+      // Se for um horário específico de uma semana (previa ou oficial), validar apenas se for cruzamento crítico padrao
+      const relevantRows = type === 'padrao' ? existingRows.filter(r => (!weekId || r.week_id === weekId) && (!academicYear || r.academic_year === academicYear)) : [];
 
-      for (const slot of schedules) {
-        if (!slot.teacherId || slot.teacherId === 'A Definir' || slot.teacherId === '-') continue;
-        
-        for (const row of relevantRows) {
-          if (row.teacherId === slot.teacherId && row.dayOfWeek === slot.dayOfWeek && row.slotId === slot.slotId) {
-             return res.status(400).json({ error: `Conflito Global: O professor já possui aula de outro curso externo em ${slot.dayOfWeek} às ${slot.slotId} na matriz tipo ${type}.` });
-          }
-          if (row.records) {
-            try {
-              const parsed = JSON.parse(row.records);
-              for (const r of parsed) {
-                if (r.teacher === slot.teacherId && String(r.day) === String(slot.dayOfWeek) && String(r.time) === String(slot.slotId)) {
-                  return res.status(400).json({ error: `Conflito Global (Legado): O professor já possui aula em ${slot.dayOfWeek} às ${slot.slotId}.` });
+      if (type === 'padrao') {
+        for (const slot of schedules) {
+          if (!slot.teacherId || slot.teacherId === 'A Definir' || slot.teacherId === '-') continue;
+          
+          for (const row of relevantRows) {
+            if (row.teacherId === slot.teacherId && row.dayOfWeek === slot.dayOfWeek && row.slotId === slot.slotId) {
+               return res.status(400).json({ error: `Bloqueio Estrito no Servidor: O professor já possui aula de outro curso externo na mesma matriz ${type} em ${slot.dayOfWeek} às ${slot.slotId}. Matrizes Padrão não podem ter choques.` });
+            }
+            if (slot.room && row.room === slot.room) {
+               return res.status(400).json({ error: `Bloqueio Estrito no Servidor: A sala/espaço já está alocada para outro curso externo isolado na matriz ${type}.` });
+            }
+            if (row.records) {
+              try {
+                const parsed = JSON.parse(row.records);
+                for (const r of parsed) {
+                  if (r.teacher === slot.teacherId && String(r.day) === String(slot.dayOfWeek) && String(r.time) === String(slot.slotId)) {
+                    return res.status(400).json({ error: `Conflito Global (Legado): O professor já possui aula em ${slot.dayOfWeek} às ${slot.slotId}.` });
+                  }
                 }
-              }
-            } catch (e) {}
+              } catch (e) {}
+            }
           }
         }
       }
