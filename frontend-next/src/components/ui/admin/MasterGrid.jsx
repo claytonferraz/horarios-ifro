@@ -466,7 +466,11 @@ export function MasterGrid({ isDarkMode, ...props }) {
              onClick={() => {
                  if(window.confirm('Limpar grade da tela para criar do zero? (O banco NÃO será apagado até você salvar)')) {
                      const pendentesAtuais = [...aulasNeutras];
-                     Object.values(grade).forEach(aula => pendentesAtuais.push(aula));
+                     Object.values(grade).forEach(aula => {
+                         if (!pendentesAtuais.some(p => String(p.id) === String(aula.id))) {
+                             pendentesAtuais.push(aula);
+                         }
+                     });
                      setGrade({}); setAulasNeutras(pendentesAtuais);
                  }
              }} 
@@ -476,30 +480,8 @@ export function MasterGrid({ isDarkMode, ...props }) {
           </button>
 
           <button onClick={() => { setSaveOptions({ type: selectedType, weekId: selectedWeek }); setModalMode('save'); }} disabled={selectedCourses.length === 0} className="flex items-center justify-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white disabled:opacity-50 px-5 py-2.5 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all w-full sm:w-auto shadow-sm">
-             <Save size={14} /> Salvar Pipeline
+             <Save size={14} /> Alterar ou Salvar Novo
           </button>
-        
-        <div className="flex flex-col sm:flex-row items-center gap-2 mr-4">
-             <select 
-               value={selectedType} onChange={e => setSelectedType(e.target.value)} 
-               className={`px-3 py-2 rounded-lg border shadow-sm outline-none cursor-pointer text-xs font-bold uppercase tracking-wider text-indigo-600 dark:text-indigo-400 ${isDarkMode ? 'bg-slate-900 border-slate-700' : 'bg-slate-50 border-slate-300'}`}
-             >
-                 <option value="padrao">Padrão Anual</option>
-                 <option value="previa">Prévia Semanal</option>
-                 <option value="atual">Horário Atual</option>
-                 <option value="oficial">Histórico Oficial</option>
-             </select>
-
-             {selectedType !== 'padrao' && (
-               <select
-                 value={selectedWeek} onChange={(e) => setSelectedWeek(e.target.value)}
-                 className={`px-3 py-2 rounded-lg border shadow-sm outline-none cursor-pointer text-xs font-bold uppercase tracking-wider text-amber-600 dark:text-amber-400 ${isDarkMode ? 'bg-slate-900 border-slate-700' : 'bg-slate-50 border-slate-300'}`}
-               >
-                 <option value="">-- Semana --</option>
-                 {academicWeeks?.filter(w => w.academic_year === selectedConfigYear).map(w => <option key={w.id} value={w.id}>{w.name}</option>)}
-               </select>
-             )}
-          </div>
           </div>
       </div>
 
