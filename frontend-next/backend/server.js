@@ -350,10 +350,47 @@ const schedulePayloadSchema = z.object({
 app.post('/api/schedules', verifyToken, (req, res) => {
   try {
     const validatedData = schedulePayloadSchema.parse(req.body);
-    const { id, week, type, fileName, records } = validatedData;
+    const { id, week, type, fileName, records: recordsStr } = validatedData;
+    
+    // Server-side Rules (Conflict Engine)
+    let parsedRecords;
+    try { parsedRecords = JSON.parse(recordsStr); } catch (e) { throw new Error("JSON Records inválido."); }
+    
+    const valid = Array.isArray(parsedRecords) ? parsedRecords : [];
+    const teacherMap = new Map();
+    const classMap = new Map();
+    const roomMap = new Map();
+
+    for (const r of valid) {
+      const skipNames = ['A Definir', 'Todos'];
+      const isSet = (val) => val && !skipNames.includes(val);
+
+      if (isSet(r.day) && isSet(r.time)) {
+        const slotKey = `${r.day}_${r.time}`;
+
+        // Professor Ocupado?
+        if (isSet(r.teacher)) {
+          const key = `${r.teacher}_${slotKey}`;
+          if (teacherMap.has(key) && teacherMap.get(key) !== r.id) {
+             throw new Error(`Conflito de Horário: O professor ${r.teacher} já possui aula em ${r.day} às ${r.time}.`);
+          }
+          teacherMap.set(key, r.id);
+        }
+
+        // Turma Ocupada? (Nenhuma turma pode ter duas aulas no mesmo tempo)
+        if (isSet(r.className)) {
+          const key = `${r.className}_${slotKey}`;
+          if (classMap.has(key) && classMap.get(key) !== r.id) {
+             throw new Error(`Conflito Acadêmico: A turma ${r.className} já possui aula alocada em ${r.day} às ${r.time}.`);
+          }
+          classMap.set(key, r.id);
+        }
+      }
+    }
+
     const now = new Date().toISOString();
     db.run(`INSERT OR REPLACE INTO schedules (id, week, type, fileName, records, updatedAt) VALUES (?, ?, ?, ?, ?, ?)`, 
-      [id, week, type, fileName, records, now], 
+      [id, week, type, fileName, recordsStr, now], 
       (err) => {
         if (err) return res.status(500).json({ error: err.message });
         lastUpdateTimestamp = Date.now(); // Dispara o Smart Polling do front
@@ -364,6 +401,7 @@ app.post('/api/schedules', verifyToken, (req, res) => {
     if (e instanceof z.ZodError) {
       return res.status(400).json({ error: "Dados inválidos: " + e.errors.map(err => err.message).join(', ') });
     }
+    // Retorna erro 400 em caso de violação de regra do Motor de Conflitos
     return res.status(400).json({ error: e.message });
   }
 });
