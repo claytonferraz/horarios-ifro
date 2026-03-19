@@ -470,9 +470,13 @@ export function MasterGrid({ isDarkMode, ...props }) {
                                 <div 
                                   draggable
                                   onDragStart={(e) => handleDragStart(e, aulaNesteSlot, slotKey)}
-                                  className={`w-[85%] sm:w-[75%] mx-auto min-h-[30px] rounded border flex flex-col justify-center px-1.5 py-0.5 cursor-grab hover:ring-2 ring-emerald-500 transition-all shadow-sm overflow-hidden relative ${isDarkMode ? 'bg-slate-700 border-slate-500' : 'bg-white border-slate-300'}`}
+                                  className={`group/card w-[85%] sm:w-[75%] mx-auto min-h-[30px] rounded border flex flex-col justify-center px-1.5 py-0.5 cursor-grab hover:ring-2 ring-emerald-500 transition-all shadow-sm overflow-hidden relative ${isDarkMode ? 'bg-slate-700 border-slate-500' : 'bg-white border-slate-300'}`}
                                 >
-                                  <span className="absolute top-0 right-0 bg-slate-200 dark:bg-slate-600 text-slate-500 dark:text-slate-300 font-bold px-1 rounded-bl-md text-[7px]" title={`Qtd Total desta Aula no Horário da Turma`}>
+                                  <button onClick={(e) => { e.preventDefault(); e.stopPropagation(); setGrade(prev => { const n = {...prev}; delete n[slotKey]; return n; }); }} className="absolute top-0 right-0 bg-rose-500 hover:bg-rose-600 text-white font-bold p-1 rounded-bl-md z-20 opacity-0 group-hover/card:opacity-100 cursor-pointer transition-opacity shadow-sm" title="Remover Aula do Horário" >
+                                    <X size={8} strokeWidth={4} />
+                                  </button>
+
+                                  <span className="absolute top-0 right-0 bg-slate-200 dark:bg-slate-600 text-slate-500 dark:text-slate-300 font-bold px-1 rounded-bl-md text-[7px] group-hover/card:opacity-0 transition-opacity" title={`Qtd Total desta Aula no Horário da Turma`}>
                                      {Object.values(grade).filter(g => String(g.classId) === String(aulaNesteSlot.classId) && String(g.id) === String(aulaNesteSlot.id)).length}/{aulaNesteSlot.numAulas || 1}
                                   </span>
 
