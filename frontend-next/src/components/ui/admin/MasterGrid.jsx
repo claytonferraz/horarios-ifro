@@ -22,6 +22,7 @@ export function MasterGrid({ isDarkMode, ...props }) {
   const [selectedWeek, setSelectedWeek] = useState('');
   const [shiftFilter, setShiftFilter] = useState('todos');
   const [refreshTrigger, setRefreshTrigger] = useState(0);
+  const [draggedItem, setDraggedItem] = useState(null);
 
   const [pendingDrop, setPendingDrop] = useState(null); // Modal DND 
   const [dropAlert, setDropAlert] = useState(null); // Alerta Simples
@@ -225,6 +226,11 @@ export function MasterGrid({ isDarkMode, ...props }) {
   // === FUNÇÕES DE DRAG AND DROP ===
   const handleDragStart = (e, aula, origem) => {
     e.dataTransfer.setData('application/json', JSON.stringify({ aula, origem }));
+    setDraggedItem({ aula, origem });
+  };
+
+  const handleDragEnd = () => {
+    setDraggedItem(null);
   };
 
   const handleDragOver = (e) => e.preventDefault();
@@ -622,10 +628,13 @@ export function MasterGrid({ isDarkMode, ...props }) {
               </div>
             )}
 
-            {Object.entries(neutrasPorTurma).filter(([nomeTurma]) => {
+            {Object.entries(neutrasPorTurma)
+              .sort((a, b) => a[0].localeCompare(b[0]))
+              .filter(([nomeTurma]) => {
                 const turmaObj = turmasDoCurso.find(t => t.name === nomeTurma);
                 return turmaObj && !hiddenClasses.includes(turmaObj.id);
-            }).map(([nomeTurma, aulas]) => (
+              })
+              .map(([nomeTurma, aulas]) => (
               <div key={nomeTurma} className="mb-2">
                 <div className="text-[10px] font-bold text-slate-400 mb-2 uppercase tracking-wider">{nomeTurma}</div>
                 <div className="flex flex-col gap-2">
@@ -639,6 +648,7 @@ export function MasterGrid({ isDarkMode, ...props }) {
                         key={aula.id}
                         draggable
                         onDragStart={(e) => handleDragStart(e, aula, 'neutra')}
+                        onDragEnd={handleDragEnd}
                         className={`w-full p-2 rounded border shadow-sm flex flex-col gap-1 cursor-grab hover:ring-2 hover:border-emerald-500 ring-emerald-500 transition-all ${(isZero && isDarkMode) ? 'bg-amber-950/20 border-amber-600/50' : (isZero ? 'bg-orange-50/60 border-orange-300' : (isDarkMode ? 'bg-slate-750 border-slate-600 border-l-4 border-l-emerald-500' : 'bg-slate-50 border-slate-200 border-l-4 border-l-emerald-500'))}`}
                       >
                        <div className="flex justify-between items-start gap-1">
@@ -680,7 +690,7 @@ export function MasterGrid({ isDarkMode, ...props }) {
                 <tr>
                   <th className="py-2 px-2 w-20 bg-inherit"></th>
                   {turmasDoCurso.filter(t => !hiddenClasses.includes(t.id)).map(turma => (
-                    <th key={turma.id} className={`py-2 px-2 text-center text-[11px] font-black uppercase tracking-widest border-b-2 border-slate-700/50 bg-inherit group/th`}>
+                    <th key={turma.id} className={`py-2 px-2 text-center text-[11px] font-black uppercase tracking-widest border-b-2 bg-inherit group/th transition-all duration-300 ${draggedItem && String(draggedItem.aula.classId) !== String(turma.id) ? 'opacity-30 grayscale pointer-events-none' : ''} ${isDarkMode ? 'border-slate-700/50' : 'border-slate-200'}`}>
                       <div className="flex items-center justify-center gap-2 relative">
                          <span className="truncate">{turma.name}</span>
                          <button onClick={() => setHiddenClasses(prev => [...prev, turma.id])} title="Ocultar da Tela" className="opacity-0 group-hover/th:opacity-100 hover:text-rose-500 transition-opacity absolute -right-2 text-slate-400 cursor-pointer">
@@ -735,7 +745,7 @@ export function MasterGrid({ isDarkMode, ...props }) {
                           return (
                             <td 
                               key={slotKey} 
-                              className="p-1 border border-slate-700/30 min-w-[140px]"
+                              className={`p-1 border min-w-[140px] align-middle transition-all duration-300 ${draggedItem && String(draggedItem.aula.classId) !== String(turma.id) ? 'opacity-30 pointer-events-none bg-slate-100/50 dark:bg-slate-900/50' : ''} ${isDarkMode ? 'border-slate-700/50' : 'border-slate-200'}`}
                               onDragOver={handleDragOver}
                               onDrop={(e) => handleDropSlot(e, turma.id, diaId, hora)}
                             >
@@ -743,6 +753,7 @@ export function MasterGrid({ isDarkMode, ...props }) {
                                 <div 
                                   draggable
                                   onDragStart={(e) => handleDragStart(e, aulaNesteSlot, slotKey)}
+                                  onDragEnd={handleDragEnd}
                                   className={`group/card w-[95%] sm:w-[90%] mx-auto min-h-[56px] rounded border flex flex-col justify-between p-2 cursor-grab hover:ring-2 ring-emerald-500 transition-all shadow-sm overflow-hidden relative ${isDarkMode ? 'bg-slate-700 border-slate-500' : 'bg-white border-slate-300'}`}
                                 >
                                   <button onClick={(e) => { e.preventDefault(); e.stopPropagation(); setGrade(prev => { const n = {...prev}; delete n[slotKey]; return n; }); }} className="absolute top-0 right-0 bg-rose-500 hover:bg-rose-600 text-white font-bold p-1 rounded-bl-md z-20 opacity-0 group-hover/card:opacity-100 cursor-pointer transition-opacity shadow-sm" title="Remover Aula do Horário" >
