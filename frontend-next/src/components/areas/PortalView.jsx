@@ -41,6 +41,30 @@ export function PortalView({
   const [pendingRequests, setPendingRequests] = useState([]);
 
   React.useEffect(() => {
+    if (appMode === 'aluno') {
+      const savedCourse = localStorage.getItem('ifro_aluno_course');
+      const savedClass = localStorage.getItem('ifro_aluno_class');
+      if (savedCourse && typeof setSelectedCourse === 'function') {
+        setSelectedCourse(savedCourse);
+      }
+      if (savedClass && typeof setSelectedClass === 'function') {
+        setTimeout(() => setSelectedClass(savedClass), 150);
+      }
+    }
+  }, [appMode, setSelectedCourse, setSelectedClass]);
+
+  React.useEffect(() => {
+    if (appMode === 'aluno') {
+      if (selectedCourse && selectedCourse !== 'Todos') {
+        localStorage.setItem('ifro_aluno_course', selectedCourse);
+      }
+      if (selectedClass) {
+        localStorage.setItem('ifro_aluno_class', selectedClass);
+      }
+    }
+  }, [appMode, selectedCourse, selectedClass]);
+
+  React.useEffect(() => {
     if ((appMode === 'admin' || userRole === 'gestao' || userRole === 'admin') && scheduleMode === 'previa' && selectedWeek) {
       apiClient.fetchRequests().then(reqs => {
         if (reqs) {
@@ -400,6 +424,27 @@ export function PortalView({
        }
    }, [appMode, academicWeeks, selectedWeek, handleAlunoScheduleTab]);
 
+   const estatisticasAluno = React.useMemo(() => {
+       if (!schedules || schedules.length === 0 || !selectedClass) return { lecionadas: 0, semProfessorSemana: 0, aReporTotal: 0 };
+       const oficiaisTurma = schedules.filter(s => s.type === 'oficial' && String(s.classId) === String(selectedClass));
+       const lecionadas = oficiaisTurma.length;
+       const aReporTotal = oficiaisTurma.filter(s => !s.teacherId || String(s.teacherId) === 'A Definir' || String(s.teacherId) === '-').length;
+       const vagasSemana = mappedSchedules.filter(s => String(s.className) === String(selectedClass) && (!s.teacher || String(s.teacher) === 'A Definir' || String(s.teacher) === '-')).length;
+       return { lecionadas, semProfessorSemana: vagasSemana, aReporTotal };
+   }, [schedules, mappedSchedules, selectedClass]);
+
+   const weekLabel = React.useMemo(() => {
+       if (!selectedWeek || !academicWeeks) return '';
+       const w = academicWeeks.find(week => String(week.id) === String(selectedWeek));
+       if (!w) return '';
+       const fmtDate = (d) => {
+           if (!d) return '';
+           const parts = d.split('T')[0].split('-');
+           return parts.length === 3 ? parts[2] + '/' + parts[1] : d;
+       };
+       return String(w.name).replace(/semana\s*/i, 'SEM ') + ' (' + fmtDate(w.start_date) + ' a ' + fmtDate(w.end_date) + ')';
+   }, [academicWeeks, selectedWeek]);
+
   return (
     <>
         {(!schedules || schedules.length === 0) ? (
@@ -492,15 +537,15 @@ export function PortalView({
               {appMode === 'aluno' && (viewMode === 'turma' || viewMode === 'hoje') && selectedClass && (
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                   <div className={`border p-3 rounded-xl text-center shadow-sm ${isDarkMode ? 'bg-emerald-900/20 border-emerald-800/50' : 'bg-emerald-50 border-emerald-100'}`}>
-                    <span className={`text-2xl font-black leading-none ${isDarkMode ? 'text-emerald-400' : 'text-emerald-600'}`}>{alunoStats.lecionadas}</span>
+                    <span className={`text-2xl font-black leading-none ${isDarkMode ? 'text-emerald-400' : 'text-emerald-600'}`}>{estatisticasAluno.lecionadas}</span>
                     <p className={`text-[9px] font-black uppercase tracking-widest mt-1 ${isDarkMode ? 'text-emerald-300' : 'text-emerald-800/60'}`}>Aulas Já Lecionadas</p>
                   </div>
                   <div className={`border p-3 rounded-xl text-center shadow-sm ${isDarkMode ? 'bg-orange-900/20 border-orange-800/50' : 'bg-orange-50 border-orange-100'}`}>
-                    <span className={`text-2xl font-black leading-none ${isDarkMode ? 'text-orange-400' : 'text-orange-600'}`}>{alunoStats.semProfessorSemana}</span>
+                    <span className={`text-2xl font-black leading-none ${isDarkMode ? 'text-orange-400' : 'text-orange-600'}`}>{estatisticasAluno.semProfessorSemana}</span>
                     <p className={`text-[9px] font-black uppercase tracking-widest mt-1 ${isDarkMode ? 'text-orange-300' : 'text-orange-800/60'}`}>Aulas Vagas ({scheduleMode === 'previa' ? 'prévia' : 'semana'})</p>
                   </div>
                   <div className={`border p-3 rounded-xl text-center shadow-sm ${isDarkMode ? 'bg-red-900/20 border-red-800/50' : 'bg-red-50 border-red-100'}`}>
-                    <span className={`text-2xl font-black leading-none ${isDarkMode ? 'text-red-400' : 'text-red-600'}`}>{alunoStats.aReporTotal}</span>
+                    <span className={`text-2xl font-black leading-none ${isDarkMode ? 'text-red-400' : 'text-red-600'}`}>{estatisticasAluno.aReporTotal}</span>
                     <p className={`text-[9px] font-black uppercase tracking-widest mt-1 ${isDarkMode ? 'text-red-300' : 'text-red-800/60'}`}>Total a repor</p>
                   </div>
                 </div>
@@ -594,6 +639,7 @@ export function PortalView({
                              {scheduleMode === 'previa' && <span className="bg-white/20 px-1.5 py-0.5 rounded text-[8px]">PRÉVIA</span>}
                              Horário do Dia: {selectedClass}
                            </h2>
+                           {weekLabel && <span className="text-[9px] font-black bg-white/10 px-3 py-1 rounded-full tracking-widest uppercase shadow-inner ml-2">{weekLabel}</span>}
                          </div>
                       </div>
 
@@ -830,7 +876,7 @@ export function PortalView({
                           if (courseClasses.length === 0) return null;
 
                           return (
-                            <div key={course} className={`rounded-2xl shadow-sm border overflow-hidden mb-6 ${isDarkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'}`}>
+                            <div key={course} className={`print:break-inside-avoid print:break-after-page rounded-2xl shadow-sm print:shadow-none border print:border-none overflow-hidden print:overflow-visible mb-6 print:mb-0 ${isDarkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'}`}>
                               <div className={`text-white px-6 py-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 no-print ${scheduleMode === 'padrao' ? (isDarkMode ? 'bg-blue-950' : 'bg-blue-900') : scheduleMode === 'previa' ? (isDarkMode ? 'bg-violet-950' : 'bg-violet-900') : (isDarkMode ? 'bg-rose-950' : 'bg-rose-900')}`}>
                                 <div className="flex items-center gap-2.5">
                                   <Layers size={18} className="opacity-80" />
@@ -845,9 +891,11 @@ export function PortalView({
                                   <Printer size={14} /> Imprimir Horário do Curso
                                 </button>
                               </div>
-
-                              <div className="hidden md:block overflow-x-auto">
-                                <table className="w-full min-w-[800px] border-collapse relative text-xs">
+                              <div className="hidden print:block font-black text-[14px] uppercase mb-2 border-b-[3px] border-black pb-2 tracking-widest mt-4">
+                                {course} <span className="float-right font-medium text-[10px] bg-black text-white px-2 py-1 rounded-sm">{scheduleMode === 'padrao' ? 'HORÁRIO PADRÃO' : (dynamicWeeksList.find(w => w.value === selectedWeek)?.label || selectedWeek)}</span>
+                              </div>
+                              <div className="hidden md:block overflow-x-auto print:overflow-visible">
+                                <table className="w-full min-w-[800px] border-collapse relative text-xs print:w-full print:min-w-0">
                                   <thead>
                                     <tr className={`border-b text-[9px] font-black uppercase tracking-widest text-slate-400 ${isDarkMode ? 'bg-slate-900 border-slate-700' : 'bg-slate-50 border-slate-200'}`}>
                                       <th className={`sticky left-0 z-30 py-3 px-2 border-r-[3px] w-10 min-w-[40px] text-center shadow-sm ${isDarkMode ? 'bg-slate-900 border-slate-700' : 'bg-slate-100 border-slate-300'}`}>Dia</th>
@@ -861,17 +909,10 @@ export function PortalView({
                                     {safeDays.map((day, dayIndex) => {
                                       const dayRecords = courseRecords.filter(r => r.day === day);
                                       const dayShifts = new Set(dayRecords.map(r => safeTimes.find(t => t.timeStr === r.time)?.shift).filter(Boolean));
-                                      const hasDiurnoDay = dayShifts.has('Matutino') || dayShifts.has('Vespertino');
-                                      const hasNoturnoDay = dayShifts.has('Noturno');
                                       const displayShiftsDay = new Set();
-                                      
-                                      if (hasDiurnoDay) {
-                                        displayShiftsDay.add('Matutino');
-                                        displayShiftsDay.add('Vespertino');
-                                      }
-                                      if (hasNoturnoDay) {
-                                        displayShiftsDay.add('Noturno');
-                                      }
+                                      if (dayShifts.has('Matutino')) displayShiftsDay.add('Matutino');
+                                      if (dayShifts.has('Vespertino')) displayShiftsDay.add('Vespertino');
+                                      if (dayShifts.has('Noturno')) displayShiftsDay.add('Noturno');
                                       
                                       const activeTimes = safeTimes.filter(t => displayShiftsDay.has(t.shift));
                                       const hasClassesToday = dayRecords.length > 0;
@@ -879,7 +920,7 @@ export function PortalView({
                                       if (!hasClassesToday || activeTimes.length === 0) {
                                         return (
                                           <React.Fragment key={`day-block-${day}-empty`}>
-                                            <tr className="group transition-colors">
+                                            <tr className="group transition-colors print:hidden">
                                               <td className={`sticky left-0 z-20 border-r-[3px] align-middle text-center ${isDarkMode ? 'bg-slate-900 border-slate-700 shadow-[2px_0_5px_rgba(0,0,0,0.2)]' : 'bg-slate-50 border-slate-300 shadow-[2px_0_5px_rgba(0,0,0,0.02)]'}`}>
                                                 <div className="flex items-center justify-center h-full w-full min-h-[80px] p-2">
                                                   <span className="text-[9px] font-black uppercase tracking-widest text-slate-500" style={{ transform: 'rotate(-90deg)', display: 'inline-block', whiteSpace: 'nowrap' }}>
@@ -892,7 +933,7 @@ export function PortalView({
                                               </td>
                                             </tr>
                                             {dayIndex < safeDays.length - 1 && (
-                                              <tr className={`border-y-[4px] ${isDarkMode ? 'bg-slate-700/40 border-slate-700' : 'bg-slate-300/40 border-slate-300'}`}>
+                                              <tr className={`border-y-[4px] print:hidden ${isDarkMode ? 'bg-slate-700/40 border-slate-700' : 'bg-slate-300/40 border-slate-300'}`}>
                                                 <td colSpan={courseClasses.length + 2} className="py-1 shadow-inner"></td>
                                               </tr>
                                             )}
@@ -979,22 +1020,24 @@ export function PortalView({
                                                                >
                                                                   {conflictMsg && snapshot.isDraggingOver && <div className="absolute -top-6 left-0 bg-red-600 text-white text-[9px] font-black uppercase px-2 py-0.5 rounded z-50 whitespace-nowrap shadow-md">{conflictMsg}</div>}
                                                                   {records.length > 0 ? records.map((r, rIndex) => {
-                                                                     const isPending = isTeacherPending(r.teacher);
-                                                                     return (
-                                                                        <Draggable key={r.id} draggableId={r.id} index={rIndex} isDragDisabled={!(scheduleMode === 'previa' && ['admin','gestao'].includes(userRole))}>
+                                                                      const isPending = isTeacherPending(r.teacher);
+                                                                      return (
+                                                                         <Draggable key={r.id} draggableId={r.id} index={rIndex} isDragDisabled={!(scheduleMode === 'previa' && ['admin','gestao'].includes(userRole))}>
                                                                            {(prov2, snap2) => (
                                                                              <div ref={prov2.innerRef} {...prov2.draggableProps} {...prov2.dragHandleProps} 
-                                                                               className={`print-clean-card p-2 rounded-xl border shadow-sm flex flex-col justify-center min-h-[50px] transition-all mb-1 last:mb-0 hover:scale-[1.02] hover:shadow-md ${snap2.isDragging ? 'shadow-xl scale-105 z-50' : ''} ${isPending ? (isDarkMode ? 'bg-red-900/30 border-red-800/50 text-red-300' : 'bg-red-50 border-red-300 text-red-800') : getColorHash(r.subject, isDarkMode)}`}
+                                                                               className={`print-clean-card p-1.5 print:p-1 rounded-xl print:rounded-none border-b-[3px] print:border-b-[1px] print:border-slate-400 shadow-sm print:shadow-none flex flex-col justify-center min-h-[46px] print:min-h-0 transition-all mb-1 print:mb-0 last:mb-0 hover:scale-[1.02] ${snap2.isDragging ? 'shadow-xl scale-105 z-50' : ''} ${isPending ? (isDarkMode ? 'bg-red-900/30 border-red-800/50 text-red-300' : 'bg-red-50 border-red-300 text-red-800') : getColorHash(r.subject, isDarkMode)}`}
                                                                              >
-                                                                                <p className={`subject font-medium text-[10px] leading-tight text-center ${isDarkMode ? 'text-slate-200' : 'text-slate-700'}`}>
-                                                                                  {r.subject} <span className={`font-medium opacity-80 ${isPending ? (isDarkMode ? 'text-red-400 font-bold' : 'text-red-600 font-bold') : ''}`}>- {resolveTeacherName(r.teacher, globalTeachers)}</span>
+                                                                                <p className={`subject font-bold text-[10px] print:text-[8.5px] leading-tight print:leading-[1.1] mb-1 print:mb-0.5 text-center ${isDarkMode ? 'text-slate-200' : 'text-slate-800'}`}>
+                                                                                  {r.subject}
                                                                                 </p>
-                                                                                {r.room && <span className={`mt-1 bg-black/10 text-center px-1 py-0.5 rounded text-[8px] uppercase tracking-widest`}>{r.room}</span>}
+                                                                                <p className={`text-[8.5px] print:text-[7.5px] font-medium leading-none text-center opacity-90 ${isPending ? (isDarkMode ? 'text-red-400 font-bold' : 'text-red-600 font-bold') : ''}`}>
+                                                                                  {resolveTeacherName(r.teacher, globalTeachers)} {r.room && <span className="font-black opacity-80 print:opacity-100">| S: {r.room}</span>}
+                                                                                </p>
                                                                              </div>
                                                                            )}
                                                                         </Draggable>
                                                                      );
-                                                                  }) : <div className={`h-[50px] flex items-center justify-center font-black text-[9px] tracking-widest uppercase select-none pointer-events-none ${isDarkMode ? 'opacity-20' : 'opacity-5'}`}>-</div>}
+                                                                  }) : <div className={`h-[46px] print:min-h-[22px] flex items-center justify-center font-black text-[9px] tracking-widest uppercase select-none pointer-events-none ${isDarkMode ? 'opacity-20' : 'opacity-5'}`}>-</div>}
                                                                   {provided.placeholder}
                                                                </div>
                                                              );
@@ -1081,11 +1124,10 @@ export function PortalView({
                                               if (dayRecords.length === 0) return null;
                                               
                                               const dayShifts = new Set(dayRecords.map(r => safeTimes.find(t => t.timeStr === r.time)?.shift).filter(Boolean));
-                                              const hasDiurno = dayShifts.has('Matutino') || dayShifts.has('Vespertino');
-                                              const hasNoturno = dayShifts.has('Noturno');
                                               const displayShifts = new Set();
-                                              if (hasDiurno) { displayShifts.add('Matutino'); displayShifts.add('Vespertino'); }
-                                              if (hasNoturno) displayShifts.add('Noturno');
+                                              if (dayShifts.has('Matutino')) displayShifts.add('Matutino');
+                                              if (dayShifts.has('Vespertino')) displayShifts.add('Vespertino');
+                                              if (dayShifts.has('Noturno')) displayShifts.add('Noturno');
                                               const activeTimes = safeTimes.filter(t => displayShifts.has(t.shift));
                                               
                                               return (
@@ -1431,7 +1473,7 @@ export function PortalView({
                             {scheduleMode === 'previa' && <span className="bg-white/20 px-1.5 py-0.5 rounded text-[8px]">PRÉVIA</span>}
                             Grade: {selectedClass}
                           </h2>
-                          {scheduleMode !== 'padrao' && <span className="text-[9px] font-black bg-white/20 px-3 py-1 rounded-full tracking-widest uppercase shadow-sm ml-2">{dynamicWeeksList.find(w => w.value === selectedWeek)?.label || selectedWeek}</span>}
+                          {scheduleMode !== 'padrao' && weekLabel && <span className="text-[9px] font-black bg-white/10 px-3 py-1 rounded-full tracking-widest uppercase shadow-inner ml-2">{weekLabel}</span>}
                         </div>
                         
                         <button onClick={handlePrint} className="hidden md:flex items-center gap-2 bg-white/20 hover:bg-white/30 text-white px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all shadow-sm active:scale-95 no-print">
@@ -1451,17 +1493,10 @@ export function PortalView({
                             {(() => {
                               const turmaRecords = mappedSchedules.filter(r => r.className === selectedClass);
                               const entityShifts = new Set(turmaRecords.map(r => safeTimes.find(t => t.timeStr === r.time)?.shift).filter(Boolean));
-                              const hasDiurno = entityShifts.has('Matutino') || entityShifts.has('Vespertino');
-                              const hasNoturno = entityShifts.has('Noturno');
                               const displayShifts = new Set();
-                              
-                              if (hasDiurno) {
-                                displayShifts.add('Matutino');
-                                displayShifts.add('Vespertino');
-                              }
-                              if (hasNoturno) {
-                                displayShifts.add('Noturno');
-                              }
+                              if (entityShifts.has('Matutino')) displayShifts.add('Matutino');
+                              if (entityShifts.has('Vespertino')) displayShifts.add('Vespertino');
+                              if (entityShifts.has('Noturno')) displayShifts.add('Noturno');
                               
                               const entityTimes = safeTimes.filter(t => displayShifts.has(t.shift));
 
@@ -1587,11 +1622,10 @@ export function PortalView({
                             if (dayRecords.length === 0) return null;
                             
                             const dayShifts = new Set(dayRecords.map(r => safeTimes.find(t => t.timeStr === r.time)?.shift).filter(Boolean));
-                            const hasDiurno = dayShifts.has('Matutino') || dayShifts.has('Vespertino');
-                            const hasNoturno = dayShifts.has('Noturno');
                             const displayShifts = new Set();
-                            if (hasDiurno) { displayShifts.add('Matutino'); displayShifts.add('Vespertino'); }
-                            if (hasNoturno) displayShifts.add('Noturno');
+                            if (dayShifts.has('Matutino')) displayShifts.add('Matutino');
+                            if (dayShifts.has('Vespertino')) displayShifts.add('Vespertino');
+                            if (dayShifts.has('Noturno')) displayShifts.add('Noturno');
                             const activeTimes = safeTimes.filter(t => displayShifts.has(t.shift));
                             
                             return (
