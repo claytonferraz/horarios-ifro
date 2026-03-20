@@ -901,7 +901,7 @@ export function PortalView({
                                   <thead>
                                     <tr className={`border-b text-[9px] font-black uppercase tracking-widest text-slate-400 ${isDarkMode ? 'bg-slate-900 border-slate-700' : 'bg-slate-50 border-slate-200'}`}>
                                       <th className={`sticky left-0 z-30 py-3 px-2 border-r-[3px] w-10 min-w-[40px] text-center shadow-sm ${isDarkMode ? 'bg-slate-900 border-slate-700' : 'bg-slate-100 border-slate-300'}`}>Dia</th>
-                                      <th className={`sticky left-[40px] z-20 py-3 px-3 border-r-[3px] w-28 min-w-[112px] text-center shadow-sm ${isDarkMode ? 'bg-slate-900 border-slate-700' : 'bg-slate-100 border-slate-300'}`}>Horário</th>
+                                      <th className={`sticky left-[40px] z-20 py-3 px-3 border-r-[3px] w-28 min-w-[112px] text-center shadow-sm ${isDarkMode ? 'bg-slate-900 border-slate-700' : 'bg-slate-100 border-slate-300'}`}>Horário<br/><span className="text-[8px] font-normal opacity-70 normal-case">{selectedWeek}</span></th>
                                       {courseClasses.map(cls => (
                                         <th key={cls} className={`py-3 px-4 border-r-[3px] last:border-r-0 text-center ${isDarkMode ? 'border-slate-700 text-slate-200' : 'border-slate-300 text-slate-800'}`}>{cls}</th>
                                       ))}
@@ -1029,11 +1029,9 @@ export function PortalView({
                                                                              <div ref={prov2.innerRef} {...prov2.draggableProps} {...prov2.dragHandleProps} 
                                                                                className={`print-clean-card p-1.5 print:p-1 rounded-xl print:rounded-none border-b-[3px] print:border-b-[1px] print:border-slate-400 shadow-sm print:shadow-none flex flex-col justify-center min-h-[46px] print:min-h-0 transition-all mb-1 print:mb-0 last:mb-0 hover:scale-[1.02] ${snap2.isDragging ? 'shadow-xl scale-105 z-50' : ''} ${isPending ? (isDarkMode ? 'bg-red-900/30 border-red-800/50 text-red-300' : 'bg-red-50 border-red-300 text-red-800') : getColorHash(r.subject, isDarkMode)}`}
                                                                              >
-                                                                                <p className={`subject font-bold text-[10px] print:text-[8.5px] leading-tight print:leading-[1.1] mb-1 print:mb-0.5 text-center ${isDarkMode ? 'text-slate-200' : 'text-slate-800'}`}>
-                                                                                  {r.subject}
-                                                                                </p>
-                                                                                <p className={`text-[8.5px] print:text-[7.5px] font-medium leading-none text-center opacity-90 ${isPending ? (isDarkMode ? 'text-red-400 font-bold' : 'text-red-600 font-bold') : ''}`}>
-                                                                                  {resolveTeacherName(r.teacher, globalTeachers)} {r.room && <span className="font-black opacity-80 print:opacity-100">| S: {r.room}</span>}
+                                                                                <p className="font-bold text-[10px] leading-tight text-center line-clamp-2">
+                                                                                  {r.subject} <span className="opacity-80 font-normal">- {isTeacherPending(r.teacher) ? 'VAGA' : resolveTeacherName(r.teacher, globalTeachers).split(' ')[0]}</span>
+                                                                                  {r.room && <span className="opacity-80 font-normal"> - {r.room}</span>}
                                                                                 </p>
                                                                              </div>
                                                                            )}
@@ -1285,7 +1283,7 @@ export function PortalView({
                                   <thead>
                                     <tr className={`border-b text-[9px] font-black uppercase tracking-widest text-slate-400 ${isDarkMode ? 'bg-slate-900 border-slate-700' : 'bg-slate-50 border-slate-200'}`}>
                                       <th className={`sticky left-0 z-30 py-3 px-2 border-r-[3px] w-10 min-w-[40px] text-center shadow-sm ${isDarkMode ? 'bg-slate-900 border-slate-700' : 'bg-slate-100 border-slate-300'}`}>Dia</th>
-                                      <th className={`sticky left-[40px] z-20 py-3 px-3 border-r-[3px] w-28 min-w-[112px] text-center shadow-sm ${isDarkMode ? 'bg-slate-900 border-slate-700' : 'bg-slate-100 border-slate-300'}`}>Horário</th>
+                                      <th className={`sticky left-[40px] z-20 py-3 px-3 border-r-[3px] w-28 min-w-[112px] text-center shadow-sm ${isDarkMode ? 'bg-slate-900 border-slate-700' : 'bg-slate-100 border-slate-300'}`}>Horário<br/><span className="text-[8px] font-normal opacity-70 normal-case">{selectedWeek}</span></th>
                                       {courseClasses.map(cls => (
                                         <th key={`head-${cls}`} className={`py-3 px-4 border-r-[3px] last:border-r-0 text-center ${isDarkMode ? 'border-slate-700 text-slate-200' : 'border-slate-300 text-slate-800'}`}>{cls}</th>
                                       ))}
@@ -1341,8 +1339,10 @@ export function PortalView({
                                                               className={`print-clean-card p-2.5 rounded-xl border shadow-sm flex flex-col justify-center min-h-[60px] transition-all hover:scale-[1.02] hover:shadow-md active:scale-95 ${appMode === 'professor' && viewMode === 'professor' && aulaNesteSlot.teacherId && String(aulaNesteSlot.teacherId).split(',').includes(String(selectedTeacher)) && ['servidor', 'admin', 'gestao'].includes(userRole) ? 'cursor-pointer hover:ring-2 hover:ring-indigo-500 hover:scale-[1.03]' : ''} ${isPending ? (isDarkMode ? 'bg-red-900/30 border-red-800/50 text-red-300' : 'bg-red-50 border-red-300 text-red-800') : getColorHash(disciplineName, isDarkMode)}`}
                                                             >
                                                               {isPending && <span className={`text-[7px] font-black uppercase tracking-widest px-1.5 py-0.5 rounded w-fit mx-auto mb-0.5 ${isDarkMode ? 'text-red-400 bg-red-900/50' : 'text-red-600 bg-red-100'}`}>SEM PROFESSOR</span>}
-                                                              <p className="subject font-black text-[11px] leading-tight text-center">{disciplineName}</p>
-                                                              {aulaNesteSlot.room && <span className={`details text-[8px] font-black tracking-tighter opacity-70 px-1.5 py-0.5 rounded mt-1 w-fit uppercase mx-auto ${isDarkMode ? 'bg-white/10' : 'bg-black/5'}`}>{aulaNesteSlot.room}</span>}
+                                                              <p className="font-bold text-[10px] leading-tight text-center line-clamp-2">
+                                                                {aulaNesteSlot.subject} <span className="opacity-80 font-normal">- {isTeacherPending(aulaNesteSlot.teacher) ? 'VAGA' : resolveTeacherName(aulaNesteSlot.teacher, globalTeachers).split(' ')[0]}</span>
+                                                                {aulaNesteSlot.room && <span className="opacity-80 font-normal"> - {aulaNesteSlot.room}</span>}
+                                                              </p>
                                                             </div>
                                                           );
                                                         })() : (
@@ -1487,7 +1487,7 @@ export function PortalView({
                         <table className="w-full min-w-[750px] border-collapse relative text-xs">
                           <thead>
                             <tr className={`border-b text-[9px] font-black uppercase tracking-widest text-slate-400 ${isDarkMode ? 'bg-slate-900 border-slate-700' : 'bg-slate-50 border-slate-200'}`}>
-                              <th className={`sticky left-0 z-20 py-3 px-4 border-r-[3px] w-28 text-center ${isDarkMode ? 'bg-slate-900 border-slate-700 shadow-[2px_0_5px_rgba(0,0,0,0.2)]' : 'bg-slate-100 border-slate-300 shadow-[2px_0_5px_rgba(0,0,0,0.02)]'}`}>Horário</th>
+                              <th className={`sticky left-0 z-20 py-3 px-4 border-r-[3px] w-28 text-center ${isDarkMode ? 'bg-slate-900 border-slate-700 shadow-[2px_0_5px_rgba(0,0,0,0.2)]' : 'bg-slate-100 border-slate-300 shadow-[2px_0_5px_rgba(0,0,0,0.02)]'}`}>Horário<br/><span className="text-[8px] font-normal opacity-70 normal-case">{selectedWeek}</span></th>
                               {safeDays.map(day => (<th key={day} className={`py-3 px-4 border-r-[3px] last:border-r-0 text-center ${isDarkMode ? 'border-slate-700' : 'border-slate-300'}`}>{day.split('-')[0]}</th>))}
                             </tr>
                           </thead>
@@ -1561,11 +1561,10 @@ export function PortalView({
                                                                     </div>
                                                                   )}
                                                                   {isPending && <span className={`text-[7px] font-black uppercase tracking-widest px-1.5 py-0.5 rounded w-fit mx-auto mb-0.5 ${isDarkMode ? 'text-red-400 bg-red-900/50' : 'text-red-600 bg-red-100'}`}>SEM PROFESSOR</span>}
-                                                                  <p className="subject font-bold text-[10px] leading-tight mb-0.5 text-center">{disciplineName}</p>
-                                                                  <p className="details text-[8px] font-bold opacity-80 flex items-center justify-center gap-1 uppercase truncate">
-                                                                    {teacherName}
+                                                                  <p className="font-bold text-[10px] leading-tight text-center line-clamp-2">
+                                                                    {aulaNesteSlot.subject} <span className="opacity-80 font-normal">- {isTeacherPending(aulaNesteSlot.teacher) ? 'VAGA' : resolveTeacherName(aulaNesteSlot.teacher, globalTeachers).split(' ')[0]}</span>
+                                                                    {aulaNesteSlot.room && <span className="opacity-80 font-normal"> - {aulaNesteSlot.room}</span>}
                                                                   </p>
-                                                                  {aulaNesteSlot.room && <span className={`details text-[8px] font-black tracking-tighter opacity-60 px-1.5 py-0.5 rounded mt-1 w-fit uppercase mx-auto ${isDarkMode ? 'bg-white/10' : 'bg-black/5'}`}>{aulaNesteSlot.room}</span>}
                                                                 </div>
                                                               )}
                                                             </Draggable>
@@ -1728,7 +1727,7 @@ export function PortalView({
                                   <thead>
                                     <tr className={`border-b text-[9px] font-black uppercase tracking-widest text-slate-400 ${isDarkMode ? 'bg-slate-900 border-slate-700' : 'bg-slate-50 border-slate-200'}`}>
                                       <th className={`sticky left-0 z-30 py-3 px-2 border-r-[3px] w-10 min-w-[40px] text-center shadow-sm ${isDarkMode ? 'bg-slate-900 border-slate-700' : 'bg-slate-100 border-slate-300'}`}>Dia</th>
-                                      <th className={`sticky left-[40px] z-20 py-3 px-3 border-r-[3px] w-28 min-w-[112px] text-center shadow-sm ${isDarkMode ? 'bg-slate-900 border-slate-700' : 'bg-slate-100 border-slate-300'}`}>Horário</th>
+                                      <th className={`sticky left-[40px] z-20 py-3 px-3 border-r-[3px] w-28 min-w-[112px] text-center shadow-sm ${isDarkMode ? 'bg-slate-900 border-slate-700' : 'bg-slate-100 border-slate-300'}`}>Horário<br/><span className="text-[8px] font-normal opacity-70 normal-case">{selectedWeek}</span></th>
                                       {courseClasses.map(cls => (
                                         <th key={cls} className={`py-3 px-4 border-r-[3px] last:border-r-0 text-center ${isDarkMode ? 'border-slate-700 text-slate-200' : 'border-slate-300 text-slate-800'}`}>{cls}</th>
                                       ))}
