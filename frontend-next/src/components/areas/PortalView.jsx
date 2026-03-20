@@ -39,6 +39,8 @@ export function PortalView({
   }, [schedules, selectedConfigYear, scheduleMode, selectedWeek]);
   const [editorModal, setEditorModal] = useState(null);
   const [pendingRequests, setPendingRequests] = useState([]);
+  const [showVacantInMyClasses, setShowVacantInMyClasses] = useState(false);
+  const [vacantRequestModal, setVacantRequestModal] = useState(null);
 
   React.useEffect(() => {
     if (appMode === 'aluno') {
@@ -1241,7 +1243,13 @@ export function PortalView({
                   {(viewMode === 'professor' || viewMode === 'outro_professor') && selectedTeacher && (
                     <div className="space-y-6 animate-in zoom-in-95 duration-500">
                       {(() => {
-                        const profRecords = mappedSchedules.filter(r => r.teacherId && String(r.teacherId).split(',').includes(String(selectedTeacher)));
+                        const baseProfRecords = mappedSchedules.filter(r => r.teacherId && String(r.teacherId).split(',').includes(String(selectedTeacher)));
+                        const profClasses = new Set(baseProfRecords.map(r => r.className));
+                        let profRecords = [...baseProfRecords];
+                        if (showVacantInMyClasses) {
+                          const vagas = mappedSchedules.filter(r => isTeacherPending(r.teacher) && profClasses.has(r.className));
+                          profRecords = [...profRecords, ...vagas];
+                        }
                         const profCourses = [...new Set(profRecords.map(r => r.course))].sort((a,b) => a.localeCompare(b));
 
                         if (profCourses.length === 0) {
@@ -1273,9 +1281,17 @@ export function PortalView({
                                   </h2>
                                   {scheduleMode !== 'padrao' && <span className="text-[9px] font-black bg-white/20 px-3 py-1 rounded-full tracking-widest uppercase shadow-sm ml-2">{dynamicWeeksList.find(w => w.value === selectedWeek)?.label || selectedWeek}</span>}
                                 </div>
-                                <button onClick={handlePrint} className="hidden md:flex items-center gap-2 bg-white/20 hover:bg-white/30 text-white px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all shadow-sm active:scale-95 no-print">
-                                  <Printer size={14} /> Imprimir Horário
-                                </button>
+                                <div className="flex items-center justify-end">
+                                  {appMode === 'professor' && viewMode === 'professor' && (
+                                    <label className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-widest cursor-pointer bg-black/20 px-3 py-1.5 rounded-lg hover:bg-black/30 transition-colors text-white mr-2 no-print">
+                                      <input type="checkbox" checked={showVacantInMyClasses} onChange={e => setShowVacantInMyClasses(e.target.checked)} className="accent-white" />
+                                      Mostrar Vagas nas Minhas Turmas
+                                    </label>
+                                  )}
+                                  <button onClick={handlePrint} className="hidden md:flex items-center gap-2 bg-white/20 hover:bg-white/30 text-white px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all shadow-sm active:scale-95 no-print">
+                                    <Printer size={14} /> Imprimir Horário
+                                  </button>
+                                </div>
                               </div>
 
                               <div className="hidden md:block overflow-x-auto">
@@ -1332,11 +1348,15 @@ export function PortalView({
                                                             <div 
                                                               key={`p-rec-${aulaNesteSlot.id || `${diaIndex}-${timeStr}`}`} 
                                                               onClick={() => {
-                                                                 if (appMode === 'professor' && viewMode === 'professor' && aulaNesteSlot.teacherId && String(aulaNesteSlot.teacherId).split(',').includes(String(selectedTeacher)) && ['servidor', 'admin', 'gestao'].includes(userRole)) {
-                                                                   setExchangeTarget({ targetClass: cls, targetCourse: course, originalRecord: aulaNesteSlot });
-                                                                 }
+                                                                if (appMode === 'professor' && viewMode === 'professor' && ['servidor', 'admin', 'gestao'].includes(userRole)) {
+                                                                  if (isPending) {
+                                                                    setVacantRequestModal(aulaNesteSlot);
+                                                                  } else if (aulaNesteSlot.teacherId && String(aulaNesteSlot.teacherId).split(',').includes(String(selectedTeacher))) {
+                                                                    setExchangeTarget({ targetClass: cls, targetCourse: course, originalRecord: aulaNesteSlot });
+                                                                  }
+                                                                }
                                                               }}
-                                                              className={`print-clean-card p-2.5 rounded-xl border shadow-sm flex flex-col justify-center min-h-[60px] transition-all hover:scale-[1.02] hover:shadow-md active:scale-95 ${appMode === 'professor' && viewMode === 'professor' && aulaNesteSlot.teacherId && String(aulaNesteSlot.teacherId).split(',').includes(String(selectedTeacher)) && ['servidor', 'admin', 'gestao'].includes(userRole) ? 'cursor-pointer hover:ring-2 hover:ring-indigo-500 hover:scale-[1.03]' : ''} ${isPending ? (isDarkMode ? 'bg-red-900/30 border-red-800/50 text-red-300' : 'bg-red-50 border-red-300 text-red-800') : getColorHash(disciplineName, isDarkMode)}`}
+                                                              className={`print-clean-card p-2.5 rounded-xl border shadow-sm flex flex-col justify-center min-h-[60px] transition-all hover:scale-[1.02] hover:shadow-md active:scale-95 ${appMode === 'professor' && viewMode === 'professor' && ['servidor', 'admin', 'gestao'].includes(userRole) && (isPending || (aulaNesteSlot.teacherId && String(aulaNesteSlot.teacherId).split(',').includes(String(selectedTeacher)))) ? 'cursor-pointer hover:ring-2 hover:ring-indigo-500 hover:scale-[1.03]' : ''} ${isPending ? (isDarkMode ? 'bg-red-900/30 border-red-800/50 text-red-300' : 'bg-red-50 border-red-300 text-red-800') : getColorHash(disciplineName, isDarkMode)}`}
                                                             >
                                                               {isPending && <span className={`text-[7px] font-black uppercase tracking-widest px-1.5 py-0.5 rounded w-fit mx-auto mb-0.5 ${isDarkMode ? 'text-red-400 bg-red-900/50' : 'text-red-600 bg-red-100'}`}>SEM PROFESSOR</span>}
                                                               <p className="font-bold text-[10px] leading-tight text-center line-clamp-2">
@@ -1895,6 +1915,40 @@ export function PortalView({
       )}
 
       {/* SISTEMA DE SOLICITAÇÕES PARA O PROFESSOR */}
+      {vacantRequestModal && (
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+          <div className={"w-full max-w-md p-6 rounded-3xl shadow-2xl " + (isDarkMode ? 'bg-slate-900 border border-slate-700 text-white' : 'bg-white text-slate-900')}>
+            <h3 className="text-lg font-black uppercase mb-4">Assumir Aula Vaga</h3>
+            <p className="text-xs mb-2"><strong>Turma:</strong> {vacantRequestModal.className}</p>
+            <p className="text-xs mb-4"><strong>Horário:</strong> {vacantRequestModal.day} às {vacantRequestModal.time}</p>
+            <label className="block text-[10px] font-black uppercase text-slate-500 mb-1">Qual disciplina você vai lecionar?</label>
+            <select id="vacantSubject" className={"w-full p-3 rounded-xl border mb-4 text-xs font-bold outline-none " + (isDarkMode ? 'bg-slate-950 border-slate-700' : 'bg-white border-slate-200')}>
+              <option value="">Selecione a disciplina...</option>
+              {[...new Set(mappedSchedules.filter(r => r.teacherId && String(r.teacherId).split(',').includes(String(selectedTeacher)) && r.className === vacantRequestModal.className).map(r => r.subject))].map(sub => (
+                <option key={sub} value={sub}>{sub}</option>
+              ))}
+            </select>
+            <div className="flex gap-3">
+              <button onClick={() => setVacantRequestModal(null)} className="flex-1 py-3 rounded-xl bg-slate-200 text-slate-700 text-xs font-bold transition-all hover:bg-slate-300">Cancelar</button>
+              <button onClick={() => {
+                const subj = document.getElementById('vacantSubject').value;
+                if (!subj) return alert('Selecione uma disciplina');
+                apiClient.submitRequest({
+                  siape: selectedTeacher,
+                  week_id: selectedWeek,
+                  description: 'Solicitação para assumir aula vaga na turma ' + vacantRequestModal.className + ' - Disciplina: ' + subj,
+                  original_slot: 'VAGA: ' + vacantRequestModal.day + ' ' + vacantRequestModal.time,
+                  proposed_slot: { day: vacantRequestModal.day, time: vacantRequestModal.time, classType: 'Substituição' }
+                }).then(() => {
+                  alert('Solicitação enviada com sucesso!');
+                  setVacantRequestModal(null);
+                }).catch(e => alert(e.message || 'Erro ao enviar a solicitação'));
+              }} className="flex-1 py-3 rounded-xl bg-indigo-600 text-white text-xs font-bold hover:bg-indigo-700 transition-all shadow-md active:scale-95">Enviar Pedido</button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {exchangeTarget && (
         <TeacherExchangeModal 
           isOpen={true} 
