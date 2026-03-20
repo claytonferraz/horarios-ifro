@@ -73,12 +73,28 @@ export function useScheduleStats({
   // ==========================================
   const alunoStats = useMemo(() => {
     if (!selectedClass) return { lecionadas: 0, semProfessorSemana: 0, aReporTotal: 0 };
+
+    const getWeekEndDate = (weekStr) => {
+        if (!weekStr) return null;
+        const m = weekStr.match(/a\s*(\d{2})[\/\-](\d{2})/i);
+        if (!m) return null;
+        const year = new Date().getFullYear();
+        // O final da semana (end_date real).
+        return new Date(year, parseInt(m[2])-1, parseInt(m[1]), 23, 59, 59);
+    };
+
+    const isRecordPast = (r) => {
+        if (r.date) return !isFutureWeek(r.date, r.year); 
+        const end = getWeekEndDate(r.week);
+        if (!end) return false; // Se a semana não tiver data válida, por segurança não assumimos que já passou.
+        return end <= new Date(); // Se passou a data final da semana, conta como dada.
+    };
     
     const classDataOficialAll = activeData.filter(r => r.className === selectedClass && r.type === 'oficial');
-    const lecionadas = classDataOficialAll.filter(r => !isFutureWeek(r.date, r.year)).length;
-    const aReporTotal = classDataOficialAll.filter(r => !isFutureWeek(r.date, r.year) && isTeacherPending(r.teacher)).length;
+    const lecionadas = classDataOficialAll.filter(r => isRecordPast(r)).length;
+    const aReporTotal = classDataOficialAll.filter(r => isRecordPast(r) && isTeacherPending(r.teacher)).length;
     
-    // semProfessorSemana uses targetData (which depends on selectedWeek context)
+    // semProfessorSemana uses targetData (which logically wraps around selectedWeek filter context now)
     const viewData = targetData.filter(r => r.className === selectedClass);
     const semProfessorSemana = viewData.filter(r => isTeacherPending(r.teacher)).length;
     

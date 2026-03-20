@@ -128,32 +128,11 @@ export function useScheduleDataTransform({
 
   const targetData = useMemo(() => {
     let data = activeData;
-    if (appMode === 'aluno') {
-      let res = [];
-      const getVal = (s) => { const m = s.match(/(\d{2})\/(\d{2})/); return m ? parseInt(m[2])*100 + parseInt(m[1]) : 9999; };
-      
-      if (scheduleMode === 'oficial') {
-        res = data.filter(r => r.type === 'oficial' && isCurrentWeek(r.date, r.year));
-        if (res.length === 0) {
-          const firstOfficialWeek = [...new Set(data.filter(r => r.type === 'oficial').map(r => r.week))].sort((a, b) => getVal(a) - getVal(b))[0];
-          res = data.filter(r => r.type === 'oficial' && r.week === firstOfficialWeek);
-        }
-      } else if (scheduleMode === 'previa') {
-        res = data.filter(r => r.type === 'previa' && isNextWeek(r.date, r.year));
-        if (res.length === 0) {
-          const firstPreviaWeek = [...new Set(data.filter(r => r.type === 'previa').map(r => r.week))].sort((a, b) => getVal(a) - getVal(b))[0];
-          res = data.filter(r => r.type === 'previa' && r.week === firstPreviaWeek);
-        }
-      } else if (scheduleMode === 'padrao') {
-        res = data.filter(r => r.type === 'padrao');
-      }
-      return res;
-    }
-
     if (viewMode === 'total') return data.filter(r => r.type === 'oficial');
-    if (scheduleMode === 'previa') return data.filter(r => r.type === 'previa' && isFutureWeek(r.date, r.year));
+    if (scheduleMode === 'previa') return data.filter(r => r.type === 'previa');
+    if (scheduleMode === 'padrao') return data.filter(r => r.type === 'padrao');
     return data.filter(r => r.type === scheduleMode);
-  }, [activeData, viewMode, scheduleMode, appMode]);
+  }, [activeData, viewMode, scheduleMode]);
 
   return {
     adminAvailableCourses,

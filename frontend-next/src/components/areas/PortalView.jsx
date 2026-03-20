@@ -282,7 +282,37 @@ export function PortalView({
      if (!schedules || !Array.isArray(schedules) || !academicWeeks) return [];
      const modeSchedules = schedules.filter(s => s.type === scheduleMode && String(s.academic_year) === String(selectedConfigYear));
      
-     const uniqueWeekIds = [...new Set(modeSchedules.map(s => String(s.week_id)))].filter(Boolean);
+     let uniqueWeekIds = [...new Set(modeSchedules.map(s => String(s.week_id)))].filter(Boolean);
+
+     // Regra Aluno Prévia Estrita: Apenas exibir prévia na exata Próxima Semana letiva
+     if (appMode === 'aluno' && scheduleMode === 'previa') {
+         const now = new Date();
+         const refDate = new Date(now);
+         if (now.getDay() === 6) refDate.setDate(refDate.getDate() + 2);
+         else if (now.getDay() === 0) refDate.setDate(refDate.getDate() + 1);
+         refDate.setHours(0,0,0,0);
+         
+         const sortedWeeks = [...academicWeeks].sort((a,b) => new Date(a.start_date) - new Date(b.start_date));
+         const currWeekIndex = sortedWeeks.findIndex(w => {
+             const s = new Date(w.start_date + 'T00:00:00'); 
+             const e = new Date(w.end_date + 'T23:59:59');
+             return refDate >= s && refDate <= e;
+         });
+         
+         let nextWeekId = null;
+         if (currWeekIndex !== -1 && currWeekIndex + 1 < sortedWeeks.length) {
+             nextWeekId = String(sortedWeeks[currWeekIndex + 1].id);
+         } else {
+             const fallback = sortedWeeks.find(w => new Date(w.start_date + 'T00:00:00') > refDate);
+             if (fallback) nextWeekId = String(fallback.id);
+         }
+         
+         if (nextWeekId) {
+             uniqueWeekIds = uniqueWeekIds.filter(id => id === nextWeekId);
+         } else {
+             uniqueWeekIds = []; // Nenhum alvo no futuro letivo aplicável
+         }
+     }
      
      return uniqueWeekIds.map(id => {
         const weekObj = academicWeeks.find(w => String(w.id) === String(id));
@@ -303,7 +333,7 @@ export function PortalView({
            label: labelStr
         };
      }).sort((a,b) => b.label.localeCompare(a.label));
-   }, [schedules, scheduleMode, selectedConfigYear, academicWeeks]);
+   }, [schedules, scheduleMode, selectedConfigYear, academicWeeks, appMode]);
 
    React.useEffect(() => {
      if (dynamicWeeksList.length > 0) {
@@ -322,24 +352,53 @@ export function PortalView({
      }
    }, [selectedCourse, filteredClassesList, selectedClass, setSelectedClass]);
 
-   const handleAlunoScheduleTab = (mode) => {
+   const handleAlunoScheduleTab = React.useCallback((mode) => {
        setScheduleMode(mode);
        if (academicWeeks && academicWeeks.length > 0 && typeof setSelectedWeek === 'function') {
-           const today = new Date();
-           today.setHours(0,0,0,0);
+           const now = new Date();
+           
+           // Regra de Negócio: A semana vira no Sábado (6) à 00:01.
+           // Se for Sábado (6) ou Domingo (0), avançamos a data de referência para a Segunda-feira.
+           const refDate = new Date(now);
+           if (now.getDay() === 6) {
+               refDate.setDate(refDate.getDate() + 2);
+           } else if (now.getDay() === 0) {
+               refDate.setDate(refDate.getDate() + 1);
+           }
+           refDate.setHours(0,0,0,0);
+
            const sortedWeeks = [...academicWeeks].sort((a,b) => new Date(a.start_date) - new Date(b.start_date));
            
+           // Encontra o index da semana que contém a data de referência
+           const currWeekIndex = sortedWeeks.findIndex(w => {
+               // Adicionando T00:00:00 para evitar bugs de fuso horário UTC na conversão da string
+               const s = new Date(w.start_date + 'T00:00:00'); 
+               const e = new Date(w.end_date + 'T23:59:59');
+               return refDate >= s && refDate <= e;
+           });
+
            if (mode === 'oficial') {
-               // Encontra a semana atual
-               const currWeek = sortedWeeks.find(w => new Date(w.start_date) <= today && new Date(w.end_date) >= today) || sortedWeeks[0];
+               const currWeek = currWeekIndex !== -1 ? sortedWeeks[currWeekIndex] : sortedWeeks[0];
                if (currWeek) setSelectedWeek(String(currWeek.id));
            } else if (mode === 'previa') {
-               // Encontra a próxima semana letiva
-               const nextWeek = sortedWeeks.find(w => new Date(w.start_date) > today) || sortedWeeks[sortedWeeks.length - 1];
+               // Próxima semana será o index atual + 1
+               let nextWeek;
+               if (currWeekIndex !== -1 && currWeekIndex + 1 < sortedWeeks.length) {
+                   nextWeek = sortedWeeks[currWeekIndex + 1];
+               } else {
+                   // Fallback de segurança: primeira semana no futuro
+                   nextWeek = sortedWeeks.find(w => new Date(w.start_date + 'T00:00:00') > refDate) || sortedWeeks[sortedWeeks.length - 1];
+               }
                if (nextWeek) setSelectedWeek(String(nextWeek.id));
            }
        }
-   };
+   }, [academicWeeks, setScheduleMode, setSelectedWeek]);
+
+   React.useEffect(() => {
+       if (appMode === 'aluno' && academicWeeks && academicWeeks.length > 0 && !selectedWeek) {
+           handleAlunoScheduleTab('oficial'); 
+       }
+   }, [appMode, academicWeeks, selectedWeek, handleAlunoScheduleTab]);
 
   return (
     <>
@@ -512,12 +571,12 @@ export function PortalView({
                   {scheduleMode === 'previa' ? <Eye size={36} className={`mx-auto mb-3 ${isDarkMode ? 'text-slate-600' : 'text-slate-300'}`} /> : <Calendar size={36} className={`mx-auto mb-3 ${isDarkMode ? 'text-slate-600' : 'text-slate-300'}`} />}
                   <h3 className={`text-lg font-black uppercase tracking-widest ${isDarkMode ? 'text-slate-200' : 'text-slate-700'}`}>
                     {appMode === 'aluno' 
-                        ? (scheduleMode === 'previa' ? 'Horário Não Publicado' : 'Sem Aulas na Semana')
+                        ? (scheduleMode === 'previa' ? 'Sem Prévia Publicada' : 'Sem Aulas na Semana')
                         : (scheduleMode === 'previa' ? 'Nenhuma Prévia Disponível' : 'Nenhuma Planilha Oficial')}
                   </h3>
                   <p className={`text-sm font-medium mt-1 max-w-md mx-auto ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>
                     {appMode === 'aluno'
-                        ? (scheduleMode === 'previa' ? 'A grade horária para a próxima semana ainda não foi liberada pela coordenação. Retorne em breve!' : 'Não há aulas programadas para a sua turma nesta semana letiva.')
+                        ? (scheduleMode === 'previa' ? 'A prévia do horário para a próxima semana ainda não foi publicada pela coordenação. Retorne em breve!' : 'Não há aulas programadas para a sua turma nesta semana letiva.')
                         : (scheduleMode === 'previa' ? 'Não há prévias arquivadas cujas datas pertençam às próximas semanas.' : 'Não há dados oficiais ativos no momento correspondentes à aba selecionada.')}
                   </p>
                 </div>
@@ -780,7 +839,7 @@ export function PortalView({
                                     {scheduleMode === 'previa' && <span className="bg-white/20 px-1.5 py-0.5 rounded text-[8px]">PRÉVIA</span>}
                                     Horário dos Cursos: {course}
                                   </h2>
-                                  {appMode !== 'aluno' && scheduleMode !== 'padrao' && <span className="text-[9px] font-black bg-white/10 px-3 py-1 rounded-full tracking-widest uppercase shadow-inner ml-2">{selectedWeek}</span>}
+                                  {scheduleMode !== 'padrao' && <span className="text-[9px] font-black bg-white/20 px-3 py-1 rounded-full tracking-widest uppercase shadow-sm ml-2">{dynamicWeeksList.find(w => w.value === selectedWeek)?.label || selectedWeek}</span>}
                                 </div>
                                 <button onClick={handlePrint} className="hidden md:flex items-center gap-2 bg-white/20 hover:bg-white/30 text-white px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all shadow-sm active:scale-95 no-print">
                                   <Printer size={14} /> Imprimir Horário do Curso
@@ -987,7 +1046,7 @@ export function PortalView({
                               </div>
                               
                               {/* Mobile Stacked View (Curso) */}
-                              <div className="md:hidden p-4 space-y-4">
+                              <div className="md:hidden no-print p-4 space-y-4">
                                  {(() => {
                                    const activeMobileCls = mobileSelectedClasses[course] || courseClasses[0];
                                    const clsRecordsAll = courseRecords.filter(r => r.className === activeMobileCls);
@@ -1092,7 +1151,7 @@ export function PortalView({
 
                       {/* Sidebar de Elementos Nao Alocados e Notificacoes */}
                       {['admin','gestao'].includes(userRole) && scheduleMode === 'previa' && (
-                        <div className="w-full lg:w-72 shrink-0 space-y-4 sticky top-20 flex flex-col items-end">
+                        <div className="w-full lg:w-72 shrink-0 space-y-4 sticky top-20 flex flex-col items-end no-print">
                           
                           <ScheduleNotifications 
                             recordsForWeek={activeData} 
@@ -1170,7 +1229,7 @@ export function PortalView({
                                     {scheduleMode === 'previa' && <span className="bg-white/20 px-1.5 py-0.5 rounded text-[8px]">PRÉVIA</span>}
                                     Horário: {resolveTeacherName(selectedTeacher, globalTeachers)} - {course}
                                   </h2>
-                                  {appMode !== 'aluno' && scheduleMode !== 'padrao' && <span className="text-[9px] font-black bg-white/10 px-3 py-1 rounded-full tracking-widest uppercase shadow-inner ml-2">{selectedWeek}</span>}
+                                  {scheduleMode !== 'padrao' && <span className="text-[9px] font-black bg-white/20 px-3 py-1 rounded-full tracking-widest uppercase shadow-sm ml-2">{dynamicWeeksList.find(w => w.value === selectedWeek)?.label || selectedWeek}</span>}
                                 </div>
                                 <button onClick={handlePrint} className="hidden md:flex items-center gap-2 bg-white/20 hover:bg-white/30 text-white px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all shadow-sm active:scale-95 no-print">
                                   <Printer size={14} /> Imprimir Horário
@@ -1286,7 +1345,7 @@ export function PortalView({
                               </div>
 
                               {/* Mobile Stacked View (Professor Full Week) */}
-                              <div className="md:hidden print:hidden p-4 space-y-4">
+                              <div className="md:hidden no-print p-4 space-y-4">
                                 {courseDays.map(day => {
                                   const dayRecords = courseRecords.filter(r => r.day === day);
                                   if (dayRecords.length === 0) return null;
@@ -1372,7 +1431,7 @@ export function PortalView({
                             {scheduleMode === 'previa' && <span className="bg-white/20 px-1.5 py-0.5 rounded text-[8px]">PRÉVIA</span>}
                             Grade: {selectedClass}
                           </h2>
-                          {appMode !== 'aluno' && scheduleMode !== 'padrao' && <span className="text-[9px] font-black bg-white/10 px-3 py-1 rounded-full tracking-widest uppercase shadow-inner ml-2">{selectedWeek}</span>}
+                          {scheduleMode !== 'padrao' && <span className="text-[9px] font-black bg-white/20 px-3 py-1 rounded-full tracking-widest uppercase shadow-sm ml-2">{dynamicWeeksList.find(w => w.value === selectedWeek)?.label || selectedWeek}</span>}
                         </div>
                         
                         <button onClick={handlePrint} className="hidden md:flex items-center gap-2 bg-white/20 hover:bg-white/30 text-white px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all shadow-sm active:scale-95 no-print">
@@ -1517,7 +1576,7 @@ export function PortalView({
                       </div>
                       
                       {/* Mobile Stacked View (Turma) */}
-                      <div className="md:hidden print:hidden p-4 space-y-4">
+                      <div className="md:hidden no-print p-4 space-y-4">
                         {(() => {
                           const turmaRecords = mappedSchedules.filter(r => r.className === selectedClass);
                           if (turmaRecords.length === 0) {
@@ -1621,7 +1680,7 @@ export function PortalView({
                                     {scheduleMode === 'previa' && <span className="bg-white/20 px-1.5 py-0.5 rounded text-[8px]">PRÉVIA</span>}
                                     Aulas Vagas: {course}
                                   </h2>
-                                  {appMode !== 'aluno' && scheduleMode !== 'padrao' && <span className="text-[9px] font-black bg-white/10 px-3 py-1 rounded-full tracking-widest uppercase shadow-inner ml-2">{selectedWeek}</span>}
+                                  {scheduleMode !== 'padrao' && <span className="text-[9px] font-black bg-white/20 px-3 py-1 rounded-full tracking-widest uppercase shadow-sm ml-2">{dynamicWeeksList.find(w => w.value === selectedWeek)?.label || selectedWeek}</span>}
                                 </div>
                                 <button onClick={handlePrint} className="hidden md:flex items-center gap-2 bg-white/20 hover:bg-white/30 text-white px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all shadow-sm active:scale-95 no-print">
                                   <Printer size={14} /> Imprimir Aulas Vagas
@@ -1710,7 +1769,7 @@ export function PortalView({
                               </div>
 
                               {/* Mobile Stacked View (Aulas Vagas) */}
-                              <div className="md:hidden p-4 space-y-4">
+                              <div className="md:hidden no-print p-4 space-y-4">
                                 {courseDays.map(day => {
                                   const dayRecords = courseRecords.filter(r => r.day === day);
                                   if (dayRecords.length === 0) return null;
@@ -1872,7 +1931,7 @@ function TeacherRequestsSection({ isDarkMode, siape, selectedWeek, weekData, act
   };
 
   return (
-    <div className="mt-8 mb-12 animate-in slide-in-from-bottom-4">
+    <div className="mt-8 mb-12 animate-in slide-in-from-bottom-4 no-print">
       <div className={`rounded-2xl shadow-lg border overflow-hidden ${isDarkMode ? 'bg-slate-900 border-slate-700' : 'bg-white border-slate-200'}`}>
         <div className={`px-6 py-4 flex items-center justify-between border-b ${isDarkMode ? 'border-slate-800 bg-slate-800/50' : 'border-slate-100 bg-slate-50'}`}>
           <div className="flex items-center gap-3">
