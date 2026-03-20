@@ -13,7 +13,7 @@ const http = require('http');
 const { Server } = require('socket.io');
 
 // Restrição Extrema de CORS: Apenas o domínio Next.js oficial operando em produção ou local
-const allowedOrigins = ['http://localhost:3001', 'http://localhost:3000', 'https://horarios-ifro.vercel.app'];
+const allowedOrigins = ['http://localhost:3001', 'http://localhost:3000', 'https://10.60.5.67:3001','http://10.60.5.67:3001'];
 
 const server = http.createServer(app);
 const io = new Server(server, {

@@ -20,8 +20,8 @@ export const SearchableSelect = ({ value, onChange, options, colorClass, placeho
 
   const filteredOptions = useMemo(() => 
     options.filter(o => {
-      const text = typeof o === 'object' ? o.label : o.toString();
-      return text.toLowerCase().includes(search.toLowerCase());
+      const text = typeof o === 'object' ? (o.label || o.value || '') : (o || '').toString();
+      return String(text).toLowerCase().includes(search.toLowerCase());
     })
   , [options, search]);
 

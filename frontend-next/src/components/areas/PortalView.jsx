@@ -381,9 +381,10 @@ export function PortalView({
                       </label>
                       <SearchableSelect 
                         isDarkMode={isDarkMode} 
-                        options={globalTeachersList
-                          .map(t => ({value: t, label: resolveTeacherName(t, globalTeachers)}))
-                          .sort((a,b) => a.label.localeCompare(b.label))} 
+                        options={(globalTeachers || [])
+                          .filter(t => t && (t.siape || t.id))
+                          .map(t => ({value: String(t.siape || t.id), label: t.nome_exibicao || t.nome_completo || t.name || 'Professor Sem Nome', raw: t}))
+                          .sort((a,b) => String(a.label).localeCompare(String(b.label)))} 
                         value={selectedTeacher} 
                         onChange={setSelectedTeacher} 
                         colorClass={isDarkMode ? "bg-indigo-900/30 border-indigo-800/50 text-indigo-200 shadow-sm" : "bg-indigo-50 border-indigo-100 text-indigo-900 shadow-sm"} 
@@ -1105,7 +1106,7 @@ export function PortalView({
                   {(viewMode === 'professor' || viewMode === 'outro_professor') && selectedTeacher && (
                     <div className="space-y-6 animate-in zoom-in-95 duration-500">
                       {(() => {
-                        const profRecords = mappedSchedules.filter(r => r.teacher && String(r.teacher).split(',').includes(String(selectedTeacher)));
+                        const profRecords = mappedSchedules.filter(r => r.teacherId && String(r.teacherId).split(',').includes(String(selectedTeacher)));
                         const profCourses = [...new Set(profRecords.map(r => r.course))].sort((a,b) => a.localeCompare(b));
 
                         if (profCourses.length === 0) {
@@ -1133,7 +1134,7 @@ export function PortalView({
                                   <h2 className="font-black text-sm uppercase tracking-widest flex items-center gap-2">
                                     {scheduleMode === 'padrao' && <span className="bg-white/20 px-1.5 py-0.5 rounded text-[8px]">PADRÃO</span>}
                                     {scheduleMode === 'previa' && <span className="bg-white/20 px-1.5 py-0.5 rounded text-[8px]">PRÉVIA</span>}
-                                    Horário: {selectedTeacher} - {course}
+                                    Horário: {resolveTeacherName(selectedTeacher, globalTeachers)} - {course}
                                   </h2>
                                   {appMode !== 'aluno' && scheduleMode !== 'padrao' && <span className="text-[9px] font-black bg-white/10 px-3 py-1 rounded-full tracking-widest uppercase shadow-inner ml-2">{selectedWeek}</span>}
                                 </div>
@@ -1184,14 +1185,13 @@ export function PortalView({
                                                     {timeStr}
                                                   </td>
                                                   {courseClasses.map(cls => {
-                                                    const diaIndex = MAP_DAYS.indexOf(day);
-                                                    const aulaNesteSlot = horariosFiltrados.find(s => String(s.dayOfWeek) === String(diaIndex) && s.slotId === timeStr && String(s.classId) === String(cls));
+                                                    const aulaNesteSlot = courseRecords.find(r => r.day === day && r.time === timeStr && r.className === cls);
                                                     return (
                                                       <td key={`prof-${cls}-${timeStr}`} className={`p-1.5 border-r-[3px] last:border-r-0 align-top min-w-[140px] ${isDarkMode ? 'border-slate-700 group-hover:bg-slate-700/30 bg-slate-800/20' : 'border-slate-300 group-hover:bg-slate-50/50 bg-slate-50/20'}`}>
                                                         {aulaNesteSlot ? (() => {
                                                           const isPending = !aulaNesteSlot.teacherId || String(aulaNesteSlot.teacherId) === 'A Definir' || String(aulaNesteSlot.teacherId) === '-';
-                                                          const disciplineName = disciplinesMeta?.[aulaNesteSlot.disciplineId]?.name || subjectHoursMeta?.[aulaNesteSlot.disciplineId]?.name || 'Disciplina Desconhecida';
-                                                          const teacherName = aulaNesteSlot.teacherId ? String(aulaNesteSlot.teacherId).split(',').map(id => resolveTeacherName(id, globalTeachers)).join(' + ') : 'A Definir';
+                                                          const disciplineName = aulaNesteSlot.subject;
+                                                          const teacherName = aulaNesteSlot.teacher;
                                                           
                                                           return (
                                                             <div 
