@@ -8,6 +8,7 @@ import { io } from "socket.io-client";
 
 export function DataProvider({ children }) {
   const [rawData, setRawData] = useState([]);
+  const [schedules, setSchedules] = useState([]);
   const [disabledWeeks, setDisabledWeeks] = useState([]);
   const [activeDays, setActiveDays] = useState(null);
   const [classTimes, setClassTimes] = useState(null);
@@ -38,6 +39,7 @@ export function DataProvider({ children }) {
         });
       }
       setRawData(combinedData);
+      setSchedules(schedules || []);
       
       // Update config, or reset to defaults if missing for the selected year
       if (config) {
@@ -122,6 +124,7 @@ export function DataProvider({ children }) {
     setErrorMsg,
     refreshData: loadData,
     loadAdminMetadata: loadMetadata,
+    schedules,
   };
 
   return <DataContext.Provider value={value}>{children}</DataContext.Provider>;

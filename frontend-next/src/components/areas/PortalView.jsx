@@ -23,9 +23,9 @@ export function PortalView({
   activeData, handlePrint, getColorHash, isTeacherPending,
   selectedDay, setSelectedDay, selectedWeek, setSelectedWeek, activeWeeksList,
   getCellRecords, activeCourseClasses, profStats, activeDays, classTimes, rawData, loadAdminMetadata,
-  schedules, academicWeeks
+  academicWeeks
 }) {
-  const { globalTeachers, refreshData, subjectHoursMeta, intervals, selectedConfigYear, disciplinesMeta } = useData();
+  const { globalTeachers, refreshData, subjectHoursMeta, intervals, selectedConfigYear, disciplinesMeta, schedules } = useData();
 
   const horariosFiltrados = React.useMemo(() => {
     if (!schedules || !Array.isArray(schedules)) return [];
@@ -34,17 +34,10 @@ export function PortalView({
       if (String(schedule.academic_year) !== String(selectedConfigYear)) return false;
       if (schedule.type !== scheduleMode) return false;
       if (scheduleMode !== 'padrao' && String(schedule.week_id) !== String(selectedWeek)) return false;
-      
-      if (appMode === 'aluno' || viewMode === 'turma') {
-         if (schedule.classId && String(schedule.classId) !== String(selectedClass)) return false;
-      }
-      if (appMode === 'professor' || viewMode === 'professor' || viewMode === 'outro_professor') {
-         const targetProf = appMode === 'professor' ? siape : selectedTeacher;
-         if (!schedule.teacherId || !String(schedule.teacherId).split(',').includes(String(targetProf))) return false;
-      }
+      // Pre-filtering removed: PortalView internal loops will filter locally using actual resolved text strings
       return true;
     });
-  }, [schedules, selectedConfigYear, scheduleMode, selectedWeek, appMode, viewMode, selectedClass, siape, selectedTeacher]);
+  }, [schedules, selectedConfigYear, scheduleMode, selectedWeek]);
   const [editorModal, setEditorModal] = useState(null);
   const [pendingRequests, setPendingRequests] = useState([]);
 
@@ -208,9 +201,41 @@ export function PortalView({
     };
   }, [schedules, selectedConfigYear, appMode, siape, selectedTeacher]);
 
+  const [dbCourses, setDbCourses] = useState([]);
+  const [dbClasses, setDbClasses] = useState([]);
+
+  React.useEffect(() => {
+    Promise.all([
+      apiClient.fetchCurriculum('matrix'),
+      apiClient.fetchCurriculum('class')
+    ]).then(([crs, cls]) => {
+      setDbCourses(crs || []);
+      setDbClasses(cls || []);
+    }).catch(e => console.error("Falha ao carregar dicionários", e));
+  }, []);
+
+   const mappedSchedules = React.useMemo(() => {
+       return horariosFiltrados.map(s => {
+           const classObj = dbClasses.find(c => String(c.id) === String(s.classId));
+           const courseObj = dbCourses.find(c => String(c.id) === String(s.courseId));
+           const discName = disciplinesMeta?.[s.disciplineId]?.name || subjectHoursMeta?.[s.disciplineId]?.name || 'Disciplina Desconhecida';
+           return {
+               id: s.id,
+               course: courseObj ? courseObj.name : s.courseId,
+               className: classObj ? classObj.name : s.classId,
+               day: MAP_DAYS[s.dayOfWeek],
+               time: s.slotId,
+               subject: discName,
+               teacher: s.teacherId ? String(s.teacherId).split(',').map(id => resolveTeacherName(id, globalTeachers)).join(',') : 'A Definir',
+               room: s.room || '',
+               raw: s
+           };
+       });
+   }, [horariosFiltrados, dbClasses, dbCourses, disciplinesMeta, subjectHoursMeta, globalTeachers]);
+
   return (
     <>
-        {activeData.length === 0 ? (
+        {(!schedules || schedules.length === 0) ? (
             <div className={`rounded-2xl border p-12 text-center shadow-sm animate-in fade-in ${isDarkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'}`}>
               <Calendar size={40} className={`mx-auto mb-4 ${isDarkMode ? 'text-slate-600' : 'text-slate-300'}`} />
               <h3 className={`text-lg font-black uppercase tracking-widest ${isDarkMode ? 'text-slate-200' : 'text-slate-700'}`}>Nenhuma Planilha Disponível</h3>
@@ -408,7 +433,7 @@ export function PortalView({
                                const isNewShift = shift !== currentShift;
                                if (isNewShift) currentShift = shift;
 
-                               const records = getCellRecords(selectedDay, time);
+                               const records = mappedSchedules.filter(r => r.day === selectedDay && r.time === time);
 
                                return (
                                   <React.Fragment key={`frag-${time}`}>
@@ -594,7 +619,8 @@ export function PortalView({
                     <div className="flex flex-col lg:flex-row gap-4 animate-in zoom-in-95 duration-500">
                       <div className="flex-1 space-y-6">
                       {(() => {
-                        const availableCourses = courses.filter(c => c !== 'Todos').sort((a,b) => a.localeCompare(b));
+                        const currentCourses = [...new Set(mappedSchedules.map(r => r.course))].filter(Boolean);
+                        const availableCourses = currentCourses.sort((a,b) => a.localeCompare(b));
 
                         if (availableCourses.length === 0) {
                           return (
@@ -610,9 +636,9 @@ export function PortalView({
 
                         return availableCourses.map(course => {
                           // Find all classes registered for this course in activeData to ensure no class is missed
-                          const courseClassesGlobais = activeData.filter(r => r.course === course).map(r => r.className);
+                          const courseClassesGlobais = mappedSchedules.filter(r => r.course === course).map(r => r.className);
                           const courseClasses = [...new Set(courseClassesGlobais)].sort();
-                          const courseRecords = recordsForWeek.filter(r => r.course === course);
+                          const courseRecords = mappedSchedules.filter(r => r.course === course);
 
                           if (courseClasses.length === 0) return null;
 
@@ -953,7 +979,7 @@ export function PortalView({
                             <Droppable droppableId="unallocated">
                               {(provided, snapshot) => (
                                 <div ref={provided.innerRef} {...provided.droppableProps} className={`space-y-3 min-h-[300px] p-2 rounded-xl transition-colors ${snapshot.isDraggingOver ? (isDarkMode ? 'bg-slate-700/50' : 'bg-slate-50') : 'bg-transparent'}`}>
-                                  {activeData.filter(r => r.day === 'A Definir' || !r.day || r.day === '-').map((r, index) => (
+                                  {mappedSchedules.filter(r => !r.day || r.day === 'A Definir' || r.day === '-').map((r, index) => (
                                     <Draggable key={r.id} draggableId={r.id} index={index}>
                                       {(prov2, snap2) => (
                                         <div ref={prov2.innerRef} {...prov2.draggableProps} {...prov2.dragHandleProps} className={`p-4 rounded-xl border shadow-sm transition-all hover:scale-[1.02] cursor-grab active:cursor-grabbing ${snap2.isDragging ? 'shadow-2xl scale-[1.04] z-50 ring-2 ring-indigo-500' : 'hover:shadow-md'} ${getColorHash(r.subject, isDarkMode)}`}>
@@ -965,7 +991,7 @@ export function PortalView({
                                     </Draggable>
                                   ))}
                                   {provided.placeholder}
-                                  {activeData.filter(r => r.day === 'A Definir' || !r.day || r.day === '-').length === 0 && (
+                                  {mappedSchedules.filter(r => !r.day || r.day === 'A Definir' || r.day === '-').length === 0 && (
                                     <div className={`h-full flex flex-col items-center justify-center opacity-30 text-center py-10 ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>
                                        <ListTodo size={32} className="mb-2"/>
                                        <span className="text-[10px] font-black uppercase tracking-[0.2em]">Nenhum bloco<br/>estacionado</span>
@@ -986,7 +1012,7 @@ export function PortalView({
                   {(viewMode === 'professor' || viewMode === 'outro_professor') && selectedTeacher && (
                     <div className="space-y-6 animate-in zoom-in-95 duration-500">
                       {(() => {
-                        const profRecords = recordsForWeek.filter(r => r.teacher === selectedTeacher);
+                        const profRecords = mappedSchedules.filter(r => r.teacher && String(r.teacher).split(',').includes(String(selectedTeacher)));
                         const profCourses = [...new Set(profRecords.map(r => r.course))].sort((a,b) => a.localeCompare(b));
 
                         if (profCourses.length === 0) {
@@ -1237,7 +1263,7 @@ export function PortalView({
                           </thead>
                           <tbody className={`divide-y ${isDarkMode ? 'divide-slate-800' : 'divide-slate-100'}`}>
                             {(() => {
-                              const turmaRecords = recordsForWeek.filter(r => r.className === selectedClass);
+                              const turmaRecords = mappedSchedules.filter(r => r.className === selectedClass);
                               const entityShifts = new Set(turmaRecords.map(r => safeTimes.find(t => t.timeStr === r.time)?.shift).filter(Boolean));
                               const hasDiurno = entityShifts.has('Matutino') || entityShifts.has('Vespertino');
                               const hasNoturno = entityShifts.has('Noturno');
@@ -1366,7 +1392,7 @@ export function PortalView({
                       {/* Mobile Stacked View (Turma) */}
                       <div className="md:hidden p-4 space-y-4">
                         {(() => {
-                          const turmaRecords = recordsForWeek.filter(r => r.className === selectedClass);
+                          const turmaRecords = mappedSchedules.filter(r => r.className === selectedClass);
                           if (turmaRecords.length === 0) {
                             return <div className="text-center text-slate-400 font-bold uppercase tracking-widest text-[10px] p-8 border rounded-xl border-dashed">Sem aulas programadas</div>;
                           }
@@ -1438,7 +1464,7 @@ export function PortalView({
                   {viewMode === 'sem_professor' && (
                     <div className="space-y-6 animate-in zoom-in-95 duration-500">
                       {(() => {
-                        const pendingRecordsForWeek = recordsForWeek.filter(r => isTeacherPending(r.teacher));
+                        const pendingRecordsForWeek = mappedSchedules.filter(r => isTeacherPending(r.teacher));
                         const pendingCourses = [...new Set(pendingRecordsForWeek.map(r => r.course))].sort((a,b) => a.localeCompare(b));
 
                         if (pendingCourses.length === 0) {
