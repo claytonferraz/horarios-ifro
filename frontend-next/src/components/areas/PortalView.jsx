@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { 
   ChevronDown, Clock, Printer, CheckCircle, Eye, BookOpen, FileText, Users,
   MessageSquare, Send, CheckCircle2, XCircle, AlertCircle, GripVertical,
-  Calendar, UserCircle, Layers, AlertTriangle, BarChart3, ListTodo, CalendarDays
+  Calendar, UserCircle, Layers, AlertTriangle, BarChart3, ListTodo, CalendarDays, Settings
 } from 'lucide-react';
 import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd';
 import { SearchableSelect } from '../ui/SearchableSelect';
@@ -479,25 +479,59 @@ export function PortalView({
             <div className={`rounded-2xl shadow-sm border p-4 space-y-4 no-print ${isDarkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'}`}>
               
               {/* Nível 1: Tipos de Visão (Adaptável por Perfil) */}
-              <div className={`flex flex-col lg:flex-row items-start lg:items-center justify-between gap-3 border-b pb-3 ${isDarkMode ? 'border-slate-700' : 'border-slate-100'}`}>
-                <div className={`flex flex-wrap p-1 rounded-xl shadow-inner w-full lg:w-auto overflow-hidden ${isDarkMode ? 'bg-slate-900' : 'bg-slate-100'}`}>
+              <div className={`flex items-center justify-between border-b pb-3 ${isDarkMode ? 'border-slate-700' : 'border-slate-100'}`}>
+                <div className={`flex flex-wrap items-center gap-2 p-1.5 rounded-xl shadow-inner w-full ${isDarkMode ? 'bg-slate-900' : 'bg-slate-100'}`}>
+                  
                   {appMode === 'professor' && (
                     <>
-                      <button onClick={() => { setViewMode('professor'); if(['servidor', 'admin', 'gestao'].includes(userRole) && typeof setSelectedTeacher === 'function') setSelectedTeacher(siape); }} className={`flex-1 min-w-[80px] md:flex-none flex items-center justify-center gap-1.5 px-4 py-2 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all ${viewMode === 'professor' ? (isDarkMode ? 'bg-slate-700 text-indigo-400 shadow-sm' : 'bg-white text-indigo-700 shadow-sm') : (isDarkMode ? 'text-slate-400 hover:text-slate-300' : 'text-slate-500 hover:text-slate-700')}`}><UserCircle size={14} /> Meu Horário</button>
-                      <button onClick={() => setViewMode('outro_professor')} className={`flex-1 min-w-[80px] md:flex-none flex items-center justify-center gap-1.5 px-4 py-2 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all ${viewMode === 'outro_professor' ? (isDarkMode ? 'bg-slate-700 text-cyan-400 shadow-sm' : 'bg-white text-cyan-700 shadow-sm') : (isDarkMode ? 'text-slate-400 hover:text-slate-300' : 'text-slate-500 hover:text-slate-700')}`}><Users size={14} /> Ver Colegas</button>
-                      <button onClick={() => setViewMode('curso')} className={`flex-1 min-w-[80px] md:flex-none flex items-center justify-center gap-1.5 px-4 py-2 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all ${viewMode === 'curso' ? (isDarkMode ? 'bg-slate-700 text-rose-400 shadow-sm' : 'bg-white text-rose-700 shadow-sm') : (isDarkMode ? 'text-slate-400 hover:text-slate-300' : 'text-slate-500 hover:text-slate-700')}`}><Layers size={14} /> Horário dos Cursos</button>
-                      <div className={`w-px mx-0.5 hidden lg:block ${isDarkMode ? 'bg-slate-700' : 'bg-slate-200'}`}></div>
-                      <button onClick={() => setViewMode('sem_professor')} className={`flex-1 min-w-[80px] md:flex-none flex items-center justify-center gap-1.5 px-4 py-2 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all ${viewMode === 'sem_professor' ? (isDarkMode ? 'bg-slate-700 text-red-400 shadow-sm' : 'bg-white text-red-700 shadow-sm') : (isDarkMode ? 'text-slate-400 hover:text-slate-300' : 'text-slate-500 hover:text-slate-700')}`}><AlertTriangle size={14} /> Aulas Vagas</button>
-                      <button onClick={() => setViewMode('total')} className={`flex-1 min-w-[80px] md:flex-none flex items-center justify-center gap-1.5 px-4 py-2 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all ${viewMode === 'total' ? (isDarkMode ? 'bg-slate-700 text-amber-400 shadow-sm' : 'bg-white text-amber-700 shadow-sm') : (isDarkMode ? 'text-slate-400 hover:text-slate-300' : 'text-slate-500 hover:text-slate-700')}`}><BarChart3 size={14} /> Controle de Aulas</button>
+                      {/* Destaques Professor */}
+                      <button onClick={() => { setViewMode('professor'); if(['servidor', 'admin', 'gestao'].includes(userRole) && typeof setSelectedTeacher === 'function') setSelectedTeacher(siape); }} 
+                              className={`flex-1 sm:flex-none min-w-[140px] flex items-center justify-center gap-2 px-6 py-3 rounded-lg text-[11px] font-black uppercase tracking-widest transition-all ${viewMode === 'professor' ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-900/40 ring-2 ring-indigo-400/50' : (isDarkMode ? 'bg-slate-800 text-slate-300 hover:text-white hover:bg-slate-700' : 'bg-white text-slate-600 hover:text-slate-900 border border-slate-200')}`}>
+                        <UserCircle size={16} /> Meu Horário
+                      </button>
+                      <button onClick={() => setViewMode('total')} 
+                              className={`flex-1 sm:flex-none min-w-[140px] flex items-center justify-center gap-2 px-6 py-3 rounded-lg text-[11px] font-black uppercase tracking-widest transition-all ${viewMode === 'total' ? 'bg-amber-600 text-white shadow-lg shadow-amber-900/40 ring-2 ring-amber-400/50' : (isDarkMode ? 'bg-slate-800 text-slate-300 hover:text-white hover:bg-slate-700' : 'bg-white text-slate-600 hover:text-slate-900 border border-slate-200')}`}>
+                        <BarChart3 size={16} /> Controle de Aulas
+                      </button>
+
+                      {/* Dropdown Outras Ações (Professor) */}
+                      <div className="relative group ml-auto flex-1 sm:flex-none">
+                        <button className={`w-full sm:w-auto flex items-center justify-center gap-2 px-6 py-3 rounded-lg text-[11px] font-black uppercase tracking-widest transition-all ${['outro_professor', 'curso', 'sem_professor'].includes(viewMode) ? (isDarkMode ? 'bg-slate-800 border border-slate-700 text-emerald-400' : 'bg-white border border-slate-300 text-emerald-600') : (isDarkMode ? 'bg-slate-800/50 text-slate-400 hover:text-slate-200' : 'bg-white/50 text-slate-500 hover:text-slate-800 border border-transparent')}`}>
+                          <Settings size={14} /> Mais Funções
+                        </button>
+                        <div className={`absolute right-0 sm:right-0 lg:left-0 lg:right-auto top-full mt-2 w-56 rounded-xl shadow-2xl p-2 z-[99] opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 ${isDarkMode ? 'bg-slate-800 border border-slate-700' : 'bg-white border border-slate-200'}`}>
+                           <button onClick={() => setViewMode('outro_professor')} className={`w-full text-left flex items-center gap-3 px-4 py-3 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all mb-1 ${viewMode === 'outro_professor' ? (isDarkMode ? 'bg-slate-900 text-cyan-400' : 'bg-slate-100 text-cyan-600') : (isDarkMode ? 'hover:bg-slate-700 text-slate-300' : 'hover:bg-slate-50 text-slate-600')}`}><Users size={14} /> Ver Colegas</button>
+                           <button onClick={() => setViewMode('curso')} className={`w-full text-left flex items-center gap-3 px-4 py-3 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all mb-1 ${viewMode === 'curso' ? (isDarkMode ? 'bg-slate-900 text-rose-400' : 'bg-slate-100 text-rose-600') : (isDarkMode ? 'hover:bg-slate-700 text-slate-300' : 'hover:bg-slate-50 text-slate-600')}`}><Layers size={14} /> Horário dos Cursos</button>
+                           <button onClick={() => setViewMode('sem_professor')} className={`w-full text-left flex items-center gap-3 px-4 py-3 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all ${viewMode === 'sem_professor' ? (isDarkMode ? 'bg-slate-900 text-red-400' : 'bg-slate-100 text-red-600') : (isDarkMode ? 'hover:bg-slate-700 text-slate-300' : 'hover:bg-slate-50 text-slate-600')}`}><AlertTriangle size={14} /> Aulas Vagas</button>
+                        </div>
+                      </div>
                     </>
                   )}
+
                   {appMode === 'aluno' && (
                     <>
-                      <button onClick={() => setViewMode('hoje')} className={`flex-1 md:flex-none flex items-center justify-center gap-1.5 px-5 py-2 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all ${viewMode === 'hoje' ? (isDarkMode ? 'bg-slate-700 text-blue-400 shadow-sm' : 'bg-white text-blue-700 shadow-sm') : (isDarkMode ? 'text-slate-400 hover:text-slate-300' : 'text-slate-500 hover:text-slate-700')}`}><ListTodo size={14} /> Painel Diário</button>
-                      <button onClick={() => setViewMode('turma')} className={`flex-1 md:flex-none flex items-center justify-center gap-1.5 px-5 py-2 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all ${viewMode === 'turma' ? (isDarkMode ? 'bg-slate-700 text-emerald-400 shadow-sm' : 'bg-white text-emerald-700 shadow-sm') : (isDarkMode ? 'text-slate-400 hover:text-slate-300' : 'text-slate-500 hover:text-slate-700')}`}><Calendar size={14} /> Minha Turma</button>
-                      <button onClick={() => setViewMode('professor')} className={`flex-1 md:flex-none flex items-center justify-center gap-1.5 px-5 py-2 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all ${viewMode === 'professor' ? (isDarkMode ? 'bg-slate-700 text-indigo-400 shadow-sm' : 'bg-white text-indigo-700 shadow-sm') : (isDarkMode ? 'text-slate-400 hover:text-slate-300' : 'text-slate-500 hover:text-slate-700')}`}><UserCircle size={14} /> Buscar Professor</button>
+                      {/* Destaques Aluno */}
+                      <button onClick={() => setViewMode('hoje')} 
+                              className={`flex-1 sm:flex-none min-w-[140px] flex items-center justify-center gap-2 px-6 py-3 rounded-lg text-[11px] font-black uppercase tracking-widest transition-all ${viewMode === 'hoje' ? 'bg-blue-600 text-white shadow-lg shadow-blue-900/40 ring-2 ring-blue-400/50' : (isDarkMode ? 'bg-slate-800 text-slate-300 hover:text-white hover:bg-slate-700' : 'bg-white text-slate-600 hover:text-slate-900 border border-slate-200')}`}>
+                        <ListTodo size={16} /> Painel Diário
+                      </button>
+                      <button onClick={() => setViewMode('turma')} 
+                              className={`flex-1 sm:flex-none min-w-[140px] flex items-center justify-center gap-2 px-6 py-3 rounded-lg text-[11px] font-black uppercase tracking-widest transition-all ${viewMode === 'turma' ? 'bg-emerald-600 text-white shadow-lg shadow-emerald-900/40 ring-2 ring-emerald-400/50' : (isDarkMode ? 'bg-slate-800 text-slate-300 hover:text-white hover:bg-slate-700' : 'bg-white text-slate-600 hover:text-slate-900 border border-slate-200')}`}>
+                        <Calendar size={16} /> Minha Turma
+                      </button>
+
+                      {/* Dropdown Outras Ações (Aluno) */}
+                      <div className="relative group ml-auto flex-1 sm:flex-none">
+                        <button className={`w-full sm:w-auto flex items-center justify-center gap-2 px-6 py-3 rounded-lg text-[11px] font-black uppercase tracking-widest transition-all ${viewMode === 'professor' ? (isDarkMode ? 'bg-slate-800 border border-slate-700 text-indigo-400' : 'bg-white border border-slate-300 text-indigo-600') : (isDarkMode ? 'bg-slate-800/50 text-slate-400 hover:text-slate-200' : 'bg-white/50 text-slate-500 hover:text-slate-800 border border-transparent')}`}>
+                          <Settings size={14} /> Mais Funções
+                        </button>
+                        <div className={`absolute right-0 sm:right-0 lg:left-0 lg:right-auto top-full mt-2 w-56 rounded-xl shadow-2xl p-2 z-[99] opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 ${isDarkMode ? 'bg-slate-800 border border-slate-700' : 'bg-white border border-slate-200'}`}>
+                           <button onClick={() => setViewMode('professor')} className={`w-full text-left flex items-center gap-3 px-4 py-3 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all mb-1 ${viewMode === 'professor' ? (isDarkMode ? 'bg-slate-900 text-indigo-400' : 'bg-slate-100 text-indigo-600') : (isDarkMode ? 'hover:bg-slate-700 text-slate-300' : 'hover:bg-slate-50 text-slate-600')}`}><UserCircle size={14} /> Buscar Professor</button>
+                        </div>
+                      </div>
                     </>
                   )}
+                  
                 </div>
               </div>
 
@@ -1261,9 +1295,12 @@ export function PortalView({
 
                   {/* GRADE DE HORÁRIO DO PROFESSOR (Separada por Curso) */}
                   {(viewMode === 'professor' || viewMode === 'outro_professor') && selectedTeacher && (
-                    <div className="space-y-6 animate-in zoom-in-95 duration-500">
-                      {(() => {
-                        const baseProfRecords = mappedSchedules.filter(r => r.teacherId && String(r.teacherId).split(',').includes(String(selectedTeacher)));
+                    <div className="flex flex-col xl:flex-row gap-6 items-start animate-in zoom-in-95 duration-500">
+                      
+                      {/* Lado Esquerdo: Grade (70%) */}
+                      <div className={`w-full ${appMode === 'professor' && viewMode === 'professor' && ['servidor', 'admin', 'gestao'].includes(userRole) ? 'xl:w-[70%]' : ''} space-y-6`}>
+                        {(() => {
+                          const baseProfRecords = mappedSchedules.filter(r => r.teacherId && String(r.teacherId).split(',').includes(String(selectedTeacher)));
                         const profClasses = new Set(baseProfRecords.map(r => r.className));
                         let profRecords = [...baseProfRecords];
                         if (showVacantInMyClasses) {
@@ -1496,6 +1533,22 @@ export function PortalView({
                           );
                         });
                       })()}
+                      </div>
+
+                      {/* Lado Direito: Solicitações (30%) */}
+                      {appMode === 'professor' && viewMode === 'professor' && ['servidor', 'admin', 'gestao'].includes(userRole) && (
+                        <div className="w-full xl:w-[30%] shrink-0 sticky top-20 no-print">
+                          <TeacherRequestsSection 
+                            isDarkMode={isDarkMode}
+                            siape={selectedTeacher}
+                            selectedWeek={selectedWeek}
+                            weekData={recordsForWeek.filter(r => r.teacher === selectedTeacher)}
+                            activeDays={activeDays}
+                            classTimes={classTimes}
+                          />
+                        </div>
+                      )}
+                      
                     </div>
                   )}
 
@@ -2029,16 +2082,6 @@ export function PortalView({
         </div>
       )}
 
-      {appMode === 'professor' && ['servidor', 'admin', 'gestao'].includes(userRole) && (
-        <TeacherRequestsSection 
-          isDarkMode={isDarkMode}
-          siape={selectedTeacher}
-          selectedWeek={selectedWeek}
-          weekData={recordsForWeek.filter(r => r.teacher === selectedTeacher)}
-          activeDays={activeDays}
-          classTimes={classTimes}
-        />
-      )}
     </>
   );
 }
