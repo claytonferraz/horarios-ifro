@@ -575,9 +575,27 @@ export function MasterGrid({ isDarkMode, ...props }) {
 
           <div className="flex flex-wrap items-center gap-3 w-full xl:w-auto">
             {hiddenClasses.length > 0 && (
-              <button onClick={() => setHiddenClasses([])} className="flex items-center justify-center gap-2 bg-rose-500/10 hover:bg-rose-500/20 text-rose-600 dark:text-rose-400 px-5 py-3 rounded-xl text-xs font-black uppercase tracking-widest transition-all shadow-sm">
-                  <Eye size={16} /> Restaurar {hiddenClasses.length} Oculta(s)
-              </button>
+              <div className={`flex items-center gap-1 p-1.5 rounded-xl border shadow-sm ${isDarkMode ? 'bg-rose-900/10 border-rose-800/30' : 'bg-rose-50 border-rose-200'}`}>
+                 <button onClick={() => setHiddenClasses([])} title="Restaurar Todas" className="flex items-center justify-center gap-1.5 bg-rose-100 hover:bg-rose-200 text-rose-700 dark:bg-rose-500/20 dark:hover:bg-rose-500/30 dark:text-rose-300 px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest transition-colors shrink-0">
+                    <Eye size={14} /> Todas
+                 </button>
+                 
+                 <div className={`h-5 w-px mx-1 shrink-0 ${isDarkMode ? 'bg-rose-800/50' : 'bg-rose-200'}`}></div>
+                 
+                 <div className="flex items-center gap-1.5 max-w-[250px] overflow-x-auto no-scrollbar scroll-smooth">
+                    {hiddenClasses.map(hcId => {
+                       const turmaOculta = classesList?.find(c => String(c.id) === String(hcId));
+                       return (
+                         <div key={hcId} className={`flex items-center gap-1 px-2 py-1 rounded-md text-[9px] font-bold border whitespace-nowrap group/badge transition-colors shrink-0 ${isDarkMode ? 'bg-slate-800 border-slate-700 text-slate-300 hover:border-emerald-500/50' : 'bg-white border-slate-200 text-slate-600 hover:border-emerald-300'}`}>
+                            <span className="truncate max-w-[100px]" title={turmaOculta?.name}>{turmaOculta?.name || 'Turma'}</span>
+                            <button onClick={() => setHiddenClasses(prev => prev.filter(id => id !== hcId))} className="text-slate-400 hover:text-emerald-500 transition-colors" title="Restaurar esta turma à tela">
+                               <Check size={10} strokeWidth={4} />
+                            </button>
+                         </div>
+                       );
+                    })}
+                 </div>
+              </div>
             )}
 
             <button onClick={() => setShowCloneModal(true)} disabled={selectedCourses.length === 0} className="flex items-center justify-center gap-2 bg-indigo-100 text-indigo-700 hover:bg-indigo-200 disabled:opacity-50 px-5 py-3 rounded-xl text-xs font-black uppercase tracking-widest transition-all shadow-sm">
@@ -777,11 +795,24 @@ export function MasterGrid({ isDarkMode, ...props }) {
                   <th className={`py-2 px-2 w-20 sticky left-0 top-0 z-50 ${isDarkMode ? 'bg-slate-800' : 'bg-white'}`}></th>
                   {turmasDoCurso.filter(t => !hiddenClasses.includes(t.id)).map(turma => (
                     <th key={turma.id} className={`py-2 px-2 text-center text-[11px] font-black uppercase tracking-widest border-b-2 bg-inherit group/th transition-all duration-300 ${draggedItem && String(draggedItem.aula.classId) !== String(turma.id) ? 'opacity-30 grayscale pointer-events-none' : ''} ${isDarkMode ? 'border-slate-700/50' : 'border-slate-200'}`}>
-                      <div className="flex items-center justify-center gap-2 relative">
-                         <span className="truncate">{turma.name}</span>
-                         <button onClick={() => setHiddenClasses(prev => [...prev, turma.id])} title="Ocultar da Tela" className="opacity-0 group-hover/th:opacity-100 hover:text-rose-500 transition-opacity absolute -right-2 text-slate-400 cursor-pointer">
-                            <EyeOff size={11} />
-                         </button>
+                      <div className="flex items-center justify-center relative w-full h-full">
+                         <span className="truncate px-4">{turma.name}</span>
+                         <div className="absolute right-0 flex items-center gap-1 opacity-0 group-hover/th:opacity-100 transition-opacity bg-inherit pl-2">
+                            <button 
+                              onClick={() => setHiddenClasses(turmasDoCurso.map(t => t.id).filter(id => String(id) !== String(turma.id)))} 
+                              title="Modo Foco: Isolar esta turma (Ocultar as outras)" 
+                              className={`hover:text-indigo-500 transition-colors rounded shadow-sm border p-0.5 ${isDarkMode ? 'bg-slate-800 border-slate-700 text-slate-400' : 'bg-white border-slate-200 text-slate-500'}`}
+                            >
+                               <Target size={12} />
+                            </button>
+                            <button 
+                              onClick={() => setHiddenClasses(prev => [...prev, turma.id])} 
+                              title="Ocultar Turma" 
+                              className={`hover:text-rose-500 transition-colors rounded shadow-sm border p-0.5 ${isDarkMode ? 'bg-slate-800 border-slate-700 text-slate-400' : 'bg-white border-slate-200 text-slate-500'}`}
+                            >
+                               <EyeOff size={12} />
+                            </button>
+                         </div>
                       </div>
                     </th>
                   ))}
