@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { 
   ChevronDown, Clock, Printer, CheckCircle, Eye, BookOpen, FileText, Users,
   MessageSquare, Send, CheckCircle2, XCircle, AlertCircle, GripVertical,
-  Calendar, UserCircle, Layers, AlertTriangle, BarChart3, ListTodo
+  Calendar, UserCircle, Layers, AlertTriangle, BarChart3, ListTodo, CalendarDays
 } from 'lucide-react';
 import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd';
 import { SearchableSelect } from '../ui/SearchableSelect';
@@ -22,10 +22,9 @@ export function PortalView({
   alunoStats, diarioStats, finalFilteredTotalData, bimestresData, recordsForWeek,
   activeData, handlePrint, getColorHash, isTeacherPending,
   selectedDay, setSelectedDay, selectedWeek, setSelectedWeek, activeWeeksList,
-  getCellRecords, activeCourseClasses, profStats, activeDays, classTimes, rawData, loadAdminMetadata,
-  academicWeeks
+  getCellRecords, activeCourseClasses, profStats, activeDays, classTimes, rawData, loadAdminMetadata
 }) {
-  const { globalTeachers, refreshData, subjectHoursMeta, intervals, selectedConfigYear, disciplinesMeta, schedules } = useData();
+  const { globalTeachers, refreshData, subjectHoursMeta, intervals, selectedConfigYear, disciplinesMeta, schedules, academicWeeks } = useData();
 
   const horariosFiltrados = React.useMemo(() => {
     if (!schedules || !Array.isArray(schedules)) return [];
@@ -214,24 +213,102 @@ export function PortalView({
     }).catch(e => console.error("Falha ao carregar dicionários", e));
   }, []);
 
+   const matrixDisciplinesMap = React.useMemo(() => {
+     const map = {};
+     (dbCourses || []).forEach(course => {
+        if (course.series && Array.isArray(course.series)) {
+           course.series.forEach(serie => {
+              if (serie.disciplines && Array.isArray(serie.disciplines)) {
+                 serie.disciplines.forEach(d => {
+                    if (d.id && d.name) map[d.id] = d.name;
+                 });
+              }
+           });
+        }
+     });
+     return map;
+   }, [dbCourses]);
+
    const mappedSchedules = React.useMemo(() => {
        return horariosFiltrados.map(s => {
            const classObj = dbClasses.find(c => String(c.id) === String(s.classId));
            const courseObj = dbCourses.find(c => String(c.id) === String(s.courseId));
-           const discName = disciplinesMeta?.[s.disciplineId]?.name || subjectHoursMeta?.[s.disciplineId]?.name || 'Disciplina Desconhecida';
+           const discName = matrixDisciplinesMap[s.disciplineId] || disciplinesMeta?.[s.disciplineId]?.name || subjectHoursMeta?.[s.disciplineId]?.name || 'Disciplina Desconhecida';
            return {
                id: s.id,
-               course: courseObj ? courseObj.name : s.courseId,
+               course: courseObj ? courseObj.course : s.courseId,
                className: classObj ? classObj.name : s.classId,
                day: MAP_DAYS[s.dayOfWeek],
                time: s.slotId,
                subject: discName,
                teacher: s.teacherId ? String(s.teacherId).split(',').map(id => resolveTeacherName(id, globalTeachers)).join(',') : 'A Definir',
+               teacherId: s.teacherId || '',
                room: s.room || '',
                raw: s
            };
        });
-   }, [horariosFiltrados, dbClasses, dbCourses, disciplinesMeta, subjectHoursMeta, globalTeachers]);
+   }, [horariosFiltrados, dbClasses, dbCourses, disciplinesMeta, subjectHoursMeta, globalTeachers, matrixDisciplinesMap]);
+
+   const dynamicCoursesList = React.useMemo(() => {
+     return ['Todos', ...[...new Set(dbCourses.map(c => c.course))].filter(Boolean).sort((a,b) => a.localeCompare(b))];
+   }, [dbCourses]);
+
+   const dynamicClassesList = React.useMemo(() => {
+     return [...new Set(dbClasses.map(c => c.name))].filter(Boolean).sort((a,b) => a.localeCompare(b));
+   }, [dbClasses]);
+
+   const filteredClassesList = React.useMemo(() => {
+     if (!selectedCourse || selectedCourse === 'Todos' || selectedCourse === '') {
+       return dynamicClassesList;
+     }
+     
+     // Find the selected course IDs (because multiple matrices can have the same course link):
+     const courseObjs = dbCourses.filter(c => c.course === selectedCourse);
+     if (courseObjs.length === 0) return dynamicClassesList;
+
+     const validMatrixIds = courseObjs.map(c => String(c.id));
+
+     // Filter classes by this course ID correctly linking relational ID
+     const classesForCourse = dbClasses
+       .filter(c => validMatrixIds.includes(String(c.matrixId)))
+       .map(c => c.name)
+       .filter(Boolean)
+       .sort((a,b) => a.localeCompare(b));
+
+     return classesForCourse.length > 0 ? classesForCourse : dynamicClassesList;
+   }, [selectedCourse, dbClasses, dbCourses, dynamicClassesList]);
+
+   const dynamicWeeksList = React.useMemo(() => {
+     if (!schedules || !Array.isArray(schedules) || !academicWeeks) return [];
+     const modeSchedules = schedules.filter(s => s.type === scheduleMode && String(s.academic_year) === String(selectedConfigYear));
+     
+     const uniqueWeekIds = [...new Set(modeSchedules.map(s => String(s.week_id)))].filter(Boolean);
+     
+     return uniqueWeekIds.map(id => {
+        const weekObj = academicWeeks.find(w => String(w.id) === String(id));
+        return {
+           value: id,
+           label: weekObj ? (weekObj.name || id) : id
+        };
+     }).sort((a,b) => b.label.localeCompare(a.label));
+   }, [schedules, scheduleMode, selectedConfigYear, academicWeeks]);
+
+   React.useEffect(() => {
+     if (dynamicWeeksList.length > 0) {
+        const validValues = dynamicWeeksList.map(w => w.value);
+        if (!selectedWeek || !validValues.includes(selectedWeek)) {
+           if (typeof setSelectedWeek === 'function') setSelectedWeek(validValues[0]);
+        }
+     }
+   }, [dynamicWeeksList, selectedWeek, setSelectedWeek]);
+
+   React.useEffect(() => {
+     if (selectedCourse && selectedCourse !== 'Todos' && selectedClass) {
+        if (!filteredClassesList.includes(selectedClass) && typeof setSelectedClass === 'function') {
+           setSelectedClass('');
+        }
+     }
+   }, [selectedCourse, filteredClassesList, selectedClass, setSelectedClass]);
 
   return (
     <>
@@ -278,10 +355,10 @@ export function PortalView({
                   {(viewMode === 'turma' || viewMode === 'hoje') && (
                     <>
                       <div className="space-y-1 lg:col-span-2"><label className="text-[9px] font-black tracking-[0.2em] text-slate-400 uppercase ml-1">Filtrar por Curso</label>
-                        <SearchableSelect isDarkMode={isDarkMode} options={courses} value={selectedCourse} onChange={setSelectedCourse} colorClass={isDarkMode ? 'bg-slate-800 border-slate-700 text-slate-200 shadow-sm' : 'bg-white border-slate-200 text-slate-700 shadow-sm'} />
+                        <SearchableSelect isDarkMode={isDarkMode} options={dynamicCoursesList} value={selectedCourse} onChange={setSelectedCourse} colorClass={isDarkMode ? 'bg-slate-800 border-slate-700 text-slate-200 shadow-sm' : 'bg-white border-slate-200 text-slate-700 shadow-sm'} />
                       </div>
                       <div className="space-y-1 lg:col-span-2"><label className="text-[9px] font-black tracking-[0.2em] text-slate-400 uppercase ml-1">Visualizar Turma</label>
-                        <SearchableSelect isDarkMode={isDarkMode} options={classesList} value={selectedClass} onChange={setSelectedClass} colorClass={scheduleMode === 'previa' ? (isDarkMode ? "bg-violet-900/30 border-violet-800/50 text-violet-200 shadow-sm" : "bg-violet-50 border-violet-100 text-violet-900 shadow-sm") : viewMode === 'hoje' ? (isDarkMode ? "bg-blue-900/30 border-blue-800/50 text-blue-200 shadow-sm" : "bg-blue-50 border-blue-100 text-blue-900 shadow-sm") : (isDarkMode ? "bg-emerald-900/30 border-emerald-800/50 text-emerald-200 shadow-sm" : "bg-emerald-50 border-emerald-100 text-emerald-900 shadow-sm")} />
+                        <SearchableSelect isDarkMode={isDarkMode} options={filteredClassesList} value={selectedClass} onChange={setSelectedClass} colorClass={scheduleMode === 'previa' ? (isDarkMode ? "bg-violet-900/30 border-violet-800/50 text-violet-200 shadow-sm" : "bg-violet-50 border-violet-100 text-violet-900 shadow-sm") : viewMode === 'hoje' ? (isDarkMode ? "bg-blue-900/30 border-blue-800/50 text-blue-200 shadow-sm" : "bg-blue-50 border-blue-100 text-blue-900 shadow-sm") : (isDarkMode ? "bg-emerald-900/30 border-emerald-800/50 text-emerald-200 shadow-sm" : "bg-emerald-50 border-emerald-100 text-emerald-900 shadow-sm")} />
                       </div>
                     </>
                   )}
@@ -372,15 +449,12 @@ export function PortalView({
                   </button>
                 </div>
 
-                {scheduleMode !== 'padrao' && (
-                  <div className={`flex items-center w-full md:w-auto p-1 rounded-xl border min-w-[300px] ${isDarkMode ? 'bg-slate-900 border-slate-700' : 'bg-slate-50 border-slate-200'}`}>
-                    <div className={`flex items-center pl-3 pr-2 gap-1.5 shrink-0 border-r mr-2 ${isDarkMode ? 'border-slate-700' : 'border-slate-200'}`}>
-                      <FileText size={14} className="text-slate-400" />
-                      <span className={`text-[9px] font-bold uppercase tracking-widest hidden sm:inline ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>Selecione a Semana:</span>
-                    </div>
-                    <SearchableSelect isDarkMode={isDarkMode} options={activeWeeksList} value={selectedWeek} onChange={setSelectedWeek} colorClass={`bg-transparent border-none font-black uppercase tracking-tighter text-[11px] ${isDarkMode ? 'text-white' : 'text-slate-900'}`} placeholder="Selecione..." />
+                {scheduleMode !== 'padrao' && dynamicWeeksList.length > 0 && (
+                    <div className={`p-1 flex items-center gap-2 rounded-lg border cursor-pointer hover:bg-black/5 dark:hover:bg-white/5 transition-colors ${isDarkMode ? 'bg-slate-800/80 border-slate-700' : 'bg-slate-50 border-slate-100'}`}>
+                    <CalendarDays size={18} className={`shrink-0 ml-2 opacity-50 ${isDarkMode ? 'text-white' : 'text-slate-700'}`} />
+                    <SearchableSelect isDarkMode={isDarkMode} options={dynamicWeeksList} value={selectedWeek} onChange={setSelectedWeek} colorClass={`bg-transparent border-none font-black uppercase tracking-tighter text-[11px] ${isDarkMode ? 'text-white' : 'text-slate-900'}`} placeholder="Selecione..." />
                   </div>
-                )}
+                  )}
               </div>
             )}
 
@@ -388,7 +462,7 @@ export function PortalView({
             <div id="printable-area">
               
               {/* TRATAMENTO DE ESTADO VAZIO */}
-              {viewMode !== 'total' && scheduleMode !== 'padrao' && activeWeeksList.length === 0 ? (
+              {viewMode !== 'total' && scheduleMode !== 'padrao' && dynamicWeeksList.length === 0 ? (
                 <div className={`rounded-2xl border p-12 text-center shadow-sm no-print ${isDarkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'}`}>
                   {scheduleMode === 'previa' ? <Eye size={36} className={`mx-auto mb-3 ${isDarkMode ? 'text-slate-600' : 'text-slate-300'}`} /> : <Calendar size={36} className={`mx-auto mb-3 ${isDarkMode ? 'text-slate-600' : 'text-slate-300'}`} />}
                   <h3 className={`text-lg font-black uppercase tracking-widest ${isDarkMode ? 'text-slate-200' : 'text-slate-700'}`}>
@@ -433,7 +507,14 @@ export function PortalView({
                                const isNewShift = shift !== currentShift;
                                if (isNewShift) currentShift = shift;
 
-                               const records = mappedSchedules.filter(r => r.day === selectedDay && r.time === time);
+                               const records = mappedSchedules.filter(r => {
+                                  if (r.day !== selectedDay || r.time !== time) return false;
+                                  if (appMode === 'aluno' && r.className !== selectedClass) return false;
+                                  if (appMode === 'professor' && viewMode === 'hoje') {
+                                     if (!r.teacherId.includes(String(siape))) return false;
+                                  }
+                                  return true;
+                               });
 
                                return (
                                   <React.Fragment key={`frag-${time}`}>
@@ -1231,7 +1312,7 @@ export function PortalView({
                            <AlertCircle size={24} className="text-amber-500 shrink-0 mt-0.5" />
                            <div>
                               <h4 className={`text-sm font-black uppercase tracking-widest ${isDarkMode ? 'text-amber-400' : 'text-amber-700'}`}>Atenção: Solicitações Pendentes para esta Semana</h4>
-                              <p className={`text-xs font-bold mt-1 ${isDarkMode ? 'text-amber-300' : 'text-amber-800'}`}>Você possui {pendingRequests.length} solicitação(ões) de mudança de horário aguardando revisão nesta "Prévia Semanal". Verifique no painel Administrativo ("Solicitações").</p>
+                              <p className={`text-xs font-bold mt-1 ${isDarkMode ? 'text-amber-300' : 'text-amber-800'}`}>Você possui {pendingRequests.length} solicitação(ões) de mudança de horário aguardando revisão nesta &quot;Prévia Semanal&quot;. Verifique no painel Administrativo (&quot;Solicitações&quot;).</p>
                            </div>
                         </div>
                       )}

@@ -1,0 +1,11 @@
+
+/Users/claytonferrazandrade/dev/dape/horarios-ifro/frontend-next/src/components/areas/PortalView.jsx
+   185:6    warning  React Hook React.useEffect has missing dependencies: 'safeDays' and 'setSelectedDay'. Either include them or remove the dependency array. If 'setSelectedDay' changes too often, find the parent component that defines it and wrap that definition in useCallback  react-hooks/exhaustive-deps
+  1259:224  error    `"` can be escaped with `&quot;`, `&ldquo;`, `&#34;`, `&rdquo;`                                                                                                                                                                                                     react/no-unescaped-entities
+  1259:239  error    `"` can be escaped with `&quot;`, `&ldquo;`, `&#34;`, `&rdquo;`                                                                                                                                                                                                     react/no-unescaped-entities
+  1259:278  error    `"` can be escaped with `&quot;`, `&ldquo;`, `&#34;`, `&rdquo;`                                                                                                                                                                                                     react/no-unescaped-entities
+  1259:291  error    `"` can be escaped with `&quot;`, `&ldquo;`, `&#34;`, `&rdquo;`                                                                                                                                                                                                     react/no-unescaped-entities
+  1749:6    warning  React Hook React.useEffect has a missing dependency: 'loadRequests'. Either include it or remove the dependency array                                                                                                                                               react-hooks/exhaustive-deps
+
+✖ 6 problems (4 errors, 2 warnings)
+
