@@ -120,6 +120,7 @@ export function MasterGrid({ isDarkMode, ...props }) {
 
              flatData.push({
                   id: `${cls.id}_${disc.id}`,
+                  disciplineId: String(disc.id),
                   classId: String(cls.id),
                   courseId: cls.matrixId,
                   className: cls.name,
@@ -165,6 +166,7 @@ export function MasterGrid({ isDarkMode, ...props }) {
     const disciplinasDoCurso = curriculumData.filter(c => idsTurmas.includes(String(c.classId)));
     const aulasReais = disciplinasDoCurso.map(disciplina => ({
       id: disciplina.id || Math.random().toString(),
+      disciplineId: disciplina.disciplineId,
       classId: String(disciplina.classId),
       courseId: String(disciplina.courseId),
       className: turmasDoCurso.find(t => String(t.id) === String(disciplina.classId))?.name || 'Turma',
@@ -386,6 +388,7 @@ export function MasterGrid({ isDarkMode, ...props }) {
       const disciplinasDoCurso = curriculumData.filter(c => idsTurmas.includes(String(c.classId)));
       const aulasReais = disciplinasDoCurso.map(disciplina => ({
         id: disciplina.id || Math.random().toString(),
+        disciplineId: disciplina.disciplineId,
         classId: String(disciplina.classId),
         courseId: String(disciplina.courseId),
         className: turmasDoCurso.find(t => String(t.id) === String(disciplina.classId))?.name || 'Turma',
@@ -1002,7 +1005,7 @@ function SaveMatrixModal({ isDarkMode, grade, selectedCourses, saveOptions, setS
   const handleConfirmSave = async () => {
       const payload = Object.entries(grade).map(([key, aula]) => {
          const [classId, dayOfWeek, slotId] = key.split('|');
-         return { courseId: aula.courseId, classId, dayOfWeek, slotId, teacherId: aula.teacherIds ? aula.teacherIds.join(',') : 'A Definir', disciplineId: aula.id.split('_')[1] || aula.id, room: aula.sala };
+         return { courseId: aula.courseId, classId, dayOfWeek, slotId, teacherId: aula.teacherIds ? aula.teacherIds.join(',') : 'A Definir', disciplineId: aula.disciplineId || aula.id, room: aula.sala };
       });
 
       if (saveOptions.type !== 'padrao' && !saveOptions.weekId) return alert('Selecione uma semana letiva!');
