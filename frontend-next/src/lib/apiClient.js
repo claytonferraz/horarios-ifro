@@ -244,6 +244,14 @@ export const apiClient = {
     }
   },
 
+  async fetchNotifications(siape, userRole) {
+    try {
+      const res = await fetch(`${API_URL}/notifications?siape=${siape || ''}&userRole=${userRole || ''}`);
+      if (!res.ok) throw new Error("Falha ao carregar notificações");
+      return await res.json();
+    } catch(e) { return []; }
+  },
+
   async createAcademicWeek(data) {
     const res = await fetch(`${API_URL}/academic-weeks`, { method: 'POST', headers: getHeaders(), body: JSON.stringify(data) });
     if (!res.ok) {

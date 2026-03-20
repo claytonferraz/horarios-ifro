@@ -232,8 +232,8 @@ export function HomeApp({ appMode }) {
         )}
       </main>
       
-      {/* WIDGET FLUTUANTE DE VERIFICAÇÃO DE SOLICITAÇÕES (GLOBAL ADMIN) */}
-      <FloatingRequestsWidget isDarkMode={isDarkMode} userRole={userRole} />
+      {/* WIDGET FLUTUANTE DE VERIFICAÇÃO DE SOLICITAÇÕES E NOTIFICAÇÕES GLOBAIS */}
+      <FloatingRequestsWidget isDarkMode={isDarkMode} userRole={userRole} appMode={appMode} />
       
     </div>
   );

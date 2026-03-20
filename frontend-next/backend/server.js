@@ -185,6 +185,16 @@ db.serialize(() => {
     details TEXT
   )`);
 
+  // Tabela de Notificações
+  db.run(`CREATE TABLE IF NOT EXISTS notifications (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    target TEXT, 
+    type TEXT,
+    title TEXT,
+    message TEXT,
+    createdAt TEXT
+  )`);
+
   // Migrações dinâmicas para o novo MasterGrid da Matriz (ignoram erros se já existirem)
   db.run("ALTER TABLE schedules ADD COLUMN courseId TEXT", () => {});
   db.run("ALTER TABLE schedules ADD COLUMN classId TEXT", () => {});
@@ -223,6 +233,30 @@ app.get('/api/status', (req, res) => {
     console.error("ERRO NA ROTA STATUS:", e);
     res.status(500).json({ error: e.message });
   }
+});
+
+// ==========================================
+// ROTA DE NOTIFICAÇÕES (Chat/Alert Widget)
+// ==========================================
+app.get('/api/notifications', (req, res) => {
+  const { siape, userRole } = req.query;
+  const limit = 20;
+
+  let targets = ["ALL"]; // Sempre buscar eventos pra todo mundo
+  if (userRole === 'aluno') {
+    targets.push('ALL_STUDENT');
+  } else if (['professor', 'servidor', 'admin', 'gestao'].includes(userRole)) {
+    targets.push('ALL_PROF');
+    if (siape && siape !== 'undefined') targets.push(siape);
+  }
+
+  const inStr = targets.map(() => '?').join(',');
+  const query = `SELECT * FROM notifications WHERE target IN (${inStr}) ORDER BY id DESC LIMIT ?`;
+  
+  db.all(query, [...targets, limit], (err, rows) => {
+    if (err) return res.status(500).json({ error: err.message });
+    res.json(rows || []);
+  });
 });
 
 // ==========================================
@@ -579,20 +613,56 @@ app.post('/api/schedules', verifyToken, (req, res) => {
     }
 
     const now = new Date().toISOString();
-    db.run(`INSERT OR REPLACE INTO schedules (id, week, type, fileName, records, updatedAt) VALUES (?, ?, ?, ?, ?, ?)`, 
-      [id, week, type, fileName, recordsStr, now], 
-      (err) => {
-        if (err) return res.status(500).json({ error: err.message });
-        // Grava Auditoria da Ação
-        db.run(`INSERT INTO audit_logs (user_id, action, timestamp, details) VALUES (?, ?, ?, ?)`, 
-          [req.userId, 'SAVE_SCHEDULE', now, `Salvo horário ID: ${id} da semana: ${week}`],
-          () => {
-            io.emit('schedule_updated');
-            res.json({ success: true });
-          }
-        );
+
+    db.get("SELECT records FROM schedules WHERE id = ?", [id], (errFetch, row) => {
+      let oldRecords = [];
+      if (row && row.records) {
+        try { oldRecords = JSON.parse(row.records); } catch(e){}
       }
-    );
+      
+      let involvedTeachers = new Set();
+      if (type === 'previa') {
+        // Evento Global para Prévia
+        involvedTeachers.add('ALL_PROF');
+        involvedTeachers.add('ALL_STUDENT');
+      } else {
+        // Verifica professores afetados na turma (diferenças)
+        for (const nR of valid) {
+          const oR = oldRecords.find(old => old.id === nR.id || (old.day === nR.day && old.time === nR.time && old.className === nR.className));
+          if (!oR) {
+            if (nR.teacher && nR.teacher !== 'A Definir' && nR.teacher !== '-') involvedTeachers.add(nR.teacher);
+          } else {
+            if (oR.teacher !== nR.teacher || oR.subject !== nR.subject || oR.room !== nR.room) {
+              if (oR.teacher && oR.teacher !== 'A Definir' && oR.teacher !== '-') involvedTeachers.add(oR.teacher);
+              if (nR.teacher && nR.teacher !== 'A Definir' && nR.teacher !== '-') involvedTeachers.add(nR.teacher);
+            }
+          }
+        }
+      }
+
+      db.run(`INSERT OR REPLACE INTO schedules (id, week, type, fileName, records, updatedAt) VALUES (?, ?, ?, ?, ?, ?)`, 
+        [id, week, type, fileName, recordsStr, now], 
+        (err) => {
+          if (err) return res.status(500).json({ error: err.message });
+          
+          // Grava Notificações
+          involvedTeachers.forEach(t => {
+            let title = type === 'previa' ? "Nova Prévia Publicada" : "Horário Alterado";
+            let msg = type === 'previa' ? `A prévia da Semana ${week} foi publicada e está disponível.` : `Sua aula na Semana ${week} sofreu uma alteração de professor/sala.`;
+            db.run("INSERT INTO notifications (target, type, title, message, createdAt) VALUES (?, ?, ?, ?, ?)", [t, type, title, msg, now]);
+          });
+
+          // Grava Auditoria da Ação
+          db.run(`INSERT INTO audit_logs (user_id, action, timestamp, details) VALUES (?, ?, ?, ?)`, 
+            [req.userId, 'SAVE_SCHEDULE', now, `Salvo horário ID: ${id} da semana: ${week}`],
+            () => {
+              io.emit('schedule_updated');
+              res.json({ success: true });
+            }
+          );
+        }
+      );
+    });
   } catch (e) {
     if (e instanceof z.ZodError) {
       return res.status(400).json({ error: "Dados inválidos: " + e.errors.map(err => err.message).join(', ') });
