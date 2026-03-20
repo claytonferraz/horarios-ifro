@@ -322,6 +322,25 @@ export function PortalView({
      }
    }, [selectedCourse, filteredClassesList, selectedClass, setSelectedClass]);
 
+   const handleAlunoScheduleTab = (mode) => {
+       setScheduleMode(mode);
+       if (academicWeeks && academicWeeks.length > 0 && typeof setSelectedWeek === 'function') {
+           const today = new Date();
+           today.setHours(0,0,0,0);
+           const sortedWeeks = [...academicWeeks].sort((a,b) => new Date(a.start_date) - new Date(b.start_date));
+           
+           if (mode === 'oficial') {
+               // Encontra a semana atual
+               const currWeek = sortedWeeks.find(w => new Date(w.start_date) <= today && new Date(w.end_date) >= today) || sortedWeeks[0];
+               if (currWeek) setSelectedWeek(String(currWeek.id));
+           } else if (mode === 'previa') {
+               // Encontra a próxima semana letiva
+               const nextWeek = sortedWeeks.find(w => new Date(w.start_date) > today) || sortedWeeks[sortedWeeks.length - 1];
+               if (nextWeek) setSelectedWeek(String(nextWeek.id));
+           }
+       }
+   };
+
   return (
     <>
         {(!schedules || schedules.length === 0) ? (
@@ -353,9 +372,9 @@ export function PortalView({
                   )}
                   {appMode === 'aluno' && (
                     <>
-                      <button onClick={() => setViewMode('hoje')} className={`flex-1 md:flex-none flex items-center justify-center gap-1.5 px-5 py-2 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all ${viewMode === 'hoje' ? (isDarkMode ? 'bg-slate-700 text-blue-400 shadow-sm' : 'bg-white text-blue-700 shadow-sm') : (isDarkMode ? 'text-slate-400 hover:text-slate-300' : 'text-slate-500 hover:text-slate-700')}`}><ListTodo size={14} /> Horário do Dia</button>
-                      <button onClick={() => setViewMode('turma')} className={`flex-1 md:flex-none flex items-center justify-center gap-1.5 px-5 py-2 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all ${viewMode === 'turma' ? (isDarkMode ? 'bg-slate-700 text-emerald-400 shadow-sm' : 'bg-white text-emerald-700 shadow-sm') : (isDarkMode ? 'text-slate-400 hover:text-slate-300' : 'text-slate-500 hover:text-slate-700')}`}><Calendar size={14} /> Grade da Semana</button>
-                      <button onClick={() => setViewMode('professor')} className={`flex-1 md:flex-none flex items-center justify-center gap-1.5 px-5 py-2 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all ${viewMode === 'professor' ? (isDarkMode ? 'bg-slate-700 text-indigo-400 shadow-sm' : 'bg-white text-indigo-700 shadow-sm') : (isDarkMode ? 'text-slate-400 hover:text-slate-300' : 'text-slate-500 hover:text-slate-700')}`}><UserCircle size={14} /> Professor</button>
+                      <button onClick={() => setViewMode('hoje')} className={`flex-1 md:flex-none flex items-center justify-center gap-1.5 px-5 py-2 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all ${viewMode === 'hoje' ? (isDarkMode ? 'bg-slate-700 text-blue-400 shadow-sm' : 'bg-white text-blue-700 shadow-sm') : (isDarkMode ? 'text-slate-400 hover:text-slate-300' : 'text-slate-500 hover:text-slate-700')}`}><ListTodo size={14} /> Painel Diário</button>
+                      <button onClick={() => setViewMode('turma')} className={`flex-1 md:flex-none flex items-center justify-center gap-1.5 px-5 py-2 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all ${viewMode === 'turma' ? (isDarkMode ? 'bg-slate-700 text-emerald-400 shadow-sm' : 'bg-white text-emerald-700 shadow-sm') : (isDarkMode ? 'text-slate-400 hover:text-slate-300' : 'text-slate-500 hover:text-slate-700')}`}><Calendar size={14} /> Minha Turma</button>
+                      <button onClick={() => setViewMode('professor')} className={`flex-1 md:flex-none flex items-center justify-center gap-1.5 px-5 py-2 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all ${viewMode === 'professor' ? (isDarkMode ? 'bg-slate-700 text-indigo-400 shadow-sm' : 'bg-white text-indigo-700 shadow-sm') : (isDarkMode ? 'text-slate-400 hover:text-slate-300' : 'text-slate-500 hover:text-slate-700')}`}><UserCircle size={14} /> Buscar Professor</button>
                     </>
                   )}
                 </div>
@@ -363,7 +382,7 @@ export function PortalView({
 
               {/* Filtros Específicos para renderização */}
               {viewMode !== 'curso' && viewMode !== 'sem_professor' && (
-                <div className={`grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 p-3 rounded-xl border ${isDarkMode ? 'bg-slate-900/50 border-slate-800' : 'bg-slate-50 border-slate-100'}`}>
+                <div className={`grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 p-3 rounded-xl border no-print ${isDarkMode ? 'bg-slate-900/50 border-slate-800' : 'bg-slate-50 border-slate-100'}`}>
                   {(viewMode === 'turma' || viewMode === 'hoje') && (
                     <>
                       <div className="space-y-1 lg:col-span-2"><label className="text-[9px] font-black tracking-[0.2em] text-slate-400 uppercase ml-1">Filtrar por Curso</label>
@@ -450,19 +469,32 @@ export function PortalView({
             {/* OPÇÕES DE BASE DE DADOS (Movido para perto da tabela) */}
             {viewMode !== 'total' && (
               <div className={`border p-2.5 rounded-2xl shadow-sm flex flex-col md:flex-row items-center justify-between gap-4 mb-2 no-print ${isDarkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'}`}>
-                <div className={`flex border p-1 rounded-xl w-full md:w-auto ${isDarkMode ? 'bg-slate-900 border-slate-700' : 'bg-slate-50 border-slate-200'}`}>
-                  <button onClick={() => setScheduleMode('oficial')} className={`flex-1 md:flex-none flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all ${scheduleMode === 'oficial' ? 'bg-emerald-500 text-white shadow-md' : (isDarkMode ? 'text-slate-400 hover:bg-slate-800 hover:text-white' : 'text-slate-500 hover:bg-slate-100 hover:text-slate-800')}`}>
-                    <Calendar size={14} /> {appMode === 'aluno' ? 'Horário da Semana' : 'Horário Consolidado'}
-                  </button>
-                  <button onClick={() => setScheduleMode('previa')} className={`flex-1 md:flex-none flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all ${scheduleMode === 'previa' ? 'bg-violet-500 text-white shadow-md' : (isDarkMode ? 'text-slate-400 hover:bg-slate-800 hover:text-white' : 'text-slate-500 hover:bg-slate-100 hover:text-slate-800')}`}>
-                    <Eye size={14} /> Prévia
-                  </button>
-                  <button onClick={() => setScheduleMode('padrao')} className={`flex-1 md:flex-none flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all ${scheduleMode === 'padrao' ? 'bg-blue-500 text-white shadow-md' : (isDarkMode ? 'text-slate-400 hover:bg-slate-800 hover:text-white' : 'text-slate-500 hover:bg-slate-100 hover:text-slate-800')}`}>
-                    <BookOpen size={14} /> Padrão Anual
-                  </button>
+                <div className={`flex border p-1 rounded-xl w-full md:w-auto shrink-0 ${isDarkMode ? 'bg-slate-900 border-slate-700' : 'bg-slate-50 border-slate-200'}`}>
+                  {appMode === 'aluno' ? (
+                    <>
+                      <button onClick={() => handleAlunoScheduleTab('oficial')} className={`flex-1 md:flex-none flex items-center justify-center gap-1.5 px-6 py-2.5 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all ${scheduleMode === 'oficial' ? 'bg-emerald-500 text-white shadow-md' : (isDarkMode ? 'text-slate-400 hover:bg-slate-800 hover:text-white' : 'text-slate-500 hover:bg-slate-100 hover:text-slate-800')}`}>
+                        <Calendar size={14} /> Horário da Semana
+                      </button>
+                      <button onClick={() => handleAlunoScheduleTab('previa')} className={`flex-1 md:flex-none flex items-center justify-center gap-1.5 px-6 py-2.5 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all ${scheduleMode === 'previa' ? 'bg-violet-500 text-white shadow-md' : (isDarkMode ? 'text-slate-400 hover:bg-slate-800 hover:text-white' : 'text-slate-500 hover:bg-slate-100 hover:text-slate-800')}`}>
+                        <Eye size={14} /> Próxima Semana
+                      </button>
+                    </>
+                  ) : (
+                    <>
+                      <button onClick={() => setScheduleMode('oficial')} className={`flex-1 md:flex-none flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all ${scheduleMode === 'oficial' ? 'bg-emerald-500 text-white shadow-md' : (isDarkMode ? 'text-slate-400 hover:bg-slate-800 hover:text-white' : 'text-slate-500 hover:bg-slate-100 hover:text-slate-800')}`}>
+                        <Calendar size={14} /> Horário Consolidado
+                      </button>
+                      <button onClick={() => setScheduleMode('previa')} className={`flex-1 md:flex-none flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all ${scheduleMode === 'previa' ? 'bg-violet-500 text-white shadow-md' : (isDarkMode ? 'text-slate-400 hover:bg-slate-800 hover:text-white' : 'text-slate-500 hover:bg-slate-100 hover:text-slate-800')}`}>
+                        <Eye size={14} /> Prévia
+                      </button>
+                      <button onClick={() => setScheduleMode('padrao')} className={`flex-1 md:flex-none flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all ${scheduleMode === 'padrao' ? 'bg-blue-500 text-white shadow-md' : (isDarkMode ? 'text-slate-400 hover:bg-slate-800 hover:text-white' : 'text-slate-500 hover:bg-slate-100 hover:text-slate-800')}`}>
+                        <BookOpen size={14} /> Padrão Anual
+                      </button>
+                    </>
+                  )}
                 </div>
 
-                {scheduleMode !== 'padrao' && dynamicWeeksList.length > 0 && (
+                {scheduleMode !== 'padrao' && appMode !== 'aluno' && dynamicWeeksList.length > 0 && (
                     <div className={`p-1 flex items-center gap-2 rounded-lg border cursor-pointer hover:bg-black/5 dark:hover:bg-white/5 transition-colors ${isDarkMode ? 'bg-slate-800/80 border-slate-700' : 'bg-slate-50 border-slate-100'}`}>
                     <CalendarDays size={18} className={`shrink-0 ml-2 opacity-50 ${isDarkMode ? 'text-white' : 'text-slate-700'}`} />
                     <SearchableSelect isDarkMode={isDarkMode} options={dynamicWeeksList} value={selectedWeek} onChange={setSelectedWeek} colorClass={`bg-transparent border-none font-black uppercase tracking-tighter text-[11px] ${isDarkMode ? 'text-white' : 'text-slate-900'}`} placeholder="Selecione..." />
@@ -475,16 +507,18 @@ export function PortalView({
             <div id="printable-area">
               
               {/* TRATAMENTO DE ESTADO VAZIO */}
-              {viewMode !== 'total' && scheduleMode !== 'padrao' && dynamicWeeksList.length === 0 ? (
+              {viewMode !== 'total' && scheduleMode !== 'padrao' && (dynamicWeeksList.length === 0 || horariosFiltrados.length === 0) ? (
                 <div className={`rounded-2xl border p-12 text-center shadow-sm no-print ${isDarkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'}`}>
                   {scheduleMode === 'previa' ? <Eye size={36} className={`mx-auto mb-3 ${isDarkMode ? 'text-slate-600' : 'text-slate-300'}`} /> : <Calendar size={36} className={`mx-auto mb-3 ${isDarkMode ? 'text-slate-600' : 'text-slate-300'}`} />}
                   <h3 className={`text-lg font-black uppercase tracking-widest ${isDarkMode ? 'text-slate-200' : 'text-slate-700'}`}>
-                    {scheduleMode === 'previa' ? 'Nenhuma Prévia Disponível' : 'Nenhuma Planilha Oficial'}
+                    {appMode === 'aluno' 
+                        ? (scheduleMode === 'previa' ? 'Horário Não Publicado' : 'Sem Aulas na Semana')
+                        : (scheduleMode === 'previa' ? 'Nenhuma Prévia Disponível' : 'Nenhuma Planilha Oficial')}
                   </h3>
                   <p className={`text-sm font-medium mt-1 max-w-md mx-auto ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>
-                    {scheduleMode === 'previa' 
-                      ? 'Não há prévias arquivadas cujas datas pertençam às próximas semanas.' 
-                      : appMode === 'aluno' ? 'Nenhuma aula programada para a semana atual.' : 'Não há dados oficiais ativos no momento correspondentes à aba selecionada.'}
+                    {appMode === 'aluno'
+                        ? (scheduleMode === 'previa' ? 'A grade horária para a próxima semana ainda não foi liberada pela coordenação. Retorne em breve!' : 'Não há aulas programadas para a sua turma nesta semana letiva.')
+                        : (scheduleMode === 'previa' ? 'Não há prévias arquivadas cujas datas pertençam às próximas semanas.' : 'Não há dados oficiais ativos no momento correspondentes à aba selecionada.')}
                   </p>
                 </div>
               ) : (
@@ -1252,7 +1286,7 @@ export function PortalView({
                               </div>
 
                               {/* Mobile Stacked View (Professor Full Week) */}
-                              <div className="md:hidden p-4 space-y-4">
+                              <div className="md:hidden print:hidden p-4 space-y-4">
                                 {courseDays.map(day => {
                                   const dayRecords = courseRecords.filter(r => r.day === day);
                                   if (dayRecords.length === 0) return null;
@@ -1483,7 +1517,7 @@ export function PortalView({
                       </div>
                       
                       {/* Mobile Stacked View (Turma) */}
-                      <div className="md:hidden p-4 space-y-4">
+                      <div className="md:hidden print:hidden p-4 space-y-4">
                         {(() => {
                           const turmaRecords = mappedSchedules.filter(r => r.className === selectedClass);
                           if (turmaRecords.length === 0) {
