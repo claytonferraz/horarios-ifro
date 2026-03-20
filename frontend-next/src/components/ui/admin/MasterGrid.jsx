@@ -185,7 +185,9 @@ export function MasterGrid({ isDarkMode, ...props }) {
       );
       filtered.forEach(schedule => {
         let refCard;
-        if (schedule.disciplineId) refCard = aulasReais.find(a => String(a.id) === String(schedule.disciplineId));
+        if (schedule.disciplineId) {
+            refCard = aulasReais.find(a => String(a.id) === `${schedule.classId}_${schedule.disciplineId}` || String(a.id) === String(schedule.disciplineId));
+        }
         if (!refCard) refCard = aulasReais.find(a => String(a.classId) === String(schedule.classId) && a.teacherIds?.join(',') === String(schedule.teacherId));
         if (refCard) {
              initialGrade[`${schedule.classId}|${schedule.dayOfWeek}|${schedule.slotId}`] = { 
@@ -198,9 +200,8 @@ export function MasterGrid({ isDarkMode, ...props }) {
         }
       });
     }
-    const pendentes = [];
-    aulasReais.forEach(d => { if (!aulasAlocadasIds.includes(String(d.id))) pendentes.push(d); });
-    setAulasNeutras(pendentes); setGrade(initialGrade);
+    setAulasNeutras(aulasReais); 
+    setGrade(initialGrade);
   }, [selectedCourses, turmasDoCurso, curriculumData, globalTeachersList, schedules, selectedType, selectedWeek, selectedConfigYear]);
 
   // Agrupa as aulas pendentes por Turma (Ordenadas Alfabeticamente)
@@ -400,7 +401,9 @@ export function MasterGrid({ isDarkMode, ...props }) {
       const aulasAlocadasIds = [];
       filtered.forEach(schedule => {
         let refCard;
-        if (schedule.disciplineId) refCard = aulasReais.find(a => String(a.id) === String(schedule.disciplineId));
+        if (schedule.disciplineId) {
+            refCard = aulasReais.find(a => String(a.id) === `${schedule.classId}_${schedule.disciplineId}` || String(a.id) === String(schedule.disciplineId));
+        }
         if (!refCard) refCard = aulasReais.find(a => String(a.classId) === String(schedule.classId) && a.teacherIds?.join(',') === String(schedule.teacherId));
         if (refCard) {
              clonedGrade[`${schedule.classId}|${schedule.dayOfWeek}|${schedule.slotId}`] = {
@@ -413,9 +416,7 @@ export function MasterGrid({ isDarkMode, ...props }) {
         }
       });
       
-      const pendentes = [];
-      aulasReais.forEach(d => { if (!aulasAlocadasIds.includes(String(d.id))) pendentes.push(d); });
-      setAulasNeutras(pendentes);
+      setAulasNeutras(aulasReais);
       setGrade(clonedGrade);
       
       setShowCloneModal(false);
@@ -633,13 +634,7 @@ export function MasterGrid({ isDarkMode, ...props }) {
            <button 
              onClick={() => {
                  if(window.confirm('Limpar grade da tela para criar do zero? (O banco NÃO será apagado até você salvar)')) {
-                     const pendentesAtuais = [...aulasNeutras];
-                     Object.values(grade).forEach(aula => {
-                         if (!pendentesAtuais.some(p => String(p.id) === String(aula.id))) {
-                             pendentesAtuais.push(aula);
-                         }
-                     });
-                     setGrade({}); setAulasNeutras(pendentesAtuais);
+                     setGrade({});
                  }
              }} 
              disabled={selectedCourses.length === 0} className="flex items-center justify-center gap-2 bg-amber-100 text-amber-700 hover:bg-amber-200 disabled:opacity-50 px-4 py-2.5 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all w-full sm:w-auto shadow-sm"

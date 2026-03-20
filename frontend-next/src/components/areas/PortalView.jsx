@@ -22,9 +22,29 @@ export function PortalView({
   alunoStats, diarioStats, finalFilteredTotalData, bimestresData, recordsForWeek,
   activeData, handlePrint, getColorHash, isTeacherPending,
   selectedDay, setSelectedDay, selectedWeek, setSelectedWeek, activeWeeksList,
-  getCellRecords, activeCourseClasses, profStats, activeDays, classTimes, rawData, loadAdminMetadata
+  getCellRecords, activeCourseClasses, profStats, activeDays, classTimes, rawData, loadAdminMetadata,
+  schedules, academicWeeks
 }) {
-  const { globalTeachers, refreshData, subjectHoursMeta, intervals } = useData();
+  const { globalTeachers, refreshData, subjectHoursMeta, intervals, selectedConfigYear, disciplinesMeta } = useData();
+
+  const horariosFiltrados = React.useMemo(() => {
+    if (!schedules || !Array.isArray(schedules)) return [];
+    
+    return schedules.filter(schedule => {
+      if (String(schedule.academic_year) !== String(selectedConfigYear)) return false;
+      if (schedule.type !== scheduleMode) return false;
+      if (scheduleMode !== 'padrao' && String(schedule.week_id) !== String(selectedWeek)) return false;
+      
+      if (appMode === 'aluno' || viewMode === 'turma') {
+         if (schedule.classId && String(schedule.classId) !== String(selectedClass)) return false;
+      }
+      if (appMode === 'professor' || viewMode === 'professor' || viewMode === 'outro_professor') {
+         const targetProf = appMode === 'professor' ? siape : selectedTeacher;
+         if (!schedule.teacherId || !String(schedule.teacherId).split(',').includes(String(targetProf))) return false;
+      }
+      return true;
+    });
+  }, [schedules, selectedConfigYear, scheduleMode, selectedWeek, appMode, viewMode, selectedClass, siape, selectedTeacher]);
   const [editorModal, setEditorModal] = useState(null);
   const [pendingRequests, setPendingRequests] = useState([]);
 
@@ -171,6 +191,23 @@ export function PortalView({
     }
   }, [selectedWeek, viewMode, scheduleMode]);
 
+  const estatisticasProfessor = React.useMemo(() => {
+    if (!schedules || !Array.isArray(schedules)) return { totalAulasOficiais: 0, semanasComRegistro: 0 };
+    const targetProf = appMode === 'professor' ? siape : selectedTeacher;
+    if (!targetProf) return { totalAulasOficiais: 0, semanasComRegistro: 0 };
+    
+    const bSchedules = schedules.filter(s => 
+      s.type === 'oficial' && 
+      String(s.academic_year) === String(selectedConfigYear) &&
+      s.teacherId && String(s.teacherId).split(',').includes(String(targetProf))
+    );
+    const weeks = new Set(bSchedules.map(r => r.week_id).filter(Boolean));
+    return {
+      totalAulasOficiais: bSchedules.length,
+      semanasComRegistro: weeks.size
+    };
+  }, [schedules, selectedConfigYear, appMode, siape, selectedTeacher]);
+
   return (
     <>
         {activeData.length === 0 ? (
@@ -278,17 +315,17 @@ export function PortalView({
 
               {/* ESTATÍSTICAS - PORTAL DO PROFESSOR */}
               {(viewMode === 'professor' || viewMode === 'outro_professor') && selectedTeacher && (
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
                   <div className={`border p-3 rounded-xl text-center shadow-sm ${isDarkMode ? 'bg-indigo-900/20 border-indigo-800/50' : 'bg-indigo-50 border-indigo-100'}`}>
-                    <span className={`text-2xl font-black leading-none ${isDarkMode ? 'text-indigo-400' : 'text-indigo-600'}`}>{profStats.dadas}</span>
-                    <p className={`text-[9px] font-black uppercase tracking-widest mt-1 ${isDarkMode ? 'text-indigo-300' : 'text-indigo-800/60'}`}>Aulas Dadas</p>
+                    <span className={`text-2xl font-black leading-none ${isDarkMode ? 'text-indigo-400' : 'text-indigo-600'}`}>{estatisticasProfessor.totalAulasOficiais}</span>
+                    <p className={`text-[9px] font-black uppercase tracking-widest mt-1 ${isDarkMode ? 'text-indigo-300' : 'text-indigo-800/60'}`}>Total de Aulas Dadas</p>
                   </div>
                   <div className={`border p-3 rounded-xl text-center shadow-sm ${isDarkMode ? 'bg-blue-900/20 border-blue-800/50' : 'bg-blue-50 border-blue-100'}`}>
-                    <span className={`text-2xl font-black leading-none ${isDarkMode ? 'text-blue-400' : 'text-blue-600'}`}>{profStats.turmas}</span>
-                    <p className={`text-[9px] font-black uppercase tracking-widest mt-1 ${isDarkMode ? 'text-blue-300' : 'text-blue-800/60'}`}>Total de Turmas</p>
+                    <span className={`text-2xl font-black leading-none ${isDarkMode ? 'text-blue-400' : 'text-blue-600'}`}>{estatisticasProfessor.semanasComRegistro} Semanas</span>
+                    <p className={`text-[9px] font-black uppercase tracking-widest mt-1 ${isDarkMode ? 'text-blue-300' : 'text-blue-800/60'}`}>Carga Cumprida</p>
                   </div>
                   <div className={`border p-3 rounded-xl text-center shadow-sm ${isDarkMode ? 'bg-emerald-900/20 border-emerald-800/50' : 'bg-emerald-50 border-emerald-100'}`}>
-                    <span className={`text-2xl font-black leading-none ${isDarkMode ? 'text-emerald-400' : 'text-emerald-600'}`}>{profStats.semanaAtual}</span>
+                    <span className={`text-2xl font-black leading-none ${isDarkMode ? 'text-emerald-400' : 'text-emerald-600'}`}>{horariosFiltrados.length}</span>
                     <p className={`text-[9px] font-black uppercase tracking-widest mt-1 ${isDarkMode ? 'text-emerald-300' : 'text-emerald-800/60'}`}>Aulas nesta semana</p>
                   </div>
                 </div>
@@ -1028,26 +1065,31 @@ export function PortalView({
                                                     {timeStr}
                                                   </td>
                                                   {courseClasses.map(cls => {
-                                                    const records = courseRecords.filter(r => r.className === cls && r.day === day && r.time === timeStr);
+                                                    const diaIndex = MAP_DAYS.indexOf(day);
+                                                    const aulaNesteSlot = horariosFiltrados.find(s => String(s.dayOfWeek) === String(diaIndex) && s.slotId === timeStr && String(s.classId) === String(cls));
                                                     return (
                                                       <td key={`prof-${cls}-${timeStr}`} className={`p-1.5 border-r-[3px] last:border-r-0 align-top min-w-[140px] ${isDarkMode ? 'border-slate-700 group-hover:bg-slate-700/30 bg-slate-800/20' : 'border-slate-300 group-hover:bg-slate-50/50 bg-slate-50/20'}`}>
-                                                        {records.length > 0 ? records.map(r => {
-                                                          const isPending = isTeacherPending(r.teacher);
+                                                        {aulaNesteSlot ? (() => {
+                                                          const isPending = !aulaNesteSlot.teacherId || String(aulaNesteSlot.teacherId) === 'A Definir' || String(aulaNesteSlot.teacherId) === '-';
+                                                          const disciplineName = disciplinesMeta?.[aulaNesteSlot.disciplineId]?.name || subjectHoursMeta?.[aulaNesteSlot.disciplineId]?.name || 'Disciplina Desconhecida';
+                                                          const teacherName = aulaNesteSlot.teacherId ? String(aulaNesteSlot.teacherId).split(',').map(id => resolveTeacherName(id, globalTeachers)).join(' + ') : 'A Definir';
+                                                          
                                                           return (
-                                                          <div 
-                                                            key={`p-rec-${r.id}`} 
-                                                            onClick={() => {
-                                                               if (appMode === 'professor' && viewMode === 'professor' && r.teacher === selectedTeacher && ['servidor', 'admin', 'gestao'].includes(userRole)) {
-                                                                 setExchangeTarget({ targetClass: cls, targetCourse: course, originalRecord: r });
-                                                               }
-                                                            }}
-                                                            className={`print-clean-card p-2.5 rounded-xl border shadow-sm flex flex-col justify-center min-h-[60px] transition-all hover:scale-[1.02] hover:shadow-md active:scale-95 ${appMode === 'professor' && viewMode === 'professor' && r.teacher === selectedTeacher && ['servidor', 'admin', 'gestao'].includes(userRole) ? 'cursor-pointer hover:ring-2 hover:ring-indigo-500 hover:scale-[1.03]' : ''} ${isPending ? (isDarkMode ? 'bg-red-900/30 border-red-800/50 text-red-300' : 'bg-red-50 border-red-300 text-red-800') : getColorHash(r.subject, isDarkMode)}`}
-                                                          >
-                                                            {isPending && <span className={`text-[7px] font-black uppercase tracking-widest px-1.5 py-0.5 rounded w-fit mx-auto mb-0.5 ${isDarkMode ? 'text-red-400 bg-red-900/50' : 'text-red-600 bg-red-100'}`}>SEM PROFESSOR</span>}
-                                                            <p className="subject font-black text-[11px] leading-tight text-center">{r.subject}</p>
-                                                            {r.room && <span className={`details text-[8px] font-black tracking-tighter opacity-70 px-1.5 py-0.5 rounded mt-1 w-fit uppercase mx-auto ${isDarkMode ? 'bg-white/10' : 'bg-black/5'}`}>{r.room}</span>}
-                                                          </div>
-                                                        )}) : <div className={`h-[60px] flex items-center justify-center font-black text-[9px] tracking-widest uppercase select-none ${isDarkMode ? 'opacity-20' : 'opacity-5'}`}>-</div>}
+                                                            <div 
+                                                              key={`p-rec-${aulaNesteSlot.id || `${diaIndex}-${timeStr}`}`} 
+                                                              onClick={() => {
+                                                                 if (appMode === 'professor' && viewMode === 'professor' && aulaNesteSlot.teacherId && String(aulaNesteSlot.teacherId).split(',').includes(String(selectedTeacher)) && ['servidor', 'admin', 'gestao'].includes(userRole)) {
+                                                                   setExchangeTarget({ targetClass: cls, targetCourse: course, originalRecord: aulaNesteSlot });
+                                                                 }
+                                                              }}
+                                                              className={`print-clean-card p-2.5 rounded-xl border shadow-sm flex flex-col justify-center min-h-[60px] transition-all hover:scale-[1.02] hover:shadow-md active:scale-95 ${appMode === 'professor' && viewMode === 'professor' && aulaNesteSlot.teacherId && String(aulaNesteSlot.teacherId).split(',').includes(String(selectedTeacher)) && ['servidor', 'admin', 'gestao'].includes(userRole) ? 'cursor-pointer hover:ring-2 hover:ring-indigo-500 hover:scale-[1.03]' : ''} ${isPending ? (isDarkMode ? 'bg-red-900/30 border-red-800/50 text-red-300' : 'bg-red-50 border-red-300 text-red-800') : getColorHash(disciplineName, isDarkMode)}`}
+                                                            >
+                                                              {isPending && <span className={`text-[7px] font-black uppercase tracking-widest px-1.5 py-0.5 rounded w-fit mx-auto mb-0.5 ${isDarkMode ? 'text-red-400 bg-red-900/50' : 'text-red-600 bg-red-100'}`}>SEM PROFESSOR</span>}
+                                                              <p className="subject font-black text-[11px] leading-tight text-center">{disciplineName}</p>
+                                                              {aulaNesteSlot.room && <span className={`details text-[8px] font-black tracking-tighter opacity-70 px-1.5 py-0.5 rounded mt-1 w-fit uppercase mx-auto ${isDarkMode ? 'bg-white/10' : 'bg-black/5'}`}>{aulaNesteSlot.room}</span>}
+                                                            </div>
+                                                          );
+                                                        })() : <div className={`h-[60px] flex items-center justify-center font-black text-[9px] tracking-widest uppercase select-none ${isDarkMode ? 'opacity-20' : 'opacity-5'}`}>-</div>}
                                                       </td>
                                                     );
                                                   })}
@@ -1214,7 +1256,8 @@ export function PortalView({
                                         <tr className="group transition-colors">
                                           <td className={`sticky left-0 z-10 py-3 px-4 border-r-[3px] font-bold text-xs whitespace-nowrap text-center ${isDarkMode ? 'bg-slate-800 group-hover:bg-slate-700/50 border-slate-700 text-slate-400 shadow-[2px_0_5px_rgba(0,0,0,0.2)]' : 'bg-white group-hover:bg-slate-50 border-slate-300 text-slate-500 shadow-[2px_0_5px_rgba(0,0,0,0.02)]'}`}>{time}</td>
                                           {safeDays.map(day => {
-                                            const records = getCellRecords(day, time);
+                                            const diaIndex = MAP_DAYS.indexOf(day);
+                                            const aulaNesteSlot = horariosFiltrados.find(s => String(s.dayOfWeek) === String(diaIndex) && s.slotId === time);
                                             const droppableId = `${day}|${time}|${selectedClass}`;
                                             return (
                                               <Droppable droppableId={droppableId} key={droppableId}>
@@ -1224,14 +1267,16 @@ export function PortalView({
                                                     {...provided.droppableProps}
                                                     className={`p-1.5 border-r-[3px] last:border-r-0 align-top w-32 transition-colors ${snapshot.isDraggingOver ? (isDarkMode ? 'bg-indigo-900/40' : 'bg-indigo-100/50') : (isDarkMode ? 'border-slate-700 group-hover:bg-slate-700/30 bg-slate-800/20' : 'border-slate-300 group-hover:bg-slate-50/50 bg-slate-50/20')}`}
                                                   >
-                                                    {records.length > 0 ? (
+                                                    {aulaNesteSlot ? (
                                                       <div className="flex flex-col gap-1.5">
-                                                        {records.map((r, rIdx) => {
-                                                          const isPending = isTeacherPending(r.teacher);
-                                                          const hasConflict = !isPending && r.teacher && r.teacher !== 'SEM PROFESSOR' && recordsForWeek.some(other => other.teacher === r.teacher && other.id !== r.id && other.day === r.day && other.time === r.time);
+                                                        {(() => {
+                                                          const isPending = !aulaNesteSlot.teacherId || String(aulaNesteSlot.teacherId) === 'A Definir' || String(aulaNesteSlot.teacherId) === '-';
+                                                          const disciplineName = disciplinesMeta?.[aulaNesteSlot.disciplineId]?.name || subjectHoursMeta?.[aulaNesteSlot.disciplineId]?.name || 'Disciplina Desconhecida';
+                                                          const teacherName = aulaNesteSlot.teacherId ? String(aulaNesteSlot.teacherId).split(',').map(id => resolveTeacherName(id, globalTeachers)).join(' + ') : 'A Definir';
+                                                          const hasConflict = false; // Resolved in server side now
                                                           
                                                           return (
-                                                            <Draggable key={r.id} draggableId={r.id.toString()} index={rIdx} isDragDisabled={appMode === 'aluno'}>
+                                                            <Draggable key={aulaNesteSlot.id || `dnd-${diaIndex}-${time}`} draggableId={String(aulaNesteSlot.id || `dnd-${diaIndex}-${time}`)} index={0} isDragDisabled={appMode === 'aluno'}>
                                                               {(drgProvided, drgSnapshot) => (
                                                                 <div 
                                                                   ref={drgProvided.innerRef}
@@ -1242,31 +1287,33 @@ export function PortalView({
                                                                       setEditorModal({ cls: selectedClass, day, time, tObj: timeObj });
                                                                     }
                                                                   }}
-                                                                  className={`print-clean-card p-2 rounded-xl border shadow-sm flex flex-col justify-center min-h-[60px] transition-all relative ${drgSnapshot.isDragging ? 'z-50 scale-105 shadow-2xl rotate-2' : 'hover:scale-[1.02] hover:shadow-md active:scale-95'} ${isPending ? (isDarkMode ? 'bg-red-900/30 border-red-800/50 text-red-300' : 'bg-red-50 border-red-300 text-red-800') : hasConflict ? (isDarkMode ? 'bg-rose-950/80 border-rose-500/80 text-rose-200 shadow-[0_0_10px_rgba(225,29,72,0.4)]' : 'bg-rose-100 border-rose-500 text-rose-900 shadow-[0_0_10px_rgba(225,29,72,0.3)]') : getColorHash(r.subject, isDarkMode)}`}
+                                                                  className={`print-clean-card p-2 rounded-xl border shadow-sm flex flex-col justify-center min-h-[60px] transition-all relative ${drgSnapshot.isDragging ? 'z-50 scale-105 shadow-2xl rotate-2' : 'hover:scale-[1.02] hover:shadow-md active:scale-95'} ${isPending ? (isDarkMode ? 'bg-red-900/30 border-red-800/50 text-red-300' : 'bg-red-50 border-red-300 text-red-800') : hasConflict ? (isDarkMode ? 'bg-rose-950/80 border-rose-500/80 text-rose-200 shadow-[0_0_10px_rgba(225,29,72,0.4)]' : 'bg-rose-100 border-rose-500 text-rose-900 shadow-[0_0_10px_rgba(225,29,72,0.3)]') : getColorHash(disciplineName, isDarkMode)}`}
                                                                 >
                                                                   {appMode !== 'aluno' && (
                                                                     <div className="absolute top-1 right-1 opacity-20 group-hover:opacity-100">
                                                                        <GripVertical size={10} />
                                                                     </div>
                                                                   )}
-                                                                  {hasConflict && (
-                                                                    <div className="absolute -top-2 -right-2 bg-rose-500 text-white rounded-full p-0.5 animate-pulse shadow-lg" title="Conflito de Professor!">
-                                                                      <AlertCircle size={14} />
-                                                                    </div>
-                                                                  )}
                                                                   {isPending && <span className={`text-[7px] font-black uppercase tracking-widest px-1.5 py-0.5 rounded w-fit mx-auto mb-0.5 ${isDarkMode ? 'text-red-400 bg-red-900/50' : 'text-red-600 bg-red-100'}`}>SEM PROFESSOR</span>}
-                                                                  <p className="subject font-bold text-[10px] leading-tight mb-0.5 text-center">{r.subject}</p>
+                                                                  <p className="subject font-bold text-[10px] leading-tight mb-0.5 text-center">{disciplineName}</p>
                                                                   <p className="details text-[8px] font-bold opacity-80 flex items-center justify-center gap-1 uppercase truncate">
-                                                                    {resolveTeacherName(r.teacher, globalTeachers)}
+                                                                    {teacherName}
                                                                   </p>
-                                                                  {r.room && <span className={`details text-[8px] font-black tracking-tighter opacity-60 px-1.5 py-0.5 rounded mt-1 w-fit uppercase mx-auto ${isDarkMode ? 'bg-white/10' : 'bg-black/5'}`}>{r.room}</span>}
+                                                                  {aulaNesteSlot.room && <span className={`details text-[8px] font-black tracking-tighter opacity-60 px-1.5 py-0.5 rounded mt-1 w-fit uppercase mx-auto ${isDarkMode ? 'bg-white/10' : 'bg-black/5'}`}>{aulaNesteSlot.room}</span>}
                                                                 </div>
                                                               )}
                                                             </Draggable>
-                                                          )
-                                                        })}
+                                                          );
+                                                        })()}
                                                       </div>
-                                                    ) : <div className={`h-[60px] flex items-center justify-center font-black text-[9px] tracking-widest uppercase select-none ${isDarkMode ? 'opacity-20' : 'opacity-5'}`}>-</div>}
+                                                    ) : (
+                                                      <div className={`h-[60px] flex items-center justify-center font-black text-[9px] tracking-widest uppercase select-none ${isDarkMode ? 'opacity-20' : 'opacity-10'}`}>
+                                                        <div className="flex flex-col items-center">
+                                                          <div className="w-1 h-1 rounded-full bg-current opacity-30 mb-1"></div>
+                                                          <span className="opacity-70">-</span>
+                                                        </div>
+                                                      </div>
+                                                    )}
                                                     {provided.placeholder}
                                                   </td>
                                                 )}

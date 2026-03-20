@@ -40,8 +40,9 @@ export const apiClient = {
   async fetchAll(year) {
     try {
       const configUrl = year ? `${API_URL}/config?year=${year}` : `${API_URL}/config`;
+      const schedulesUrl = year ? `${API_URL}/schedules?academicYear=${year}` : `${API_URL}/schedules`;
       const [schedRes, confRes, weekRes] = await Promise.all([
-        fetch(`${API_URL}/schedules`),
+        fetch(schedulesUrl),
         fetch(configUrl),
         fetch(`${API_URL}/academic-weeks`)
       ]);
