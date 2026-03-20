@@ -1089,7 +1089,24 @@ export function PortalView({
                                                               {aulaNesteSlot.room && <span className={`details text-[8px] font-black tracking-tighter opacity-70 px-1.5 py-0.5 rounded mt-1 w-fit uppercase mx-auto ${isDarkMode ? 'bg-white/10' : 'bg-black/5'}`}>{aulaNesteSlot.room}</span>}
                                                             </div>
                                                           );
-                                                        })() : <div className={`h-[60px] flex items-center justify-center font-black text-[9px] tracking-widest uppercase select-none ${isDarkMode ? 'opacity-20' : 'opacity-5'}`}>-</div>}
+                                                        })() : (
+                                                              <div className={`w-full h-full min-h-[60px] flex flex-col items-center justify-center p-2 rounded-lg border border-dashed opacity-70 transition-colors ${isDarkMode ? 'bg-slate-800/40 border-slate-600' : 'bg-slate-100 border-slate-300'}`}>
+                                                                  <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">Aula Vaga</span>
+                                                                  
+                                                                  {userRole === 'professor' && scheduleMode !== 'padrao' && (
+                                                                      <button
+                                                                          onClick={() => {
+                                                                              if(window.confirm(`Deseja solicitar à coordenação para assumir esta Aula Vaga na ${MAP_DAYS[diaIndex]} às ${timeStr}?`)) {
+                                                                                  alert('Solicitação registrada! A coordenação analisará seu pedido para assumir este horário.');
+                                                                              }
+                                                                          }}
+                                                                          className="mt-2 px-3 py-1.5 bg-emerald-100 hover:bg-emerald-200 text-emerald-700 text-[9px] font-black uppercase tracking-widest rounded-md shadow-sm transition-all active:scale-95 flex items-center gap-1"
+                                                                      >
+                                                                          <CheckCircle size={10} /> Assumir
+                                                                      </button>
+                                                                  )}
+                                                              </div>
+                                                          )}
                                                       </td>
                                                     );
                                                   })}
@@ -1307,11 +1324,21 @@ export function PortalView({
                                                         })()}
                                                       </div>
                                                     ) : (
-                                                      <div className={`h-[60px] flex items-center justify-center font-black text-[9px] tracking-widest uppercase select-none ${isDarkMode ? 'opacity-20' : 'opacity-10'}`}>
-                                                        <div className="flex flex-col items-center">
-                                                          <div className="w-1 h-1 rounded-full bg-current opacity-30 mb-1"></div>
-                                                          <span className="opacity-70">-</span>
-                                                        </div>
+                                                      <div className={`w-full h-full min-h-[60px] flex flex-col items-center justify-center p-2 rounded-lg border border-dashed opacity-70 transition-colors ${isDarkMode ? 'bg-slate-800/40 border-slate-600' : 'bg-slate-100 border-slate-300'}`}>
+                                                          <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">Aula Vaga</span>
+                                                          
+                                                          {userRole === 'professor' && scheduleMode !== 'padrao' && (
+                                                              <button
+                                                                  onClick={() => {
+                                                                      if(window.confirm(`Deseja solicitar à coordenação para assumir esta Aula Vaga na ${MAP_DAYS[diaIndex]} às ${time}?`)) {
+                                                                          alert('Solicitação registrada! A coordenação analisará seu pedido para assumir este horário.');
+                                                                      }
+                                                                  }}
+                                                                  className="mt-2 px-3 py-1.5 bg-emerald-100 hover:bg-emerald-200 text-emerald-700 text-[9px] font-black uppercase tracking-widest rounded-md shadow-sm transition-all active:scale-95 flex items-center gap-1"
+                                                              >
+                                                                  <CheckCircle size={10} /> Assumir
+                                                              </button>
+                                                          )}
                                                       </div>
                                                     )}
                                                     {provided.placeholder}
