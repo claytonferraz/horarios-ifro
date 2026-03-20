@@ -33,6 +33,26 @@ const getCardStyle = (courseId, classId, subjectName, isDarkMode) => {
     };
 };
 
+const formatWeekLabel = (w) => {
+    if (!w) return '';
+    // Troca a palavra "Semana" por "SEM" para economizar espaço
+    const name = String(w.name || '').replace(/semana\s*/i, 'SEM ');
+    
+    const formatDate = (dateStr) => {
+        if (!dateStr) return '';
+        // Extrai apenas YYYY-MM-DD para evitar bugs de fuso horário
+        const parts = dateStr.split('T')[0].split('-');
+        if (parts.length === 3) return `${parts[2]}/${parts[1]}`;
+        return dateStr;
+    };
+    
+    const start = formatDate(w.start_date || w.startDate);
+    const end = formatDate(w.end_date || w.endDate);
+    
+    if (start && end) return `${name} (${start} a ${end})`;
+    return name;
+};
+
 export function MasterGrid({ isDarkMode, ...props }) {
   const { globalTeachers: globalTeachersList, activeDays, classTimes, academicWeeks, selectedConfigYear, setSelectedConfigYear, academicYearsMeta } = useData();
   
@@ -588,7 +608,9 @@ export function MasterGrid({ isDarkMode, ...props }) {
                  className={`px-3 py-2 rounded-lg border shadow-sm outline-none cursor-pointer text-xs font-bold uppercase tracking-wider text-amber-600 dark:text-amber-400 ${isDarkMode ? 'bg-slate-900 border-slate-700' : 'bg-slate-50 border-slate-300'}`}
                >
                  <option value="">-- Semana --</option>
-                 {academicWeeks?.filter(w => w.academic_year === selectedConfigYear).map(w => <option key={w.id} value={w.id}>{w.name}</option>)}
+                 {academicWeeks?.filter(w => String(w.academic_year) === String(selectedConfigYear)).map(w => (
+                     <option key={w.id} value={w.id}>{formatWeekLabel(w)}</option>
+                 ))}
                </select>
              )}
           </div>
@@ -1038,7 +1060,9 @@ function SaveMatrixModal({ isDarkMode, grade, selectedCourses, saveOptions, setS
                 <label className="block text-[10px] font-black uppercase opacity-60 mb-2">Semana Destino</label>
                 <select value={saveOptions.weekId} onChange={e => setSaveOptions(p => ({...p, weekId: e.target.value}))} className="w-full p-3 rounded border text-xs text-black">
                    <option value="">Selecione...</option>
-                   {currentYearWeeks.map(w => <option key={w.id} value={w.id}>{w.name}</option>)}
+                   {currentYearWeeks.map(w => (
+                       <option key={w.id} value={w.id}>{formatWeekLabel(w)}</option>
+                   ))}
                 </select>
               </div>
             )}
