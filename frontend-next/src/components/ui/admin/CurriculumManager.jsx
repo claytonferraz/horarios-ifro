@@ -457,7 +457,9 @@ function ClassesTab({ isDarkMode, matrices, classes, setClasses, generateId, aca
   const [localFormData, setLocalFormData] = useState(null);
 
   const [filterYear, setFilterYear] = useState('');
+  const [filterCourse, setFilterCourse] = useState('');
   const activeYearsList = Object.keys(academicYearsMeta || {}).sort((a,b) => Number(b) - Number(a));
+  const availableCourses = Array.from(new Set(matrices.map(m => m.course).filter(Boolean))).sort();
 
   useEffect(() => {
     if(!filterYear && activeYearsList.length > 0) {
@@ -555,7 +557,7 @@ function ClassesTab({ isDarkMode, matrices, classes, setClasses, generateId, aca
   if (editingId) {
     const selectedMatrix = matrices.find(m => m.id === localFormData.matrixId);
     const selectedSerie = selectedMatrix ? selectedMatrix.series.find(s => s.id === localFormData.serieId) : null;
-    const disciplinesToAssign = selectedSerie ? selectedSerie.disciplines : [];
+    const disciplinesToAssign = selectedSerie ? [...selectedSerie.disciplines].sort((a, b) => a.name.localeCompare(b.name)) : [];
 
     return (
       <div className={`space-y-6 animate-in fade-in zoom-in-95 duration-200`}>
@@ -656,13 +658,25 @@ function ClassesTab({ isDarkMode, matrices, classes, setClasses, generateId, aca
   }
 
   // Filtered classes
-  const displayedClasses = classes.filter(c => c.academicYear === filterYear).sort((a, b) => a.name.localeCompare(b.name));
+  const displayedClasses = classes.filter(c => {
+    const matrix = matrices.find(m => m.id === c.matrixId);
+    const matchesYear = c.academicYear === filterYear;
+    const matchesCourse = filterCourse ? (matrix && matrix.course === filterCourse) : true;
+    return matchesYear && matchesCourse;
+  }).sort((a, b) => a.name.localeCompare(b.name));
 
   return (
     <div className="space-y-6">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <h3 className="text-xl font-black uppercase tracking-widest opacity-80">Catálogo de Turmas</h3>
         <div className="flex gap-4">
+          <div className="flex items-center gap-2">
+            <span className="text-[10px] font-black uppercase tracking-widest opacity-60">Curso:</span>
+            <select value={filterCourse} onChange={e => setFilterCourse(e.target.value)} className={`text-xs font-bold px-3 py-1.5 rounded-lg border focus:outline-none max-w-[150px] truncate ${isDarkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'}`}>
+              <option value="">Todos</option>
+              {availableCourses.map(c => <option key={c} value={c}>{c}</option>)}
+            </select>
+          </div>
           <div className="flex items-center gap-2">
             <span className="text-[10px] font-black uppercase tracking-widest opacity-60">Ano:</span>
             <select value={filterYear} onChange={e => setFilterYear(e.target.value)} className={`text-xs font-bold px-3 py-1.5 rounded-lg border focus:outline-none ${isDarkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'}`}>
