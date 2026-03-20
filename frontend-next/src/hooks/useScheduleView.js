@@ -64,17 +64,7 @@ export function useScheduleView({ appMode, rawData, disabledWeeks, targetData, d
     activeDays
   });
 
-  useEffect(() => {
-    if (activeWeeksList.length > 0 && !activeWeeksList.includes(selectedWeek)) {
-      if (scheduleMode === 'oficial') {
-        setSelectedWeek(activeWeeksList[activeWeeksList.length - 1]);
-      } else {
-        setSelectedWeek(activeWeeksList[0]);
-      }
-    } else if (activeWeeksList.length === 0) {
-      setSelectedWeek('');
-    }
-  }, [activeWeeksList, selectedWeek, scheduleMode]);
+  // Legacy activeWeeksList auto-reset logic disabled to allow PortalView's dynamicWeeksList exclusive control
 
   const officialDataForTotal = activeData.filter(r => r.type === 'oficial');
 

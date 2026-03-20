@@ -286,9 +286,21 @@ export function PortalView({
      
      return uniqueWeekIds.map(id => {
         const weekObj = academicWeeks.find(w => String(w.id) === String(id));
+        let labelStr = id;
+        if (weekObj) {
+           const fmt = (iso) => {
+              if (!iso) return '';
+              const parts = iso.split('-');
+              if (parts.length === 3) return `${parts[2]}/${parts[1]}`;
+              return iso;
+           };
+           const start = fmt(weekObj.start_date);
+           const end = fmt(weekObj.end_date);
+           labelStr = start && end ? `${weekObj.name} (${start} a ${end})` : (weekObj.name || id);
+        }
         return {
            value: id,
-           label: weekObj ? (weekObj.name || id) : id
+           label: labelStr
         };
      }).sort((a,b) => b.label.localeCompare(a.label));
    }, [schedules, scheduleMode, selectedConfigYear, academicWeeks]);
@@ -1381,7 +1393,7 @@ export function PortalView({
                                           <td className={`sticky left-0 z-10 py-3 px-4 border-r-[3px] font-bold text-xs whitespace-nowrap text-center ${isDarkMode ? 'bg-slate-800 group-hover:bg-slate-700/50 border-slate-700 text-slate-400 shadow-[2px_0_5px_rgba(0,0,0,0.2)]' : 'bg-white group-hover:bg-slate-50 border-slate-300 text-slate-500 shadow-[2px_0_5px_rgba(0,0,0,0.02)]'}`}>{time}</td>
                                           {safeDays.map(day => {
                                             const diaIndex = MAP_DAYS.indexOf(day);
-                                            const aulaNesteSlot = horariosFiltrados.find(s => String(s.dayOfWeek) === String(diaIndex) && s.slotId === time);
+                                            const aulaNesteSlot = turmaRecords.find(r => r.day === day && r.time === time);
                                             const droppableId = `${day}|${time}|${selectedClass}`;
                                             return (
                                               <Droppable droppableId={droppableId} key={droppableId}>
@@ -1395,8 +1407,8 @@ export function PortalView({
                                                       <div className="flex flex-col gap-1.5">
                                                         {(() => {
                                                           const isPending = !aulaNesteSlot.teacherId || String(aulaNesteSlot.teacherId) === 'A Definir' || String(aulaNesteSlot.teacherId) === '-';
-                                                          const disciplineName = disciplinesMeta?.[aulaNesteSlot.disciplineId]?.name || subjectHoursMeta?.[aulaNesteSlot.disciplineId]?.name || 'Disciplina Desconhecida';
-                                                          const teacherName = aulaNesteSlot.teacherId ? String(aulaNesteSlot.teacherId).split(',').map(id => resolveTeacherName(id, globalTeachers)).join(' + ') : 'A Definir';
+                                                          const disciplineName = aulaNesteSlot.subject;
+                                                          const teacherName = aulaNesteSlot.teacher;
                                                           const hasConflict = false; // Resolved in server side now
                                                           
                                                           return (
