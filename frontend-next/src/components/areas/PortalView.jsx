@@ -1946,8 +1946,8 @@ export function PortalView({
                   siape: selectedTeacher || siape,
                   week_id: selectedWeek,
                   description: 'Solicitação para assumir aula vaga na turma ' + vacantRequestModal.className + ' - Disciplina: ' + subj,
-                  original_slot: 'VAGA: ' + vacantRequestModal.day + ' ' + vacantRequestModal.time,
-                  proposed_slot: { day: vacantRequestModal.day, time: vacantRequestModal.time, classType: 'Substituição' }
+                  original_slot: JSON.stringify({ day: vacantRequestModal.day, time: vacantRequestModal.time, type: 'VAGA' }),
+                  proposed_slot: { day: vacantRequestModal.day, time: vacantRequestModal.time, className: vacantRequestModal.className, subject: subj, classType: 'Substituição' }
                 }).then(() => {
                   setAlertModal({ title: 'Tudo Certo!', message: 'Sua solicitação foi enviada com sucesso à coordenação.', type: 'success' });
                   setVacantRequestModal(null);
@@ -2106,9 +2106,37 @@ function TeacherRequestsSection({ isDarkMode, siape, selectedWeek, weekData, act
                       </div>
                       <p className={`text-xs font-bold leading-relaxed ${isDarkMode ? 'text-slate-300' : 'text-slate-700'}`}>{req.description}</p>
                       {(req.original_slot || req.proposed_slot) && (
-                        <div className={`mt-3 grid grid-cols-2 gap-2 p-2 rounded-lg text-[9px] font-bold uppercase tracking-widest ${isDarkMode ? 'bg-slate-950/50' : 'bg-slate-50'}`}>
-                          <div className={isDarkMode ? 'text-slate-500' : 'text-slate-400'}>Original: <span className={isDarkMode ? 'text-slate-300' : 'text-slate-600'}>{req.original_slot || '-'}</span></div>
-                          <div className={isDarkMode ? 'text-slate-500' : 'text-slate-400'}>Proposta: <span className={isDarkMode ? 'text-indigo-400' : 'text-indigo-600'}>{req.proposed_slot || '-'}</span></div>
+                        <div className={`mt-3 grid grid-cols-2 gap-2 p-3 rounded-xl border text-[10px] font-bold uppercase tracking-widest ${isDarkMode ? 'bg-slate-950/50 border-slate-800' : 'bg-slate-50 border-slate-100'}`}>
+                          <div className={`flex flex-col gap-1 pr-2 border-r ${isDarkMode ? 'border-slate-800' : 'border-slate-200'}`}>
+                            <span className={isDarkMode ? 'text-slate-500' : 'text-slate-400'}>Original</span>
+                            <span className={isDarkMode ? 'text-slate-300' : 'text-slate-600'}>
+                              {(() => {
+                                try {
+                                  let parsed = req.original_slot;
+                                  if (typeof parsed === 'string' && parsed.startsWith('{')) parsed = JSON.parse(parsed);
+                                  if (typeof parsed === 'string' && parsed.startsWith('"')) parsed = JSON.parse(parsed);
+                                  if (typeof parsed === 'string' && parsed.startsWith('{')) parsed = JSON.parse(parsed);
+                                  if (typeof parsed === 'object' && parsed !== null) return `VAGA:\n${parsed.day} às ${parsed.time}`;
+                                  return String(req.original_slot).replace(/["{}]/g, '');
+                                } catch(e) { return String(req.original_slot); }
+                              })()}
+                            </span>
+                          </div>
+                          <div className={`flex flex-col gap-1 pl-1`}>
+                            <span className={isDarkMode ? 'text-slate-500' : 'text-slate-400'}>Proposta</span>
+                             <span className={isDarkMode ? 'text-indigo-400' : 'text-indigo-600'}>
+                              {(() => {
+                                try {
+                                  let parsed = req.proposed_slot;
+                                  if (typeof parsed === 'string' && parsed.startsWith('{')) parsed = JSON.parse(parsed);
+                                  if (typeof parsed === 'string' && parsed.startsWith('"')) parsed = JSON.parse(parsed);
+                                  if (typeof parsed === 'string' && parsed.startsWith('{')) parsed = JSON.parse(parsed);
+                                  if (typeof parsed === 'object' && parsed !== null) return `${parsed.subject || parsed.classType || 'Mudança'} - ${parsed.day} às ${parsed.time}`;
+                                  return String(req.proposed_slot).replace(/["{}]/g, '');
+                                } catch(e) { return String(req.proposed_slot); }
+                              })()}
+                            </span>
+                          </div>
                         </div>
                       )}
                     </div>

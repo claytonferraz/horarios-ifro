@@ -1081,14 +1081,54 @@ app.post('/api/professor/request', verifyToken, (req, res) => {
 
 app.put('/api/requests/:id', verifyToken, (req, res) => {
   const { status, admin_feedback } = req.body;
-  db.run(
-    "UPDATE change_requests SET status = ?, admin_feedback = ? WHERE id = ?",
-    [status, admin_feedback, req.params.id],
-    (err) => {
-      if (err) return res.status(500).json({ error: err.message });
-      res.json({ success: true });
-    }
-  );
+  const reqId = req.params.id;
+
+  db.serialize(() => {
+    db.run(
+      "UPDATE change_requests SET status = ?, admin_feedback = ? WHERE id = ?",
+      [status, admin_feedback, reqId],
+      (err) => {
+        if (err) return res.status(500).json({ error: err.message });
+        
+        if (status === 'aprovado') {
+          db.get("SELECT * FROM change_requests WHERE id = ?", [reqId], (errReq, rowReq) => {
+            if (errReq || !rowReq) return;
+            try {
+              let proposed = JSON.parse(rowReq.proposed_slot);
+              if (typeof proposed === 'string') proposed = JSON.parse(proposed);
+              
+              if (proposed && proposed.day && proposed.time && proposed.className && proposed.subject) {
+                db.get("SELECT records FROM schedules WHERE id = ?", [rowReq.week_id], (errSched, rowSched) => {
+                  if (errSched || !rowSched) return;
+                  try {
+                    let foiAtualizado = false;
+                    const records = JSON.parse(rowSched.records);
+                    const updatedRecords = records.map(r => {
+                      if (r.className === proposed.className && String(r.day) === String(proposed.day) && String(r.time) === String(proposed.time)) {
+                         const isVaga = (!r.teacher || r.teacher === 'A Definir' || r.teacher === '-');
+                         if (isVaga) {
+                           foiAtualizado = true;
+                           return { ...r, teacher: rowReq.siape, subject: proposed.subject };
+                         }
+                      }
+                      return r;
+                    });
+                    
+                    if (foiAtualizado) {
+                      db.run("UPDATE schedules SET records = ?, updatedAt = ? WHERE id = ?", [JSON.stringify(updatedRecords), new Date().toISOString(), rowReq.week_id], () => {
+                        try { if (io) io.emit('schedule_updated'); } catch(e){}
+                      });
+                    }
+                  } catch(e) { }
+                });
+              }
+            } catch(e) { console.error("Erro na conversão do motor de aprovação:", e) }
+          });
+        }
+        res.json({ success: true });
+      }
+    );
+  });
 });
 
 server.listen(3012, () => console.log('Backend rodando na porta 3012'));

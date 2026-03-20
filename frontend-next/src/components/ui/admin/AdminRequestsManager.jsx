@@ -5,7 +5,7 @@ import { useData } from '@/contexts/DataContext';
 
 export function AdminRequestsManager({ isDarkMode }) {
   const [requests, setRequests] = React.useState([]);
-  const { globalTeachers } = useData();
+  const { globalTeachers, academicWeeks } = useData();
   const [loadingId, setLoadingId] = React.useState(null);
 
   const loadAll = async () => {
@@ -60,6 +60,7 @@ export function AdminRequestsManager({ isDarkMode }) {
                   loadingId={loadingId} 
                   handleUpdate={handleUpdate} 
                   globalTeachers={globalTeachers} 
+                  academicWeeks={academicWeeks}
                 />
               ))}
             </div>
@@ -70,9 +71,14 @@ export function AdminRequestsManager({ isDarkMode }) {
   );
 }
 
-function RequestCard({ req, isDarkMode, loadingId, handleUpdate, globalTeachers }) {
-  const teacherName = globalTeachers.find(t => t.siape === req.siape)?.nome_exibicao || req.siape;
+function RequestCard({ req, isDarkMode, loadingId, handleUpdate, globalTeachers, academicWeeks }) {
+  const teacherName = globalTeachers?.find(t => t.siape === req.siape)?.nome_exibicao || req.siape;
   const [feedback, setFeedback] = React.useState(req.admin_feedback || '');
+
+  const weekData = typeof req.week_id === 'string' && req.week_id === 'padrao' ? null : academicWeeks?.find(w => String(w.id) === String(req.week_id));
+  const scheduleTypeName = req.week_id === 'padrao' ? 'Grade Matriz Oficial (Padrão)' : 
+                           weekData ? `Semana Letiva ${weekData.name} - ${weekData.start_date.split('-').reverse().join('/')}` : 
+                           `Semana Isolada / Especial (${req.week_id})`;
 
   return (
     <div className={`p-5 rounded-2xl border transition-all ${isDarkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200 shadow-sm'}`}>
@@ -89,11 +95,11 @@ function RequestCard({ req, isDarkMode, loadingId, handleUpdate, globalTeachers 
               </div>
             </div>
             <span className={`text-[8px] font-black px-2 py-0.5 rounded-full uppercase tracking-widest ${
-              req.status === 'pendente' ? (isDarkMode ? 'bg-amber-900/30 text-amber-500' : 'bg-amber-50 text-amber-600') :
+              (req.status === 'pendente' || req.status === 'pending') ? (isDarkMode ? 'bg-amber-900/30 text-amber-500' : 'bg-amber-50 text-amber-600') :
               req.status === 'aprovado' ? (isDarkMode ? 'bg-emerald-900/30 text-emerald-500' : 'bg-emerald-50 text-emerald-600') :
               (isDarkMode ? 'bg-rose-900/30 text-rose-500' : 'bg-rose-50 text-rose-600')
             }`}>
-              {req.status}
+              {req.status === 'pending' ? 'pendente' : req.status}
             </span>
           </div>
 
@@ -103,18 +109,44 @@ function RequestCard({ req, isDarkMode, loadingId, handleUpdate, globalTeachers 
           </div>
 
           {(req.original_slot || req.proposed_slot) && (
-            <div className="grid grid-cols-2 gap-3">
-               <div className={`p-3 rounded-xl border ${isDarkMode ? 'bg-slate-950/30 border-slate-800' : 'bg-slate-50 border-slate-100'}`}>
-                  <p className="text-[8px] font-black text-slate-500 uppercase tracking-widest mb-1">Original</p>
-                  <p className="text-xs font-bold">{req.original_slot}</p>
+            <div className="grid grid-cols-2 gap-3 mt-4">
+               <div className={`p-4 rounded-xl border flex flex-col gap-1.5 ${isDarkMode ? 'bg-slate-950/30 border-slate-800' : 'bg-slate-50 border-slate-100'}`}>
+                  <p className="text-[9px] font-black text-slate-500 uppercase tracking-widest mb-1 opacity-70">Original</p>
+                  <p className={`text-xs font-bold leading-relaxed ${isDarkMode ? 'text-slate-300' : 'text-slate-700'}`}>
+                    {(() => {
+                      try {
+                        let parsed = req.original_slot;
+                        if (typeof parsed === 'string' && parsed.startsWith('{')) parsed = JSON.parse(parsed);
+                        if (typeof parsed === 'string' && parsed.startsWith('"')) parsed = JSON.parse(parsed);
+                        if (typeof parsed === 'string' && parsed.startsWith('{')) parsed = JSON.parse(parsed);
+                        if (typeof parsed === 'object' && parsed !== null) return `VAGA na turma ${parsed.day} às ${parsed.time}`;
+                        return String(req.original_slot).replace(/["{}]/g, '');
+                      } catch(e) { return String(req.original_slot); }
+                    })()}
+                  </p>
                </div>
-               <div className={`p-3 rounded-xl border ${isDarkMode ? 'bg-indigo-900/10 border-indigo-900/30' : 'bg-indigo-50 border-indigo-100'}`}>
-                  <p className="text-[8px] font-black text-indigo-500 uppercase tracking-widest mb-1">Proposta</p>
-                  <p className="text-xs font-bold text-indigo-600">{req.proposed_slot}</p>
+               <div className={`p-4 rounded-xl border flex flex-col gap-1.5 ${isDarkMode ? 'bg-indigo-900/10 border-indigo-900/30' : 'bg-indigo-50 border-indigo-100'}`}>
+                  <p className="text-[9px] font-black flex items-center gap-1.5 text-indigo-500 uppercase tracking-widest mb-1 opacity-80"><CheckCircle2 size={12}/> Proposta</p>
+                  <p className="text-xs font-black text-indigo-600 dark:text-indigo-400 leading-relaxed drop-shadow-sm">
+                    {(() => {
+                      try {
+                        let parsed = req.proposed_slot;
+                        if (typeof parsed === 'string' && parsed.startsWith('{')) parsed = JSON.parse(parsed);
+                        if (typeof parsed === 'string' && parsed.startsWith('"')) parsed = JSON.parse(parsed);
+                        if (typeof parsed === 'string' && parsed.startsWith('{')) parsed = JSON.parse(parsed);
+                        if (typeof parsed === 'object' && parsed !== null) return `${parsed.subject || parsed.classType || 'Mudança'} (${parsed.className || 'Mesma turma'}) ${parsed.day} às ${parsed.time}`;
+                        return String(req.proposed_slot).replace(/["{}]/g, '');
+                      } catch(e) { return String(req.proposed_slot); }
+                    })()}
+                  </p>
                </div>
             </div>
           )}
-          <p className="text-[9px] font-bold text-slate-500 uppercase">Semana Alvo: {req.week_id}</p>
+          
+          <div className={`mt-3 p-3 rounded-xl border flex items-center justify-between ${isDarkMode ? 'bg-slate-950/40 border-slate-800 text-slate-400' : 'bg-slate-50 border-slate-200 text-slate-500'}`}>
+            <span className="text-[10px] font-black uppercase tracking-widest">Semana Alvo: <span className={isDarkMode ? 'text-indigo-400' : 'text-indigo-600'}>{req.week_id}</span></span>
+            <span className="text-[10px] font-bold uppercase tracking-widest">{scheduleTypeName}</span>
+          </div>
         </div>
 
         <div className={`w-full lg:w-72 lg:border-l lg:pl-6 space-y-4 ${isDarkMode ? 'border-slate-800' : 'border-slate-100'}`}>
