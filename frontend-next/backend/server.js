@@ -1098,28 +1098,61 @@ app.put('/api/requests/:id', verifyToken, (req, res) => {
               if (typeof proposed === 'string') proposed = JSON.parse(proposed);
               
               if (proposed && proposed.day && proposed.time && proposed.className && proposed.subject) {
+                // 1. UPDATE for OLD STRUCTURE (Legacy JSON Monolith - PortalView V1)
                 db.get("SELECT records FROM schedules WHERE id = ?", [rowReq.week_id], (errSched, rowSched) => {
-                  if (errSched || !rowSched) return;
-                  try {
-                    let foiAtualizado = false;
-                    const records = JSON.parse(rowSched.records);
-                    const updatedRecords = records.map(r => {
-                      if (r.className === proposed.className && String(r.day) === String(proposed.day) && String(r.time) === String(proposed.time)) {
-                         const isVaga = (!r.teacher || r.teacher === 'A Definir' || r.teacher === '-');
-                         if (isVaga) {
-                           foiAtualizado = true;
-                           return { ...r, teacher: rowReq.siape, subject: proposed.subject };
-                         }
-                      }
-                      return r;
-                    });
-                    
-                    if (foiAtualizado) {
-                      db.run("UPDATE schedules SET records = ?, updatedAt = ? WHERE id = ?", [JSON.stringify(updatedRecords), new Date().toISOString(), rowReq.week_id], () => {
-                        try { if (io) io.emit('schedule_updated'); } catch(e){}
+                  if (!errSched && rowSched && rowSched.records) {
+                    try {
+                      let foiAtualizado = false;
+                      const records = JSON.parse(rowSched.records);
+                      const updatedRecords = records.map(r => {
+                        if (r.className === proposed.className && String(r.day) === String(proposed.day) && String(r.time) === String(proposed.time)) {
+                           const isVaga = (!r.teacher || r.teacher === 'A Definir' || r.teacher === '-');
+                           if (isVaga) {
+                             foiAtualizado = true;
+                             return { ...r, teacher: rowReq.siape, subject: proposed.subject, isSubstituted: true, originRequest: reqId };
+                           }
+                        }
+                        return r;
                       });
-                    }
-                  } catch(e) { }
+                      if (foiAtualizado) {
+                        db.run("UPDATE schedules SET records = ?, updatedAt = ? WHERE id = ?", [JSON.stringify(updatedRecords), new Date().toISOString(), rowReq.week_id], () => {
+                           try { if (io) io.emit('schedule_updated'); } catch(e){}
+                        });
+                      }
+                    } catch(e) { }
+                  }
+                });
+
+                // 2. UPDATE for NEW STRUCTURE (Bulk Slots DB - MasterGrid V2)
+                db.all("SELECT id, data FROM curriculum_data WHERE type = 'class'", [], (errC, rowsC) => {
+                  if (errC || !rowsC) return;
+                  let targetClassId = null;
+                  for (let row of rowsC) {
+                      try { 
+                          const d = JSON.parse(row.data); 
+                          if (d.name === proposed.className) { targetClassId = d.id; break; } 
+                      } catch(e){}
+                  }
+
+                  let dayIndex = String(['Segunda-feira', 'Terça-feira', 'Quarta-feira', 'Quinta-feira', 'Sexta-feira', 'Sábado'].indexOf(proposed.day));
+                  
+                  if (targetClassId) {
+                      db.all("SELECT * FROM schedules WHERE week_id = ? AND (dayOfWeek = ? OR dayOfWeek = ?) AND slotId = ? AND classId = ?", 
+                         [rowReq.week_id, proposed.day, dayIndex, proposed.time, targetClassId], 
+                         (errS, rowsS) => {
+                           if (!errS && rowsS && rowsS.length > 0) {
+                               rowsS.forEach(sRow => {
+                                   const isVaga = (!sRow.teacherId || sRow.teacherId === 'A Definir' || sRow.teacherId === '-' || sRow.teacherId === '');
+                                   if (isVaga) {
+                                       const recFlag = JSON.stringify({ isSubstituted: true, originRequest: reqId, originalSubject: proposed.subject });
+                                       db.run("UPDATE schedules SET teacherId = ?, records = ?, updatedAt = ? WHERE id = ?", 
+                                           [rowReq.siape, recFlag, new Date().toISOString(), sRow.id], 
+                                           () => { try { if (io) io.emit('schedule_updated'); } catch(e){} });
+                                   }
+                               });
+                           }
+                         });
+                  }
                 });
               }
             } catch(e) { console.error("Erro na conversão do motor de aprovação:", e) }

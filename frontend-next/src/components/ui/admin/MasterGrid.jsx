@@ -96,6 +96,7 @@ export function MasterGrid({ isDarkMode, ...props }) {
   const [curriculumData, setCurriculumData] = useState([]);
   const [schedules, setSchedules] = useState([]);
   const [loadingInitial, setLoadingInitial] = useState(true);
+  const [changeRequests, setChangeRequests] = useState([]);
 
   const horariosExibidos = useMemo(() => {
     if (!classTimes || classTimes.length === 0) {
@@ -115,11 +116,14 @@ export function MasterGrid({ isDarkMode, ...props }) {
     async function loadAdminData() {
       setLoadingInitial(true);
       try {
-        const [loadedMatrices, loadedClasses, dbSchedules] = await Promise.all([
+        const [loadedMatrices, loadedClasses, dbSchedules, allRequests] = await Promise.all([
           apiClient.fetchCurriculum('matrix'),
           apiClient.fetchCurriculum('class'),
-          fetch(`/api/schedules?academicYear=${selectedConfigYear}`, { headers: getHeaders() }).then(r => r.json()).catch(() => [])
+          fetch(`/api/schedules?academicYear=${selectedConfigYear}`, { headers: getHeaders() }).then(r => r.json()).catch(() => []),
+          apiClient.fetchRequests().catch(() => [])
         ]);
+
+        setChangeRequests(allRequests || []);
 
         const uniqueCourses = (loadedMatrices || []).map(m => ({ id: m.id, name: `${m.course} (${m.name})` }));
         setCourses(uniqueCourses);
@@ -233,13 +237,26 @@ export function MasterGrid({ isDarkMode, ...props }) {
                  const sortedCurr = [...currentTeacherIds].sort();
                  teacherChanged = dbTeacherIds.length !== currentTeacherIds.length || sortedDb.some((val, idx) => val !== sortedCurr[idx]);
              }
+             
+             let flagIsSubstituted = false;
+             if (schedule.records) {
+                 try {
+                     const recs = JSON.parse(schedule.records);
+                     if (recs.isSubstituted) flagIsSubstituted = true;
+                     if (Array.isArray(recs)) {
+                         const found = recs.find(r => String(r.day) === String(schedule.dayOfWeek) && String(r.time) === String(schedule.slotId));
+                         if (found?.isSubstituted) flagIsSubstituted = true;
+                     }
+                 } catch(e) {}
+             }
 
              initialGrade[`${schedule.classId}|${schedule.dayOfWeek}|${schedule.slotId}`] = { 
                  ...refCard, 
                  sala: schedule.room || refCard.sala,
                  teacherIds: dbTeacherIds || currentTeacherIds,
                  professores: dbTeacherIds ? dbTeacherIds.map(id => resolveTeacherName(id, globalTeachersList)) : refCard.professores,
-                 teacherChanged: teacherChanged
+                 teacherChanged: teacherChanged,
+                 isSubstituted: flagIsSubstituted
              };
              aulasAlocadasIds.push(String(refCard.id));
         }
@@ -615,6 +632,11 @@ export function MasterGrid({ isDarkMode, ...props }) {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [grade, schedules, horariosExibidos]);
 
+  const activeRequestsForWeek = useMemo(() => {
+     if (selectedType === 'padrao' || !selectedWeek || changeRequests.length === 0) return [];
+     return changeRequests.filter(req => String(req.week_id) === String(selectedWeek));
+  }, [changeRequests, selectedWeek, selectedType]);
+
   return (
     <div className={`flex flex-col gap-4 animate-in fade-in duration-300 ${isDarkMode ? 'text-slate-200' : 'text-slate-800'}`}>
       
@@ -771,6 +793,32 @@ export function MasterGrid({ isDarkMode, ...props }) {
                  </li>
                ))}
             </ul>
+         </div>
+      )}
+
+      {activeRequestsForWeek.length > 0 && (
+         <div className={`p-4 rounded-xl border flex flex-col gap-3 ${isDarkMode ? 'bg-indigo-950/20 border-indigo-900/50' : 'bg-indigo-50/50 border-indigo-200/50'}`}>
+            <h3 className={`text-[11px] font-black uppercase tracking-widest flex items-center gap-2 ${isDarkMode ? 'text-indigo-400' : 'text-indigo-600'}`}>
+               <AlertCircle size={16} /> Status das Modificações Solicitadas para esta Grade ({activeRequestsForWeek.length})
+            </h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-2 mt-1">
+               {activeRequestsForWeek.map((req, i) => {
+                  const profName = globalTeachersList?.find(t => t.siape === req.siape)?.nome_exibicao || req.siape;
+                  return (
+                     <div key={i} className={`p-3 rounded-lg border flex flex-col gap-1.5 ${isDarkMode ? 'bg-slate-900 border-slate-700' : 'bg-white border-slate-200'}`}>
+                        <div className="flex items-center justify-between">
+                           <span className={`text-[9px] font-black uppercase truncate max-w-[150px] ${isDarkMode ? 'text-slate-300' : 'text-slate-700'}`}>{profName}</span>
+                           <span className={`text-[8px] font-black px-2 py-0.5 rounded-full uppercase tracking-widest ${
+                              req.status === 'aprovado' ? (isDarkMode ? 'bg-emerald-900/30 text-emerald-500' : 'bg-emerald-50 text-emerald-600') :
+                              req.status === 'rejeitado' ? (isDarkMode ? 'bg-rose-900/30 text-rose-500' : 'bg-rose-50 text-rose-600') :
+                              (isDarkMode ? 'bg-amber-900/30 text-amber-500' : 'bg-amber-50 text-amber-600')
+                           }`}>{req.status}</span>
+                        </div>
+                        <p className={`text-[10px] font-bold leading-relaxed opacity-80 ${isDarkMode ? 'text-slate-400' : 'text-slate-600'}`}>{req.description}</p>
+                     </div>
+                  );
+               })}
+            </div>
          </div>
       )}
 
@@ -970,6 +1018,10 @@ export function MasterGrid({ isDarkMode, ...props }) {
                                   <span className="absolute top-0 right-0 bg-slate-200 dark:bg-slate-600 text-slate-500 dark:text-slate-300 font-bold px-1 rounded-bl-md text-[7px] group-hover/card:opacity-0 transition-opacity" title={`Qtd Total desta Aula no Horário da Turma`}>
                                      {Object.values(grade).filter(g => String(g.classId) === String(aulaNesteSlot.classId) && String(g.id) === String(aulaNesteSlot.id)).length}/{aulaNesteSlot.numAulas || 1}
                                   </span>
+                                  
+                                  {aulaNesteSlot.isSubstituted && (
+                                     <div title="Assumido via Solicitação de Vaga do Professor" className="absolute top-0 right-3 bg-indigo-600 text-white text-[6.5px] font-black uppercase px-1.5 py-0.5 rounded-b shadow-[0_2px_4px_rgba(0,0,0,0.2)] tracking-widest pointer-events-none z-10 border border-t-0 border-indigo-400 group-hover/card:opacity-0 transition-opacity">Substituído</div>
+                                  )}
 
                                   <div className="flex flex-col w-[85%] leading-none" title={`${aulaNesteSlot.disciplina} - ${aulaNesteSlot.className}`}>
                                     <span className="text-[10px] font-black uppercase tracking-widest truncate">{aulaNesteSlot.disciplina}</span>

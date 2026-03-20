@@ -7,6 +7,7 @@ export function AdminRequestsManager({ isDarkMode }) {
   const [requests, setRequests] = React.useState([]);
   const { globalTeachers, academicWeeks } = useData();
   const [loadingId, setLoadingId] = React.useState(null);
+  const [alertModal, setAlertModal] = React.useState(null);
 
   const loadAll = async () => {
     try {
@@ -26,9 +27,9 @@ export function AdminRequestsManager({ isDarkMode }) {
     try {
       await apiClient.updateRequestStatus(id, status, feedback);
       loadAll();
-      // Emit trigger implicitly via backend save, but loadAll handles local view
+      setAlertModal({ type: 'success', title: 'Sucesso!', msg: `Solicitação ${status} com sucesso!` });
     } catch (e) {
-      alert("Erro ao atualizar: " + e.message);
+      setAlertModal({ type: 'error', title: 'Erro', msg: "Erro ao atualizar: " + e.message });
     } finally {
       setLoadingId(null);
     }
@@ -67,6 +68,27 @@ export function AdminRequestsManager({ isDarkMode }) {
           )}
         </div>
       </div>
+
+      {alertModal && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in zoom-in-95">
+          <div className={`w-full max-w-sm p-6 rounded-2xl shadow-2xl ${isDarkMode ? 'bg-slate-800 border border-slate-700 text-white' : 'bg-white text-slate-900'}`}>
+            <h3 className={`text-lg font-black uppercase tracking-widest flex items-center gap-2 mb-3 ${alertModal.type === 'error' ? 'text-red-500' : 'text-emerald-500'}`}>
+              {alertModal.type === 'error' ? <XCircle size={20} /> : <CheckCircle2 size={20} />}
+              {alertModal.title}
+            </h3>
+            <p className="text-sm font-bold opacity-80 mb-6 font-mono">{alertModal.msg}</p>
+            <div className="flex justify-end gap-3">
+              <button 
+                onClick={() => setAlertModal(null)} 
+                className="px-5 py-2 rounded-xl text-xs font-black uppercase tracking-widest bg-emerald-600 hover:bg-emerald-500 text-white transition-colors"
+                autoFocus
+              >
+                OK
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -149,32 +171,41 @@ function RequestCard({ req, isDarkMode, loadingId, handleUpdate, globalTeachers,
           </div>
         </div>
 
-        <div className={`w-full lg:w-72 lg:border-l lg:pl-6 space-y-4 ${isDarkMode ? 'border-slate-800' : 'border-slate-100'}`}>
+        <div className={`w-full lg:w-72 lg:border-l lg:pl-6 space-y-4 flex flex-col justify-center ${isDarkMode ? 'border-slate-800' : 'border-slate-100'}`}>
            <div className="space-y-1.5">
               <label className="text-[9px] font-black uppercase text-slate-500 tracking-widest">Ação / Resposta</label>
               <textarea 
                 placeholder="Feedback para o professor..."
-                className={`w-full min-h-[80px] p-3 rounded-xl border text-[11px] font-bold outline-none resize-none transition-all ${isDarkMode ? 'bg-slate-950 border-slate-700 text-white focus:border-indigo-500' : 'bg-white border-slate-200 text-slate-900 focus:border-indigo-600'}`}
+                className={`w-full min-h-[80px] p-3 rounded-xl border text-[11px] font-bold outline-none resize-none transition-all ${req.status !== 'pendente' && req.status !== 'pending' ? 'opacity-50 cursor-not-allowed pointer-events-none' : ''} ${isDarkMode ? 'bg-slate-950 border-slate-700 text-white focus:border-indigo-500' : 'bg-white border-slate-200 text-slate-900 focus:border-indigo-600'}`}
                 value={feedback}
                 onChange={e => setFeedback(e.target.value)}
+                readOnly={req.status !== 'pendente' && req.status !== 'pending'}
               />
            </div>
-           <div className="grid grid-cols-2 gap-2">
-              <button 
-                disabled={loadingId === req.id}
-                onClick={() => handleUpdate(req.id, 'aprovado', feedback)}
-                className={`flex items-center justify-center gap-1.5 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${isDarkMode ? 'bg-emerald-600 hover:bg-emerald-500' : 'bg-emerald-600 hover:bg-emerald-700'} text-white shadow-lg shadow-emerald-900/20 active:scale-95`}
-              >
-                <CheckCircle2 size={14} /> Aprovar
-              </button>
-              <button 
-                disabled={loadingId === req.id}
-                onClick={() => handleUpdate(req.id, 'rejeitado', feedback)}
-                className={`flex items-center justify-center gap-1.5 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${isDarkMode ? 'bg-rose-600 hover:bg-rose-500' : 'bg-rose-600 hover:bg-rose-700'} text-white shadow-lg shadow-rose-900/20 active:scale-95`}
-              >
-                <XCircle size={14} /> Rejeitar
-              </button>
-           </div>
+           
+           {(req.status === 'pendente' || req.status === 'pending') ? (
+               <div className="grid grid-cols-2 gap-2">
+                  <button 
+                    disabled={loadingId === req.id}
+                    onClick={() => handleUpdate(req.id, 'aprovado', feedback)}
+                    className={`flex items-center justify-center gap-1.5 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${isDarkMode ? 'bg-emerald-600 hover:bg-emerald-500' : 'bg-emerald-600 hover:bg-emerald-700'} text-white shadow-lg shadow-emerald-900/20 active:scale-95`}
+                  >
+                    <CheckCircle2 size={14} /> Aprovar
+                  </button>
+                  <button 
+                    disabled={loadingId === req.id}
+                    onClick={() => handleUpdate(req.id, 'rejeitado', feedback)}
+                    className={`flex items-center justify-center gap-1.5 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${isDarkMode ? 'bg-rose-600 hover:bg-rose-500' : 'bg-rose-600 hover:bg-rose-700'} text-white shadow-lg shadow-rose-900/20 active:scale-95`}
+                  >
+                    <XCircle size={14} /> Rejeitar
+                  </button>
+               </div>
+           ) : (
+               <div className={`flex items-center justify-center py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all border ${req.status === 'aprovado' ? (isDarkMode ? 'bg-emerald-900/20 border-emerald-900/50 text-emerald-500' : 'bg-emerald-50 border-emerald-200 text-emerald-700') : (isDarkMode ? 'bg-rose-900/20 border-rose-900/50 text-rose-500' : 'bg-rose-50 border-rose-200 text-rose-700')}`}>
+                  {req.status === 'aprovado' ? <CheckCircle2 size={14} className="mr-2" /> : <XCircle size={14} className="mr-2" />}
+                  Solicitação Resolvida
+               </div>
+           )}
         </div>
       </div>
     </div>

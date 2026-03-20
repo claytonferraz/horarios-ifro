@@ -68,17 +68,29 @@ export function PortalView({
   }, [appMode, selectedCourse, selectedClass]);
 
   React.useEffect(() => {
-    if ((appMode === 'admin' || userRole === 'gestao' || userRole === 'admin') && scheduleMode === 'previa' && selectedWeek) {
+    if (scheduleMode === 'previa' && selectedWeek) {
       apiClient.fetchRequests().then(reqs => {
         if (reqs) {
-          setPendingRequests(reqs.filter(r => r.status === 'pendente' && r.week_id === selectedWeek));
+          setPendingRequests(reqs.filter(r => (r.status === 'pendente' || r.status === 'pending') && r.week_id === selectedWeek));
         }
       }).catch(e => console.error("Error fetching requests for previa alerts", e));
     }
-  }, [scheduleMode, selectedWeek, appMode, userRole]);
+  }, [scheduleMode, selectedWeek]);
 
   const [draggingRecord, setDraggingRecord] = useState(null);
   const [exchangeTarget, setExchangeTarget] = useState(null);
+
+  const isSlotLocked = React.useCallback((r) => {
+      return pendingRequests.some(req => {
+          try {
+              let prop = req.proposed_slot;
+              if (typeof prop === 'string' && prop.startsWith('{')) prop = JSON.parse(prop);
+              if (typeof prop === 'string' && prop.startsWith('"')) prop = JSON.parse(prop);
+              if (typeof prop === 'string' && prop.startsWith('{')) prop = JSON.parse(prop);
+              return String(prop.day) === String(r.day) && String(prop.time) === String(r.time) && String(prop.className) === String(r.className);
+          } catch(e) { return false; }
+      });
+  }, [pendingRequests]);
 
   const checkConflict = (record, dDay, dTime, dCls) => {
     if (!record || !record.teacher || record.teacher === 'A Definir' || record.teacher === '-') return null;
@@ -1030,8 +1042,13 @@ export function PortalView({
                                                                          <Draggable key={r.id} draggableId={r.id} index={rIndex} isDragDisabled={!(scheduleMode === 'previa' && ['admin','gestao'].includes(userRole))}>
                                                                            {(prov2, snap2) => (
                                                                              <div ref={prov2.innerRef} {...prov2.draggableProps} {...prov2.dragHandleProps} 
-                                                                               className={`print-clean-card p-1.5 print:p-1 rounded-xl print:rounded-none border-b-[3px] print:border-b-[1px] print:border-slate-400 shadow-sm print:shadow-none flex flex-col justify-center min-h-[46px] print:min-h-0 transition-all mb-1 print:mb-0 last:mb-0 hover:scale-[1.02] ${snap2.isDragging ? 'shadow-xl scale-105 z-50' : ''} ${isPending ? (isDarkMode ? 'bg-red-900/30 border-red-800/50 text-red-300' : 'bg-red-50 border-red-300 text-red-800') : getColorHash(r.subject, isDarkMode)}`}
+                                                                               className={`print-clean-card p-1.5 print:p-1 rounded-xl print:rounded-none border-b-[3px] print:border-b-[1px] print:border-slate-400 shadow-sm print:shadow-none flex flex-col justify-center min-h-[46px] print:min-h-0 transition-all mb-1 print:mb-0 last:mb-0 hover:scale-[1.02] relative overflow-visible ${snap2.isDragging ? 'shadow-xl scale-105 z-50' : ''} ${isPending ? (isDarkMode ? 'bg-red-900/30 border-red-800/50 text-red-300' : 'bg-red-50 border-red-300 text-red-800') : getColorHash(r.subject, isDarkMode)}`}
                                                                              >
+                                                                                {r.isSubstituted && (
+                                                                                   <div className="absolute -top-1.5 -right-1 z-10 print:hidden shadow-sm pointer-events-none">
+                                                                                     <span title="Aula assumida de Vaga via Troca" className="text-[5px] font-black uppercase tracking-widest text-white px-1.5 py-[2px] rounded border border-indigo-400 bg-indigo-600 block animate-pulse shadow-sm shadow-indigo-900/40">Substituição</span>
+                                                                                   </div>
+                                                                                )}
                                                                                 <p className={`subject font-bold text-[10px] print:text-[8.5px] leading-tight print:leading-[1.1] mb-1 print:mb-0.5 text-center ${isDarkMode ? 'text-slate-200' : 'text-slate-800'}`}>
                                                                                   {r.subject}
                                                                                 </p>
@@ -1350,32 +1367,42 @@ export function PortalView({
                                                             recordsNesteSlot.map((r, idx) => {
                                                               const isVaga = isTeacherPending(r.teacher);
                                                               const hasClash = recordsNesteSlot.length > 1;
+                                                              const isLocked = isVaga && isSlotLocked(r);
                                                               return (
                                                                 <div
                                                                   key={r.id || idx}
                                                                   onClick={() => {
                                                                     if (appMode === 'professor') {
                                                                       if (isVaga) {
+                                                                        if (isLocked) {
+                                                                           alert("Esta vaga já está sendo analisada pela direção.");
+                                                                           return;
+                                                                        }
                                                                         if (typeof setVacantRequestModal === 'function') setVacantRequestModal(r);
                                                                       } else if (typeof setExchangeTarget === 'function') {
                                                                         setExchangeTarget({ targetClass: r.className, targetCourse: r.course, originalRecord: r });
                                                                       }
                                                                     }
                                                                   }}
-                                                                  className={`print-clean-card p-2 rounded-xl border shadow-sm flex flex-col justify-center min-h-[76px] transition-all hover:scale-[1.02] relative cursor-pointer ${isVaga ? (isDarkMode ? 'bg-red-900/30 border-red-800/50' : 'bg-red-50 border-red-300') : getColorHash(r.className, isDarkMode)}${hasClash && isVaga ? ' ring-2 ring-amber-500 animate-pulse' : ''}`}
+                                                                  className={`print-clean-card p-2 rounded-xl border shadow-sm flex flex-col justify-center min-h-[76px] transition-all relative ${isLocked ? (isDarkMode ? 'bg-slate-800/80 border-slate-700 opacity-60 cursor-not-allowed' : 'bg-slate-200 border-slate-300 opacity-60 cursor-not-allowed') : (isVaga ? (isDarkMode ? 'bg-red-900/30 border-red-800/50 hover:scale-[1.02] cursor-pointer' : 'bg-red-50 border-red-300 hover:scale-[1.02] cursor-pointer') : `${getColorHash(r.className, isDarkMode)} hover:scale-[1.02] cursor-pointer`)} ${hasClash && isVaga && !isLocked ? ' ring-2 ring-amber-500 animate-pulse' : ''}`}
                                                                 >
                                                                   {isVaga ? (
                                                                     <React.Fragment>
                                                                       <div className="absolute -top-2.5 left-1/2 -translate-x-1/2 w-max z-10">
-                                                                        <span className={`text-[9px] font-black uppercase tracking-widest text-white px-2 py-0.5 rounded shadow-sm ${isDarkMode ? 'bg-red-600 shadow-red-900' : 'bg-red-600 shadow-red-200'}`}>AULA VAGA</span>
+                                                                        <span className={`text-[9px] font-black uppercase tracking-widest text-white px-2 py-0.5 rounded shadow-sm ${isLocked ? 'bg-slate-500' : (isDarkMode ? 'bg-red-600 shadow-red-900' : 'bg-red-600 shadow-red-200')}`}>{isLocked ? 'EM ANÁLISE' : 'AULA VAGA'}</span>
                                                                       </div>
-                                                                      <p className={`subject font-black text-xs leading-snug text-center mt-1 ${isDarkMode ? 'text-red-100' : 'text-red-950'}`}>{r.subject || 'Pendente'}</p>
-                                                                      <span className={`details text-[10px] font-black tracking-widest px-1.5 py-0.5 rounded mt-1.5 w-fit uppercase mx-auto ${isDarkMode ? 'bg-red-900/80 text-red-100' : 'bg-red-200 text-red-950'}`}>{r.className} {r.room ? '- ' + r.room : ''}</span>
+                                                                      <p className={`subject font-black text-xs leading-snug text-center mt-1 ${isLocked ? 'text-slate-400' : (isDarkMode ? 'text-red-100' : 'text-red-950')}`}>{r.subject || 'Pendente'}</p>
+                                                                      <span className={`details text-[10px] font-black tracking-widest px-1.5 py-0.5 rounded mt-1.5 w-fit uppercase mx-auto ${isLocked ? 'bg-slate-700/50 text-slate-300' : (isDarkMode ? 'bg-red-900/80 text-red-100' : 'bg-red-200 text-red-950')}`}>{r.className} {r.room ? '- ' + r.room : ''}</span>
                                                                     </React.Fragment>
                                                                   ) : (
                                                                     <React.Fragment>
                                                                       <p className="subject font-black text-xs sm:text-sm leading-snug text-center drop-shadow-sm">{r.subject}</p>
                                                                       <span className={`details text-[10px] sm:text-xs font-black tracking-widest px-2 py-1 rounded mt-1.5 w-fit uppercase mx-auto shadow-sm ${isDarkMode ? 'bg-white/25 text-white' : 'bg-black/10 text-slate-900'}`}>{r.className} {r.room ? '- ' + r.room : ''}</span>
+                                                                      {r.isSubstituted && (
+                                                                         <div className="absolute top-0 right-0 z-10 pointer-events-none print:hidden">
+                                                                           <span title="Assumida no lugar de uma Vaga" className="text-[6px] font-black uppercase tracking-wide text-white px-1.5 py-0.5 rounded-bl-[8px] bg-indigo-600 border-l border-b border-indigo-700 block animate-pulse shadow-sm shadow-indigo-900/30">Substituição</span>
+                                                                         </div>
+                                                                      )}
                                                                     </React.Fragment>
                                                                   )}
                                                                 </div>
