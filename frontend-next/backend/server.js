@@ -378,7 +378,7 @@ const bulkScheduleSchema = z.object({
     classId: z.union([z.string(), z.number()]).transform(String),
     dayOfWeek: z.string(),
     slotId: z.string(),
-    teacherId: z.string(),
+    teacherId: z.union([z.string(), z.number()]).transform(String),
     disciplineId: z.string().optional().nullable(),
     room: z.string().optional().nullable()
   }))

@@ -20,7 +20,8 @@ export function MasterGrid({ isDarkMode, ...props }) {
   // ESTADO DA TELA PRINCIPAL (O que o usuário está visualizando)
   const [selectedType, setSelectedType] = useState('previa'); 
   const [selectedWeek, setSelectedWeek] = useState('');
-  const [refreshTick, setRefreshTick] = useState(0);
+  const [shiftFilter, setShiftFilter] = useState('todos');
+  const [refreshTrigger, setRefreshTrigger] = useState(0);
 
   const [pendingDrop, setPendingDrop] = useState(null); // Modal DND 
   const [dropAlert, setDropAlert] = useState(null); // Alerta Simples
@@ -35,8 +36,17 @@ export function MasterGrid({ isDarkMode, ...props }) {
   const [schedules, setSchedules] = useState([]);
   const [loadingInitial, setLoadingInitial] = useState(true);
 
-  const rawHorarios = classTimes && classTimes.length > 0 ? classTimes : ['07:30 - 08:20', '08:20 - 09:10', '09:10 - 10:00', '10:20 - 11:10', '11:10 - 12:00'];
-  const horariosExibidos = rawHorarios.map(h => typeof h === 'string' ? h : h.timeStr);
+  const horariosExibidos = useMemo(() => {
+    if (!classTimes || classTimes.length === 0) {
+      return ['07:30 - 08:20', '08:20 - 09:10', '09:10 - 10:00', '10:20 - 11:10', '11:10 - 12:00'];
+    }
+    return classTimes.filter(t => {
+       if (shiftFilter === 'todos') return true;
+       if (shiftFilter === 'diurno') return t.shift === 'Matutino' || t.shift === 'Vespertino';
+       if (shiftFilter === 'noturno') return t.shift === 'Noturno';
+       return true;
+    }).map(t => t.timeStr);
+  }, [classTimes, shiftFilter]);
   const diasExibidos = activeDays && activeDays.length > 0 ? activeDays : ['Segunda-feira', 'Terça-feira', 'Quarta-feira', 'Quinta-feira', 'Sexta-feira'];
 
   // Carrega os currículos e turmas direto da fonte
@@ -65,7 +75,7 @@ export function MasterGrid({ isDarkMode, ...props }) {
 
           serie.disciplines?.forEach(disc => {
              const profs = cls.professorAssignments?.[disc.id];
-             const teacher = (profs && profs.length > 0) ? profs[0] : 'A Definir';
+             const teacherIds = (profs && profs.length > 0) ? profs : ['A Definir'];
              const classRoom = cls.roomAssignments?.[disc.id] || cls.room || '';
              
              // Calcula a quantidade padrao esperada na matriz (Prio 1: Aulas Semanais preenchidas. Prio 2: Cálculo por Carga Horária)
@@ -84,7 +94,7 @@ export function MasterGrid({ isDarkMode, ...props }) {
                   courseId: cls.matrixId,
                   className: cls.name,
                   subjectName: disc.name,
-                  teacherId: String(teacher),
+                  teacherIds: teacherIds.map(String),
                   room: classRoom,
                   numAulas: numAulas
              });
@@ -100,7 +110,7 @@ export function MasterGrid({ isDarkMode, ...props }) {
       }
     }
     loadAdminData();
-  }, [selectedConfigYear, refreshTick]); // Recarrega os dados caso o usuário mude o ano letivo na interface
+  }, [selectedConfigYear, refreshTrigger]); // Recarrega os dados caso o usuário mude o ano letivo na interface
 
   // Pega todas as turmas dos cursos selecionados
   const turmasDoCurso = useMemo(() => {
@@ -122,8 +132,8 @@ export function MasterGrid({ isDarkMode, ...props }) {
       courseId: String(disciplina.courseId),
       className: turmasDoCurso.find(t => String(t.id) === String(disciplina.classId))?.name || 'Turma',
       disciplina: disciplina.subjectName,
-      teacherId: disciplina.teacherId,
-      professor: resolveTeacherName(disciplina.teacherId, globalTeachersList),
+      teacherIds: disciplina.teacherIds,
+      professores: disciplina.teacherIds.map(id => resolveTeacherName(id, globalTeachersList)),
       sala: disciplina.room || '', 
       cor: getColorHash(disciplina.subjectName),
       numAulas: disciplina.numAulas || 1
@@ -139,7 +149,7 @@ export function MasterGrid({ isDarkMode, ...props }) {
       filtered.forEach(schedule => {
         let refCard;
         if (schedule.disciplineId) refCard = aulasReais.find(a => String(a.id) === String(schedule.disciplineId));
-        if (!refCard) refCard = aulasReais.find(a => String(a.classId) === String(schedule.classId) && String(a.teacherId) === String(schedule.teacherId));
+        if (!refCard) refCard = aulasReais.find(a => String(a.classId) === String(schedule.classId) && a.teacherIds?.join(',') === String(schedule.teacherId));
         if (refCard) {
              initialGrade[`${schedule.classId}|${schedule.dayOfWeek}|${schedule.slotId}`] = { ...refCard, sala: schedule.room || refCard.sala };
              aulasAlocadasIds.push(String(refCard.id));
@@ -167,7 +177,7 @@ export function MasterGrid({ isDarkMode, ...props }) {
   }, [aulasNeutras]);
 
   // === MOTOR DE PREVENÇÃO DE CONFLITOS (CHOQUE DE HORÁRIO) ===
-  const verificarChoqueHorario = (teacherId, sala, diaId, hora, currentClassId) => {
+  const verificarChoqueHorario = (teacherIdsArray, sala, diaId, hora, currentClassId) => {
     let pMsg = null;
     let sMsg = null;
 
@@ -175,8 +185,11 @@ export function MasterGrid({ isDarkMode, ...props }) {
     for (const [key, aula] of Object.entries(grade)) {
       const [kClassId, kDiaId, kHora] = key.split('|');
       if (kDiaId === String(diaId) && kHora === hora && kClassId !== String(currentClassId)) {
-         if (teacherId && teacherId !== 'A Definir' && teacherId !== '-' && aula.teacherId === teacherId) {
-            pMsg = `O professor já está na turma ${aula.className}.`;
+         for (const tId of teacherIdsArray) {
+           if (tId && tId !== 'A Definir' && tId !== '-' && aula.teacherIds?.includes(tId)) {
+              if (!pMsg) pMsg = [];
+              pMsg.push(`O professor ${tId} já está na turma ${aula.className}.`);
+           }
          }
          if (sala && aula.sala && aula.sala === sala) {
             sMsg = `O ambiente "${sala}" já está alocado para a turma ${aula.className}.`;
@@ -187,9 +200,12 @@ export function MasterGrid({ isDarkMode, ...props }) {
     // 2. Verifica no banco global (outros cursos)
     const relRows = schedules?.filter(s => String(s.dayOfWeek) === String(diaId) && s.slotId === hora && String(s.classId) !== String(currentClassId)) || [];
     for (const row of relRows) {
-       if (teacherId && teacherId !== 'A Definir' && teacherId !== '-' && String(row.teacherId) === String(teacherId)) {
-          const turmaConflito = classesList?.find(c => String(c.id) === String(row.classId));
-          pMsg = `Este professor já está alocado na turma externa "${turmaConflito?.name || 'Desconhecida'}".`;
+       for (const tId of teacherIdsArray) {
+         if (tId && tId !== 'A Definir' && tId !== '-' && row.teacherId && String(row.teacherId).split(',').includes(String(tId))) {
+            const turmaConflito = classesList?.find(c => String(c.id) === String(row.classId));
+            if (!pMsg) pMsg = [];
+            pMsg.push(`Este professor ${tId} já está alocado na turma externa "${turmaConflito?.name || 'Desconhecida'}".`);
+         }
        }
        if (sala && row.room && row.room === sala) {
           const turmaConflito = classesList?.find(c => String(c.id) === String(row.classId));
@@ -197,7 +213,7 @@ export function MasterGrid({ isDarkMode, ...props }) {
        }
     }
     
-    if (pMsg || sMsg) return { profMsg: pMsg, salaMsg: sMsg };
+    if (pMsg || sMsg) return { profMsg: pMsg?.join(' '), salaMsg: sMsg };
     return null;
   };
 
@@ -258,7 +274,7 @@ export function MasterGrid({ isDarkMode, ...props }) {
     // Identifica todos os conflitos dos drops agrupados
     const conflicts = [];
     for (const drop of dropsToMake) {
-        const check = verificarChoqueHorario(aula.teacherId, aula.sala, diaId, drop.hora, classId);
+        const check = verificarChoqueHorario(aula.teacherIds, aula.sala, diaId, drop.hora, classId);
         if (check) {
            conflicts.push(`[${drop.hora}] ${[check.profMsg, check.salaMsg].filter(Boolean).join(' | ')}`);
         }
@@ -326,8 +342,8 @@ export function MasterGrid({ isDarkMode, ...props }) {
         courseId: String(disciplina.courseId),
         className: turmasDoCurso.find(t => String(t.id) === String(disciplina.classId))?.name || 'Turma',
         disciplina: disciplina.subjectName,
-        teacherId: disciplina.teacherId,
-        professor: resolveTeacherName(disciplina.teacherId, globalTeachersList),
+        teacherIds: disciplina.teacherIds,
+        professores: disciplina.teacherIds.map(id => resolveTeacherName(id, globalTeachersList)),
         sala: disciplina.room || '', 
         cor: getColorHash(disciplina.subjectName),
         numAulas: disciplina.numAulas || 1
@@ -338,7 +354,7 @@ export function MasterGrid({ isDarkMode, ...props }) {
       filtered.forEach(schedule => {
         let refCard;
         if (schedule.disciplineId) refCard = aulasReais.find(a => String(a.id) === String(schedule.disciplineId));
-        if (!refCard) refCard = aulasReais.find(a => String(a.classId) === String(schedule.classId) && String(a.teacherId) === String(schedule.teacherId));
+        if (!refCard) refCard = aulasReais.find(a => String(a.classId) === String(schedule.classId) && a.teacherIds?.join(',') === String(schedule.teacherId));
         if (refCard) {
              clonedGrade[`${schedule.classId}|${schedule.dayOfWeek}|${schedule.slotId}`] = { ...refCard, sala: schedule.room || refCard.sala };
              aulasAlocadasIds.push(String(refCard.id));
@@ -367,8 +383,8 @@ export function MasterGrid({ isDarkMode, ...props }) {
       const [classId, diaId, hora] = slotKey.split('|');
       cellAlerts[slotKey] = [];
 
-      if (aula && aula.teacherId && aula.teacherId !== 'A Definir' && aula.teacherId !== '-') {
-         const strConflito = verificarChoqueHorario(aula.teacherId, aula.sala, diaId, hora, classId);
+      if (aula && aula.teacherIds && aula.teacherIds.length > 0 && aula.teacherIds[0] !== 'A Definir' && aula.teacherIds[0] !== '-') {
+         const strConflito = verificarChoqueHorario(aula.teacherIds, aula.sala, diaId, hora, classId);
          if (strConflito) {
             if (strConflito.profMsg) {
                 cellAlerts[slotKey].profAlert = true;
@@ -381,40 +397,45 @@ export function MasterGrid({ isDarkMode, ...props }) {
             }
          }
 
-         const profSlots = new Set();
-         for (const [k, dObj] of Object.entries(grade)) {
-             if (k.split('|')[1] === diaId && dObj.teacherId === aula.teacherId) profSlots.add(k.split('|')[2]);
-         }
-         schedules?.forEach(s => {
-             if (String(s.dayOfWeek) === diaId && s.teacherId === aula.teacherId) profSlots.add(s.slotId);
-         });
-
-         let m = false; let t = false; let n = false;
-         const morningEnds = horariosExibidos.filter(h => parseInt(h.split(':')[0], 10) < 12).pop();
-         const afternoonStarts = horariosExibidos.find(h => { const v = parseInt(h.split(':')[0],10); return v >= 12 && v < 18; });
-         if (profSlots.has(morningEnds) && profSlots.has(afternoonStarts) && (hora === morningEnds || hora === afternoonStarts)) {
-             const noRest = "Sem descanso (Manhã -> Tarde).";
-             if (!cellAlerts[slotKey].profAlertMsg) cellAlerts[slotKey].profAlertMsg = [];
-             cellAlerts[slotKey].profAlertMsg.push(noRest);
-             cellAlerts[slotKey].profAlert = true;
-             if (!alerts.some(a => a.includes(`[${MAP_DAYS[diaId]}] Professor(a) ${aula.professor.split(' ')[0]} leciona sem descanso`))) {
-                 alerts.push(`[${MAP_DAYS[diaId]}] Professor(a) ${aula.professor.split(' ')[0]} leciona sem descanso entre Turnos (M->T).`);
+         aula.teacherIds.forEach(tId => {
+             if (tId === 'A Definir' || tId === '-') return;
+             const profSlots = new Set();
+             for (const [k, dObj] of Object.entries(grade)) {
+                 if (k.split('|')[1] === diaId && dObj.teacherIds?.includes(tId)) profSlots.add(k.split('|')[2]);
              }
-         }
+             schedules?.forEach(s => {
+                 if (String(s.dayOfWeek) === diaId && s.teacherId && String(s.teacherId).split(',').includes(String(tId))) profSlots.add(s.slotId);
+             });
 
-         profSlots.forEach(pt => {
-            const val = parseInt(pt.split(':')[0], 10);
-            if (val < 12) m = true; else if (val >= 12 && val < 18) t = true; else n = true;
+             let m = false; let t = false; let n = false;
+             const morningEnds = horariosExibidos.filter(h => parseInt(h.split(':')[0], 10) < 12).pop();
+             const afternoonStarts = horariosExibidos.find(h => { const v = parseInt(h.split(':')[0],10); return v >= 12 && v < 18; });
+             if (profSlots.has(morningEnds) && profSlots.has(afternoonStarts) && (hora === morningEnds || hora === afternoonStarts)) {
+                 const noRest = "Sem descanso (Manhã -> Tarde).";
+                 if (!cellAlerts[slotKey].profAlertMsg) cellAlerts[slotKey].profAlertMsg = [];
+                 cellAlerts[slotKey].profAlertMsg.push(noRest);
+                 cellAlerts[slotKey].profAlert = true;
+                 const pName = resolveTeacherName(tId, globalTeachersList).split(' ')[0];
+                 if (!alerts.some(a => a.includes(`[${MAP_DAYS[diaId]}] Professor(a) ${pName} leciona sem descanso`))) {
+                     alerts.push(`[${MAP_DAYS[diaId]}] Professor(a) ${pName} leciona sem descanso entre Turnos (M->T).`);
+                 }
+             }
+
+             profSlots.forEach(pt => {
+                const val = parseInt(pt.split(':')[0], 10);
+                if (val < 12) m = true; else if (val >= 12 && val < 18) t = true; else n = true;
+             });
+             if (m && t && n) {
+                const threeShifts = "Alocado em 3 Turnos no dia.";
+                if (!cellAlerts[slotKey].profAlertMsg) cellAlerts[slotKey].profAlertMsg = [];
+                cellAlerts[slotKey].profAlertMsg.push(threeShifts);
+                cellAlerts[slotKey].profAlert = true;
+                const pName = resolveTeacherName(tId, globalTeachersList).split(' ')[0];
+                if (!alerts.some(a => a.includes(`[${MAP_DAYS[diaId]}] Professor(a) ${pName} atua`))) {
+                     alerts.push(`[${MAP_DAYS[diaId]}] Professor(a) ${pName} atua em 3 Turnos diferentes.`);
+                }
+             }
          });
-         if (m && t && n) {
-            const threeShifts = "Alocado em 3 Turnos no dia.";
-            if (!cellAlerts[slotKey].profAlertMsg) cellAlerts[slotKey].profAlertMsg = [];
-            cellAlerts[slotKey].profAlertMsg.push(threeShifts);
-            cellAlerts[slotKey].profAlert = true;
-            if (!alerts.some(a => a.includes(`[${MAP_DAYS[diaId]}] Professor(a) ${aula.professor.split(' ')[0]} atua`))) {
-                 alerts.push(`[${MAP_DAYS[diaId]}] Professor(a) ${aula.professor.split(' ')[0]} atua em 3 Turnos diferentes.`);
-            }
-         }
       }
     });
     // Remove duplicados gerais de alerts
@@ -460,11 +481,22 @@ export function MasterGrid({ isDarkMode, ...props }) {
           </div>
           {/* SELETORES DE VISUALIZAÇÃO */}
           <div className="flex flex-col sm:flex-row items-center gap-2 px-2">
+             <select
+               value={shiftFilter}
+               onChange={e => setShiftFilter(e.target.value)}
+               className={`px-3 py-2 rounded-lg border shadow-sm outline-none cursor-pointer text-xs font-bold uppercase tracking-wider text-teal-600 dark:text-teal-400 ${isDarkMode ? 'bg-slate-900 border-slate-700' : 'bg-slate-50 border-slate-300'}`}
+               title="Filtrar visualização de linhas"
+             >
+               <option value="todos">Todos os Turnos</option>
+               <option value="diurno">Diurno (Mat/Vesp)</option>
+               <option value="noturno">Noturno</option>
+             </select>
+
              <select 
                value={selectedType} onChange={e => setSelectedType(e.target.value)} 
                className={`px-3 py-2 rounded-lg border shadow-sm outline-none cursor-pointer text-xs font-bold uppercase tracking-wider text-indigo-600 dark:text-indigo-400 ${isDarkMode ? 'bg-slate-900 border-slate-700' : 'bg-slate-50 border-slate-300'}`}
              >
-                 <option value="padrao">Padrão Anual</option>
+                 <option value="padrao">Padrão Anual (Base)</option>
                  <option value="previa">Prévia Semanal</option>
                  <option value="atual">Horário Atual</option>
                  <option value="oficial">Histórico Oficial</option>
@@ -613,7 +645,7 @@ export function MasterGrid({ isDarkMode, ...props }) {
                          </div>
                        </div>
                        <div className="flex justify-between items-center pl-4 pr-1 mt-1">
-                          <span className="text-[8px] font-bold text-slate-500 truncate max-w-[80px]">{aula.professor?.split(' ')[0]}</span>
+                          <span className="text-[8px] font-bold text-slate-500 truncate max-w-[80px]">{aula.professores?.map(p => p.split(' ')[0]).join(' + ')}</span>
                           <span className="text-[8px] text-slate-400 flex items-center gap-0.5 truncate bg-black/5 dark:bg-white/5 px-1 py-[1px] rounded"><MapPin size={8} /> {aula.sala ? aula.sala.slice(0, 8) : 'S/Sala'}</span>
                        </div>
 
@@ -701,7 +733,7 @@ export function MasterGrid({ isDarkMode, ...props }) {
                                 <div 
                                   draggable
                                   onDragStart={(e) => handleDragStart(e, aulaNesteSlot, slotKey)}
-                                  className={`group/card w-[85%] sm:w-[75%] mx-auto min-h-[30px] rounded border flex flex-col justify-center px-1.5 py-0.5 cursor-grab hover:ring-2 ring-emerald-500 transition-all shadow-sm overflow-hidden relative ${isDarkMode ? 'bg-slate-700 border-slate-500' : 'bg-white border-slate-300'}`}
+                                  className={`group/card w-[95%] sm:w-[90%] mx-auto min-h-[56px] rounded border flex flex-col justify-between p-2 cursor-grab hover:ring-2 ring-emerald-500 transition-all shadow-sm overflow-hidden relative ${isDarkMode ? 'bg-slate-700 border-slate-500' : 'bg-white border-slate-300'}`}
                                 >
                                   <button onClick={(e) => { e.preventDefault(); e.stopPropagation(); setGrade(prev => { const n = {...prev}; delete n[slotKey]; return n; }); }} className="absolute top-0 right-0 bg-rose-500 hover:bg-rose-600 text-white font-bold p-1 rounded-bl-md z-20 opacity-0 group-hover/card:opacity-100 cursor-pointer transition-opacity shadow-sm" title="Remover Aula do Horário" >
                                     <X size={8} strokeWidth={4} />
@@ -711,12 +743,12 @@ export function MasterGrid({ isDarkMode, ...props }) {
                                      {Object.values(grade).filter(g => String(g.classId) === String(aulaNesteSlot.classId) && String(g.id) === String(aulaNesteSlot.id)).length}/{aulaNesteSlot.numAulas || 1}
                                   </span>
 
-                                  <span className={`text-[9px] w-[80%] font-black uppercase tracking-widest text-${aulaNesteSlot.cor}-500 dark:text-${aulaNesteSlot.cor}-400 leading-none truncate mt-1`} title={`${aulaNesteSlot.disciplina} - ${aulaNesteSlot.className}`}>
+                                  <span className={`text-[9px] w-[80%] font-black uppercase tracking-widest text-${aulaNesteSlot.cor}-500 dark:text-${aulaNesteSlot.cor}-400 leading-tight truncate`} title={`${aulaNesteSlot.disciplina} - ${aulaNesteSlot.className}`}>
                                     {aulaNesteSlot.disciplina} <span className="text-[7px] ml-1 opacity-60 font-bold tracking-normal">- {aulaNesteSlot.className}</span>
                                   </span>
-                                  <div className="flex justify-between items-center mt-1 gap-1 overflow-hidden" title={temAlertaProf ? profMsgText : "Professor e Local"}>
+                                  <div className="flex justify-between items-center mt-auto pt-1 gap-1 overflow-hidden" title={temAlertaProf ? profMsgText : "Professor e Local"}>
                                     <span className={`text-[8px] font-bold truncate max-w-[80px] ${temAlertaProf ? 'text-red-500 dark:text-red-400 bg-red-500/10 px-0.5 rounded border border-red-500/20' : 'text-slate-500 dark:text-slate-300'}`}>
-                                      {temAlertaProf && <AlertTriangle size={8} className="inline mr-0.5 mb-[1px]" />} {aulaNesteSlot.professor?.split(' ')[0]}
+                                      {temAlertaProf && <AlertTriangle size={8} className="inline mr-0.5 mb-[1px]" />} {aulaNesteSlot.professores?.map(p => p.split(' ')[0]).join(' + ')}
                                     </span>
                                     {aulaNesteSlot.sala && (
                                       <span className={`text-[8px] font-bold flex items-center gap-0.5 truncate px-1 py-[1px] rounded ${temAlertaSala ? 'bg-amber-500/20 text-amber-600 border border-amber-500/30' : 'bg-black/5 dark:bg-white/5 text-slate-400'}`} title={temAlertaSala ? alertasObj.salaText : "Local da Aula"}>
@@ -726,7 +758,7 @@ export function MasterGrid({ isDarkMode, ...props }) {
                                   </div>
                                 </div>
                               ) : (
-                                <div className={`w-[70%] mx-auto h-[26px] rounded border border-dashed flex items-center justify-center transition-colors ${isDarkMode ? 'border-slate-700/50 hover:bg-slate-700/30' : 'border-slate-200 hover:bg-slate-50'}`}>
+                                <div className={`w-[95%] sm:w-[90%] mx-auto min-h-[56px] rounded border border-dashed flex items-center justify-center transition-colors ${isDarkMode ? 'border-slate-700/50 hover:bg-slate-700/30' : 'border-slate-200 hover:bg-slate-50'}`}>
                                 </div>
                               )}
                             </td>
@@ -800,7 +832,7 @@ export function MasterGrid({ isDarkMode, ...props }) {
            academicWeeks={academicWeeks} schedules={schedules} selectedConfigYear={selectedConfigYear}
            loadedType={selectedType} loadedWeek={selectedWeek} 
            onClose={() => setModalMode(null)} 
-           onSuccess={() => { setModalMode(null); alert("Grade armazenada com sucesso!"); setRefreshTick(prev => prev + 1); }} 
+           onSuccess={() => { setModalMode(null); alert("Grade armazenada com sucesso!"); setRefreshTrigger(prev => prev + 1); }} 
          />
       )}
 
@@ -853,11 +885,11 @@ function SaveMatrixModal({ isDarkMode, grade, selectedCourses, saveOptions, setS
   const currentYearWeeks = useMemo(() => academicWeeks?.filter(w => String(w.academic_year) === String(selectedConfigYear)) || [], [academicWeeks, selectedConfigYear]);
 
   const availableOptions = useMemo(() => {
-      if (loadedType === 'padrao') return [{ value: 'padrao', label: '1. Criar/Atualizar: Padrão Anual' }, { value: 'previa', label: '2. Criar: Prévia Semanal' }];
+      if (loadedType === 'padrao') return [{ value: 'padrao', label: '0. Atualizar: Padrão Anual (Base)' }, { value: 'previa', label: '1. Criar: Prévia Semanal' }];
       if (loadedType === 'previa') return [{ value: 'previa', label: '1. Atualizar: Prévia' }, { value: 'atual', label: '2. Promover para: Atual' }];
       if (loadedType === 'atual') return [{ value: 'atual', label: '2. Atualizar: Atual' }, { value: 'oficial', label: '3. Promover para: Oficial' }];
       if (loadedType === 'oficial') return [{ value: 'oficial', label: '3. Retificar: Oficial' }];
-      return [{ value: 'padrao', label: '1. Novo Padrão Anual' }, { value: 'previa', label: '2. Criar: Prévia Semanal' }];
+      return [{ value: 'padrao', label: '0. Criar: Padrão Anual (Base)' }, { value: 'previa', label: '1. Criar: Prévia Semanal' }];
   }, [loadedType]);
 
   useEffect(() => { setSaveOptions({ type: availableOptions[0].value, weekId: loadedWeek }); }, [loadedType, loadedWeek, availableOptions]);
@@ -865,7 +897,7 @@ function SaveMatrixModal({ isDarkMode, grade, selectedCourses, saveOptions, setS
   const handleConfirmSave = async () => {
       const payload = Object.entries(grade).map(([key, aula]) => {
          const [classId, dayOfWeek, slotId] = key.split('|');
-         return { courseId: aula.courseId, classId, dayOfWeek, slotId, teacherId: aula.teacherId, disciplineId: aula.id.split('_')[1] || aula.id, room: aula.sala };
+         return { courseId: aula.courseId, classId, dayOfWeek, slotId, teacherId: aula.teacherIds ? aula.teacherIds.join(',') : 'A Definir', disciplineId: aula.id.split('_')[1] || aula.id, room: aula.sala };
       });
 
       if (saveOptions.type !== 'padrao' && !saveOptions.weekId) return alert('Selecione uma semana letiva!');
@@ -886,19 +918,14 @@ function SaveMatrixModal({ isDarkMode, grade, selectedCourses, saveOptions, setS
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
       <div className={`w-full max-w-2xl rounded-xl p-6 ${isDarkMode ? 'bg-slate-900 text-white' : 'bg-white'}`}>
          <h2 className="text-lg font-black uppercase mb-4">Pipeline de Aprovação</h2>
-          <div className="grid grid-cols-2 gap-4 mb-6">
+          <div className={`grid ${saveOptions.type !== 'padrao' ? 'grid-cols-2' : 'grid-cols-1'} gap-4 mb-6`}>
             <div>
               <label className="block text-[10px] font-black uppercase opacity-60 mb-2">Ação Permitida</label>
               <select value={saveOptions.type} onChange={e => setSaveOptions(p => ({...p, type: e.target.value}))} className="w-full p-3 rounded border text-xs font-bold text-black">
                  {availableOptions.map(opt => <option key={opt.value} value={opt.value}>{opt.label}</option>)}
               </select>
             </div>
-            {saveOptions.type === 'padrao' ? (
-              <div>
-                <label className="block text-[10px] font-black uppercase opacity-60 mb-2">Versão (Ex: v1.0)</label>
-                <input type="text" value={saveOptions.weekId} onChange={e => setSaveOptions(p => ({...p, weekId: e.target.value}))} className="w-full p-3 rounded border text-black text-xs" />
-              </div>
-            ) : (
+            {saveOptions.type !== 'padrao' && (
               <div>
                 <label className="block text-[10px] font-black uppercase opacity-60 mb-2">Semana Destino</label>
                 <select value={saveOptions.weekId} onChange={e => setSaveOptions(p => ({...p, weekId: e.target.value}))} className="w-full p-3 rounded border text-xs text-black">
