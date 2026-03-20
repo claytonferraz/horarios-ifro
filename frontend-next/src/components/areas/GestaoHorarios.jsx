@@ -45,15 +45,53 @@ export function GestaoHorarios({
         
         <AdminStatsPanel adminStats={adminStats} isDarkMode={isDarkMode} />
 
-        {/* BARRA DE NAVEGAÇÃO INTERNA ADMIN */}
-        <div className={`flex flex-wrap p-1.5 rounded-xl shadow-inner w-full mb-4 ${isDarkMode ? 'bg-slate-900' : 'bg-slate-100'}`}>
-          {/* TODO: Módulo de Gestão de Planilhas inativado. Dados preservados para migração futura. */}
-          {/* <button onClick={() => setAdminTab('planilhas')} className={`flex-1 min-w-[120px] md:flex-none flex items-center justify-center gap-1.5 px-6 py-2.5 rounded-lg text-xs font-black uppercase tracking-widest transition-all ${adminTab === 'planilhas' ? (isDarkMode ? 'bg-slate-800 text-slate-100 shadow-sm' : 'bg-white text-slate-800 shadow-sm') : (isDarkMode ? 'text-slate-400 hover:text-slate-300' : 'text-slate-500 hover:text-slate-700')}`}><Database size={16} /> Gestão de Planilhas</button> */}
-          <button onClick={() => setAdminTab('disciplinas')} className={`flex-1 min-w-[120px] md:flex-none flex items-center justify-center gap-1.5 px-6 py-2.5 rounded-lg text-xs font-black uppercase tracking-widest transition-all ${adminTab === 'disciplinas' ? (isDarkMode ? 'bg-slate-800 text-indigo-400 shadow-sm' : 'bg-white text-indigo-700 shadow-sm') : (isDarkMode ? 'text-slate-400 hover:text-slate-300' : 'text-slate-500 hover:text-slate-700')}`}><ClipboardList size={16} /> Gestão Escolar</button>
-          {['admin','gestao'].includes(userRole) && <button onClick={() => setAdminTab('ano_letivo')} className={`flex-1 min-w-[120px] md:flex-none flex items-center justify-center gap-1.5 px-6 py-2.5 rounded-lg text-xs font-black uppercase tracking-widest transition-all ${adminTab === 'ano_letivo' ? (isDarkMode ? 'bg-slate-800 text-emerald-400 shadow-sm' : 'bg-white text-emerald-700 shadow-sm') : (isDarkMode ? 'text-slate-400 hover:text-slate-300' : 'text-slate-500 hover:text-slate-700')}`}><CalendarDays size={16} /> Ano Letivo</button>}
-          {['admin','gestao'].includes(userRole) && <button onClick={() => { setAdminTab('master_grid'); props.setScheduleMode('previa'); props.setViewMode('curso'); }} className={`flex-1 min-w-[120px] md:flex-none flex items-center justify-center gap-1.5 px-6 py-2.5 rounded-lg text-xs font-black uppercase tracking-widest transition-all ${adminTab === 'master_grid' ? (isDarkMode ? 'bg-slate-800 text-emerald-400 shadow-sm' : 'bg-white text-emerald-600 shadow-sm') : (isDarkMode ? 'text-slate-400 hover:text-slate-300' : 'text-slate-500 hover:text-slate-700')}`}><CalendarDays size={16} /> Montar Horário</button>}
-          {['admin','gestao'].includes(userRole) && <button onClick={() => setAdminTab('solicitacoes')} className={`flex-1 min-w-[120px] md:flex-none flex items-center justify-center gap-1.5 px-6 py-2.5 rounded-lg text-xs font-black uppercase tracking-widest transition-all ${adminTab === 'solicitacoes' ? (isDarkMode ? 'bg-slate-800 text-rose-400 shadow-sm' : 'bg-white text-rose-700 shadow-sm') : (isDarkMode ? 'text-slate-400 hover:text-slate-300' : 'text-slate-500 hover:text-slate-700')}`}><MessageSquare size={16} /> Solicitações</button>}
-          {['admin','gestao'].includes(userRole) && <button onClick={() => setAdminTab('configuracoes')} className={`flex-1 min-w-[120px] md:flex-none flex items-center justify-center gap-1.5 px-6 py-2.5 rounded-lg text-xs font-black uppercase tracking-widest transition-all ${adminTab === 'configuracoes' ? (isDarkMode ? 'bg-slate-800 text-amber-400 shadow-sm' : 'bg-white text-amber-600 shadow-sm') : (isDarkMode ? 'text-slate-400 hover:text-slate-300' : 'text-slate-500 hover:text-slate-700')}`}><Settings size={16} /> Configurações de Horários</button>}
+        {/* BARRA DE NAVEGAÇÃO INTERNA ADMIN (REFINADA) */}
+        <div className={`flex flex-wrap items-center gap-2 p-1.5 rounded-xl shadow-inner w-full mb-4 ${isDarkMode ? 'bg-slate-900' : 'bg-slate-100'}`}>
+          
+          {/* DESTAQUES (MASTER GRID & SOLICITAÇÕES) */}
+          {['admin','gestao'].includes(userRole) && (
+            <button onClick={() => { setAdminTab('master_grid'); props.setScheduleMode('previa'); props.setViewMode('curso'); }} 
+                    className={`flex-1 sm:flex-none min-w-[200px] flex items-center justify-center gap-2 px-6 py-3 rounded-lg text-[11px] font-black uppercase tracking-widest transition-all ${adminTab === 'master_grid' ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-900/40 ring-2 ring-indigo-400/50' : (isDarkMode ? 'bg-slate-800 text-slate-300 hover:text-white hover:bg-slate-700' : 'bg-white text-slate-600 hover:text-slate-900 border border-slate-200')}`}>
+              <CalendarDays size={16} /> Montar Horário
+            </button>
+          )}
+          
+          {['admin','gestao'].includes(userRole) && (
+             <button onClick={() => setAdminTab('solicitacoes')} 
+                     className={`flex-1 sm:flex-none min-w-[200px] flex items-center justify-center gap-2 px-6 py-3 rounded-lg text-[11px] font-black uppercase tracking-widest transition-all ${adminTab === 'solicitacoes' ? 'bg-rose-600 text-white shadow-lg shadow-rose-900/40 ring-2 ring-rose-400/50' : (isDarkMode ? 'bg-slate-800 text-slate-300 hover:text-white hover:bg-slate-700' : 'bg-white text-slate-600 hover:text-slate-900 border border-slate-200')}`}>
+               <MessageSquare size={16} /> Solicitações
+             </button>
+          )}
+
+          {/* DROPDOWN MENU PARA OUTRAS FUNÇÕES */}
+          <div className="relative group ml-auto flex-1 sm:flex-none">
+            <button className={`w-full sm:w-auto flex items-center justify-center gap-2 px-6 py-3 rounded-lg text-[11px] font-black uppercase tracking-widest transition-all ${['disciplinas', 'ano_letivo', 'configuracoes'].includes(adminTab) ? (isDarkMode ? 'bg-slate-800 border border-slate-700 text-emerald-400' : 'bg-white border border-slate-300 text-emerald-600') : (isDarkMode ? 'bg-slate-800/50 text-slate-400 hover:text-slate-200' : 'bg-white/50 text-slate-500 hover:text-slate-800 border border-transparent')}`}>
+              <Settings size={14} /> Mais Configurações
+            </button>
+            
+            {/* Overlay invisível para fechar ao sair do hover */}
+            <div className={`absolute right-0 sm:right-0 lg:left-0 lg:right-auto top-full mt-2 w-64 rounded-xl shadow-2xl p-2 z-[99] opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 ${isDarkMode ? 'bg-slate-800 border border-slate-700' : 'bg-white border border-slate-200'}`}>
+               
+               <button onClick={() => setAdminTab('disciplinas')} 
+                       className={`w-full text-left flex items-center gap-3 px-4 py-3 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all mb-1 ${adminTab === 'disciplinas' ? (isDarkMode ? 'bg-slate-900 text-indigo-400' : 'bg-slate-100 text-indigo-600') : (isDarkMode ? 'hover:bg-slate-700 text-slate-300' : 'hover:bg-slate-50 text-slate-600')}`}>
+                 <ClipboardList size={14} /> Gestão Escolar
+               </button>
+               
+               {['admin','gestao'].includes(userRole) && (
+                 <button onClick={() => setAdminTab('ano_letivo')} 
+                         className={`w-full text-left flex items-center gap-3 px-4 py-3 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all mb-1 ${adminTab === 'ano_letivo' ? (isDarkMode ? 'bg-slate-900 text-emerald-400' : 'bg-slate-100 text-emerald-600') : (isDarkMode ? 'hover:bg-slate-700 text-slate-300' : 'hover:bg-slate-50 text-slate-600')}`}>
+                   <CalendarDays size={14} /> Ano Letivo
+                 </button>
+               )}
+               
+               {['admin','gestao'].includes(userRole) && (
+                 <button onClick={() => setAdminTab('configuracoes')} 
+                         className={`w-full text-left flex items-center gap-3 px-4 py-3 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all ${adminTab === 'configuracoes' ? (isDarkMode ? 'bg-slate-900 text-amber-400' : 'bg-slate-100 text-amber-600') : (isDarkMode ? 'hover:bg-slate-700 text-slate-300' : 'hover:bg-slate-50 text-slate-600')}`}>
+                   <Settings size={14} /> Config. de Horários
+                 </button>
+               )}
+            </div>
+          </div>
         </div>
 
         {/* ABA 4: CONFIGURAÇÕES DE HORÁRIOS */}
