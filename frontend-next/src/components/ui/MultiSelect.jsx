@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useRef, useMemo } from "react";
 import { ChevronDown, Check } from "lucide-react";
 
-export const MultiSelect = ({ values, onChange, options, colorClass, placeholder = "Selecione...", isDarkMode }) => {
+export const MultiSelect = ({ values = [], onChange, options = [], colorClass, placeholder = "Selecione...", isDarkMode }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [search, setSearch] = useState('');
   const wrapperRef = useRef(null);
@@ -18,22 +18,31 @@ export const MultiSelect = ({ values, onChange, options, colorClass, placeholder
     }
   }, []);
 
-  const filteredOptions = useMemo(() => 
-    options.filter(o => o.toString().toLowerCase().includes(search.toLowerCase()))
-  , [options, search]);
+  const normalizedOptions = useMemo(() => {
+    return options.map(opt => {
+      if (typeof opt === 'object' && opt !== null) {
+        return { value: opt.value, label: opt.label || String(opt.value) };
+      }
+      return { value: opt, label: String(opt) };
+    });
+  }, [options]);
 
-  const toggleOption = (opt) => {
-    if (values.includes(opt)) {
-      onChange(values.filter(v => v !== opt));
+  const filteredOptions = useMemo(() => 
+    normalizedOptions.filter(o => o.label.toLowerCase().includes(search.toLowerCase()))
+  , [normalizedOptions, search]);
+
+  const toggleOption = (optValue) => {
+    if (values.includes(optValue)) {
+      onChange(values.filter(v => v !== optValue));
     } else {
-      onChange([...values, opt]);
+      onChange([...values, optValue]);
     }
   };
 
-  const displayValue = values.length === 0 
+  const displayValue = !values || values.length === 0 
     ? placeholder 
     : values.length === 1 
-      ? values[0] 
+      ? (normalizedOptions.find(o => o.value === values[0])?.label || values[0])
       : `${values.length} selecionados`;
 
   return (
@@ -58,13 +67,13 @@ export const MultiSelect = ({ values, onChange, options, colorClass, placeholder
               autoFocus
             />
             <div className="flex justify-between items-center px-1">
-              <button onClick={() => onChange([...options])} className={`text-[9px] font-black uppercase tracking-wider hover:opacity-70 ${isDarkMode ? 'text-emerald-400' : 'text-emerald-600'}`}>Sel. Todos</button>
+              <button onClick={() => onChange(normalizedOptions.map(o => o.value))} className={`text-[9px] font-black uppercase tracking-wider hover:opacity-70 ${isDarkMode ? 'text-emerald-400' : 'text-emerald-600'}`}>Sel. Todos</button>
               <button onClick={() => onChange([])} className={`text-[9px] font-black uppercase tracking-wider hover:opacity-70 ${isDarkMode ? 'text-rose-400' : 'text-rose-600'}`}>Limpar</button>
             </div>
           </div>
           <ul className="overflow-y-auto p-1">
             {filteredOptions.length > 0 ? filteredOptions.map(opt => {
-               const isSelected = values.includes(opt);
+               const isSelected = values.includes(opt.value);
                let itemClasses = "px-2 py-2 text-[11px] uppercase rounded-md cursor-pointer transition-colors flex items-center gap-2 ";
                if (isSelected) {
                    itemClasses += isDarkMode ? "bg-emerald-900/40 text-emerald-300 font-bold" : "bg-emerald-50 text-emerald-800 font-bold";
@@ -74,14 +83,14 @@ export const MultiSelect = ({ values, onChange, options, colorClass, placeholder
 
                return (
                 <li 
-                  key={opt}
+                  key={opt.value}
                   className={itemClasses}
-                  onClick={() => toggleOption(opt)}
+                  onClick={() => toggleOption(opt.value)}
                 >
                   <div className={`w-3.5 h-3.5 rounded flex items-center justify-center border shrink-0 ${isSelected ? 'bg-emerald-500 border-emerald-500 text-white' : (isDarkMode ? 'border-slate-500' : 'border-slate-300')}`}>
                     {isSelected && <Check size={10} strokeWidth={4} />}
                   </div>
-                  <span className="truncate">{opt}</span>
+                  <span className="truncate">{opt.label}</span>
                 </li>
                )
             }) : (

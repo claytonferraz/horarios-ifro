@@ -2,6 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { BookOpen, Users, Plus, Trash2, Edit2, Save, X, Settings2, CalendarDays, CheckCircle, User as UserIcon, AlertTriangle } from 'lucide-react';
 import { apiClient } from '@/lib/apiClient';
 import { UsersManager } from './UsersManager';
+import { MultiSelect } from '../MultiSelect';
 
 export function CurriculumManager({ isDarkMode, academicYearsMeta, groupedDisciplinesBySerie = {} }) {
   const [activeTab, setActiveTab] = useState('matrices');
@@ -531,40 +532,12 @@ function ClassesTab({ isDarkMode, matrices, classes, setClasses, generateId, aca
     }, 'info');
   };
 
-  const handleAddProf = (discId, siape) => {
-    if (!siape) return;
-    setLocalFormData(prev => {
-      const current = prev.professorAssignments?.[discId] || [];
-      if (current.includes(siape)) return prev;
-      return {
-        ...prev,
-        professorAssignments: {
-          ...(prev.professorAssignments || {}),
-          [discId]: [...current, siape]
-        }
-      };
-    });
-  };
-
-  const handleRemoveProf = (discId, siapeToRemove) => {
-    setLocalFormData(prev => {
-      const current = prev.professorAssignments?.[discId] || [];
-      return {
-        ...prev,
-        professorAssignments: {
-          ...(prev.professorAssignments || {}),
-          [discId]: current.filter(s => s !== siapeToRemove)
-        }
-      };
-    });
-  };
-
-  const handleClearProfs = (discId) => {
+  const handleAssignmentChange = (disciplineId, teacherIdsArray) => {
     setLocalFormData(prev => ({
       ...prev,
       professorAssignments: {
         ...(prev.professorAssignments || {}),
-        [discId]: []
+        [disciplineId]: teacherIdsArray
       }
     }));
   };
@@ -651,32 +624,14 @@ function ClassesTab({ isDarkMode, matrices, classes, setClasses, generateId, aca
                         <td className="p-3 font-bold">{disc.name} {disc.code && <span className="opacity-50 ml-1 text-[10px] uppercase">({disc.code})</span>}</td>
                         <td className="p-3 font-black text-slate-500">{disc.hours}h</td>
                         <td className="p-2">
-                          <div className="flex flex-col gap-2">
-                             {assignedProfs.length > 0 && (
-                               <div className="flex flex-wrap gap-1.5 items-center">
-                                  {assignedProfs.map(siape => {
-                                      const match = globalTeachers.find(t => t.siape === siape);
-                                      const label = match ? (match.nome_exibicao || match.nome_completo) : siape;
-                                      return (
-                                        <span key={siape} className="inline-flex items-center gap-1 px-2 py-1 rounded bg-indigo-100 dark:bg-indigo-900/40 text-indigo-700 dark:text-indigo-300 text-[10px] font-black uppercase tracking-widest shadow-sm">
-                                            {label}
-                                            <button type="button" onClick={() => handleRemoveProf(disc.id, siape)} className="hover:text-rose-500 hover:bg-indigo-200 dark:hover:bg-indigo-800 rounded-full p-0.5" title="Remover Professor"><X size={10} strokeWidth={3}/></button>
-                                        </span>
-                                      );
-                                  })}
-                                  <button type="button" onClick={() => handleClearProfs(disc.id)} className="ml-1 text-[9px] font-black uppercase tracking-widest text-rose-500 hover:text-rose-600 underline" title="Desalocar Todos os Professores desta Disciplina">Limpar</button>
-                               </div>
-                             )}
-                             <select 
-                               onChange={e => { handleAddProf(disc.id, e.target.value); e.target.value = ''; }} 
-                               defaultValue=""
-                               className={`w-full p-2.5 rounded-lg border font-bold text-xs uppercase cursor-pointer transition-all ${isDarkMode ? 'bg-slate-800 border-slate-700 focus:bg-slate-700' : 'bg-white border-slate-300'}`} 
-                             >
-                                <option value="" disabled>+ Adicionar Prof...</option>
-                                {globalTeachers.filter(t => t.atua_como_docente === 1 || t.atua_como_docente === true).map(t => (
-                                   <option key={t.siape} value={t.siape}>{t.nome_exibicao || t.nome_completo}</option>
-                                ))}
-                             </select>
+                          <div className="flex-1 min-w-[250px]">
+                            <MultiSelect
+                              options={globalTeachers.filter(t => t.atua_como_docente === 1 || t.atua_como_docente === true).map(t => ({ value: String(t.siape), label: t.nome_exibicao || t.nome_completo }))}
+                              values={assignedProfs}
+                              onChange={selectedIds => handleAssignmentChange(disc.id, selectedIds)}
+                              placeholder="Buscar e selecionar professor(es)..."
+                              isDarkMode={isDarkMode}
+                            />
                           </div>
                         </td>
                         <td className="p-2">
@@ -701,7 +656,7 @@ function ClassesTab({ isDarkMode, matrices, classes, setClasses, generateId, aca
   }
 
   // Filtered classes
-  const displayedClasses = classes.filter(c => c.academicYear === filterYear);
+  const displayedClasses = classes.filter(c => c.academicYear === filterYear).sort((a, b) => a.name.localeCompare(b.name));
 
   return (
     <div className="space-y-6">

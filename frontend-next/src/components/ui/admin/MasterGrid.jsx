@@ -115,7 +115,7 @@ export function MasterGrid({ isDarkMode, ...props }) {
   // Pega todas as turmas dos cursos selecionados
   const turmasDoCurso = useMemo(() => {
     if (selectedCourses.length === 0) return [];
-    return classesList?.filter(cls => selectedCourses.includes(String(cls.courseId))) || [];
+    return classesList?.filter(cls => selectedCourses.includes(String(cls.courseId))).sort((a, b) => a.name.localeCompare(b.name)) || [];
   }, [selectedCourses, classesList]);
 
  // Estrutura do Grid Baseado no Estado Global de Schedules + Alocação Neutra
