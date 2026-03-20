@@ -425,13 +425,15 @@ export function PortalView({
    }, [appMode, academicWeeks, selectedWeek, handleAlunoScheduleTab]);
 
    const estatisticasAluno = React.useMemo(() => {
-       if (!schedules || schedules.length === 0 || !selectedClass) return { lecionadas: 0, semProfessorSemana: 0, aReporTotal: 0 };
-       const oficiaisTurma = schedules.filter(s => s.type === 'oficial' && String(s.classId) === String(selectedClass));
+       if (!schedules || schedules.length === 0 || !selectedClass || !dbClasses) return { lecionadas: 0, semProfessorSemana: 0, aReporTotal: 0 };
+       const classObj = dbClasses.find(c => c.name === selectedClass);
+       const classId = classObj ? String(classObj.id) : String(selectedClass);
+       const oficiaisTurma = schedules.filter(s => s.type === 'oficial' && String(s.classId) === classId);
        const lecionadas = oficiaisTurma.length;
        const aReporTotal = oficiaisTurma.filter(s => !s.teacherId || String(s.teacherId) === 'A Definir' || String(s.teacherId) === '-').length;
        const vagasSemana = mappedSchedules.filter(s => String(s.className) === String(selectedClass) && (!s.teacher || String(s.teacher) === 'A Definir' || String(s.teacher) === '-')).length;
        return { lecionadas, semProfessorSemana: vagasSemana, aReporTotal };
-   }, [schedules, mappedSchedules, selectedClass]);
+   }, [schedules, mappedSchedules, selectedClass, dbClasses]);
 
    const weekLabel = React.useMemo(() => {
        if (!selectedWeek || !academicWeeks) return '';
