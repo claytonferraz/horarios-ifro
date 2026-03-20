@@ -531,28 +531,40 @@ function ClassesTab({ isDarkMode, matrices, classes, setClasses, generateId, aca
     }, 'info');
   };
 
-  const handleProfChange = (discId, profStr) => {
-    // Treat the input string as a comma-separated list of names or SIAPEs
-    const profArray = profStr.split(',').map(p => {
-       const trimmed = p.trim();
-       if (!trimmed) return null;
-       
-       // Try to find a teacher by display name, full name or existing SIAPE
-       const match = globalTeachers.find(t => 
-         t.nome_exibicao === trimmed || 
-         t.nome_completo === trimmed || 
-         t.siape === trimmed
-       );
-       
-       // Store SIAPE if found, otherwise store as is (it will resolve later if user types exact name)
-       return match ? match.siape : trimmed;
-    }).filter(Boolean);
-    
+  const handleAddProf = (discId, siape) => {
+    if (!siape) return;
+    setLocalFormData(prev => {
+      const current = prev.professorAssignments?.[discId] || [];
+      if (current.includes(siape)) return prev;
+      return {
+        ...prev,
+        professorAssignments: {
+          ...(prev.professorAssignments || {}),
+          [discId]: [...current, siape]
+        }
+      };
+    });
+  };
+
+  const handleRemoveProf = (discId, siapeToRemove) => {
+    setLocalFormData(prev => {
+      const current = prev.professorAssignments?.[discId] || [];
+      return {
+        ...prev,
+        professorAssignments: {
+          ...(prev.professorAssignments || {}),
+          [discId]: current.filter(s => s !== siapeToRemove)
+        }
+      };
+    });
+  };
+
+  const handleClearProfs = (discId) => {
     setLocalFormData(prev => ({
       ...prev,
       professorAssignments: {
         ...(prev.professorAssignments || {}),
-        [discId]: profArray
+        [discId]: []
       }
     }));
   };
@@ -616,9 +628,6 @@ function ClassesTab({ isDarkMode, matrices, classes, setClasses, generateId, aca
         {selectedSerie && (
           <div className="pt-6">
             <h4 className="font-black text-sm uppercase tracking-widest flex items-center gap-2 mb-4"><Users size={16}/> Atribuição de Professores</h4>
-            <datalist id="teachers-list">
-               {globalTeachers.filter(t => t.atua_como_docente === 1 || t.atua_como_docente === true).map(t => <option key={t.siape} value={t.nome_exibicao || t.nome_completo} />)}
-            </datalist>
             <div className={`rounded-xl border overflow-hidden ${isDarkMode ? 'bg-slate-900/50 border-slate-700' : 'bg-slate-50 border-slate-200'}`}>
               <table className="w-full text-left text-xs">
                 <thead>
@@ -637,25 +646,38 @@ function ClassesTab({ isDarkMode, matrices, classes, setClasses, generateId, aca
                     const assignedProfs = localFormData.professorAssignments?.[disc.id] || [];
                     const assignedRoom = localFormData.roomAssignments?.[disc.id] || '';
                     
-                    // NEW DYNAMIC RESOLUTION: Lookup SIAPE in globalTeachers to get the CURRENT name
-                    const profStr = assignedProfs.map(siape => {
-                      const match = globalTeachers.find(t => t.siape === siape);
-                      // If no match by SIAPE, maybe it's a name we haven't linked yet
-                      return match ? (match.nome_exibicao || match.nome_completo) : siape;
-                    }).join(', ');
                     return (
                       <tr key={disc.id}>
                         <td className="p-3 font-bold">{disc.name} {disc.code && <span className="opacity-50 ml-1 text-[10px] uppercase">({disc.code})</span>}</td>
                         <td className="p-3 font-black text-slate-500">{disc.hours}h</td>
                         <td className="p-2">
-                          <input 
-                            type="text"
-                            list="teachers-list"
-                            value={profStr} 
-                            onChange={e => handleProfChange(disc.id, e.target.value)} 
-                            placeholder="Ex: Prof. Silva, Prof. Costa" 
-                            className={`w-full p-2.5 rounded-lg border font-bold transition-all ${isDarkMode ? 'bg-slate-800 border-slate-700 focus:bg-slate-700' : 'bg-white border-slate-300'}`} 
-                          />
+                          <div className="flex flex-col gap-2">
+                             {assignedProfs.length > 0 && (
+                               <div className="flex flex-wrap gap-1.5 items-center">
+                                  {assignedProfs.map(siape => {
+                                      const match = globalTeachers.find(t => t.siape === siape);
+                                      const label = match ? (match.nome_exibicao || match.nome_completo) : siape;
+                                      return (
+                                        <span key={siape} className="inline-flex items-center gap-1 px-2 py-1 rounded bg-indigo-100 dark:bg-indigo-900/40 text-indigo-700 dark:text-indigo-300 text-[10px] font-black uppercase tracking-widest shadow-sm">
+                                            {label}
+                                            <button type="button" onClick={() => handleRemoveProf(disc.id, siape)} className="hover:text-rose-500 hover:bg-indigo-200 dark:hover:bg-indigo-800 rounded-full p-0.5" title="Remover Professor"><X size={10} strokeWidth={3}/></button>
+                                        </span>
+                                      );
+                                  })}
+                                  <button type="button" onClick={() => handleClearProfs(disc.id)} className="ml-1 text-[9px] font-black uppercase tracking-widest text-rose-500 hover:text-rose-600 underline" title="Desalocar Todos os Professores desta Disciplina">Limpar</button>
+                               </div>
+                             )}
+                             <select 
+                               onChange={e => { handleAddProf(disc.id, e.target.value); e.target.value = ''; }} 
+                               defaultValue=""
+                               className={`w-full p-2.5 rounded-lg border font-bold text-xs uppercase cursor-pointer transition-all ${isDarkMode ? 'bg-slate-800 border-slate-700 focus:bg-slate-700' : 'bg-white border-slate-300'}`} 
+                             >
+                                <option value="" disabled>+ Adicionar Prof...</option>
+                                {globalTeachers.filter(t => t.atua_como_docente === 1 || t.atua_como_docente === true).map(t => (
+                                   <option key={t.siape} value={t.siape}>{t.nome_exibicao || t.nome_completo}</option>
+                                ))}
+                             </select>
+                          </div>
                         </td>
                         <td className="p-2">
                           <input 

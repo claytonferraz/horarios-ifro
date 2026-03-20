@@ -151,7 +151,12 @@ export function MasterGrid({ isDarkMode, ...props }) {
         if (schedule.disciplineId) refCard = aulasReais.find(a => String(a.id) === String(schedule.disciplineId));
         if (!refCard) refCard = aulasReais.find(a => String(a.classId) === String(schedule.classId) && a.teacherIds?.join(',') === String(schedule.teacherId));
         if (refCard) {
-             initialGrade[`${schedule.classId}|${schedule.dayOfWeek}|${schedule.slotId}`] = { ...refCard, sala: schedule.room || refCard.sala };
+             initialGrade[`${schedule.classId}|${schedule.dayOfWeek}|${schedule.slotId}`] = { 
+                 ...refCard, 
+                 sala: schedule.room || refCard.sala,
+                 teacherIds: schedule.teacherId ? String(schedule.teacherId).split(',') : refCard.teacherIds,
+                 professores: schedule.teacherId ? String(schedule.teacherId).split(',').map(id => resolveTeacherName(id, globalTeachersList)) : refCard.professores
+             };
              aulasAlocadasIds.push(String(refCard.id));
         }
       });
@@ -356,7 +361,12 @@ export function MasterGrid({ isDarkMode, ...props }) {
         if (schedule.disciplineId) refCard = aulasReais.find(a => String(a.id) === String(schedule.disciplineId));
         if (!refCard) refCard = aulasReais.find(a => String(a.classId) === String(schedule.classId) && a.teacherIds?.join(',') === String(schedule.teacherId));
         if (refCard) {
-             clonedGrade[`${schedule.classId}|${schedule.dayOfWeek}|${schedule.slotId}`] = { ...refCard, sala: schedule.room || refCard.sala };
+             clonedGrade[`${schedule.classId}|${schedule.dayOfWeek}|${schedule.slotId}`] = {
+                 ...refCard,
+                 sala: schedule.room || refCard.sala,
+                 teacherIds: schedule.teacherId ? String(schedule.teacherId).split(',') : refCard.teacherIds,
+                 professores: schedule.teacherId ? String(schedule.teacherId).split(',').map(id => resolveTeacherName(id, globalTeachersList)) : refCard.professores
+             };
              aulasAlocadasIds.push(String(refCard.id));
         }
       });
