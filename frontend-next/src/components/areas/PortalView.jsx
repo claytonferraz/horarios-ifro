@@ -1031,9 +1031,11 @@ export function PortalView({
                                                                              <div ref={prov2.innerRef} {...prov2.draggableProps} {...prov2.dragHandleProps} 
                                                                                className={`print-clean-card p-1.5 print:p-1 rounded-xl print:rounded-none border-b-[3px] print:border-b-[1px] print:border-slate-400 shadow-sm print:shadow-none flex flex-col justify-center min-h-[46px] print:min-h-0 transition-all mb-1 print:mb-0 last:mb-0 hover:scale-[1.02] ${snap2.isDragging ? 'shadow-xl scale-105 z-50' : ''} ${isPending ? (isDarkMode ? 'bg-red-900/30 border-red-800/50 text-red-300' : 'bg-red-50 border-red-300 text-red-800') : getColorHash(r.subject, isDarkMode)}`}
                                                                              >
-                                                                                <p className="font-bold text-[10px] leading-tight text-center line-clamp-2">
-                                                                                  {r.subject} <span className="opacity-80 font-normal">- {isTeacherPending(r.teacher) ? 'VAGA' : resolveTeacherName(r.teacher, globalTeachers).split(' ')[0]}</span>
-                                                                                  {r.room && <span className="opacity-80 font-normal"> - {r.room}</span>}
+                                                                                <p className={`subject font-bold text-[10px] print:text-[8.5px] leading-tight print:leading-[1.1] mb-1 print:mb-0.5 text-center ${isDarkMode ? 'text-slate-200' : 'text-slate-800'}`}>
+                                                                                  {r.subject}
+                                                                                </p>
+                                                                                <p className={`text-[8.5px] print:text-[7.5px] font-medium leading-none text-center opacity-90 ${isPending ? (isDarkMode ? 'text-red-400 font-bold' : 'text-red-600 font-bold') : ''}`}>
+                                                                                  {resolveTeacherName(r.teacher, globalTeachers)} {r.room && <span className="font-black opacity-80 print:opacity-100">| S: {r.room}</span>}
                                                                                 </p>
                                                                              </div>
                                                                            )}
@@ -1346,42 +1348,53 @@ export function PortalView({
                                                           
                                                           return (
                                                             <div 
-                                                              key={`p-rec-${aulaNesteSlot.id || `${diaIndex}-${timeStr}`}`} 
+                                                              key={`p-rec-${aulaNesteSlot.id || dayIndex + '-' + timeStr}`} 
                                                               onClick={() => {
                                                                 if (appMode === 'professor' && viewMode === 'professor' && ['servidor', 'admin', 'gestao'].includes(userRole)) {
                                                                   if (isPending) {
-                                                                    setVacantRequestModal(aulaNesteSlot);
+                                                                    if (typeof setVacantRequestModal === 'function') {
+                                                                      setVacantRequestModal(aulaNesteSlot);
+                                                                    } else if(window.confirm('Deseja solicitar à coordenação para assumir esta Aula Vaga na ' + day + ' às ' + timeStr + '?')) {
+                                                                      alert('Solicitação registrada! A coordenação analisará seu pedido para assumir este horário.');
+                                                                    }
                                                                   } else if (aulaNesteSlot.teacherId && String(aulaNesteSlot.teacherId).split(',').includes(String(selectedTeacher))) {
                                                                     setExchangeTarget({ targetClass: cls, targetCourse: course, originalRecord: aulaNesteSlot });
                                                                   }
                                                                 }
                                                               }}
-                                                              className={`print-clean-card p-2.5 rounded-xl border shadow-sm flex flex-col justify-center min-h-[60px] transition-all hover:scale-[1.02] hover:shadow-md active:scale-95 ${appMode === 'professor' && viewMode === 'professor' && ['servidor', 'admin', 'gestao'].includes(userRole) && (isPending || (aulaNesteSlot.teacherId && String(aulaNesteSlot.teacherId).split(',').includes(String(selectedTeacher)))) ? 'cursor-pointer hover:ring-2 hover:ring-indigo-500 hover:scale-[1.03]' : ''} ${isPending ? (isDarkMode ? 'bg-red-900/30 border-red-800/50 text-red-300' : 'bg-red-50 border-red-300 text-red-800') : getColorHash(disciplineName, isDarkMode)}`}
+                                                              className={`print-clean-card p-2.5 rounded-xl border shadow-sm flex flex-col justify-center min-h-[60px] transition-all hover:scale-[1.02] hover:shadow-md active:scale-95 relative ${isPending ? 'pt-4 cursor-pointer hover:ring-2 hover:ring-red-500 ' + (isDarkMode ? 'bg-red-900/30 border-red-800/50' : 'bg-red-50 border-red-300') : ((aulaNesteSlot.teacherId && String(aulaNesteSlot.teacherId).split(',').includes(String(selectedTeacher))) ? 'pt-4 ' + (['servidor', 'admin', 'gestao'].includes(userRole) ? 'cursor-pointer hover:ring-2 hover:ring-emerald-500 hover:scale-[1.03] ' : '') + (isDarkMode ? 'bg-emerald-900/30 border-emerald-800/50' : 'bg-emerald-50 border-emerald-300') : getColorHash(disciplineName, isDarkMode))}`}
                                                             >
-                                                              {isPending && <span className={`text-[7px] font-black uppercase tracking-widest px-1.5 py-0.5 rounded w-fit mx-auto mb-0.5 ${isDarkMode ? 'text-red-400 bg-red-900/50' : 'text-red-600 bg-red-100'}`}>SEM PROFESSOR</span>}
-                                                              <p className="font-bold text-[10px] leading-tight text-center line-clamp-2">
-                                                                {aulaNesteSlot.subject} <span className="opacity-80 font-normal">- {isTeacherPending(aulaNesteSlot.teacher) ? 'VAGA' : resolveTeacherName(aulaNesteSlot.teacher, globalTeachers).split(' ')[0]}</span>
-                                                                {aulaNesteSlot.room && <span className="opacity-80 font-normal"> - {aulaNesteSlot.room}</span>}
-                                                              </p>
+                                                              {isPending ? (
+                                                                <>
+                                                                  <div className="absolute -top-2 left-1/2 -translate-x-1/2 w-max">
+                                                                    <span className={`text-[9px] font-black uppercase tracking-widest text-white px-2 py-0.5 rounded shadow-sm ${isDarkMode ? 'bg-red-600 shadow-red-900/50' : 'bg-red-600 shadow-red-200'}`}>Sem Professor</span>
+                                                                  </div>
+                                                                  <p className={`subject font-black text-[13px] leading-tight text-center ${isDarkMode ? 'text-red-300' : 'text-red-900'}`}>
+                                                                    {disciplineName}
+                                                                  </p>
+                                                                  {aulaNesteSlot.room && <span className={`details text-[9px] font-black tracking-tighter opacity-80 px-2 py-0.5 rounded mt-1.5 w-fit uppercase mx-auto ${isDarkMode ? 'bg-red-900/50 text-red-300' : 'bg-red-200/50 text-red-900'}`}>{aulaNesteSlot.room}</span>}
+                                                                </>
+                                                              ) : (aulaNesteSlot.teacherId && String(aulaNesteSlot.teacherId).split(',').includes(String(selectedTeacher))) ? (
+                                                                <>
+                                                                  <div className="absolute -top-2 left-1/2 -translate-x-1/2 w-max">
+                                                                    <span className={`text-[9px] font-black uppercase tracking-widest text-white px-2 py-0.5 rounded shadow-sm ${isDarkMode ? 'bg-emerald-600 shadow-emerald-900/50' : 'bg-emerald-600 shadow-emerald-200'}`}>Sua Aula</span>
+                                                                  </div>
+                                                                  <p className={`subject font-black text-[13px] leading-tight text-center ${isDarkMode ? 'text-emerald-300' : 'text-emerald-900'}`}>
+                                                                    {disciplineName}
+                                                                  </p>
+                                                                  {aulaNesteSlot.room && <span className={`details text-[9px] font-black tracking-tighter opacity-80 px-2 py-0.5 rounded mt-1.5 w-fit uppercase mx-auto ${isDarkMode ? 'bg-emerald-900/50 text-emerald-300' : 'bg-emerald-200/50 text-emerald-900'}`}>{aulaNesteSlot.room}</span>}
+                                                                </>
+                                                              ) : (
+                                                                <>
+                                                                  <p className="subject font-black text-[11px] leading-tight text-center">{disciplineName}</p>
+                                                                  <p className="details text-[8px] font-bold opacity-80 flex items-center justify-center gap-1 uppercase truncate mt-0.5">{resolveTeacherName(aulaNesteSlot.teacher, globalTeachers).split(' ')[0]}</p>
+                                                                  {aulaNesteSlot.room && <span className={`details text-[8px] font-black tracking-tighter opacity-70 px-1.5 py-0.5 rounded mt-1 w-fit uppercase mx-auto ${isDarkMode ? 'bg-white/10' : 'bg-black/5'}`}>{aulaNesteSlot.room}</span>}
+                                                                </>
+                                                              )}
                                                             </div>
                                                           );
                                                         })() : (
-                                                              <div className={`w-full h-full min-h-[60px] flex flex-col items-center justify-center p-2 rounded-lg border border-dashed opacity-70 transition-colors ${isDarkMode ? 'bg-slate-800/40 border-slate-600' : 'bg-slate-100 border-slate-300'}`}>
-                                                                  <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">Aula Vaga</span>
-                                                                  
-                                                                  {userRole === 'professor' && scheduleMode !== 'padrao' && (
-                                                                      <button
-                                                                          onClick={() => {
-                                                                              if(window.confirm(`Deseja solicitar à coordenação para assumir esta Aula Vaga na ${MAP_DAYS[diaIndex]} às ${timeStr}?`)) {
-                                                                                  alert('Solicitação registrada! A coordenação analisará seu pedido para assumir este horário.');
-                                                                              }
-                                                                          }}
-                                                                          className="mt-2 px-3 py-1.5 bg-emerald-100 hover:bg-emerald-200 text-emerald-700 text-[9px] font-black uppercase tracking-widest rounded-md shadow-sm transition-all active:scale-95 flex items-center gap-1"
-                                                                      >
-                                                                          <CheckCircle size={10} /> Assumir
-                                                                      </button>
-                                                                  )}
-                                                              </div>
+                                                              <div className={`h-[60px] flex items-center justify-center font-black text-[9px] tracking-widest uppercase select-none ${isDarkMode ? 'opacity-20' : 'opacity-5'}`}>-</div>
                                                           )}
                                                       </td>
                                                     );
@@ -1581,10 +1594,11 @@ export function PortalView({
                                                                     </div>
                                                                   )}
                                                                   {isPending && <span className={`text-[7px] font-black uppercase tracking-widest px-1.5 py-0.5 rounded w-fit mx-auto mb-0.5 ${isDarkMode ? 'text-red-400 bg-red-900/50' : 'text-red-600 bg-red-100'}`}>SEM PROFESSOR</span>}
-                                                                  <p className="font-bold text-[10px] leading-tight text-center line-clamp-2">
-                                                                    {aulaNesteSlot.subject} <span className="opacity-80 font-normal">- {isTeacherPending(aulaNesteSlot.teacher) ? 'VAGA' : resolveTeacherName(aulaNesteSlot.teacher, globalTeachers).split(' ')[0]}</span>
-                                                                    {aulaNesteSlot.room && <span className="opacity-80 font-normal"> - {aulaNesteSlot.room}</span>}
+                                                                  <p className="subject font-bold text-[10px] leading-tight mb-0.5 text-center">{disciplineName}</p>
+                                                                  <p className="details text-[8px] font-bold opacity-80 flex items-center justify-center gap-1 uppercase truncate">
+                                                                    {teacherName}
                                                                   </p>
+                                                                  {aulaNesteSlot.room && <span className={`details text-[8px] font-black tracking-tighter opacity-60 px-1.5 py-0.5 rounded mt-1 w-fit uppercase mx-auto ${isDarkMode ? 'bg-white/10' : 'bg-black/5'}`}>{aulaNesteSlot.room}</span>}
                                                                 </div>
                                                               )}
                                                             </Draggable>
