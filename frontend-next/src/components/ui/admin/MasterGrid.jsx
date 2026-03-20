@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { CalendarDays, GripVertical, AlertCircle, Save, Filter, MapPin, Loader2, Download, X, Check, Layers, Trash2, Eye, EyeOff, Target, CheckCircle2, AlertTriangle } from 'lucide-react';
+import { CalendarDays, GripVertical, AlertCircle, Save, Filter, MapPin, Loader2, Download, X, Check, Layers, Trash2, Eye, EyeOff, Target, CheckCircle2, AlertTriangle, Clock } from 'lucide-react';
 import { useData } from '@/contexts/DataContext';
 import { MAP_DAYS, getColorHash, resolveTeacherName } from '@/lib/dates';
 import { apiClient, getHeaders } from '@/lib/apiClient';
@@ -223,11 +223,23 @@ export function MasterGrid({ isDarkMode, ...props }) {
         }
         if (!refCard) refCard = aulasReais.find(a => String(a.classId) === String(schedule.classId) && a.teacherIds?.join(',') === String(schedule.teacherId));
         if (refCard) {
+             const dbTeacherIds = schedule.teacherId ? String(schedule.teacherId).split(',') : null;
+             const currentTeacherIds = refCard.teacherIds || [];
+             
+             let teacherChanged = false;
+             if (dbTeacherIds) {
+                 // Compara se os IDs do banco são diferentes dos IDs do currículo atual (independente da ordem)
+                 const sortedDb = [...dbTeacherIds].sort();
+                 const sortedCurr = [...currentTeacherIds].sort();
+                 teacherChanged = dbTeacherIds.length !== currentTeacherIds.length || sortedDb.some((val, idx) => val !== sortedCurr[idx]);
+             }
+
              initialGrade[`${schedule.classId}|${schedule.dayOfWeek}|${schedule.slotId}`] = { 
                  ...refCard, 
                  sala: schedule.room || refCard.sala,
-                 teacherIds: schedule.teacherId ? String(schedule.teacherId).split(',') : refCard.teacherIds,
-                 professores: schedule.teacherId ? String(schedule.teacherId).split(',').map(id => resolveTeacherName(id, globalTeachersList)) : refCard.professores
+                 teacherIds: dbTeacherIds || currentTeacherIds,
+                 professores: dbTeacherIds ? dbTeacherIds.map(id => resolveTeacherName(id, globalTeachersList)) : refCard.professores,
+                 teacherChanged: teacherChanged
              };
              aulasAlocadasIds.push(String(refCard.id));
         }
@@ -456,11 +468,22 @@ export function MasterGrid({ isDarkMode, ...props }) {
         }
         if (!refCard) refCard = aulasReais.find(a => String(a.classId) === String(schedule.classId) && a.teacherIds?.join(',') === String(schedule.teacherId));
         if (refCard) {
+             const dbTeacherIds = schedule.teacherId ? String(schedule.teacherId).split(',') : null;
+             const currentTeacherIds = refCard.teacherIds || [];
+             
+             let teacherChanged = false;
+             if (dbTeacherIds) {
+                 const sortedDb = [...dbTeacherIds].sort();
+                 const sortedCurr = [...currentTeacherIds].sort();
+                 teacherChanged = dbTeacherIds.length !== currentTeacherIds.length || sortedDb.some((val, idx) => val !== sortedCurr[idx]);
+             }
+
              clonedGrade[`${schedule.classId}|${schedule.dayOfWeek}|${schedule.slotId}`] = {
                  ...refCard,
                  sala: schedule.room || refCard.sala,
-                 teacherIds: schedule.teacherId ? String(schedule.teacherId).split(',') : refCard.teacherIds,
-                 professores: schedule.teacherId ? String(schedule.teacherId).split(',').map(id => resolveTeacherName(id, globalTeachersList)) : refCard.professores
+                 teacherIds: dbTeacherIds || currentTeacherIds,
+                 professores: dbTeacherIds ? dbTeacherIds.map(id => resolveTeacherName(id, globalTeachersList)) : refCard.professores,
+                 teacherChanged: teacherChanged
              };
              aulasAlocadasIds.push(String(refCard.id));
         }
@@ -481,6 +504,8 @@ export function MasterGrid({ isDarkMode, ...props }) {
   const dashboardAlerts = useMemo(() => {
     const alerts = [];
     const cellAlerts = {}; 
+    const teacherConflictsTracker = new Set();
+    const roomConflictsTracker = new Set();
 
     Object.entries(grade).forEach(([slotKey, aula]) => {
       const [classId, diaId, hora] = slotKey.split('|');
@@ -491,12 +516,32 @@ export function MasterGrid({ isDarkMode, ...props }) {
          if (strConflito) {
             if (strConflito.profMsg) {
                 cellAlerts[slotKey].profAlert = true;
-                alerts.push(`[${MAP_DAYS[diaId]} às ${hora} | Turma: ${aula.className}] - Choque de Professor: ${strConflito.profMsg}`);
+                cellAlerts[slotKey].profText = strConflito.profMsg;
+                
+                const profsList = aula.teacherIds || (aula.teacherId ? String(aula.teacherId).split(',') : []);
+                profsList.forEach(tId => {
+                    if (tId && tId !== 'A Definir' && tId !== '-') {
+                        const uniqueKey = `${tId}_${diaId}_${hora}`;
+                        if (!teacherConflictsTracker.has(uniqueKey)) {
+                            teacherConflictsTracker.add(uniqueKey);
+                            const profName = resolveTeacherName(tId, globalTeachersList).split(' ')[0] || tId;
+                            alerts.push(`[${MAP_DAYS[diaId]} às ${hora}] - Choque: Prof(a) ${profName} alocado(a) em múltiplas turmas simultaneamente.`);
+                        }
+                    }
+                });
             }
+
             if (strConflito.salaMsg) {
                 cellAlerts[slotKey].salaAlert = true;
                 cellAlerts[slotKey].salaText = strConflito.salaMsg;
-                alerts.push(`[${MAP_DAYS[diaId]} às ${hora} | Turma: ${aula.className}] - Choque de Ambiente: ${strConflito.salaMsg}`);
+                
+                if (aula.sala && aula.sala !== 'A Definir' && aula.sala !== '-') {
+                    const uniqueKey = `${aula.sala}_${diaId}_${hora}`;
+                    if (!roomConflictsTracker.has(uniqueKey)) {
+                        roomConflictsTracker.add(uniqueKey);
+                        alerts.push(`[${MAP_DAYS[diaId]} às ${hora}] - Choque: Ambiente '${aula.sala}' alocado para múltiplas turmas.`);
+                    }
+                }
             }
          }
 
@@ -931,9 +976,20 @@ export function MasterGrid({ isDarkMode, ...props }) {
                                     <span className="text-[7px] opacity-75 font-bold tracking-widest truncate mt-0.5">{aulaNesteSlot.className}</span>
                                   </div>
                                   <div className="flex justify-between items-center mt-auto pt-1 gap-1 overflow-hidden" title={temAlertaProf ? profMsgText : "Professor e Local"}>
-                                    <span className={`text-[8px] font-bold truncate max-w-[80px] ${temAlertaProf ? 'text-red-500 dark:text-red-400 bg-red-500/10 px-0.5 rounded border border-red-500/20' : 'text-slate-500 dark:text-slate-300'}`}>
-                                      {temAlertaProf && <AlertTriangle size={8} className="inline mr-0.5 mb-[1px]" />} {aulaNesteSlot.professores?.map(p => p.split(' ')[0]).join(' + ')}
-                                    </span>
+                                    <div className={`flex items-center gap-1 overflow-hidden flex-1 ${temAlertaProf ? 'text-red-500 dark:text-red-400 bg-red-500/10 px-0.5 rounded border border-red-500/20' : 'text-slate-500 dark:text-slate-300'}`}>
+                                       {temAlertaProf && <AlertTriangle size={8} className="shrink-0" />}
+                                       <span className="truncate text-[9px] font-bold" title={aulaNesteSlot.professores?.join(' + ')}>
+                                           {aulaNesteSlot.professores && aulaNesteSlot.professores.length > 0
+                                               ? aulaNesteSlot.professores.map(p => {
+                                                   if (!p || p === 'A Definir' || p === '-') return 'A Def.';
+                                                   return p.split(' ')[0];
+                                               }).join(' + ')
+                                               : 'A Def.'}
+                                       </span>
+                                       {aulaNesteSlot.teacherChanged && (
+                                           <Clock size={11} className="text-amber-500 dark:text-amber-400 shrink-0" title="Registro Histórico: Professor diverge da matriz atual." />
+                                       )}
+                                    </div>
                                     {aulaNesteSlot.sala && (
                                       <span className={`text-[8px] font-bold flex items-center gap-0.5 truncate px-1 py-[1px] rounded ${temAlertaSala ? 'bg-amber-500/20 text-amber-600 border border-amber-500/30' : 'bg-black/5 dark:bg-white/5 text-slate-400'}`} title={temAlertaSala ? alertasObj.salaText : "Local da Aula"}>
                                         {temAlertaSala ? <AlertTriangle size={6} className="shrink-0" /> : <MapPin size={6} className="shrink-0" />} {aulaNesteSlot.sala.slice(0, 8)}
@@ -1112,9 +1168,12 @@ function SaveMatrixModal({ isDarkMode, grade, selectedCourses, saveOptions, setS
             method: 'POST', headers: getHeaders(),
             body: JSON.stringify({ courseIds: selectedCourses, type: saveOptions.type, weekId: saveOptions.weekId || null, academicYear: selectedConfigYear, schedules: payload })
           });
-          if(!resp.ok) throw new Error('Erro Crítico no Backend!');
+          if(!resp.ok) {
+              const errData = await resp.json().catch(() => ({}));
+              throw new Error(errData.error || 'Erro Crítico desconhecido no Backend!');
+          }
           onSuccess();
-      } catch(e) { setSystemDialog({ isOpen: true, type: 'alert', title: 'Erro Crítico', message: e.message }); } finally { setIsSaving(false); }
+      } catch(e) { setSystemDialog({ isOpen: true, type: 'alert', title: 'Falha ao Salvar', message: e.message }); } finally { setIsSaving(false); }
   };
 
   const handleConfirmSave = async () => {

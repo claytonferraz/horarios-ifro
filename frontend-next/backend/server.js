@@ -371,17 +371,17 @@ app.get('/api/schedules', (req, res) => {
 const bulkScheduleSchema = z.object({
   courseIds: z.array(z.union([z.string(), z.number()]).transform(String)).optional(),
   courseId: z.union([z.string(), z.number()]).transform(String).optional(),
-  type: z.string().default('previa'),
-  weekId: z.string().optional().nullable(),
-  academicYear: z.string().optional().nullable(),
+  type: z.union([z.string(), z.number()]).transform(String).default('previa'),
+  weekId: z.union([z.string(), z.number()]).transform(String).optional().nullable(),
+  academicYear: z.union([z.string(), z.number()]).transform(String).optional().nullable(),
   schedules: z.array(z.object({
     courseId: z.union([z.string(), z.number()]).transform(String).optional(),
     classId: z.union([z.string(), z.number()]).transform(String),
-    dayOfWeek: z.string(),
-    slotId: z.string(),
+    dayOfWeek: z.union([z.string(), z.number()]).transform(String),
+    slotId: z.union([z.string(), z.number()]).transform(String),
     teacherId: z.union([z.string(), z.number()]).transform(String),
-    disciplineId: z.string().optional().nullable(),
-    room: z.string().optional().nullable()
+    disciplineId: z.union([z.string(), z.number()]).transform(String).optional().nullable(),
+    room: z.union([z.string(), z.number()]).transform(String).optional().nullable()
   }))
 });
 
@@ -405,12 +405,20 @@ app.post('/api/schedules/bulk-course', verifyToken, (req, res) => {
         for (const slot of schedules) {
           if (!slot.teacherId || slot.teacherId === 'A Definir' || slot.teacherId === '-') continue;
           
+          const slotTeachers = String(slot.teacherId).split(',');
+
           for (const row of relevantRows) {
-            if (row.teacherId === slot.teacherId && row.dayOfWeek === slot.dayOfWeek && row.slotId === slot.slotId) {
-               return res.status(400).json({ error: `Bloqueio Estrito no Servidor: O professor já possui aula de outro curso externo na mesma matriz ${type} em ${slot.dayOfWeek} às ${slot.slotId}. Matrizes Padrão não podem ter choques.` });
+            if (!row.teacherId) continue;
+            const rowTeachers = String(row.teacherId).split(',');
+
+            // Verifica se há colisão entre os professores da grade nova e da grade antiga externa
+            const hasConflict = slotTeachers.some(st => rowTeachers.includes(st));
+
+            if (hasConflict && String(row.dayOfWeek) === String(slot.dayOfWeek) && String(row.slotId) === String(slot.slotId)) {
+               return res.status(400).json({ error: `Bloqueio Estrito no Servidor: O professor já possui aula em outro curso na mesma matriz ${type} em ${slot.dayOfWeek} às ${slot.slotId}.` });
             }
-            if (slot.room && row.room === slot.room) {
-               return res.status(400).json({ error: `Bloqueio Estrito no Servidor: A sala/espaço já está alocada para outro curso externo isolado na matriz ${type}.` });
+            if (slot.room && row.room === slot.room && String(row.dayOfWeek) === String(slot.dayOfWeek) && String(row.slotId) === String(slot.slotId)) {
+               return res.status(400).json({ error: `Bloqueio Estrito no Servidor: A sala/espaço já está alocada para outro curso na matriz ${type}.` });
             }
             if (row.records) {
               try {
