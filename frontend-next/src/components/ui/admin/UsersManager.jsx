@@ -1,8 +1,11 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { User, Users, Search, Plus, Trash2, RotateCcw, Save, ShieldCheck, ShieldAlert, FileText, Upload } from 'lucide-react';
+import { User, Users, Search, Plus, Trash2, RotateCcw, Save, ShieldCheck, ShieldAlert, FileText, Upload, Shield } from 'lucide-react';
 import { apiClient } from '@/lib/apiClient';
+import { useAuth } from '@/contexts/AuthContext';
 
 export function UsersManager({ isDarkMode, showConfirm, refreshGlobalTeachers }) {
+  const { userRole } = useAuth();
+  const isAdminLogado = userRole === 'admin';
   const [teachers, setTeachers] = useState([]);
   const [originalTeachers, setOriginalTeachers] = useState([]); // Keep track of original state for changes
   const [loading, setLoading] = useState(true);
@@ -108,6 +111,25 @@ export function UsersManager({ isDarkMode, showConfirm, refreshGlobalTeachers })
     setTeachers(teachers.map(t => t._clientId === clientId ? { ...t, [field]: value } : t));
   };
 
+  const handleToggleAdminStatus = async (teacher) => {
+    if (!teacher.oldSiape) return alert("Salve o servidor primeiro antes de modificar permissões.");
+    const newValue = teacher.is_admin === 1 ? 0 : 1;
+    const actionName = newValue === 1 ? "Promover a Administrador" : "Remover de Administrador";
+    
+    showConfirm(actionName, `Deseja ${newValue === 1 ? 'conceder' : 'revogar'} os privilégios de super administrador para ${teacher.nome_completo}?`, async () => {
+      try {
+        await apiClient.updateAdminStatus(teacher.oldSiape, newValue === 1);
+        alert(`Privilégios atualizados com sucesso!`);
+        updateTeacher(teacher._clientId, 'is_admin', newValue);
+        // Opcional: atualizar os originais para não acusar "mudança pendente" sobre este campo que já foi salvo
+        setOriginalTeachers(prev => prev.map(ot => ot._clientId === teacher._clientId ? { ...ot, is_admin: newValue } : ot));
+        await refreshGlobalTeachers();
+      } catch (e) {
+        alert("Erro ao alterar privilégios: " + e.message);
+      }
+    }, 'info');
+  };
+
   const handleAddEmpty = () => {
     setTeachers([{
       siape: '',
@@ -117,6 +139,7 @@ export function UsersManager({ isDarkMode, showConfirm, refreshGlobalTeachers })
       email: '',
       status: 'ativo',
       perfis: ['Professor'],
+      is_admin: 0,
       atua_como_docente: 1,
       exigir_troca_senha: 1,
       _clientId: Math.random().toString(36).substr(2, 9)
@@ -226,6 +249,7 @@ export function UsersManager({ isDarkMode, showConfirm, refreshGlobalTeachers })
                    email: '',
                    status: 'ativo',
                    perfis: ['Professor'],
+                   is_admin: 0,
                    atua_como_docente: 1,
                    exigir_troca_senha: 1,
                    _clientId: Math.random().toString(36).substr(2, 9)
@@ -327,6 +351,7 @@ export function UsersManager({ isDarkMode, showConfirm, refreshGlobalTeachers })
                   <th className="py-3 px-3 w-36">Nome de Exibição</th>
                   <th className="py-3 px-3">Nome Completo Oficial</th>
                   <th className="py-3 px-3 w-40 text-center">Perfis (Roles)</th>
+                  {isAdminLogado && <th className="py-3 px-3 w-28 text-center" title="Admin Máximo do App">Admin?</th>}
                   <th className="py-3 px-3 w-28 text-center" title="Aparece nas listagens de aulas">Docente?</th>
                   <th className="py-3 px-3 w-32 text-center" title="Senha padrão vs Privada">Senha</th>
                   <th className="py-3 px-3 w-28 text-center">Status</th>
@@ -386,6 +411,17 @@ export function UsersManager({ isDarkMode, showConfirm, refreshGlobalTeachers })
                            </label>
                         </div>
                      </td>
+                     {isAdminLogado && (
+                       <td className="p-2 text-center">
+                          <button 
+                             onClick={() => handleToggleAdminStatus(t)}
+                             title={t.is_admin === 1 ? "Remover de Admin" : "Tornar Admin"}
+                             className={`p-1.5 rounded-lg transition-colors flex items-center justify-center mx-auto ${t.is_admin === 1 ? (isDarkMode ? 'bg-amber-900/40 text-amber-400 border border-amber-800' : 'bg-amber-100 text-amber-700 border border-amber-300') : (isDarkMode ? 'text-slate-600 hover:text-amber-500' : 'text-slate-300 hover:text-amber-500')}`}
+                          >
+                             <Shield size={16} className={t.is_admin === 1 ? "fill-amber-500/20" : ""} />
+                          </button>
+                       </td>
+                     )}
                      <td className="p-2 text-center">
                         <label className="flex items-center justify-center cursor-pointer">
                            <input 

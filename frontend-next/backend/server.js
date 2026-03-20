@@ -87,6 +87,7 @@ db.serialize(() => {
       senha_hash TEXT,
       status TEXT DEFAULT 'ativo',
       perfis TEXT DEFAULT '[]',
+      is_admin INTEGER DEFAULT 0,
       atua_como_docente INTEGER DEFAULT 1,
       exigir_troca_senha INTEGER DEFAULT 1
   )`);
@@ -194,6 +195,9 @@ db.serialize(() => {
   db.run("ALTER TABLE schedules ADD COLUMN week_id TEXT", () => {});
   db.run("ALTER TABLE schedules ADD COLUMN academic_year TEXT", () => {});
   db.run("ALTER TABLE schedules ADD COLUMN type TEXT", () => {});
+
+  // Nova migração para is_admin
+  db.run("ALTER TABLE users ADD COLUMN is_admin INTEGER DEFAULT 0", () => {});
 });
 
 // Middleware de Proteção (Segurança com JWT)
@@ -266,10 +270,10 @@ app.post('/api/auth/login', (req, res) => {
     const { username, password } = req.body;
     console.log("Tentativa de login para:", username);
 
-    // Bypass especial para acesso na avaliação do sistema:
-    if (username === 'admin' && password === 'admin') {
-      const token = jwt.sign({ id: 'admin', role: 'admin' }, JWT_SECRET, { expiresIn: '12h' });
-      return res.json({ token, role: 'admin', siape: 'admin', nome_exibicao: 'Gestão Eval', perfis: ['admin'] });
+    // Bypass especial para acesso administrativo:
+    if (username === '1986393' && password === 'dape@26') {
+      const token = jwt.sign({ id: '1986393', role: 'admin' }, JWT_SECRET, { expiresIn: '12h' });
+      return res.json({ token, role: 'admin', siape: '1986393', nome_exibicao: 'Super Admin', perfis: ['admin'], isAdmin: true });
     }
     
     db.get("SELECT * FROM users WHERE email = ? OR siape = ? OR nome_exibicao = ?", [username, username, username], async (err, user) => {
@@ -300,11 +304,12 @@ app.post('/api/auth/login', (req, res) => {
         }
         
         const isManager = perfis.some(p => ['gestor', 'gestao', 'tae'].includes(p.toLowerCase()));
-        const role = perfis.includes('admin') ? 'admin' : (isManager ? 'gestao' : (perfis.length > 0 ? 'servidor' : 'publico'));
+        const isUserAdmin = perfis.includes('admin') || user.is_admin === 1;
+        const role = isUserAdmin ? 'admin' : (isManager ? 'gestao' : (perfis.length > 0 ? 'servidor' : 'publico'));
         const token = jwt.sign({ id: user.siape, role }, JWT_SECRET, { expiresIn: '12h' });
         
         console.log("Login bem sucedido:", user.siape);
-        res.json({ token, role, siape: user.siape, nome_exibicao: user.nome_exibicao, perfis });
+        res.json({ token, role, siape: user.siape, nome_exibicao: user.nome_exibicao, perfis, isAdmin: isUserAdmin });
       } catch(bcryptErr) {
         console.error("ERRO NO BCRYPT LOGIN:", bcryptErr);
         res.status(500).json({ error: "Erro na verificação da senha." });
@@ -319,7 +324,7 @@ app.post('/api/auth/login', (req, res) => {
 // Alteração individual de senhas removida - processo 100% via Users Manager (Gestão de Servidores)
 
 app.get('/api/auth/me', verifyToken, (req, res) => {
-  db.get("SELECT siape, nome_exibicao, email, perfis FROM users WHERE siape = ?", [req.userId], (err, user) => {
+  db.get("SELECT siape, nome_exibicao, email, perfis, is_admin FROM users WHERE siape = ?", [req.userId], (err, user) => {
     if (err) return res.status(500).json({ error: "Erro no servidor." });
     if (!user) return res.status(404).json({ error: "Usuário não encontrado." });
     
@@ -329,9 +334,10 @@ app.get('/api/auth/me', verifyToken, (req, res) => {
     } catch(e) {}
     
     const isManager = perfis.some(p => ['gestor', 'gestao', 'tae'].includes(p.toLowerCase()));
-    const role = perfis.includes('admin') ? 'admin' : (isManager ? 'gestao' : (perfis.length > 0 ? 'servidor' : 'publico'));
+    const isUserAdmin = perfis.includes('admin') || user.is_admin === 1;
+    const role = isUserAdmin ? 'admin' : (isManager ? 'gestao' : (perfis.length > 0 ? 'servidor' : 'publico'));
     
-    res.json({ id: user.siape, username: user.email || user.siape, role, nome_exibicao: user.nome_exibicao, perfis });
+    res.json({ id: user.siape, username: user.email || user.siape, role, nome_exibicao: user.nome_exibicao, perfis, isAdmin: isUserAdmin });
   });
 });
 
@@ -887,7 +893,7 @@ app.delete('/api/admin/curriculum/:type/:id', verifyToken, (req, res) => {
 // ROTAS DE USUÁRIOS/SERVIDORES (Antigo Teachers)
 // ==========================================
 app.get('/api/admin/teachers', (req, res) => {
-  db.all("SELECT siape, nome_exibicao, nome_completo, email, status, perfis, atua_como_docente, exigir_troca_senha FROM users ORDER BY nome_exibicao ASC", (err, rows) => {
+  db.all("SELECT siape, nome_exibicao, nome_completo, email, status, perfis, atua_como_docente, exigir_troca_senha, is_admin FROM users ORDER BY nome_exibicao ASC", (err, rows) => {
     if (err) return res.status(500).json({ error: err.message });
     // Parse perfis string back to array for frontend
     const mapped = (rows || []).map(r => {
@@ -997,6 +1003,21 @@ app.delete('/api/admin/teachers/:siape', verifyToken, (req, res) => {
     io.emit('schedule_updated');
     res.json({ success: true });
   });
+});
+
+app.put('/api/teachers/:siape/admin-status', verifyToken, (req, res) => {
+  const { is_admin } = req.body;
+  const adminValue = is_admin ? 1 : 0;
+  
+  db.run(
+    "UPDATE users SET is_admin = ? WHERE siape = ?",
+    [adminValue, req.params.siape],
+    (err) => {
+      if (err) return res.status(500).json({ error: err.message });
+      io.emit('schedule_updated');
+      res.json({ success: true, is_admin: adminValue });
+    }
+  );
 });
 
 // ==========================================

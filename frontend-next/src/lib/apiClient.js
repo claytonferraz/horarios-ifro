@@ -343,6 +343,20 @@ export const apiClient = {
     }
   },
 
+  async updateAdminStatus(siape, is_admin) {
+    try {
+      const res = await fetch(`${API_URL}/teachers/${siape}/admin-status`, {
+        method: 'PUT',
+        headers: getHeaders(),
+        body: JSON.stringify({ is_admin })
+      });
+      if (!res.ok) throw new Error('Falha ao atualizar status de administrador');
+      return await res.json();
+    } catch (e) {
+      throw e;
+    }
+  },
+
   // --- SOLICITAÇÕES DE MUDANÇA (PROMPT 2) ---
   async fetchRequests(siape = null) {
     try {
