@@ -4,6 +4,30 @@ import { useData } from '@/contexts/DataContext';
 import { MAP_DAYS, getColorHash, resolveTeacherName } from '@/lib/dates';
 import { apiClient, getHeaders } from '@/lib/apiClient';
 
+const getCardStyle = (courseId, classId, subjectName, isDarkMode) => {
+    const strToNum = (str) => {
+        let hash = 0;
+        for (let i = 0; i < str.length; i++) hash = str.charCodeAt(i) + ((hash << 5) - hash);
+        return Math.abs(hash);
+    };
+    // Tom Base = Curso (0-360)
+    const baseHue = strToNum(String(courseId)) % 360;
+    // Variação do Tom = Turma (-20 a +20 graus no disco de cores)
+    const classHueShift = (strToNum(String(classId)) % 40) - 20; 
+    const finalHue = (baseHue + classHueShift + 360) % 360;
+    // Variação de Luminosidade = Disciplina
+    const subjectLightShift = (strToNum(String(subjectName)) % 10) - 5;
+    
+    const lightness = isDarkMode ? (25 + subjectLightShift) : (92 + subjectLightShift);
+    const borderLightness = isDarkMode ? (40 + subjectLightShift) : (75 + subjectLightShift);
+    
+    return {
+        backgroundColor: `hsl(${finalHue}, 65%, ${lightness}%)`,
+        borderColor: `hsl(${finalHue}, 65%, ${borderLightness}%)`,
+        color: isDarkMode ? `hsl(${finalHue}, 80%, 85%)` : `hsl(${finalHue}, 80%, 20%)`
+    };
+};
+
 export function MasterGrid({ isDarkMode, ...props }) {
   const { globalTeachers: globalTeachersList, activeDays, classTimes, academicWeeks, selectedConfigYear, setSelectedConfigYear, academicYearsMeta } = useData();
   
@@ -649,12 +673,13 @@ export function MasterGrid({ isDarkMode, ...props }) {
                         draggable
                         onDragStart={(e) => handleDragStart(e, aula, 'neutra')}
                         onDragEnd={handleDragEnd}
-                        className={`w-full p-2 rounded border shadow-sm flex flex-col gap-1 cursor-grab hover:ring-2 hover:border-emerald-500 ring-emerald-500 transition-all ${(isZero && isDarkMode) ? 'bg-amber-950/20 border-amber-600/50' : (isZero ? 'bg-orange-50/60 border-orange-300' : (isDarkMode ? 'bg-slate-750 border-slate-600 border-l-4 border-l-emerald-500' : 'bg-slate-50 border-slate-200 border-l-4 border-l-emerald-500'))}`}
+                        className={`w-full p-2 rounded border shadow-sm flex flex-col gap-1 cursor-grab hover:ring-2 hover:border-emerald-500 ring-emerald-500 transition-all ${isZero ? (isDarkMode ? 'bg-amber-950/20 border-amber-600/50' : 'bg-orange-50/60 border-orange-300') : 'border-l-4 border-l-emerald-500'}`}
+                        style={!isZero ? getCardStyle(aula.courseId, aula.classId, aula.disciplina, isDarkMode) : {}}
                       >
                        <div className="flex justify-between items-start gap-1">
                          <div className="flex items-start gap-1 overflow-hidden pt-0.5">
                            <GripVertical size={12} className={`shrink-0 ${isZero ? 'text-amber-500' : 'text-slate-400'}`} />
-                           <div className={`text-[9px] font-black uppercase tracking-widest ${isZero ? 'text-amber-600 dark:text-amber-500' : `text-${aula.cor}-500 dark:text-${aula.cor}-400`} leading-tight truncate`} title={`${aula.disciplina} - ${aula.className}`}>
+                           <div className={`text-[9px] font-black uppercase tracking-widest ${isZero ? 'text-amber-600 dark:text-amber-500' : ''} leading-tight truncate`} title={`${aula.disciplina} - ${aula.className}`}>
                              {aula.disciplina} <span className="text-[6.5px] ml-1 opacity-70 font-bold tracking-normal">- {aula.className}</span>
                            </div>
                          </div>
@@ -716,6 +741,20 @@ export function MasterGrid({ isDarkMode, ...props }) {
                     {/* Horários do Dia */}
                     {horariosExibidos.map((hora, index) => {
                       const numHora = parseInt(hora.split(':')[0], 10);
+                      
+                      const isMorning = numHora < 12;
+                      const isAfternoon = numHora >= 12 && numHora < 18;
+                      const isEven = index % 2 === 0;
+
+                      let rowBgClass = '';
+                      if (isMorning) {
+                          rowBgClass = isEven ? (isDarkMode ? 'bg-sky-950/20' : 'bg-sky-50/40') : (isDarkMode ? 'bg-sky-950/10' : 'bg-sky-50/10');
+                      } else if (isAfternoon) {
+                          rowBgClass = isEven ? (isDarkMode ? 'bg-amber-950/20' : 'bg-amber-50/40') : (isDarkMode ? 'bg-amber-950/10' : 'bg-amber-50/10');
+                      } else {
+                          rowBgClass = isEven ? (isDarkMode ? 'bg-indigo-950/20' : 'bg-indigo-50/40') : (isDarkMode ? 'bg-indigo-950/10' : 'bg-indigo-50/10');
+                      }
+
                       const isAfternoonStart = index > 0 && numHora >= 12 && parseInt(horariosExibidos[index-1].split(':')[0], 10) < 12;
                       const isNightStart = index > 0 && numHora >= 18 && parseInt(horariosExibidos[index-1].split(':')[0], 10) < 18;
                       
@@ -726,7 +765,7 @@ export function MasterGrid({ isDarkMode, ...props }) {
                               <td colSpan={turmasDoCurso.filter(t => !hiddenClasses.includes(t.id)).length + 1} className="p-0 h-[3px] bg-slate-300 dark:bg-slate-700 border-none"></td>
                            </tr>
                         )}
-                        <tr key={`${diaId}-${hora}-row`}>
+                        <tr key={`${diaId}-${hora}-row`} className={rowBgClass}>
                           <td className="py-2 px-2 text-center text-[9px] font-bold text-slate-400 border-r border-slate-700/30 whitespace-nowrap align-middle">
                             {hora}
                           </td>
@@ -754,7 +793,8 @@ export function MasterGrid({ isDarkMode, ...props }) {
                                   draggable
                                   onDragStart={(e) => handleDragStart(e, aulaNesteSlot, slotKey)}
                                   onDragEnd={handleDragEnd}
-                                  className={`group/card w-[95%] sm:w-[90%] mx-auto min-h-[56px] rounded border flex flex-col justify-between p-2 cursor-grab hover:ring-2 ring-emerald-500 transition-all shadow-sm overflow-hidden relative ${isDarkMode ? 'bg-slate-700 border-slate-500' : 'bg-white border-slate-300'}`}
+                                  className={`group/card w-[95%] sm:w-[90%] mx-auto min-h-[56px] rounded border flex flex-col justify-between p-2 cursor-grab hover:ring-2 ring-emerald-500 transition-all shadow-sm overflow-hidden relative`}
+                                  style={getCardStyle(aulaNesteSlot.courseId, aulaNesteSlot.classId, aulaNesteSlot.disciplina, isDarkMode)}
                                 >
                                   <button onClick={(e) => { e.preventDefault(); e.stopPropagation(); setGrade(prev => { const n = {...prev}; delete n[slotKey]; return n; }); }} className="absolute top-0 right-0 bg-rose-500 hover:bg-rose-600 text-white font-bold p-1 rounded-bl-md z-20 opacity-0 group-hover/card:opacity-100 cursor-pointer transition-opacity shadow-sm" title="Remover Aula do Horário" >
                                     <X size={8} strokeWidth={4} />
@@ -764,7 +804,7 @@ export function MasterGrid({ isDarkMode, ...props }) {
                                      {Object.values(grade).filter(g => String(g.classId) === String(aulaNesteSlot.classId) && String(g.id) === String(aulaNesteSlot.id)).length}/{aulaNesteSlot.numAulas || 1}
                                   </span>
 
-                                  <span className={`text-[9px] w-[80%] font-black uppercase tracking-widest text-${aulaNesteSlot.cor}-500 dark:text-${aulaNesteSlot.cor}-400 leading-tight truncate`} title={`${aulaNesteSlot.disciplina} - ${aulaNesteSlot.className}`}>
+                                  <span className={`text-[9px] w-[80%] font-black uppercase tracking-widest leading-tight truncate`} title={`${aulaNesteSlot.disciplina} - ${aulaNesteSlot.className}`}>
                                     {aulaNesteSlot.disciplina} <span className="text-[7px] ml-1 opacity-60 font-bold tracking-normal">- {aulaNesteSlot.className}</span>
                                   </span>
                                   <div className="flex justify-between items-center mt-auto pt-1 gap-1 overflow-hidden" title={temAlertaProf ? profMsgText : "Professor e Local"}>
