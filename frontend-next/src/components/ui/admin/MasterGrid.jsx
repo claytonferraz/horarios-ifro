@@ -7,24 +7,29 @@ import { apiClient, getHeaders } from '@/lib/apiClient';
 const getCardStyle = (courseId, classId, subjectName, isDarkMode) => {
     const strToNum = (str) => {
         let hash = 0;
+        if (!str) return 0;
         for (let i = 0; i < str.length; i++) hash = str.charCodeAt(i) + ((hash << 5) - hash);
         return Math.abs(hash);
     };
-    // Tom Base = Curso (0-360)
-    const baseHue = strToNum(String(courseId)) % 360;
-    // Variação do Tom = Turma (-20 a +20 graus no disco de cores)
-    const classHueShift = (strToNum(String(classId)) % 40) - 20; 
-    const finalHue = (baseHue + classHueShift + 360) % 360;
-    // Variação de Luminosidade = Disciplina
-    const subjectLightShift = (strToNum(String(subjectName)) % 10) - 5;
     
-    const lightness = isDarkMode ? (25 + subjectLightShift) : (92 + subjectLightShift);
-    const borderLightness = isDarkMode ? (40 + subjectLightShift) : (75 + subjectLightShift);
+    // 1. Tom base fixo gerado a partir do ID do curso
+    const baseHue = strToNum(String(courseId)) % 360;
+    
+    // 2. Variação significativa do Tom baseada na Disciplina (Cores Distintas)
+    // Desloca a cor no círculo cromático em até 80 graus (+ ou -)
+    const subjectHueShift = (strToNum(String(subjectName)) % 160) - 80; 
+    const finalHue = (baseHue + subjectHueShift + 360) % 360;
+    
+    // 3. Pequena variação de luminosidade para textura visual
+    const subjectLightShift = (strToNum(String(subjectName)) % 16) - 8;
+    
+    const lightness = isDarkMode ? (30 + subjectLightShift) : (85 + subjectLightShift);
+    const borderLightness = isDarkMode ? (45 + subjectLightShift) : (70 + subjectLightShift);
     
     return {
-        backgroundColor: `hsl(${finalHue}, 65%, ${lightness}%)`,
-        borderColor: `hsl(${finalHue}, 65%, ${borderLightness}%)`,
-        color: isDarkMode ? `hsl(${finalHue}, 80%, 85%)` : `hsl(${finalHue}, 80%, 20%)`
+        backgroundColor: `hsl(${finalHue}, 75%, ${lightness}%)`,
+        borderColor: `hsl(${finalHue}, 75%, ${borderLightness}%)`,
+        color: isDarkMode ? `hsl(${finalHue}, 90%, 90%)` : `hsl(${finalHue}, 90%, 15%)`
     };
 };
 
@@ -140,7 +145,14 @@ export function MasterGrid({ isDarkMode, ...props }) {
   // Pega todas as turmas dos cursos selecionados
   const turmasDoCurso = useMemo(() => {
     if (selectedCourses.length === 0) return [];
-    return classesList?.filter(cls => selectedCourses.includes(String(cls.courseId))).sort((a, b) => a.name.localeCompare(b.name)) || [];
+    return classesList?.filter(cls => selectedCourses.includes(String(cls.courseId)))
+      .sort((a, b) => {
+        // Agrupa pelo Curso primeiro
+        const courseCompare = String(a.courseId).localeCompare(String(b.courseId));
+        if (courseCompare !== 0) return courseCompare;
+        // Depois ordena alfabeticamente pela Turma
+        return a.name.localeCompare(b.name);
+      }) || [];
   }, [selectedCourses, classesList]);
 
  // Estrutura do Grid Baseado no Estado Global de Schedules + Alocação Neutra
@@ -478,8 +490,32 @@ export function MasterGrid({ isDarkMode, ...props }) {
          });
       }
     });
-    // Remove duplicados gerais de alerts
-    return { list: [...new Set(alerts)], perCell: cellAlerts };
+    // Filtro de desduplicação cruzada de alertas (Ex: Turma A acusando B, e Turma B acusando A)
+    const uniqueAlerts = [];
+    const seenMsgs = new Set();
+    
+    alerts.forEach(a => {
+        let signature = a;
+        // Processamento Regex para capturar os espelhos bidirecionais
+        const choqueMatch = a.match(/\[(.*?) \| Turma: (.*?)\] - Choque de (.*?): .* turma (.*?)\.?$/);
+        
+        if (choqueMatch) {
+             const [_, diaHora, turmaA, tipoChoque, turmaB] = choqueMatch;
+             // Remove aspas caso seja a mensagem de "turma externa" e limpa espaços
+             const cleanTurmaA = String(turmaA).trim();
+             const cleanTurmaB = String(turmaB).replace(/["']/g, '').trim();
+             // Ordena para que choque A->B tenha a mesma assinatura que choque B->A
+             const turmasEspelhadas = [cleanTurmaA, cleanTurmaB].sort().join('<->');
+             signature = `${diaHora}|${tipoChoque}|${turmasEspelhadas}`;
+        }
+        
+        if (!seenMsgs.has(signature)) {
+            seenMsgs.add(signature);
+            uniqueAlerts.push(a);
+        }
+    });
+
+    return { list: uniqueAlerts, perCell: cellAlerts };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [grade, schedules, horariosExibidos]);
 
@@ -641,7 +677,7 @@ export function MasterGrid({ isDarkMode, ...props }) {
           onDrop={handleDropNeutra}
         >
           <h3 className="text-[11px] font-black uppercase tracking-widest text-slate-500 mb-4 flex items-center justify-between border-b pb-2 border-slate-700/50">
-            <span className="flex items-center gap-2"><AlertCircle size={14} /> Pendentes</span>
+            <span className="flex items-center gap-2"><AlertCircle size={14} /> Disciplinas Pendentes</span>
             <span className="bg-slate-200 dark:bg-slate-700 px-2 py-0.5 rounded">{aulasNeutras.length}</span>
           </h3>
           
@@ -653,7 +689,16 @@ export function MasterGrid({ isDarkMode, ...props }) {
             )}
 
             {Object.entries(neutrasPorTurma)
-              .sort((a, b) => a[0].localeCompare(b[0]))
+              .sort((a, b) => {
+                const turmaA = turmasDoCurso.find(c => c.name === a[0]);
+                const turmaB = turmasDoCurso.find(c => c.name === b[0]);
+                if (!turmaA || !turmaB) return 0;
+                
+                const courseCompare = String(turmaA.courseId).localeCompare(String(turmaB.courseId));
+                if (courseCompare !== 0) return courseCompare;
+                
+                return turmaA.name.localeCompare(turmaB.name);
+              })
               .filter(([nomeTurma]) => {
                 const turmaObj = turmasDoCurso.find(t => t.name === nomeTurma);
                 return turmaObj && !hiddenClasses.includes(turmaObj.id);
@@ -679,8 +724,9 @@ export function MasterGrid({ isDarkMode, ...props }) {
                        <div className="flex justify-between items-start gap-1">
                          <div className="flex items-start gap-1 overflow-hidden pt-0.5">
                            <GripVertical size={12} className={`shrink-0 ${isZero ? 'text-amber-500' : 'text-slate-400'}`} />
-                           <div className={`text-[9px] font-black uppercase tracking-widest ${isZero ? 'text-amber-600 dark:text-amber-500' : ''} leading-tight truncate`} title={`${aula.disciplina} - ${aula.className}`}>
-                             {aula.disciplina} <span className="text-[6.5px] ml-1 opacity-70 font-bold tracking-normal">- {aula.className}</span>
+                           <div className={`flex flex-col w-[85%] leading-none pt-0.5 ${isZero ? 'text-amber-600 dark:text-amber-500' : ''}`} title={`${aula.disciplina} - ${aula.className}`}>
+                             <span className="text-[10px] font-black uppercase tracking-widest truncate">{aula.disciplina}</span>
+                             <span className="text-[7px] opacity-75 font-bold tracking-widest truncate mt-0.5">{aula.className}</span>
                            </div>
                          </div>
                          <div title="Meta de Aulas Semanais Recomendadas / Aulas Já Alocadas" className={`flex items-center gap-1.5 text-[7px] font-black px-1 py-[2px] rounded flex-shrink-0 shadow-sm ${isZero ? 'bg-amber-100 text-amber-700 dark:bg-amber-950/50 dark:text-amber-400' : 'bg-emerald-100 text-emerald-750 dark:bg-emerald-900/40 dark:text-emerald-400'}`}>
@@ -711,9 +757,9 @@ export function MasterGrid({ isDarkMode, ...props }) {
              </div>
           ) : (
             <table className="w-full text-left border-collapse min-w-[800px]">
-              <thead className="sticky top-0 z-10 bg-inherit shadow-sm">
+              <thead className={`sticky top-0 z-40 shadow-sm ${isDarkMode ? 'bg-slate-800' : 'bg-white'}`}>
                 <tr>
-                  <th className="py-2 px-2 w-20 bg-inherit"></th>
+                  <th className={`py-2 px-2 w-20 sticky left-0 top-0 z-50 ${isDarkMode ? 'bg-slate-800' : 'bg-white'}`}></th>
                   {turmasDoCurso.filter(t => !hiddenClasses.includes(t.id)).map(turma => (
                     <th key={turma.id} className={`py-2 px-2 text-center text-[11px] font-black uppercase tracking-widest border-b-2 bg-inherit group/th transition-all duration-300 ${draggedItem && String(draggedItem.aula.classId) !== String(turma.id) ? 'opacity-30 grayscale pointer-events-none' : ''} ${isDarkMode ? 'border-slate-700/50' : 'border-slate-200'}`}>
                       <div className="flex items-center justify-center gap-2 relative">
@@ -733,9 +779,10 @@ export function MasterGrid({ isDarkMode, ...props }) {
                   <React.Fragment key={diaId}>
                     {/* Linha Divisória do Dia */}
                     <tr>
-                      <td colSpan={turmasDoCurso.filter(t => !hiddenClasses.includes(t.id)).length + 1} className={`py-1 px-3 text-[10px] font-black uppercase tracking-widest mt-4 ${isDarkMode ? 'bg-slate-700/50 text-emerald-400' : 'bg-emerald-50 text-emerald-700'}`}>
-                        {diaNome}
+                      <td className={`py-1 px-1 text-center text-[10px] font-black uppercase tracking-widest sticky left-0 z-30 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)] truncate max-w-[80px] ${isDarkMode ? 'bg-slate-800 text-emerald-400' : 'bg-slate-100 text-emerald-700'}`}>
+                        {diaNome.split('-')[0]}
                       </td>
+                      <td colSpan={turmasDoCurso.filter(t => !hiddenClasses.includes(t.id)).length} className={`p-0 border-none ${isDarkMode ? 'bg-slate-700/50' : 'bg-emerald-50'}`}></td>
                     </tr>
                     
                     {/* Horários do Dia */}
@@ -762,11 +809,12 @@ export function MasterGrid({ isDarkMode, ...props }) {
                       <React.Fragment key={`${diaId}-${hora}`}>
                         {(isAfternoonStart || isNightStart) && (
                            <tr>
-                              <td colSpan={turmasDoCurso.filter(t => !hiddenClasses.includes(t.id)).length + 1} className="p-0 h-[3px] bg-slate-300 dark:bg-slate-700 border-none"></td>
+                              <td className={`p-0 h-[3px] sticky left-0 z-30 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)] ${isDarkMode ? 'bg-slate-700' : 'bg-slate-300'}`}></td>
+                              <td colSpan={turmasDoCurso.filter(t => !hiddenClasses.includes(t.id)).length} className="p-0 h-[3px] bg-slate-300 dark:bg-slate-700 border-none"></td>
                            </tr>
                         )}
                         <tr key={`${diaId}-${hora}-row`} className={rowBgClass}>
-                          <td className="py-2 px-2 text-center text-[9px] font-bold text-slate-400 border-r border-slate-700/30 whitespace-nowrap align-middle">
+                          <td className={`py-2 px-2 text-center text-[9px] font-bold text-slate-400 border-r border-slate-700/30 whitespace-nowrap align-middle sticky left-0 z-30 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)] ${isDarkMode ? 'bg-slate-800' : 'bg-white'}`}>
                             {hora}
                           </td>
                         
@@ -804,9 +852,10 @@ export function MasterGrid({ isDarkMode, ...props }) {
                                      {Object.values(grade).filter(g => String(g.classId) === String(aulaNesteSlot.classId) && String(g.id) === String(aulaNesteSlot.id)).length}/{aulaNesteSlot.numAulas || 1}
                                   </span>
 
-                                  <span className={`text-[9px] w-[80%] font-black uppercase tracking-widest leading-tight truncate`} title={`${aulaNesteSlot.disciplina} - ${aulaNesteSlot.className}`}>
-                                    {aulaNesteSlot.disciplina} <span className="text-[7px] ml-1 opacity-60 font-bold tracking-normal">- {aulaNesteSlot.className}</span>
-                                  </span>
+                                  <div className="flex flex-col w-[85%] leading-none" title={`${aulaNesteSlot.disciplina} - ${aulaNesteSlot.className}`}>
+                                    <span className="text-[10px] font-black uppercase tracking-widest truncate">{aulaNesteSlot.disciplina}</span>
+                                    <span className="text-[7px] opacity-75 font-bold tracking-widest truncate mt-0.5">{aulaNesteSlot.className}</span>
+                                  </div>
                                   <div className="flex justify-between items-center mt-auto pt-1 gap-1 overflow-hidden" title={temAlertaProf ? profMsgText : "Professor e Local"}>
                                     <span className={`text-[8px] font-bold truncate max-w-[80px] ${temAlertaProf ? 'text-red-500 dark:text-red-400 bg-red-500/10 px-0.5 rounded border border-red-500/20' : 'text-slate-500 dark:text-slate-300'}`}>
                                       {temAlertaProf && <AlertTriangle size={8} className="inline mr-0.5 mb-[1px]" />} {aulaNesteSlot.professores?.map(p => p.split(' ')[0]).join(' + ')}
