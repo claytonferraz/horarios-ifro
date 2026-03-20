@@ -6,7 +6,7 @@
     "dev": "concurrently \"npm run dev:frontend\" \"npm run dev:backend\"",
     "dev:frontend": "next dev -p 3001",
     "dev:backend": "cd backend && npm start",
-    "build": "next build",
+    "build": "next build --webpack",
     "start": "next start",
     "lint": "eslint"
   },
@@ -18,6 +18,7 @@
     "date-fns": "^4.1.0",
     "lucide-react": "^0.577.0",
     "next": "16.1.7",
+    "next-pwa": "^5.6.0",
     "react": "19.2.3",
     "react-dom": "19.2.3",
     "socket.io-client": "^4.8.3",

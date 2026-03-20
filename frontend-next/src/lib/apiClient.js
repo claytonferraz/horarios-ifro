@@ -157,12 +157,15 @@ export const apiClient = {
       if (!res.ok) { 
         let errorMsg = "Credenciais inválidas";
         try {
-          const err = await res.json(); 
-          errorMsg = err.error || errorMsg;
+          const text = await res.text();
+          try {
+            const err = JSON.parse(text); 
+            errorMsg = err.error || errorMsg;
+          } catch(e) {
+            errorMsg = text || `Erro ${res.status}: ${res.statusText}`;
+          }
         } catch (e) {
-          // Se não for JSON, tenta pegar como texto ou usa o statusText
-          const text = await res.text().catch(() => "");
-          errorMsg = text || `Erro ${res.status}: ${res.statusText}`;
+           errorMsg = `Erro ${res.status}: ${res.statusText}`;
         }
         throw new Error(errorMsg); 
       }

@@ -34,10 +34,11 @@ app.options(/.*/, cors());
 app.use(cors({
   origin: function(origin, callback) {
     if(!origin) return callback(null, true); // Mobile / Postman
-    if(allowedOrigins.indexOf(origin) === -1){
-      return callback(new Error('CORS Policy: Access Blocked'), false);
+    // Libera conexões de rede locais e outras abas do dev (necessário para testes em outros navegadores/dispositivos)
+    if (origin.startsWith('http://localhost') || origin.startsWith('http://127.0.0.1') || origin.startsWith('http://192.168.') || allowedOrigins.includes(origin)) {
+      return callback(null, true);
     }
-    return callback(null, true);
+    return callback(new Error('CORS Blocked'), false);
   },
   credentials: true
 }));

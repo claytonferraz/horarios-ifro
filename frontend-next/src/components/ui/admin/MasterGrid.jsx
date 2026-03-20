@@ -76,9 +76,20 @@ export function MasterGrid({ isDarkMode, ...props }) {
   const [pendingDrop, setPendingDrop] = useState(null); // Modal DND 
   const [dropAlert, setDropAlert] = useState(null); // Alerta Simples
 
+  const [systemDialog, setSystemDialog] = useState({ isOpen: false, type: 'alert', title: '', message: '', onConfirm: null });
   const [modalMode, setModalMode] = useState(null); // 'save' | 'import' | null
   const [saveOptions, setSaveOptions] = useState({ type: 'previa', weekId: '' });
   const [importOptions, setImportOptions] = useState({ type: 'previa', weekId: '' });
+
+  const handleLimparTela = () => {
+      setSystemDialog({
+          isOpen: true,
+          type: 'confirm',
+          title: 'Limpar Grade da Tela',
+          message: 'Deseja remover todas as alocações da tela e enviá-las para os Pendentes? (O banco de dados NÃO será apagado até você clicar em Salvar).',
+          onConfirm: () => setGrade({})
+      });
+  };
 
   const [classesList, setClassesList] = useState([]);
   const [courses, setCourses] = useState([]);
@@ -444,9 +455,9 @@ export function MasterGrid({ isDarkMode, ...props }) {
       
       setShowCloneModal(false);
       setCloneSourceYear('');
-      alert("Grade baseada no padrão do ano anterior carregada na tela. Faça os ajustes e depois clique em Salvar Novo para registrar no ano atual.");
+      setSystemDialog({ isOpen: true, type: 'alert', title: 'Clonagem Concluída', message: 'Grade baseada no padrão do ano anterior carregada na tela. Faça os ajustes e depois clique em Salvar Novo para registrar.' });
     } catch (err) {
-      alert(err.message);
+      setSystemDialog({ isOpen: true, type: 'alert', title: 'Erro de Clonagem', message: err.message });
     }
   };
 
@@ -547,130 +558,114 @@ export function MasterGrid({ isDarkMode, ...props }) {
     <div className={`flex flex-col gap-4 animate-in fade-in duration-300 ${isDarkMode ? 'text-slate-200' : 'text-slate-800'}`}>
       
       {/* CABEÇALHO */}
-      <div className={`p-4 rounded-xl border shadow-sm flex flex-col xl:flex-row justify-between items-center gap-4 ${isDarkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'}`}>
-        <div className="flex items-center gap-3">
-          <CalendarDays className="text-emerald-500" size={24} />
-          <div>
-            <h2 className="text-lg font-black uppercase tracking-widest">Matriz do Curso</h2>
-            <p className="text-xs text-slate-400 font-bold tracking-wider">Visão simultânea de todas as turmas</p>
+      {/* CABEÇALHO ORGANIZADO EM DUAS LINHAS */}
+      <div className={`p-5 rounded-xl border shadow-sm flex flex-col gap-5 transition-colors ${isDarkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'}`}>
+        
+        {/* LINHA 1: TÍTULO E BOTÕES DE AÇÃO PRIMÁRIOS */}
+        <div className="flex flex-col xl:flex-row justify-between items-start xl:items-center gap-4">
+          <div className="flex items-center gap-3">
+            <div className="p-3 rounded-lg bg-emerald-500/10 text-emerald-500">
+               <CalendarDays size={28} />
+            </div>
+            <div>
+              <h2 className="text-xl font-black uppercase tracking-widest">Matriz do Curso</h2>
+              <p className="text-xs text-slate-400 font-bold tracking-wider mt-0.5">Visão simultânea de todas as turmas</p>
+            </div>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-3 w-full xl:w-auto">
+            {hiddenClasses.length > 0 && (
+              <button onClick={() => setHiddenClasses([])} className="flex items-center justify-center gap-2 bg-rose-500/10 hover:bg-rose-500/20 text-rose-600 dark:text-rose-400 px-5 py-3 rounded-xl text-xs font-black uppercase tracking-widest transition-all shadow-sm">
+                  <Eye size={16} /> Restaurar {hiddenClasses.length} Oculta(s)
+              </button>
+            )}
+
+            <button onClick={() => setShowCloneModal(true)} disabled={selectedCourses.length === 0} className="flex items-center justify-center gap-2 bg-indigo-100 text-indigo-700 hover:bg-indigo-200 disabled:opacity-50 px-5 py-3 rounded-xl text-xs font-black uppercase tracking-widest transition-all shadow-sm">
+               <Layers size={16} /> Clonar Anterior
+            </button>
+
+            <button 
+              onClick={() => handleLimparTela()} 
+              disabled={selectedCourses.length === 0} className="flex items-center justify-center gap-2 bg-amber-100 text-amber-700 hover:bg-amber-200 disabled:opacity-50 px-5 py-3 rounded-xl text-xs font-black uppercase tracking-widest transition-all shadow-sm"
+           >
+              <Trash2 size={16} /> Limpar Tela
+           </button>
+
+           <button onClick={() => { setSaveOptions({ type: selectedType, weekId: selectedWeek }); setModalMode('save'); }} disabled={selectedCourses.length === 0} className="flex items-center justify-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white disabled:opacity-50 px-6 py-3 rounded-xl text-xs font-black uppercase tracking-widest transition-all shadow-md hover:shadow-lg">
+              <Save size={16} /> Alterar / Salvar Novo
+           </button>
           </div>
         </div>
 
-        <div className="flex items-center gap-3 w-full xl:w-auto">
-          {/* SELETOR DE ANO LETIVO */}
-          <div className="flex items-center gap-2 px-3 py-2 rounded border bg-slate-50 dark:bg-slate-900 border-slate-300 dark:border-slate-700">
-             <CalendarDays size={16} className="text-emerald-500" />
+        {/* LINHA 2: BARRA DE FILTROS E CONFIGURAÇÕES DE VISUALIZAÇÃO */}
+        <div className={`p-3 rounded-xl flex flex-wrap items-center gap-3 border ${isDarkMode ? 'bg-slate-900/50 border-slate-700/50' : 'bg-slate-50 border-slate-200'}`}>
+          <div className="flex items-center gap-2 px-3 py-2 rounded-lg border bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-600 shadow-sm">
+             <CalendarDays size={14} className="text-emerald-500" />
              <select 
                value={String(selectedConfigYear)} 
-               onChange={(e) => {
-                 setSelectedCourses([]); 
-                 setGrade({}); 
-                 setAulasNeutras([]); 
-                 setSelectedConfigYear(e.target.value);
-               }}
+               onChange={(e) => { setSelectedCourses([]); setGrade({}); setAulasNeutras([]); setSelectedConfigYear(e.target.value); }}
                className="bg-transparent text-sm font-black outline-none cursor-pointer w-[60px] text-emerald-700 dark:text-emerald-400"
              >
                {academicYearsMeta && Object.keys(academicYearsMeta).length > 0 ? (
-                 Object.keys(academicYearsMeta).sort((a,b)=>b-a).map(yr => (
-                   <option key={yr} value={yr}>{yr}</option>
-                 ))
-               ) : (
-                 <option value={selectedConfigYear}>{selectedConfigYear}</option>
-               )}
+                 Object.keys(academicYearsMeta).sort((a,b)=>b-a).map(yr => <option key={yr} value={yr}>{yr}</option>)
+               ) : <option value={selectedConfigYear}>{selectedConfigYear}</option>}
              </select>
           </div>
-          {/* SELETORES DE VISUALIZAÇÃO */}
-          <div className="flex flex-col sm:flex-row items-center gap-2 px-2">
-             <select
-               value={shiftFilter}
-               onChange={e => setShiftFilter(e.target.value)}
-               className={`px-3 py-2 rounded-lg border shadow-sm outline-none cursor-pointer text-xs font-bold uppercase tracking-wider text-teal-600 dark:text-teal-400 ${isDarkMode ? 'bg-slate-900 border-slate-700' : 'bg-slate-50 border-slate-300'}`}
-               title="Filtrar visualização de linhas"
-             >
-               <option value="todos">Todos os Turnos</option>
-               <option value="diurno">Diurno (Mat/Vesp)</option>
-               <option value="noturno">Noturno</option>
-             </select>
 
-             <select 
-               value={selectedType} onChange={e => setSelectedType(e.target.value)} 
-               className={`px-3 py-2 rounded-lg border shadow-sm outline-none cursor-pointer text-xs font-bold uppercase tracking-wider text-indigo-600 dark:text-indigo-400 ${isDarkMode ? 'bg-slate-900 border-slate-700' : 'bg-slate-50 border-slate-300'}`}
-             >
-                 <option value="padrao">Padrão Anual (Base)</option>
-                 <option value="previa">Prévia Semanal</option>
-                 <option value="atual">Horário Atual</option>
-                 <option value="oficial">Histórico Oficial</option>
-             </select>
+          <div className="h-6 w-px bg-slate-300 dark:bg-slate-600 mx-1 hidden sm:block"></div>
 
-             {selectedType !== 'padrao' && (
-               <select
-                 value={selectedWeek} onChange={(e) => setSelectedWeek(e.target.value)}
-                 className={`px-3 py-2 rounded-lg border shadow-sm outline-none cursor-pointer text-xs font-bold uppercase tracking-wider text-amber-600 dark:text-amber-400 ${isDarkMode ? 'bg-slate-900 border-slate-700' : 'bg-slate-50 border-slate-300'}`}
-               >
-                 <option value="">-- Semana --</option>
-                 {academicWeeks?.filter(w => String(w.academic_year) === String(selectedConfigYear)).map(w => (
-                     <option key={w.id} value={w.id}>{formatWeekLabel(w)}</option>
-                 ))}
-               </select>
-             )}
-          </div>
-          
-          <div className="relative">
-             <div 
-               className="flex items-center gap-2 px-3 py-2 rounded border bg-slate-50 dark:bg-slate-900 border-slate-300 dark:border-slate-700 cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
-               onClick={() => setIsCoursesOpen(!isCoursesOpen)}
-             >
-                <Filter size={16} className="text-slate-400" />
-                <div className="bg-transparent text-xs font-bold w-48 flex items-center justify-between">
-                   <span>{selectedCourses.length === 0 ? '-- Selecionar Cursos --' : `${selectedCourses.length} Curso(s) da Matriz`}</span>
-                   <span className="text-[9px] opacity-50">{isCoursesOpen ? '▲' : '▼'}</span>
+          <select value={shiftFilter} onChange={e => setShiftFilter(e.target.value)} className={`px-4 py-2.5 rounded-lg border shadow-sm outline-none cursor-pointer text-xs font-bold uppercase tracking-wider text-teal-600 dark:text-teal-400 ${isDarkMode ? 'bg-slate-800 border-slate-600' : 'bg-white border-slate-200'}`}>
+            <option value="todos">Todos os Turnos</option>
+            <option value="diurno">Diurno (Mat/Vesp)</option>
+            <option value="noturno">Noturno</option>
+          </select>
+
+          <select value={selectedType} onChange={e => setSelectedType(e.target.value)} className={`px-4 py-2.5 rounded-lg border shadow-sm outline-none cursor-pointer text-xs font-bold uppercase tracking-wider text-indigo-600 dark:text-indigo-400 ${isDarkMode ? 'bg-slate-800 border-slate-600' : 'bg-white border-slate-200'}`}>
+              <option value="padrao">Padrão Anual (Base)</option>
+              <option value="previa">Prévia Semanal</option>
+              <option value="atual">Horário Atual</option>
+              <option value="oficial">Histórico Oficial</option>
+          </select>
+
+          {selectedType !== 'padrao' && (
+            <select value={selectedWeek} onChange={(e) => setSelectedWeek(e.target.value)} className={`px-4 py-2.5 rounded-lg border shadow-sm outline-none cursor-pointer text-xs font-bold uppercase tracking-wider text-amber-600 dark:text-amber-400 ${isDarkMode ? 'bg-slate-800 border-slate-600' : 'bg-white border-slate-200'}`}>
+              <option value="">-- Semana --</option>
+              {academicWeeks?.filter(w => String(w.academic_year) === String(selectedConfigYear)).map(w => <option key={w.id} value={w.id}>{formatWeekLabel ? formatWeekLabel(w) : w.name}</option>)}
+            </select>
+          )}
+
+          <div className="h-6 w-px bg-slate-300 dark:bg-slate-600 mx-1 hidden sm:block"></div>
+
+          <div className="relative flex-1 min-w-[200px] max-w-sm">
+             <div onClick={() => setIsCoursesOpen(!isCoursesOpen)} className={`flex items-center justify-between px-4 py-2.5 rounded-lg border shadow-sm cursor-pointer transition-colors ${isDarkMode ? 'bg-slate-800 border-slate-600 hover:bg-slate-700' : 'bg-white border-slate-200 hover:bg-slate-50'}`}>
+                <div className="flex items-center gap-2">
+                   <Filter size={14} className="text-slate-400" />
+                   <span className="text-xs font-bold uppercase tracking-wider text-slate-600 dark:text-slate-300">
+                     {selectedCourses.length === 0 ? 'Selecionar Cursos' : `${selectedCourses.length} Curso(s) da Matriz`}
+                   </span>
                 </div>
+                <span className="text-[9px] opacity-50">{isCoursesOpen ? '▲' : '▼'}</span>
              </div>
              
              {isCoursesOpen && (
                  <>
                    <div className="fixed inset-0 z-40" onClick={() => setIsCoursesOpen(false)} />
-                   <div className="absolute top-12 w-64 p-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg shadow-xl flex flex-col z-50 max-h-60 overflow-y-auto gap-1 right-0 sm:left-0 sm:right-auto">
+                   <div className="absolute top-12 left-0 w-full p-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-600 rounded-xl shadow-2xl flex flex-col z-50 max-h-64 overflow-y-auto gap-1">
                       {courses?.map(c => (
-                       <label key={c.id} className="flex items-center gap-2 text-[10px] font-bold cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-700 px-2 py-1.5 rounded transition-colors group/label z-50 relative">
-                         <input type="checkbox" className="accent-emerald-500 w-3 h-3 cursor-pointer" checked={selectedCourses.includes(String(c.id))} onChange={(e) => {
+                       <label key={c.id} className="flex items-center gap-3 text-xs font-bold cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-700 px-3 py-2.5 rounded-lg transition-colors group/label">
+                         <input type="checkbox" className="accent-emerald-500 w-4 h-4 cursor-pointer" checked={selectedCourses.includes(String(c.id))} onChange={(e) => {
                            if (e.target.checked) setSelectedCourses(p => [...p, String(c.id)]);
                            else setSelectedCourses(p => p.filter(id => id !== String(c.id)));
                          }} />
                          <span className="group-hover/label:text-emerald-600 dark:group-hover/label:text-emerald-400">{c.name}</span>
                        </label>
                      ))}
-                     {courses?.length === 0 && <span className="text-xs p-2 opacity-50">Nenhum curso.</span>}
+                     {courses?.length === 0 && <span className="text-xs p-3 text-center opacity-50">Nenhum curso.</span>}
                    </div>
                  </>
              )}
            </div>
-           
-           {hiddenClasses.length > 0 && (
-             <button onClick={() => setHiddenClasses([])} className="flex items-center justify-center gap-1.5 bg-rose-500/10 hover:bg-rose-500/20 text-rose-600 dark:text-rose-400 px-3 py-2 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all w-full sm:w-auto shadow-sm">
-                 <Eye size={14} /> Restaurar {hiddenClasses.length} Oculta(s)
-             </button>
-           )}
-
-           <button onClick={() => setShowCloneModal(true)} disabled={selectedCourses.length === 0} className="flex items-center justify-center gap-2 bg-indigo-100 text-indigo-700 hover:bg-indigo-200 disabled:opacity-50 px-4 py-2.5 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all w-full sm:w-auto shadow-sm">
-              Clonar de Ano Anterior
-           </button>
-
-           <button 
-             onClick={() => {
-                 if(window.confirm('Limpar grade da tela para criar do zero? (O banco NÃO será apagado até você salvar)')) {
-                     setGrade({});
-                 }
-             }} 
-             disabled={selectedCourses.length === 0} className="flex items-center justify-center gap-2 bg-amber-100 text-amber-700 hover:bg-amber-200 disabled:opacity-50 px-4 py-2.5 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all w-full sm:w-auto shadow-sm"
-          >
-             <AlertCircle size={14} /> Limpar Tela
-          </button>
-
-          <button onClick={() => { setSaveOptions({ type: selectedType, weekId: selectedWeek }); setModalMode('save'); }} disabled={selectedCourses.length === 0} className="flex items-center justify-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white disabled:opacity-50 px-5 py-2.5 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all w-full sm:w-auto shadow-sm">
-             <Save size={14} /> Alterar ou Salvar Novo
-          </button>
-          </div>
+        </div>
       </div>
 
       {dashboardAlerts.list.length > 0 && (
@@ -962,7 +957,8 @@ export function MasterGrid({ isDarkMode, ...props }) {
            academicWeeks={academicWeeks} schedules={schedules} selectedConfigYear={selectedConfigYear}
            loadedType={selectedType} loadedWeek={selectedWeek} 
            onClose={() => setModalMode(null)} 
-           onSuccess={() => { setModalMode(null); alert("Grade armazenada com sucesso!"); setRefreshTrigger(prev => prev + 1); }} 
+           onSuccess={() => { setModalMode(null); setSystemDialog({ isOpen: true, type: 'alert', title: 'Sucesso!', message: 'Grade armazenada com sucesso no banco de dados.' }); setRefreshTrigger(prev => prev + 1); }} 
+           setSystemDialog={setSystemDialog}
          />
       )}
 
@@ -1003,6 +999,27 @@ export function MasterGrid({ isDarkMode, ...props }) {
            </div>
         </div>
       )}
+      {systemDialog.isOpen && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[100] flex items-center justify-center p-4 animate-in fade-in zoom-in-95 duration-200">
+          <div className={`w-full max-w-md rounded-2xl shadow-2xl overflow-hidden flex flex-col ${isDarkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200 border'}`}>
+             <div className={`p-6 border-b ${isDarkMode ? 'border-slate-700' : 'border-slate-100'}`}>
+               <h3 className="text-lg font-black uppercase tracking-widest flex items-center gap-2">
+                  {systemDialog.type === 'confirm' ? <AlertTriangle className="text-amber-500" /> : <AlertCircle className="text-indigo-500" />}
+                  {systemDialog.title}
+               </h3>
+               <p className={`mt-3 text-sm font-bold leading-relaxed ${isDarkMode ? 'text-slate-300' : 'text-slate-600'}`}>{systemDialog.message}</p>
+             </div>
+             <div className={`p-4 flex items-center justify-end gap-3 ${isDarkMode ? 'bg-slate-900/50' : 'bg-slate-50'}`}>
+               {systemDialog.type === 'confirm' && (
+                 <button onClick={() => setSystemDialog({ isOpen: false, type: 'alert', title: '', message: '', onConfirm: null })} className={`px-5 py-2.5 rounded-xl text-xs font-bold transition-all ${isDarkMode ? 'bg-slate-700 hover:bg-slate-600 text-white' : 'bg-white border border-slate-300 hover:bg-slate-100 text-slate-700'}`}>Cancelar</button>
+               )}
+               <button onClick={() => { if(systemDialog.onConfirm) systemDialog.onConfirm(); setSystemDialog({ isOpen: false, type: 'alert', title: '', message: '', onConfirm: null }); }} className={`px-6 py-2.5 rounded-xl text-xs font-black uppercase tracking-widest text-white shadow-md transition-all ${systemDialog.type === 'confirm' ? 'bg-emerald-600 hover:bg-emerald-500' : 'bg-indigo-600 hover:bg-indigo-500'}`}>
+                  {systemDialog.type === 'confirm' ? 'Confirmar Ação' : 'OK, Entendi'}
+               </button>
+             </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -1010,7 +1027,7 @@ export function MasterGrid({ isDarkMode, ...props }) {
 // -------------------------------------------------------------
 // SUB-COMPONENTES DE AÇÃO (SALVAR E IMPORTAR)
 // -------------------------------------------------------------
-function SaveMatrixModal({ isDarkMode, grade, selectedCourses, saveOptions, setSaveOptions, academicWeeks, selectedConfigYear, loadedType, loadedWeek, onClose, onSuccess }) {
+function SaveMatrixModal({ isDarkMode, grade, selectedCourses, saveOptions, setSaveOptions, academicWeeks, selectedConfigYear, loadedType, loadedWeek, onClose, onSuccess, setSystemDialog }) {
   const [isSaving, setIsSaving] = useState(false);
   const currentYearWeeks = useMemo(() => academicWeeks?.filter(w => String(w.academic_year) === String(selectedConfigYear)) || [], [academicWeeks, selectedConfigYear]);
 
@@ -1024,14 +1041,11 @@ function SaveMatrixModal({ isDarkMode, grade, selectedCourses, saveOptions, setS
 
   useEffect(() => { setSaveOptions({ type: availableOptions[0].value, weekId: loadedWeek }); }, [loadedType, loadedWeek, availableOptions]);
 
-  const handleConfirmSave = async () => {
+  const executarSalvamentoNoBackend = async () => {
       const payload = Object.entries(grade).map(([key, aula]) => {
          const [classId, dayOfWeek, slotId] = key.split('|');
          return { courseId: aula.courseId, classId, dayOfWeek, slotId, teacherId: aula.teacherIds ? aula.teacherIds.join(',') : 'A Definir', disciplineId: aula.disciplineId || aula.id, room: aula.sala };
       });
-
-      if (saveOptions.type !== 'padrao' && !saveOptions.weekId) return alert('Selecione uma semana letiva!');
-      if (saveOptions.type === 'oficial' && !window.confirm("⚠️ Você está prestes a salvar um histórico Oficial. Continuar?")) return;
 
       setIsSaving(true);
       try {
@@ -1041,7 +1055,21 @@ function SaveMatrixModal({ isDarkMode, grade, selectedCourses, saveOptions, setS
           });
           if(!resp.ok) throw new Error('Erro Crítico no Backend!');
           onSuccess();
-      } catch(e) { alert(e.message); } finally { setIsSaving(false); }
+      } catch(e) { setSystemDialog({ isOpen: true, type: 'alert', title: 'Erro Crítico', message: e.message }); } finally { setIsSaving(false); }
+  };
+
+  const handleConfirmSave = async () => {
+      if (saveOptions.type !== 'padrao' && !saveOptions.weekId) return setSystemDialog({ isOpen: true, type: 'alert', title: 'Atenção', message: 'Selecione uma semana letiva de destino!' });
+      
+      if (saveOptions.type === 'oficial') {
+          setSystemDialog({
+              isOpen: true, type: 'confirm', title: 'Confirmação Crítica',
+              message: 'Você está prestes a salvar um histórico Oficial e Imutável. Tem certeza que deseja consolidar essa grade?',
+              onConfirm: () => executarSalvamentoNoBackend()
+          });
+          return;
+      }
+      executarSalvamentoNoBackend();
   };
 
   return (

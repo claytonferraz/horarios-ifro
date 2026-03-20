@@ -12,17 +12,16 @@ export const viewport = {
   width: 'device-width',
   initialScale: 1,
   maximumScale: 1,
-  userScalable: false,
 };
 
 export const metadata = {
-  title: "Horários IFRO - Ji-Paraná",
-  description: "Sistema de Horários do IFRO Campus Ji-Paraná",
-  manifest: "/manifest.json",
+  title: 'Gestão de Horários IFRO',
+  description: 'Sistema Inteligente de Horários Acadêmicos',
+  manifest: '/manifest.json',
   appleWebApp: {
     capable: true,
-    title: "Horários IFRO",
-    statusBarStyle: "black-translucent",
+    statusBarStyle: 'default',
+    title: 'Horários IFRO',
   },
   icons: {
     icon: '/icon.svg',
