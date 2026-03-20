@@ -12,8 +12,7 @@ const TABS = [
   { id: 'days', label: 'Dias da Semana', icon: Calendar },
   { id: 'times', label: 'Horários & Turnos', icon: Clock },
   { id: 'bimesters', label: 'Bimestres', icon: Calendar },
-  { id: 'weeks', label: 'Semanas Acadêmicas', icon: Calendar },
-  { id: 'default', label: 'Horário Padrão', icon: List }
+  { id: 'weeks', label: 'Semanas Acadêmicas', icon: Calendar }
 ];
 
 function sortTimes(times) {
@@ -30,7 +29,6 @@ export function ScheduleConfigPanel({ isDarkMode }) {
     classTimes, setClassTimes,
     bimesters, setBimesters,
     intervals, setIntervals,
-    activeDefaultScheduleId, setActiveDefaultScheduleId,
     rawData, refreshData, setErrorMsg,
     selectedConfigYear, setSelectedConfigYear,
     academicYearsMeta
@@ -43,7 +41,6 @@ export function ScheduleConfigPanel({ isDarkMode }) {
   const [localTimes, setLocalTimes] = useState([]);
   const [localBimesters, setLocalBimesters] = useState([]);
   const [localIntervals, setLocalIntervals] = useState([]);
-  const [localDefaultId, setLocalDefaultId] = useState('');
 
   // Sync state whenever the contextual data from useData changes (trigger by year switch)
   useEffect(() => {
@@ -51,8 +48,7 @@ export function ScheduleConfigPanel({ isDarkMode }) {
     setLocalTimes(classTimes || []);
     setLocalBimesters(bimesters || []);
     setLocalIntervals(intervals || []);
-    setLocalDefaultId(activeDefaultScheduleId || '');
-  }, [activeDays, classTimes, bimesters, intervals, activeDefaultScheduleId, selectedConfigYear]);
+  }, [activeDays, classTimes, bimesters, intervals, selectedConfigYear]);
 
   const [savingSection, setSavingSection] = useState(null);
   const [savedSection, setSavedSection] = useState(null);
@@ -95,7 +91,7 @@ export function ScheduleConfigPanel({ isDarkMode }) {
   const saveDays = async () => {
     setSavingSection('days');
     try {
-      await apiClient.updateConfig({ year: selectedConfigYear, activeDays: localDays, classTimes, bimesters, intervals, activeDefaultScheduleId });
+      await apiClient.updateConfig({ year: selectedConfigYear, activeDays: localDays, classTimes, bimesters, intervals });
       setActiveDays(localDays);
       flashSaved('days');
     } catch (e) { setErrorMsg(`Falha: ${e.message}`); }
@@ -125,7 +121,7 @@ export function ScheduleConfigPanel({ isDarkMode }) {
     setSavingSection('times');
     const sorted = sortTimes(localTimes);
     try {
-      await apiClient.updateConfig({ year: selectedConfigYear, activeDays, classTimes: sorted, bimesters, intervals: localIntervals, activeDefaultScheduleId });
+      await apiClient.updateConfig({ year: selectedConfigYear, activeDays, classTimes: sorted, bimesters, intervals: localIntervals });
       setLocalTimes(sorted);
       setClassTimes(sorted);
       setIntervals(localIntervals);
@@ -180,25 +176,12 @@ export function ScheduleConfigPanel({ isDarkMode }) {
   const saveBimesters = async () => {
     setSavingSection('bimesters');
     try {
-      await apiClient.updateConfig({ year: selectedConfigYear, activeDays, classTimes, bimesters: localBimesters, intervals, activeDefaultScheduleId });
+      await apiClient.updateConfig({ year: selectedConfigYear, activeDays, classTimes, bimesters: localBimesters, intervals });
       setBimesters(localBimesters);
       flashSaved('bimesters');
     } catch (e) { setErrorMsg(`Falha: ${e.message}`); }
     finally { setSavingSection(null); }
   };
-
-  // ── Default schedule ──────────────────────────────────────────────────────
-  const saveDefault = async () => {
-    setSavingSection('default');
-    try {
-      await apiClient.updateConfig({ year: selectedConfigYear, activeDays, classTimes, bimesters, activeDefaultScheduleId: localDefaultId || null });
-      setActiveDefaultScheduleId(localDefaultId);
-      flashSaved('default');
-    } catch (e) { setErrorMsg(`Falha: ${e.message}`); }
-    finally { setSavingSection(null); }
-  };
-
-  const padraoList = Array.from(new Set(rawData.filter(r => r.type === 'padrao').map(r => r.week)));
 
   const groupedTimes = SHIFTS.reduce((acc, s) => {
     const items = localTimes.filter(t => t.shift === s);
@@ -516,54 +499,6 @@ export function ScheduleConfigPanel({ isDarkMode }) {
                 {localIntervals.length === 0 && <p className="text-[10px] font-bold opacity-50 italic py-2 text-center">Nenhum intervalo cadastrado.</p>}
               </div>
 
-            </div>
-          </div>
-        )}
-
-        {/* --- HORÁRIO PADRÃO --- */}
-        {activeTab === 'default' && (
-          <div className="max-w-3xl animate-in fade-in slide-in-from-bottom-2">
-             <div className="flex items-center justify-between mb-6">
-              <h3 className="text-sm font-black uppercase tracking-widest flex items-center gap-2 opacity-70">
-                <List size={16}/> Horário Base (Padrão) de {selectedConfigYear}
-              </h3>
-              <SaveBtn section="default" onClick={saveDefault} />
-            </div>
-            <div className={`p-6 rounded-2xl border shadow-sm ${isDarkMode ? 'bg-blue-900/10 border-blue-900/30' : 'bg-blue-50/50 border-blue-100'}`}>
-              
-              {/* O texto antigo sobre FET foi inativado */}
-              {/* <p className="text-sm mb-4 font-medium opacity-80 leading-relaxed">Selecione qual grade de horário "Padrão" enviada pelo FET o sistema deve assumir como base fundamental. O sistema usará essa base para preencher os nomes das turmas nas estatísticas e painéis de conflitos.</p> */}
-
-              <p className="text-sm mb-4 font-medium opacity-80 leading-relaxed">Selecione qual grade de horário o sistema deve assumir como base fundamental (Padrão) para o preenchimento de dependências de conflitos e estatísticas.</p>
-              
-              <div className="flex flex-col gap-2">
-                <label className="text-[10px] uppercase tracking-widest font-black opacity-60 ml-1">Horário Padrão (Base) Selecionado</label>
-                <select
-                  value={localDefaultId}
-                  onChange={e => setLocalDefaultId(e.target.value)}
-                  className={`w-full p-4 font-bold text-sm rounded-xl border focus:ring-2 focus:ring-blue-500 outline-none transition-all ${isDarkMode ? 'bg-slate-800 border-slate-700 text-white shadow-inner' : 'bg-white border-slate-200 text-slate-800 shadow-sm'}`}
-                >
-                  <option value="">-- Nenhum Horário Base Selecionado --</option>
-                  {padraoList.map(p => <option key={p} value={p}>{p}</option>)}
-                </select>
-              </div>
-
-              {/* O alerta sobre falta de upload do FET foi inativado */}
-              {/* 
-              {padraoList.length === 0 && (
-                <div className={`mt-4 p-4 rounded-xl flex items-start gap-3 ${isDarkMode ? 'bg-amber-900/20 text-amber-400' : 'bg-amber-50 text-amber-700'}`}>
-                  <AlertCircle size={18} className="shrink-0 mt-0.5" />
-                  <p className="text-xs font-medium leading-relaxed">Você ainda não enviou nenhuma grade oficial do tipo <strong>"PADRAO"</strong> ao sistema. Vá até a aba "Efetivar Novo Horário FET" e faça upload da planilha base contendo todas as turmas para que as opções apareçam aqui.</p>
-                </div>
-              )}
-              */}
-              
-               {padraoList.length === 0 && (
-                <div className={`mt-4 p-4 rounded-xl flex items-start gap-3 ${isDarkMode ? 'bg-amber-900/20 text-amber-400' : 'bg-amber-50 text-amber-700'}`}>
-                  <AlertCircle size={18} className="shrink-0 mt-0.5" />
-                  <p className="text-xs font-medium leading-relaxed">Para definir um horário padrão, crie uma grade nas opções de Matriz e promova-a como base oficial do ano letivo.</p>
-                </div>
-              )}
             </div>
           </div>
         )}

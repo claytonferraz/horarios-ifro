@@ -20,6 +20,7 @@ export function MasterGrid({ isDarkMode, ...props }) {
   // ESTADO DA TELA PRINCIPAL (O que o usuário está visualizando)
   const [selectedType, setSelectedType] = useState('previa'); 
   const [selectedWeek, setSelectedWeek] = useState('');
+  const [refreshTick, setRefreshTick] = useState(0);
 
   const [pendingDrop, setPendingDrop] = useState(null); // Modal DND 
   const [dropAlert, setDropAlert] = useState(null); // Alerta Simples
@@ -99,7 +100,7 @@ export function MasterGrid({ isDarkMode, ...props }) {
       }
     }
     loadAdminData();
-  }, [selectedConfigYear]); // Recarrega os dados caso o usuário mude o ano letivo na interface
+  }, [selectedConfigYear, refreshTick]); // Recarrega os dados caso o usuário mude o ano letivo na interface
 
   // Pega todas as turmas dos cursos selecionados
   const turmasDoCurso = useMemo(() => {
@@ -463,18 +464,21 @@ export function MasterGrid({ isDarkMode, ...props }) {
                value={selectedType} onChange={e => setSelectedType(e.target.value)} 
                className={`px-3 py-2 rounded-lg border shadow-sm outline-none cursor-pointer text-xs font-bold uppercase tracking-wider text-indigo-600 dark:text-indigo-400 ${isDarkMode ? 'bg-slate-900 border-slate-700' : 'bg-slate-50 border-slate-300'}`}
              >
+                 <option value="padrao">Padrão Anual</option>
                  <option value="previa">Prévia Semanal</option>
                  <option value="atual">Horário Atual</option>
                  <option value="oficial">Histórico Oficial</option>
              </select>
 
-             <select
-               value={selectedWeek} onChange={(e) => setSelectedWeek(e.target.value)}
-               className={`px-3 py-2 rounded-lg border shadow-sm outline-none cursor-pointer text-xs font-bold uppercase tracking-wider text-amber-600 dark:text-amber-400 ${isDarkMode ? 'bg-slate-900 border-slate-700' : 'bg-slate-50 border-slate-300'}`}
-             >
-               <option value="">-- Semana --</option>
-               {academicWeeks?.filter(w => w.academic_year === selectedConfigYear).map(w => <option key={w.id} value={w.id}>{w.name}</option>)}
-             </select>
+             {selectedType !== 'padrao' && (
+               <select
+                 value={selectedWeek} onChange={(e) => setSelectedWeek(e.target.value)}
+                 className={`px-3 py-2 rounded-lg border shadow-sm outline-none cursor-pointer text-xs font-bold uppercase tracking-wider text-amber-600 dark:text-amber-400 ${isDarkMode ? 'bg-slate-900 border-slate-700' : 'bg-slate-50 border-slate-300'}`}
+               >
+                 <option value="">-- Semana --</option>
+                 {academicWeeks?.filter(w => w.academic_year === selectedConfigYear).map(w => <option key={w.id} value={w.id}>{w.name}</option>)}
+               </select>
+             )}
           </div>
           
           <div className="relative">
@@ -796,7 +800,7 @@ export function MasterGrid({ isDarkMode, ...props }) {
            academicWeeks={academicWeeks} schedules={schedules} selectedConfigYear={selectedConfigYear}
            loadedType={selectedType} loadedWeek={selectedWeek} 
            onClose={() => setModalMode(null)} 
-           onSuccess={() => { setModalMode(null); alert("Grade armazenada com sucesso!"); fetchData(); }} 
+           onSuccess={() => { setModalMode(null); alert("Grade armazenada com sucesso!"); setRefreshTick(prev => prev + 1); }} 
          />
       )}
 
@@ -849,10 +853,11 @@ function SaveMatrixModal({ isDarkMode, grade, selectedCourses, saveOptions, setS
   const currentYearWeeks = useMemo(() => academicWeeks?.filter(w => String(w.academic_year) === String(selectedConfigYear)) || [], [academicWeeks, selectedConfigYear]);
 
   const availableOptions = useMemo(() => {
+      if (loadedType === 'padrao') return [{ value: 'padrao', label: '1. Criar/Atualizar: Padrão Anual' }, { value: 'previa', label: '2. Criar: Prévia Semanal' }];
       if (loadedType === 'previa') return [{ value: 'previa', label: '1. Atualizar: Prévia' }, { value: 'atual', label: '2. Promover para: Atual' }];
       if (loadedType === 'atual') return [{ value: 'atual', label: '2. Atualizar: Atual' }, { value: 'oficial', label: '3. Promover para: Oficial' }];
       if (loadedType === 'oficial') return [{ value: 'oficial', label: '3. Retificar: Oficial' }];
-      return [{ value: 'previa', label: '1. Criar: Prévia Semanal' }];
+      return [{ value: 'padrao', label: '1. Novo Padrão Anual' }, { value: 'previa', label: '2. Criar: Prévia Semanal' }];
   }, [loadedType]);
 
   useEffect(() => { setSaveOptions({ type: availableOptions[0].value, weekId: loadedWeek }); }, [loadedType, loadedWeek, availableOptions]);
@@ -863,7 +868,7 @@ function SaveMatrixModal({ isDarkMode, grade, selectedCourses, saveOptions, setS
          return { courseId: aula.courseId, classId, dayOfWeek, slotId, teacherId: aula.teacherId, disciplineId: aula.id.split('_')[1] || aula.id, room: aula.sala };
       });
 
-      if (!saveOptions.weekId) return alert('Selecione uma semana letiva!');
+      if (saveOptions.type !== 'padrao' && !saveOptions.weekId) return alert('Selecione uma semana letiva!');
       if (saveOptions.type === 'oficial' && !window.confirm("⚠️ Você está prestes a salvar um histórico Oficial. Continuar?")) return;
 
       setIsSaving(true);
@@ -888,13 +893,20 @@ function SaveMatrixModal({ isDarkMode, grade, selectedCourses, saveOptions, setS
                  {availableOptions.map(opt => <option key={opt.value} value={opt.value}>{opt.label}</option>)}
               </select>
             </div>
-            <div>
-              <label className="block text-[10px] font-black uppercase opacity-60 mb-2">Semana Destino</label>
-              <select value={saveOptions.weekId} onChange={e => setSaveOptions(p => ({...p, weekId: e.target.value}))} className="w-full p-3 rounded border text-xs text-black">
-                 <option value="">Selecione...</option>
-                 {currentYearWeeks.map(w => <option key={w.id} value={w.id}>{w.name}</option>)}
-              </select>
-            </div>
+            {saveOptions.type === 'padrao' ? (
+              <div>
+                <label className="block text-[10px] font-black uppercase opacity-60 mb-2">Versão (Ex: v1.0)</label>
+                <input type="text" value={saveOptions.weekId} onChange={e => setSaveOptions(p => ({...p, weekId: e.target.value}))} className="w-full p-3 rounded border text-black text-xs" />
+              </div>
+            ) : (
+              <div>
+                <label className="block text-[10px] font-black uppercase opacity-60 mb-2">Semana Destino</label>
+                <select value={saveOptions.weekId} onChange={e => setSaveOptions(p => ({...p, weekId: e.target.value}))} className="w-full p-3 rounded border text-xs text-black">
+                   <option value="">Selecione...</option>
+                   {currentYearWeeks.map(w => <option key={w.id} value={w.id}>{w.name}</option>)}
+                </select>
+              </div>
+            )}
          </div>
          <div className="flex justify-end gap-3 border-t pt-4">
              <button onClick={onClose} className="px-4 py-2 font-bold text-xs bg-slate-200 text-slate-700 rounded">Cancelar</button>
