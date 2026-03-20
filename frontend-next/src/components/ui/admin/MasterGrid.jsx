@@ -338,11 +338,27 @@ export function MasterGrid({ isDarkMode, ...props }) {
          if (startIndex !== -1) {
              let placed = 0;
              let currentIdx = startIndex;
+             
+             // Descobre em qual turno o card foi solto inicialmente
+             const getShift = (timeStr) => {
+                 const h = parseInt(timeStr.split(':')[0], 10);
+                 if (h < 12) return 'M';
+                 if (h >= 12 && h < 18) return 'T';
+                 return 'N';
+             };
+             const startShift = getShift(hora);
+
              while (placed < aulasAmount && currentIdx < horariosExibidos.length) {
                  const targetHora = horariosExibidos[currentIdx];
+                 
+                 // Regra de Negócio: Impede que a alocação em cascata invada o próximo turno
+                 if (getShift(targetHora) !== startShift) {
+                     break;
+                 }
+
                  const slotK = `${classId}|${diaId}|${targetHora}`;
                  
-                 // Pode pular um slot ocupado para continuar preenchendo? A lógica era apenas parar se confirmar 'não', mas prechia se não ocupado...
+                 // Preenche se o slot estiver vazio (ou sobrescreve o primeiro se o usuário forçou)
                  if (!grade[slotK] || placed === 0) {
                      dropsToMake.push({ slotKey: slotK, hora: targetHora });
                      placed++;
@@ -575,26 +591,38 @@ export function MasterGrid({ isDarkMode, ...props }) {
 
           <div className="flex flex-wrap items-center gap-3 w-full xl:w-auto">
             {hiddenClasses.length > 0 && (
-              <div className={`flex items-center gap-1 p-1.5 rounded-xl border shadow-sm ${isDarkMode ? 'bg-rose-900/10 border-rose-800/30' : 'bg-rose-50 border-rose-200'}`}>
-                 <button onClick={() => setHiddenClasses([])} title="Restaurar Todas" className="flex items-center justify-center gap-1.5 bg-rose-100 hover:bg-rose-200 text-rose-700 dark:bg-rose-500/20 dark:hover:bg-rose-500/30 dark:text-rose-300 px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest transition-colors shrink-0">
-                    <Eye size={14} /> Todas
-                 </button>
-                 
-                 <div className={`h-5 w-px mx-1 shrink-0 ${isDarkMode ? 'bg-rose-800/50' : 'bg-rose-200'}`}></div>
-                 
-                 <div className="flex items-center gap-1.5 max-w-[250px] overflow-x-auto no-scrollbar scroll-smooth">
-                    {hiddenClasses.map(hcId => {
-                       const turmaOculta = classesList?.find(c => String(c.id) === String(hcId));
-                       return (
-                         <div key={hcId} className={`flex items-center gap-1 px-2 py-1 rounded-md text-[9px] font-bold border whitespace-nowrap group/badge transition-colors shrink-0 ${isDarkMode ? 'bg-slate-800 border-slate-700 text-slate-300 hover:border-emerald-500/50' : 'bg-white border-slate-200 text-slate-600 hover:border-emerald-300'}`}>
-                            <span className="truncate max-w-[100px]" title={turmaOculta?.name}>{turmaOculta?.name || 'Turma'}</span>
-                            <button onClick={() => setHiddenClasses(prev => prev.filter(id => id !== hcId))} className="text-slate-400 hover:text-emerald-500 transition-colors" title="Restaurar esta turma à tela">
-                               <Check size={10} strokeWidth={4} />
-                            </button>
-                         </div>
-                       );
-                    })}
-                 </div>
+              <div className={`flex items-center gap-2 px-4 py-3 rounded-xl border shadow-sm transition-colors ${isDarkMode ? 'bg-rose-900/10 border-rose-800/30' : 'bg-rose-50 border-rose-200'}`}>
+                 <Eye size={16} className={isDarkMode ? 'text-rose-400' : 'text-rose-600'} />
+                 <select
+                    value=""
+                    onChange={(e) => {
+                       const val = e.target.value;
+                       if (val === 'all') {
+                          setHiddenClasses([]);
+                       } else if (val) {
+                          setHiddenClasses(prev => prev.filter(id => id !== val));
+                       }
+                    }}
+                    className={`bg-transparent text-xs font-black uppercase tracking-widest outline-none cursor-pointer w-full max-w-[180px] truncate ${isDarkMode ? 'text-rose-400' : 'text-rose-700'}`}
+                    title="Restaurar turmas ocultas"
+                 >
+                    <option value="" disabled className={isDarkMode ? 'bg-slate-800 text-slate-300' : 'bg-white text-slate-700'}>
+                       {hiddenClasses.length} Oculta(s)...
+                    </option>
+                    <option value="all" className={`font-bold ${isDarkMode ? 'bg-slate-800 text-emerald-400' : 'bg-white text-emerald-600'}`}>
+                       ++ Restaurar Todas
+                    </option>
+                    <optgroup label="Restaurar Individual:" className={isDarkMode ? 'bg-slate-800 text-slate-400' : 'bg-white text-slate-500'}>
+                      {hiddenClasses.map(hcId => {
+                         const turmaOculta = classesList?.find(c => String(c.id) === String(hcId));
+                         return (
+                           <option key={hcId} value={hcId} className={isDarkMode ? 'bg-slate-800 text-slate-200' : 'bg-white text-slate-700'}>
+                             {turmaOculta?.name || 'Turma Desconhecida'}
+                           </option>
+                         );
+                      })}
+                    </optgroup>
+                 </select>
               </div>
             )}
 
