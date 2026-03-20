@@ -11,19 +11,22 @@ export function MasterGrid({ isDarkMode, ...props }) {
   const [isCoursesOpen, setIsCoursesOpen] = useState(false);
   const [hiddenClasses, setHiddenClasses] = useState([]);
  
+  const [showCloneModal, setShowCloneModal] = useState(false);
+  const [cloneSourceYear, setCloneSourceYear] = useState('');
+
   const [aulasNeutras, setAulasNeutras] = useState([]);
   const [grade, setGrade] = useState({});
   
   // ESTADO DA TELA PRINCIPAL (O que o usuário está visualizando)
-  const [selectedType, setSelectedType] = useState('padrao'); 
+  const [selectedType, setSelectedType] = useState('previa'); 
   const [selectedWeek, setSelectedWeek] = useState('');
 
   const [pendingDrop, setPendingDrop] = useState(null); // Modal DND 
   const [dropAlert, setDropAlert] = useState(null); // Alerta Simples
 
   const [modalMode, setModalMode] = useState(null); // 'save' | 'import' | null
-  const [saveOptions, setSaveOptions] = useState({ type: 'padrao', weekId: '' });
-  const [importOptions, setImportOptions] = useState({ type: 'padrao', weekId: '' });
+  const [saveOptions, setSaveOptions] = useState({ type: 'previa', weekId: '' });
+  const [importOptions, setImportOptions] = useState({ type: 'previa', weekId: '' });
 
   const [classesList, setClassesList] = useState([]);
   const [courses, setCourses] = useState([]);
@@ -302,6 +305,58 @@ export function MasterGrid({ isDarkMode, ...props }) {
     }
   };
 
+  const handleClonePreviousYear = async () => {
+    if (!cloneSourceYear) return;
+    try {
+      const response = await fetch('/api/schedules?academicYear=' + cloneSourceYear, { headers: getHeaders() });
+      if (!response.ok) throw new Error("Falha ao buscar grade do ano anterior");
+      const data = await response.json();
+      
+      const filtered = data.filter(s => 
+        selectedCourses.includes(String(s.courseId)) && 
+        s.type === 'padrao'
+      );
+      
+      const idsTurmas = turmasDoCurso.map(t => String(t.id));
+      const disciplinasDoCurso = curriculumData.filter(c => idsTurmas.includes(String(c.classId)));
+      const aulasReais = disciplinasDoCurso.map(disciplina => ({
+        id: disciplina.id || Math.random().toString(),
+        classId: String(disciplina.classId),
+        courseId: String(disciplina.courseId),
+        className: turmasDoCurso.find(t => String(t.id) === String(disciplina.classId))?.name || 'Turma',
+        disciplina: disciplina.subjectName,
+        teacherId: disciplina.teacherId,
+        professor: resolveTeacherName(disciplina.teacherId, globalTeachersList),
+        sala: disciplina.room || '', 
+        cor: getColorHash(disciplina.subjectName),
+        numAulas: disciplina.numAulas || 1
+      }));
+
+      const clonedGrade = {};
+      const aulasAlocadasIds = [];
+      filtered.forEach(schedule => {
+        let refCard;
+        if (schedule.disciplineId) refCard = aulasReais.find(a => String(a.id) === String(schedule.disciplineId));
+        if (!refCard) refCard = aulasReais.find(a => String(a.classId) === String(schedule.classId) && String(a.teacherId) === String(schedule.teacherId));
+        if (refCard) {
+             clonedGrade[`${schedule.classId}|${schedule.dayOfWeek}|${schedule.slotId}`] = { ...refCard, sala: schedule.room || refCard.sala };
+             aulasAlocadasIds.push(String(refCard.id));
+        }
+      });
+      
+      const pendentes = [];
+      aulasReais.forEach(d => { if (!aulasAlocadasIds.includes(String(d.id))) pendentes.push(d); });
+      setAulasNeutras(pendentes);
+      setGrade(clonedGrade);
+      
+      setShowCloneModal(false);
+      setCloneSourceYear('');
+      alert("Grade baseada no padrão do ano anterior carregada na tela. Faça os ajustes e depois clique em Salvar Novo para registrar no ano atual.");
+    } catch (err) {
+      alert(err.message);
+    }
+  };
+
   // === CONCENTRADOR GLOBAL DE ALERTAS ===
   const dashboardAlerts = useMemo(() => {
     const alerts = [];
@@ -408,21 +463,18 @@ export function MasterGrid({ isDarkMode, ...props }) {
                value={selectedType} onChange={e => setSelectedType(e.target.value)} 
                className={`px-3 py-2 rounded-lg border shadow-sm outline-none cursor-pointer text-xs font-bold uppercase tracking-wider text-indigo-600 dark:text-indigo-400 ${isDarkMode ? 'bg-slate-900 border-slate-700' : 'bg-slate-50 border-slate-300'}`}
              >
-                 <option value="padrao">Padrão Anual</option>
                  <option value="previa">Prévia Semanal</option>
                  <option value="atual">Horário Atual</option>
                  <option value="oficial">Histórico Oficial</option>
              </select>
 
-             {selectedType !== 'padrao' && (
-               <select
-                 value={selectedWeek} onChange={(e) => setSelectedWeek(e.target.value)}
-                 className={`px-3 py-2 rounded-lg border shadow-sm outline-none cursor-pointer text-xs font-bold uppercase tracking-wider text-amber-600 dark:text-amber-400 ${isDarkMode ? 'bg-slate-900 border-slate-700' : 'bg-slate-50 border-slate-300'}`}
-               >
-                 <option value="">-- Semana --</option>
-                 {academicWeeks?.filter(w => w.academic_year === selectedConfigYear).map(w => <option key={w.id} value={w.id}>{w.name}</option>)}
-               </select>
-             )}
+             <select
+               value={selectedWeek} onChange={(e) => setSelectedWeek(e.target.value)}
+               className={`px-3 py-2 rounded-lg border shadow-sm outline-none cursor-pointer text-xs font-bold uppercase tracking-wider text-amber-600 dark:text-amber-400 ${isDarkMode ? 'bg-slate-900 border-slate-700' : 'bg-slate-50 border-slate-300'}`}
+             >
+               <option value="">-- Semana --</option>
+               {academicWeeks?.filter(w => w.academic_year === selectedConfigYear).map(w => <option key={w.id} value={w.id}>{w.name}</option>)}
+             </select>
           </div>
           
           <div className="relative">
@@ -461,6 +513,10 @@ export function MasterGrid({ isDarkMode, ...props }) {
                  <Eye size={14} /> Restaurar {hiddenClasses.length} Oculta(s)
              </button>
            )}
+
+           <button onClick={() => setShowCloneModal(true)} disabled={selectedCourses.length === 0} className="flex items-center justify-center gap-2 bg-indigo-100 text-indigo-700 hover:bg-indigo-200 disabled:opacity-50 px-4 py-2.5 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all w-full sm:w-auto shadow-sm">
+              Clonar de Ano Anterior
+           </button>
 
            <button 
              onClick={() => {
@@ -754,6 +810,33 @@ export function MasterGrid({ isDarkMode, ...props }) {
            onClose={() => setModalMode(null)} 
          />
       )}
+
+      {showCloneModal && (
+        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+           <div className={`w-full max-w-sm rounded-xl p-5 shadow-2xl ${isDarkMode ? 'bg-slate-800 border border-slate-700 text-slate-200' : 'bg-white border border-slate-200 text-slate-800'}`}>
+              <h2 className="text-lg font-bold mb-4">Clonar Base de Ano Anterior</h2>
+              <p className="text-xs opacity-80 mb-4">Atenção: Isso buscará horários do tipo 'Padrão Anual' dos cursos selecionados do ano fonte e jogará na tela atual. Depois de revisar, salve.</p>
+              
+              <select
+                value={cloneSourceYear}
+                onChange={e => setCloneSourceYear(e.target.value)}
+                className={`w-full p-3 rounded-lg border text-sm font-bold mb-4 focus:ring-2 focus:ring-indigo-500 outline-none ${isDarkMode ? 'bg-slate-900 border-slate-600' : 'bg-white border-slate-300'}`}
+              >
+                <option value="">-- Selecione o Ano Letivo Fonte --</option>
+                {academicYearsMeta && Object.keys(academicYearsMeta)
+                  .filter(y => y !== String(selectedConfigYear))
+                  .sort((a,b)=>b-a)
+                  .map(y => <option key={y} value={y}>{y}</option>)
+                }
+              </select>
+
+              <div className="flex justify-end gap-3 mt-4 pt-4 border-t border-slate-200 dark:border-slate-700">
+                 <button onClick={() => setShowCloneModal(false)} className="px-4 py-2 rounded-lg font-bold text-xs bg-slate-200 text-slate-700 hover:bg-slate-300 transition-colors">Cancelar</button>
+                 <button onClick={handleClonePreviousYear} disabled={!cloneSourceYear} className="px-4 py-2 rounded-lg font-bold text-xs bg-indigo-600 text-white hover:bg-indigo-700 disabled:opacity-50 transition-colors">Confirmar Clonagem</button>
+              </div>
+           </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -766,11 +849,10 @@ function SaveMatrixModal({ isDarkMode, grade, selectedCourses, saveOptions, setS
   const currentYearWeeks = useMemo(() => academicWeeks?.filter(w => String(w.academic_year) === String(selectedConfigYear)) || [], [academicWeeks, selectedConfigYear]);
 
   const availableOptions = useMemo(() => {
-      if (loadedType === 'padrao') return [{ value: 'padrao', label: '1. Atualizar: Padrão Anual' }, { value: 'previa', label: '2. Criar: Prévia Semanal' }];
-      if (loadedType === 'previa') return [{ value: 'previa', label: '2. Atualizar: Prévia' }, { value: 'atual', label: '3. Promover para: Atual' }];
-      if (loadedType === 'atual') return [{ value: 'atual', label: '3. Atualizar: Atual' }, { value: 'oficial', label: '4. Promover para: Oficial' }];
-      if (loadedType === 'oficial') return [{ value: 'oficial', label: '4. Retificar: Oficial' }];
-      return [{ value: 'padrao', label: '1. Padrão Anual' }];
+      if (loadedType === 'previa') return [{ value: 'previa', label: '1. Atualizar: Prévia' }, { value: 'atual', label: '2. Promover para: Atual' }];
+      if (loadedType === 'atual') return [{ value: 'atual', label: '2. Atualizar: Atual' }, { value: 'oficial', label: '3. Promover para: Oficial' }];
+      if (loadedType === 'oficial') return [{ value: 'oficial', label: '3. Retificar: Oficial' }];
+      return [{ value: 'previa', label: '1. Criar: Prévia Semanal' }];
   }, [loadedType]);
 
   useEffect(() => { setSaveOptions({ type: availableOptions[0].value, weekId: loadedWeek }); }, [loadedType, loadedWeek, availableOptions]);
@@ -781,7 +863,7 @@ function SaveMatrixModal({ isDarkMode, grade, selectedCourses, saveOptions, setS
          return { courseId: aula.courseId, classId, dayOfWeek, slotId, teacherId: aula.teacherId, disciplineId: aula.id.split('_')[1] || aula.id, room: aula.sala };
       });
 
-      if (saveOptions.type !== 'padrao' && !saveOptions.weekId) return alert('Selecione uma semana letiva!');
+      if (!saveOptions.weekId) return alert('Selecione uma semana letiva!');
       if (saveOptions.type === 'oficial' && !window.confirm("⚠️ Você está prestes a salvar um histórico Oficial. Continuar?")) return;
 
       setIsSaving(true);
@@ -799,27 +881,20 @@ function SaveMatrixModal({ isDarkMode, grade, selectedCourses, saveOptions, setS
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
       <div className={`w-full max-w-2xl rounded-xl p-6 ${isDarkMode ? 'bg-slate-900 text-white' : 'bg-white'}`}>
          <h2 className="text-lg font-black uppercase mb-4">Pipeline de Aprovação</h2>
-         <div className="grid grid-cols-2 gap-4 mb-6">
+          <div className="grid grid-cols-2 gap-4 mb-6">
             <div>
               <label className="block text-[10px] font-black uppercase opacity-60 mb-2">Ação Permitida</label>
               <select value={saveOptions.type} onChange={e => setSaveOptions(p => ({...p, type: e.target.value}))} className="w-full p-3 rounded border text-xs font-bold text-black">
                  {availableOptions.map(opt => <option key={opt.value} value={opt.value}>{opt.label}</option>)}
               </select>
             </div>
-            {saveOptions.type === 'padrao' ? (
-              <div>
-                <label className="block text-[10px] font-black uppercase opacity-60 mb-2">Versão (Ex: v1.0)</label>
-                <input type="text" value={saveOptions.weekId} onChange={e => setSaveOptions(p => ({...p, weekId: e.target.value}))} className="w-full p-3 rounded border text-black text-xs" />
-              </div>
-            ) : (
-              <div>
-                <label className="block text-[10px] font-black uppercase opacity-60 mb-2">Semana Destino</label>
-                <select value={saveOptions.weekId} onChange={e => setSaveOptions(p => ({...p, weekId: e.target.value}))} className="w-full p-3 rounded border text-xs text-black">
-                   <option value="">Selecione...</option>
-                   {currentYearWeeks.map(w => <option key={w.id} value={w.id}>{w.name}</option>)}
-                </select>
-              </div>
-            )}
+            <div>
+              <label className="block text-[10px] font-black uppercase opacity-60 mb-2">Semana Destino</label>
+              <select value={saveOptions.weekId} onChange={e => setSaveOptions(p => ({...p, weekId: e.target.value}))} className="w-full p-3 rounded border text-xs text-black">
+                 <option value="">Selecione...</option>
+                 {currentYearWeeks.map(w => <option key={w.id} value={w.id}>{w.name}</option>)}
+              </select>
+            </div>
          </div>
          <div className="flex justify-end gap-3 border-t pt-4">
              <button onClick={onClose} className="px-4 py-2 font-bold text-xs bg-slate-200 text-slate-700 rounded">Cancelar</button>

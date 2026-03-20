@@ -370,7 +370,7 @@ app.get('/api/schedules', (req, res) => {
 const bulkScheduleSchema = z.object({
   courseIds: z.array(z.union([z.string(), z.number()]).transform(String)).optional(),
   courseId: z.union([z.string(), z.number()]).transform(String).optional(),
-  type: z.string().default('padrao'),
+  type: z.string().default('previa'),
   weekId: z.string().optional().nullable(),
   academicYear: z.string().optional().nullable(),
   schedules: z.array(z.object({

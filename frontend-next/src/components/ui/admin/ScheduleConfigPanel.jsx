@@ -530,24 +530,38 @@ export function ScheduleConfigPanel({ isDarkMode }) {
               <SaveBtn section="default" onClick={saveDefault} />
             </div>
             <div className={`p-6 rounded-2xl border shadow-sm ${isDarkMode ? 'bg-blue-900/10 border-blue-900/30' : 'bg-blue-50/50 border-blue-100'}`}>
-              <p className="text-sm mb-4 font-medium opacity-80 leading-relaxed">Selecione qual grade de horário "Padrão" enviada pelo FET o sistema deve assumir como base fundamental. O sistema usará essa base para preencher os nomes das turmas nas estatísticas e painéis de conflitos.</p>
+              
+              {/* O texto antigo sobre FET foi inativado */}
+              {/* <p className="text-sm mb-4 font-medium opacity-80 leading-relaxed">Selecione qual grade de horário "Padrão" enviada pelo FET o sistema deve assumir como base fundamental. O sistema usará essa base para preencher os nomes das turmas nas estatísticas e painéis de conflitos.</p> */}
+
+              <p className="text-sm mb-4 font-medium opacity-80 leading-relaxed">Selecione qual grade de horário o sistema deve assumir como base fundamental (Padrão) para o preenchimento de dependências de conflitos e estatísticas.</p>
               
               <div className="flex flex-col gap-2">
-                <label className="text-[10px] uppercase tracking-widest font-black opacity-60 ml-1">Semana Padrão Cadastrada</label>
+                <label className="text-[10px] uppercase tracking-widest font-black opacity-60 ml-1">Horário Padrão (Base) Selecionado</label>
                 <select
                   value={localDefaultId}
                   onChange={e => setLocalDefaultId(e.target.value)}
                   className={`w-full p-4 font-bold text-sm rounded-xl border focus:ring-2 focus:ring-blue-500 outline-none transition-all ${isDarkMode ? 'bg-slate-800 border-slate-700 text-white shadow-inner' : 'bg-white border-slate-200 text-slate-800 shadow-sm'}`}
                 >
-                  <option value="">-- Nenhum Horário Padrão Selecionado --</option>
+                  <option value="">-- Nenhum Horário Base Selecionado --</option>
                   {padraoList.map(p => <option key={p} value={p}>{p}</option>)}
                 </select>
               </div>
 
+              {/* O alerta sobre falta de upload do FET foi inativado */}
+              {/* 
               {padraoList.length === 0 && (
                 <div className={`mt-4 p-4 rounded-xl flex items-start gap-3 ${isDarkMode ? 'bg-amber-900/20 text-amber-400' : 'bg-amber-50 text-amber-700'}`}>
                   <AlertCircle size={18} className="shrink-0 mt-0.5" />
                   <p className="text-xs font-medium leading-relaxed">Você ainda não enviou nenhuma grade oficial do tipo <strong>"PADRAO"</strong> ao sistema. Vá até a aba "Efetivar Novo Horário FET" e faça upload da planilha base contendo todas as turmas para que as opções apareçam aqui.</p>
+                </div>
+              )}
+              */}
+              
+               {padraoList.length === 0 && (
+                <div className={`mt-4 p-4 rounded-xl flex items-start gap-3 ${isDarkMode ? 'bg-amber-900/20 text-amber-400' : 'bg-amber-50 text-amber-700'}`}>
+                  <AlertCircle size={18} className="shrink-0 mt-0.5" />
+                  <p className="text-xs font-medium leading-relaxed">Para definir um horário padrão, crie uma grade nas opções de Matriz e promova-a como base oficial do ano letivo.</p>
                 </div>
               )}
             </div>
