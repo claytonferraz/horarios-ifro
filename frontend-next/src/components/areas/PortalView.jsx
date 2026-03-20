@@ -41,6 +41,7 @@ export function PortalView({
   const [pendingRequests, setPendingRequests] = useState([]);
   const [showVacantInMyClasses, setShowVacantInMyClasses] = useState(false);
   const [vacantRequestModal, setVacantRequestModal] = useState(null);
+  const [alertModal, setAlertModal] = useState(null);
 
   React.useEffect(() => {
     if (appMode === 'aluno') {
@@ -1252,7 +1253,7 @@ export function PortalView({
                           const vagas = mappedSchedules.filter(r => isTeacherPending(r.teacher) && profClasses.has(r.className));
                           profRecords = [...profRecords, ...vagas];
                         }
-                        const profCourses = [...new Set(profRecords.map(r => r.course))].sort((a,b) => a.localeCompare(b));
+                        const profCourses = [...new Set(profRecords.map(r => r.course))].sort((a,b) => String(a).localeCompare(String(b)));
 
                         if (profCourses.length === 0) {
                           return (
@@ -1338,64 +1339,50 @@ export function PortalView({
                                                     {timeStr}
                                                   </td>
                                                   {courseClasses.map(cls => {
-                                                    const aulaNesteSlot = courseRecords.find(r => r.day === day && r.time === timeStr && r.className === cls);
+                                                    const recordsNesteSlot = courseRecords.filter(r => r.day === day && r.time === timeStr && r.className === cls);
+
                                                     return (
-                                                      <td key={`prof-${cls}-${timeStr}`} className={`p-1.5 border-r-[3px] last:border-r-0 align-top min-w-[140px] ${isDarkMode ? 'border-slate-700 group-hover:bg-slate-700/30 bg-slate-800/20' : 'border-slate-300 group-hover:bg-slate-50/50 bg-slate-50/20'}`}>
-                                                        {aulaNesteSlot ? (() => {
-                                                          const isPending = !aulaNesteSlot.teacherId || String(aulaNesteSlot.teacherId) === 'A Definir' || String(aulaNesteSlot.teacherId) === '-';
-                                                          const disciplineName = aulaNesteSlot.subject;
-                                                          const teacherName = aulaNesteSlot.teacher;
-                                                          
-                                                          return (
-                                                            <div 
-                                                              key={`p-rec-${aulaNesteSlot.id || dayIndex + '-' + timeStr}`} 
-                                                              onClick={() => {
-                                                                if (appMode === 'professor' && viewMode === 'professor' && ['servidor', 'admin', 'gestao'].includes(userRole)) {
-                                                                  if (isPending) {
-                                                                    if (typeof setVacantRequestModal === 'function') {
-                                                                      setVacantRequestModal(aulaNesteSlot);
-                                                                    } else if(window.confirm('Deseja solicitar à coordenação para assumir esta Aula Vaga na ' + day + ' às ' + timeStr + '?')) {
-                                                                      alert('Solicitação registrada! A coordenação analisará seu pedido para assumir este horário.');
+                                                      <td key={`prof-${cls}-${timeStr}`} className={`p-1 border align-top relative ${isDarkMode ? 'border-slate-700 group-hover:bg-slate-700/30' : 'border-slate-200 group-hover:bg-slate-50/50'}`}>
+                                                        <div className="flex flex-col gap-1 w-full h-full min-h-[76px]">
+                                                          {recordsNesteSlot.length === 0 ? (
+                                                            <div className={`flex items-center justify-center h-full font-black text-[9px] tracking-widest uppercase select-none flex-1 ${isDarkMode ? 'opacity-20' : 'opacity-5'}`}>-</div>
+                                                          ) : (
+                                                            recordsNesteSlot.map((r, idx) => {
+                                                              const isVaga = isTeacherPending(r.teacher);
+                                                              const hasClash = recordsNesteSlot.length > 1;
+                                                              return (
+                                                                <div
+                                                                  key={r.id || idx}
+                                                                  onClick={() => {
+                                                                    if (appMode === 'professor') {
+                                                                      if (isVaga) {
+                                                                        if (typeof setVacantRequestModal === 'function') setVacantRequestModal(r);
+                                                                      } else if (typeof setExchangeTarget === 'function') {
+                                                                        setExchangeTarget({ targetClass: r.className, targetCourse: r.course, originalRecord: r });
+                                                                      }
                                                                     }
-                                                                  } else if (aulaNesteSlot.teacherId && String(aulaNesteSlot.teacherId).split(',').includes(String(selectedTeacher))) {
-                                                                    setExchangeTarget({ targetClass: cls, targetCourse: course, originalRecord: aulaNesteSlot });
-                                                                  }
-                                                                }
-                                                              }}
-                                                              className={`print-clean-card p-2.5 rounded-xl border shadow-sm flex flex-col justify-center min-h-[60px] transition-all hover:scale-[1.02] hover:shadow-md active:scale-95 relative ${isPending ? 'pt-4 cursor-pointer hover:ring-2 hover:ring-red-500 ' + (isDarkMode ? 'bg-red-900/30 border-red-800/50' : 'bg-red-50 border-red-300') : ((aulaNesteSlot.teacherId && String(aulaNesteSlot.teacherId).split(',').includes(String(selectedTeacher))) ? 'pt-4 ' + (['servidor', 'admin', 'gestao'].includes(userRole) ? 'cursor-pointer hover:ring-2 hover:ring-emerald-500 hover:scale-[1.03] ' : '') + (isDarkMode ? 'bg-emerald-900/30 border-emerald-800/50' : 'bg-emerald-50 border-emerald-300') : getColorHash(disciplineName, isDarkMode))}`}
-                                                            >
-                                                              {isPending ? (
-                                                                <>
-                                                                  <div className="absolute -top-2 left-1/2 -translate-x-1/2 w-max">
-                                                                    <span className={`text-[9px] font-black uppercase tracking-widest text-white px-2 py-0.5 rounded shadow-sm ${isDarkMode ? 'bg-red-600 shadow-red-900/50' : 'bg-red-600 shadow-red-200'}`}>Sem Professor</span>
-                                                                  </div>
-                                                                  <p className={`subject font-black text-[13px] leading-tight text-center ${isDarkMode ? 'text-red-300' : 'text-red-900'}`}>
-                                                                    {disciplineName}
-                                                                  </p>
-                                                                  {aulaNesteSlot.room && <span className={`details text-[9px] font-black tracking-tighter opacity-80 px-2 py-0.5 rounded mt-1.5 w-fit uppercase mx-auto ${isDarkMode ? 'bg-red-900/50 text-red-300' : 'bg-red-200/50 text-red-900'}`}>{aulaNesteSlot.room}</span>}
-                                                                </>
-                                                              ) : (aulaNesteSlot.teacherId && String(aulaNesteSlot.teacherId).split(',').includes(String(selectedTeacher))) ? (
-                                                                <>
-                                                                  <div className="absolute -top-2 left-1/2 -translate-x-1/2 w-max">
-                                                                    <span className={`text-[9px] font-black uppercase tracking-widest text-white px-2 py-0.5 rounded shadow-sm ${isDarkMode ? 'bg-emerald-600 shadow-emerald-900/50' : 'bg-emerald-600 shadow-emerald-200'}`}>Sua Aula</span>
-                                                                  </div>
-                                                                  <p className={`subject font-black text-[13px] leading-tight text-center ${isDarkMode ? 'text-emerald-300' : 'text-emerald-900'}`}>
-                                                                    {disciplineName}
-                                                                  </p>
-                                                                  {aulaNesteSlot.room && <span className={`details text-[9px] font-black tracking-tighter opacity-80 px-2 py-0.5 rounded mt-1.5 w-fit uppercase mx-auto ${isDarkMode ? 'bg-emerald-900/50 text-emerald-300' : 'bg-emerald-200/50 text-emerald-900'}`}>{aulaNesteSlot.room}</span>}
-                                                                </>
-                                                              ) : (
-                                                                <>
-                                                                  <p className="subject font-black text-[11px] leading-tight text-center">{disciplineName}</p>
-                                                                  <p className="details text-[8px] font-bold opacity-80 flex items-center justify-center gap-1 uppercase truncate mt-0.5">{resolveTeacherName(aulaNesteSlot.teacher, globalTeachers).split(' ')[0]}</p>
-                                                                  {aulaNesteSlot.room && <span className={`details text-[8px] font-black tracking-tighter opacity-70 px-1.5 py-0.5 rounded mt-1 w-fit uppercase mx-auto ${isDarkMode ? 'bg-white/10' : 'bg-black/5'}`}>{aulaNesteSlot.room}</span>}
-                                                                </>
-                                                              )}
-                                                            </div>
-                                                          );
-                                                        })() : (
-                                                              <div className={`h-[60px] flex items-center justify-center font-black text-[9px] tracking-widest uppercase select-none ${isDarkMode ? 'opacity-20' : 'opacity-5'}`}>-</div>
+                                                                  }}
+                                                                  className={`print-clean-card p-2 rounded-xl border shadow-sm flex flex-col justify-center min-h-[76px] transition-all hover:scale-[1.02] relative cursor-pointer ${isVaga ? (isDarkMode ? 'bg-red-900/30 border-red-800/50' : 'bg-red-50 border-red-300') : getColorHash(r.className, isDarkMode)}${hasClash && isVaga ? ' ring-2 ring-amber-500 animate-pulse' : ''}`}
+                                                                >
+                                                                  {isVaga ? (
+                                                                    <React.Fragment>
+                                                                      <div className="absolute -top-2.5 left-1/2 -translate-x-1/2 w-max z-10">
+                                                                        <span className={`text-[9px] font-black uppercase tracking-widest text-white px-2 py-0.5 rounded shadow-sm ${isDarkMode ? 'bg-red-600 shadow-red-900' : 'bg-red-600 shadow-red-200'}`}>AULA VAGA</span>
+                                                                      </div>
+                                                                      <p className={`subject font-black text-xs leading-snug text-center mt-1 ${isDarkMode ? 'text-red-100' : 'text-red-950'}`}>{r.subject || 'Pendente'}</p>
+                                                                      <span className={`details text-[10px] font-black tracking-widest px-1.5 py-0.5 rounded mt-1.5 w-fit uppercase mx-auto ${isDarkMode ? 'bg-red-900/80 text-red-100' : 'bg-red-200 text-red-950'}`}>{r.className} {r.room ? '- ' + r.room : ''}</span>
+                                                                    </React.Fragment>
+                                                                  ) : (
+                                                                    <React.Fragment>
+                                                                      <p className="subject font-black text-xs sm:text-sm leading-snug text-center drop-shadow-sm">{r.subject}</p>
+                                                                      <span className={`details text-[10px] sm:text-xs font-black tracking-widest px-2 py-1 rounded mt-1.5 w-fit uppercase mx-auto shadow-sm ${isDarkMode ? 'bg-white/25 text-white' : 'bg-black/10 text-slate-900'}`}>{r.className} {r.room ? '- ' + r.room : ''}</span>
+                                                                    </React.Fragment>
+                                                                  )}
+                                                                </div>
+                                                              );
+                                                            })
                                                           )}
+                                                        </div>
                                                       </td>
                                                     );
                                                   })}
@@ -1449,7 +1436,7 @@ export function PortalView({
                                                 {records.map(r => {
                                                   const isPending = isTeacherPending(r.teacher);
                                                   return (
-                                                    <div key={`mob-rec-${r.id}`} className={`p-2.5 rounded-lg border shadow-sm flex flex-col justify-center ${isPending ? (isDarkMode ? 'bg-red-900/30 border-red-800/50 text-red-300' : 'bg-red-50 border-red-200 text-red-900') : getColorHash(r.subject, isDarkMode)}`}>
+                                                    <div key={`mob-rec-${r.id}`} className={`p-2.5 rounded-lg border shadow-sm flex flex-col justify-center ${isPending ? (isDarkMode ? 'bg-red-900/30 border-red-800/50 text-red-300' : 'bg-red-50 border-red-200 text-red-900') : getColorHash(r.className, isDarkMode)}`}>
                                                       <div className="flex items-center gap-1.5 flex-1 w-full">
                                                         <span className={`text-[8px] font-black uppercase rounded px-1 shrink-0 ${isDarkMode ? 'bg-white/20' : 'bg-black/10'}`}>{r.className}</span>
                                                         <span className="font-bold text-[10px] leading-tight truncate">{r.subject}</span>
@@ -1930,33 +1917,47 @@ export function PortalView({
 
       {/* SISTEMA DE SOLICITAÇÕES PARA O PROFESSOR */}
       {vacantRequestModal && (
-        <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
-          <div className={"w-full max-w-md p-6 rounded-3xl shadow-2xl " + (isDarkMode ? 'bg-slate-900 border border-slate-700 text-white' : 'bg-white text-slate-900')}>
-            <h3 className="text-lg font-black uppercase mb-4">Assumir Aula Vaga</h3>
-            <p className="text-xs mb-2"><strong>Turma:</strong> {vacantRequestModal.className}</p>
-            <p className="text-xs mb-4"><strong>Horário:</strong> {vacantRequestModal.day} às {vacantRequestModal.time}</p>
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in zoom-in-95">
+          <div className={"w-full max-w-md p-6 rounded-2xl shadow-2xl " + (isDarkMode ? 'bg-slate-800 border border-slate-700 text-white' : 'bg-white text-slate-900')}>
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-lg font-black uppercase tracking-widest flex items-center gap-2 text-indigo-500">
+                <CheckCircle size={20} /> Assumir Aula Vaga
+              </h3>
+              <button onClick={() => setVacantRequestModal(null)} className="text-slate-400 hover:text-rose-500"><XCircle size={20} /></button>
+            </div>
+            <div className={`p-4 rounded-xl mb-4 ${isDarkMode ? 'bg-slate-900/50' : 'bg-slate-50'}`}>
+              <p className="text-xs mb-1"><strong>Turma:</strong> {vacantRequestModal.className}</p>
+              <p className="text-xs"><strong>Horário:</strong> {vacantRequestModal.day} às {vacantRequestModal.time}</p>
+            </div>
             <label className="block text-[10px] font-black uppercase text-slate-500 mb-1">Qual disciplina você vai lecionar?</label>
             <select id="vacantSubject" className={"w-full p-3 rounded-xl border mb-4 text-xs font-bold outline-none " + (isDarkMode ? 'bg-slate-950 border-slate-700' : 'bg-white border-slate-200')}>
               <option value="">Selecione a disciplina...</option>
-              {[...new Set(mappedSchedules.filter(r => r.teacherId && String(r.teacherId).split(',').includes(String(selectedTeacher)) && r.className === vacantRequestModal.className).map(r => r.subject))].map(sub => (
+              {[...new Set(mappedSchedules.filter(r => r.teacherId && String(r.teacherId).split(',').includes(String(selectedTeacher || siape)) && r.className === vacantRequestModal.className).map(r => r.subject))].map(sub => (
                 <option key={sub} value={sub}>{sub}</option>
               ))}
             </select>
-            <div className="flex gap-3">
+            <div className="flex gap-3 mt-6">
               <button onClick={() => setVacantRequestModal(null)} className="flex-1 py-3 rounded-xl bg-slate-200 text-slate-700 text-xs font-bold transition-all hover:bg-slate-300">Cancelar</button>
               <button onClick={() => {
                 const subj = document.getElementById('vacantSubject').value;
-                if (!subj) return alert('Selecione uma disciplina');
+                if (!subj) return setAlertModal({ title: 'Atenção', message: 'Selecione a disciplina que deseja lecionar antes de enviar o pedido.', type: 'alert' });
+                
                 apiClient.submitRequest({
-                  siape: selectedTeacher,
+                  siape: selectedTeacher || siape,
                   week_id: selectedWeek,
                   description: 'Solicitação para assumir aula vaga na turma ' + vacantRequestModal.className + ' - Disciplina: ' + subj,
                   original_slot: 'VAGA: ' + vacantRequestModal.day + ' ' + vacantRequestModal.time,
                   proposed_slot: { day: vacantRequestModal.day, time: vacantRequestModal.time, classType: 'Substituição' }
                 }).then(() => {
-                  alert('Solicitação enviada com sucesso!');
+                  setAlertModal({ title: 'Tudo Certo!', message: 'Sua solicitação foi enviada com sucesso à coordenação.', type: 'success' });
                   setVacantRequestModal(null);
-                }).catch(e => alert(e.message || 'Erro ao enviar a solicitação'));
+                }).catch(e => {
+                  setAlertModal({ 
+                    title: 'Ops, algo deu errado!', 
+                    message: e.message === 'Sessão expirada.' ? 'Sua sessão expirou por segurança. Faça o logout e faça login novamente para enviar a solicitação.' : (e.message || 'Erro ao comunicar com o servidor. Tente novamente.'), 
+                    type: 'error' 
+                  });
+                });
               }} className="flex-1 py-3 rounded-xl bg-indigo-600 text-white text-xs font-bold hover:bg-indigo-700 transition-all shadow-md active:scale-95">Enviar Pedido</button>
             </div>
           </div>
@@ -1979,6 +1980,28 @@ export function PortalView({
           selectedWeek={selectedWeek}
         />
       )}
+
+      {/* MODAL GLOBAL ESTILIZADO PARA FEEDBACKS (Ex: Sessão expirada, Sucesso) */}
+      {alertModal && (
+        <div className="fixed inset-0 z-[99999] flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm animate-in fade-in zoom-in-95 duration-200">
+          <div className={`w-full max-w-sm p-6 rounded-3xl shadow-2xl flex flex-col items-center text-center ${isDarkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'} border`}>
+            {alertModal.type === 'error' && <AlertCircle size={48} className={`mb-4 ${isDarkMode ? 'text-rose-400' : 'text-rose-500'}`} />}
+            {alertModal.type === 'success' && <CheckCircle size={48} className={`mb-4 ${isDarkMode ? 'text-emerald-400' : 'text-emerald-500'}`} />}
+            {alertModal.type === 'alert' && <AlertCircle size={48} className={`mb-4 ${isDarkMode ? 'text-amber-400' : 'text-amber-500'}`} />}
+            
+            <h3 className={`text-lg font-black mb-2 uppercase tracking-widest ${isDarkMode ? 'text-white' : 'text-slate-900'}`}>{alertModal.title}</h3>
+            <p className={`text-sm mb-6 ${isDarkMode ? 'text-slate-300' : 'text-slate-600'}`}>{alertModal.message}</p>
+            
+            <button 
+              onClick={() => setAlertModal(null)}
+              className={`w-full py-3 rounded-xl font-bold uppercase tracking-widest text-xs transition-all active:scale-95 ${alertModal.type === 'error' ? 'bg-rose-500 hover:bg-rose-600 text-white shadow-[0_0_15px_rgba(244,63,94,0.4)]' : alertModal.type === 'success' ? 'bg-emerald-500 hover:bg-emerald-600 text-white shadow-[0_0_15px_rgba(16,185,129,0.4)]' : 'bg-amber-500 hover:bg-amber-600 text-white shadow-[0_0_15px_rgba(245,158,11,0.4)]'}`}
+            >
+              Entendido
+            </button>
+          </div>
+        </div>
+      )}
+
       {appMode === 'professor' && ['servidor', 'admin', 'gestao'].includes(userRole) && (
         <TeacherRequestsSection 
           isDarkMode={isDarkMode}
