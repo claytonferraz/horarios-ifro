@@ -469,29 +469,60 @@ app.post('/api/schedules/bulk-course', verifyToken, (req, res) => {
       }
 
       // No conflicts! Faz a transação massiva
-      db.serialize(() => {
-        db.run("BEGIN TRANSACTION");
-        
-        if (weekId) {
-            db.run(`DELETE FROM schedules WHERE courseId IN (${placeholders}) AND type = ? AND (week_id = ? OR week_id IS NULL) AND (academic_year = ? OR academic_year IS NULL)`, [...coursesToClear, type, weekId, academicYear || '']);
-        } else {
-            db.run(`DELETE FROM schedules WHERE courseId IN (${placeholders}) AND type = ? AND (academic_year = ? OR academic_year IS NULL)`, [...coursesToClear, type, academicYear || '']);
+      let condStr = weekId ? `type = ? AND (week_id = ? OR week_id IS NULL)` : `type = ? AND (week_id IS NULL)`;
+      let params = weekId ? [type, weekId] : [type];
+      
+      db.all(`SELECT * FROM schedules WHERE courseId IN (${placeholders}) AND ${condStr}`, [...coursesToClear, ...params], (errOld, oldRows) => {
+        let involvedTeachers = new Set();
+        if (type === 'previa') {
+          involvedTeachers.add('ALL_PROF');
+          involvedTeachers.add('ALL_STUDENT');
+        } else if (type === 'oficial') {
+          for (const nR of schedules) {
+            const oR = (oldRows || []).find(old => old.classId === nR.classId && String(old.dayOfWeek) === String(nR.dayOfWeek) && String(old.slotId) === String(nR.slotId));
+            if (!oR) {
+              if (nR.teacherId && nR.teacherId !== 'A Definir' && nR.teacherId !== '-') involvedTeachers.add(nR.teacherId);
+            } else {
+              if (oR.teacherId !== nR.teacherId || oR.disciplineId !== nR.disciplineId || oR.room !== nR.room) {
+                 if (oR.teacherId && oR.teacherId !== 'A Definir' && oR.teacherId !== '-') involvedTeachers.add(oR.teacherId);
+                 if (nR.teacherId && nR.teacherId !== 'A Definir' && nR.teacherId !== '-') involvedTeachers.add(nR.teacherId);
+              }
+            }
+          }
         }
 
-        const stmt = db.prepare("INSERT INTO schedules (id, courseId, academic_year, classId, dayOfWeek, slotId, teacherId, disciplineId, room, type, week_id, updatedAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
-        const now = new Date().toISOString();
+        db.serialize(() => {
+          db.run("BEGIN TRANSACTION");
+          
+          if (weekId) {
+              db.run(`DELETE FROM schedules WHERE courseId IN (${placeholders}) AND type = ? AND (week_id = ? OR week_id IS NULL) AND (academic_year = ? OR academic_year IS NULL)`, [...coursesToClear, type, weekId, academicYear || '']);
+          } else {
+              db.run(`DELETE FROM schedules WHERE courseId IN (${placeholders}) AND type = ? AND (academic_year = ? OR academic_year IS NULL)`, [...coursesToClear, type, academicYear || '']);
+          }
 
-        for (const slot of schedules) {
-          const id = `s_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
-          const targetCourse = slot.courseId || coursesToClear[0];
-          stmt.run([id, targetCourse, academicYear || null, slot.classId, slot.dayOfWeek, slot.slotId, slot.teacherId, slot.disciplineId || null, slot.room || null, type, weekId || null, now]);
-        }
-        
-        stmt.finalize();
-        db.run("COMMIT", (errCommit) => {
-          if (errCommit) return res.status(500).json({ error: errCommit.message });
-          io.emit('schedule_updated');
-          res.json({ success: true, message: 'Grades gravadas com sucesso!' });
+          const stmt = db.prepare("INSERT INTO schedules (id, courseId, academic_year, classId, dayOfWeek, slotId, teacherId, disciplineId, room, type, week_id, updatedAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
+          const now = new Date().toISOString();
+
+          for (const slot of schedules) {
+            const id = `s_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
+            const targetCourse = slot.courseId || coursesToClear[0];
+            stmt.run([id, targetCourse, academicYear || null, slot.classId, slot.dayOfWeek, slot.slotId, slot.teacherId, slot.disciplineId || null, slot.room || null, type, weekId || null, now]);
+          }
+          
+          stmt.finalize();
+
+          // Notificações
+          involvedTeachers.forEach(t => {
+            let title = type === 'previa' ? "Nova Prévia Publicada" : "Horário Alterado";
+            let msg = type === 'previa' ? `A prévia da Semana ${weekId || ''} foi publicada e está disponível.` : `Sua aula na Semana ${weekId || ''} sofreu uma alteração.`;
+            db.run("INSERT INTO notifications (target, type, title, message, createdAt) VALUES (?, ?, ?, ?, ?)", [t, type, title, msg, now]);
+          });
+
+          db.run("COMMIT", (errCommit) => {
+            if (errCommit) return res.status(500).json({ error: errCommit.message });
+            io.emit('schedule_updated');
+            res.json({ success: true, message: 'Grades gravadas com sucesso!' });
+          });
         });
       });
     });
@@ -1124,6 +1155,9 @@ app.post('/api/professor/request', verifyToken, (req, res) => {
       [siape, week_id, description, JSON.stringify(original_slot), JSON.stringify(proposed_slot), now],
       function(err) {
         if (err) return res.status(500).json({ error: err.message });
+        
+        io.emit('schedule_updated'); // <-- EMIT PUSH ATUALIZACAO VIA SOCKET
+        
         res.json({ id: this.lastID, success: true });
       }
     );
@@ -1160,9 +1194,25 @@ app.put('/api/requests/:id', verifyToken, (req, res) => {
       (err) => {
         if (err) return res.status(500).json({ error: err.message });
         
-        if (status === 'aprovado') {
-          db.get("SELECT * FROM change_requests WHERE id = ?", [reqId], (errReq, rowReq) => {
-            if (errReq || !rowReq) return;
+        // ENVIA NOTIFICACAO AO PROFESSOR
+        db.get("SELECT * FROM change_requests WHERE id = ?", [reqId], (errReq, rowReq) => {
+          if (rowReq) {
+             let proposedDesc = "";
+             try {
+                let p = JSON.parse(rowReq.proposed_slot);
+                if (typeof p === 'string') p = JSON.parse(p);
+                if (p && p.day && p.time && p.className) {
+                   proposedDesc = `\nAula: ${p.subject || ''} - Turma: ${p.className} - Horário: ${p.day} às ${p.time}`;
+                }
+             } catch(e) {}
+             const now = new Date().toISOString();
+             const msg = status === 'aprovado' ? `Seu pedido de aula foi Aprovado pela gestão.${proposedDesc}` : 'Seu pedido de aula foi Rejeitado.';
+             db.run("INSERT INTO notifications (target, type, title, message, createdAt) VALUES (?, ?, ?, ?, ?)", [rowReq.siape, 'STATUS_UPDATE', 'Aviso sobre Solicitação', msg, now], () => {
+                 io.emit('schedule_updated'); // alerta widget
+             });
+          }
+          
+          if (status === 'aprovado' && rowReq) {
             try {
               let proposed = JSON.parse(rowReq.proposed_slot);
               if (typeof proposed === 'string') proposed = JSON.parse(proposed);
@@ -1194,7 +1244,7 @@ app.put('/api/requests/:id', verifyToken, (req, res) => {
                 });
 
                 // 2. UPDATE for NEW STRUCTURE (Bulk Slots DB - MasterGrid V2)
-                db.all("SELECT id, data FROM curriculum_data WHERE type = 'class'", [], (errC, rowsC) => {
+                db.all("SELECT id, payload as data FROM curriculum_data WHERE dataType = 'class'", [], (errC, rowsC) => {
                   if (errC || !rowsC) return;
                   let targetClassId = null;
                   for (let row of rowsC) {
@@ -1204,7 +1254,7 @@ app.put('/api/requests/:id', verifyToken, (req, res) => {
                       } catch(e){}
                   }
 
-                  let dayIndex = String(['Segunda-feira', 'Terça-feira', 'Quarta-feira', 'Quinta-feira', 'Sexta-feira', 'Sábado'].indexOf(proposed.day));
+                  let dayIndex = String(['Domingo', 'Segunda-feira', 'Terça-feira', 'Quarta-feira', 'Quinta-feira', 'Sexta-feira', 'Sábado'].indexOf(proposed.day));
                   
                   if (targetClassId) {
                       db.all("SELECT * FROM schedules WHERE week_id = ? AND (dayOfWeek = ? OR dayOfWeek = ?) AND slotId = ? AND classId = ?", 
@@ -1212,13 +1262,10 @@ app.put('/api/requests/:id', verifyToken, (req, res) => {
                          (errS, rowsS) => {
                            if (!errS && rowsS && rowsS.length > 0) {
                                rowsS.forEach(sRow => {
-                                   const isVaga = (!sRow.teacherId || sRow.teacherId === 'A Definir' || sRow.teacherId === '-' || sRow.teacherId === '');
-                                   if (isVaga) {
-                                       const recFlag = JSON.stringify({ isSubstituted: true, originRequest: reqId, originalSubject: proposed.subject });
-                                       db.run("UPDATE schedules SET teacherId = ?, records = ?, updatedAt = ? WHERE id = ?", 
-                                           [rowReq.siape, recFlag, new Date().toISOString(), sRow.id], 
-                                           () => { try { if (io) io.emit('schedule_updated'); } catch(e){} });
-                                   }
+                                   const recFlag = JSON.stringify({ isSubstituted: true, originRequest: reqId, originalSubject: proposed.subject });
+                                   db.run("UPDATE schedules SET teacherId = ?, records = ?, updatedAt = ? WHERE id = ?", 
+                                       [rowReq.siape, recFlag, new Date().toISOString(), sRow.id], 
+                                       () => { try { if (io) io.emit('schedule_updated'); } catch(e){} });
                                });
                            }
                          });
@@ -1226,8 +1273,9 @@ app.put('/api/requests/:id', verifyToken, (req, res) => {
                 });
               }
             } catch(e) { console.error("Erro na conversão do motor de aprovação:", e) }
-          });
-        }
+          }
+        });
+          
         res.json({ success: true });
       }
     );

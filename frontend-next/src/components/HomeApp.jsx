@@ -105,7 +105,7 @@ export function HomeApp({ appMode }) {
 
         {appMode === 'home' && <PublicHome isDarkMode={isDarkMode} navigateTo={navigateTo} />}
 
-        {appMode === 'admin' && !isUnlocked && (
+        {appMode === 'admin' && (!isUnlocked || userRole !== 'admin') && (
           <div className="flex-1 flex flex-col items-center justify-center p-6 mt-10 mb-20 animate-in zoom-in">
              {isLoadingAuth ? (
                <div className="flex flex-col items-center justify-center opacity-50 py-10">
@@ -118,16 +118,22 @@ export function HomeApp({ appMode }) {
                     <Lock size={64} />
                  </div>
                  <h2 className={`text-2xl md:text-3xl font-black uppercase tracking-widest mb-4 text-center ${isDarkMode ? 'text-white' : 'text-slate-800'}`}>Acesso Restrito</h2>
-                 <p className={`mb-8 font-medium text-center max-w-md ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>Você precisa estar autenticado como administrador para acessar o painel de controle.</p>
-                 <button onClick={() => security.setAuthModal({ show: true, pendingAction: null, mode: 'login' })} className="px-8 py-4 bg-emerald-600 hover:bg-emerald-700 text-white font-black rounded-xl shadow-lg transition-all flex items-center justify-center gap-3 active:scale-95 w-full max-w-xs">
-                   <Unlock size={20}/> Fazer Login
-                 </button>
+                 <p className={`mb-8 font-medium text-center max-w-md ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>Você precisa estar autenticado como <b>Administrador</b> para acessar a gestão do sistema.</p>
+                 {!isUnlocked ? (
+                   <button onClick={() => security.setAuthModal({ show: true, pendingAction: null, mode: 'login' })} className="px-8 py-4 bg-emerald-600 hover:bg-emerald-700 text-white font-black rounded-xl shadow-lg transition-all flex items-center justify-center gap-3 active:scale-95 w-full max-w-xs">
+                     <Unlock size={20}/> Fazer Login
+                   </button>
+                 ) : (
+                   <button onClick={logout} className="px-8 py-4 bg-slate-600 hover:bg-slate-700 text-white font-black rounded-xl shadow-lg transition-all flex items-center justify-center gap-3 active:scale-95 w-full max-w-xs">
+                     Sair
+                   </button>
+                 )}
                </>
              )}
           </div>
         )}
 
-        {appMode === 'admin' && isUnlocked && (
+        {appMode === 'admin' && isUnlocked && userRole === 'admin' && (
             <>
                 <div className="mb-6 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 no-print">
                     <div className="flex items-center gap-4">
