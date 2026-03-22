@@ -71,6 +71,7 @@ export function MasterGrid({ isDarkMode, ...props }) {
 
   const [aulasNeutras, setAulasNeutras] = useState([]);
   const [grade, setGrade] = useState({});
+  const [disabledDays, setDisabledDays] = useState(new Set());
   
   // ESTADO DA TELA PRINCIPAL (O que o usuário está visualizando)
   const [selectedType, setSelectedType] = useState('previa'); 
@@ -116,6 +117,44 @@ export function MasterGrid({ isDarkMode, ...props }) {
     }).map(t => t.timeStr);
   }, [classTimes, shiftFilter]);
   const diasExibidos = activeDays && activeDays.length > 0 ? activeDays : ['Segunda-feira', 'Terça-feira', 'Quarta-feira', 'Quinta-feira', 'Sexta-feira'];
+
+  useEffect(() => {
+    if (selectedType === 'padrao' || !selectedWeek || !academicWeeks) {
+      setDisabledDays(new Set());
+      return;
+    }
+    const w = academicWeeks.find(week => String(week.id) === String(selectedWeek));
+    if (!w || !w.start_date || !w.end_date) {
+      setDisabledDays(new Set());
+      return;
+    }
+    const disabledOpts = new Set();
+    const [sy, sm, sd] = w.start_date.split('-').map(Number);
+    const [ey, em, ed] = w.end_date.split('-').map(Number);
+    const start = new Date(sy, sm - 1, sd);
+    const end = new Date(ey, em - 1, ed);
+
+    diasExibidos.forEach(diaNome => {
+      const dayIndex = MAP_DAYS.indexOf(diaNome);
+      let isIncluded = false;
+      let cur = new Date(start);
+      while (cur <= end) {
+          if (cur.getDay() === dayIndex) { isIncluded = true; break; }
+          cur.setDate(cur.getDate() + 1);
+      }
+      if (!isIncluded) disabledOpts.add(diaNome);
+    });
+    setDisabledDays(disabledOpts);
+  }, [selectedWeek, selectedType, academicWeeks, diasExibidos]);
+
+  const toggleDisabledDay = (diaNome) => {
+    setDisabledDays(prev => {
+        const nextSet = new Set(prev);
+        if (nextSet.has(diaNome)) nextSet.delete(diaNome);
+        else nextSet.add(diaNome);
+        return nextSet;
+    });
+  };
 
   // Carrega os currículos e turmas direto da fonte
   useEffect(() => {
@@ -964,16 +1003,32 @@ export function MasterGrid({ isDarkMode, ...props }) {
                   const diaId = String(MAP_DAYS.indexOf(diaNome));
                   return (
                   <React.Fragment key={diaId}>
-                    {/* Linha Divisória do Dia */}
+                    {/* Linha Divisória do Dia com Botão de Feriado */}
                     <tr>
-                      <td className={`py-1 px-1 text-center text-[10px] font-black uppercase tracking-widest sticky left-0 z-30 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)] truncate max-w-[80px] ${isDarkMode ? 'bg-slate-800 text-emerald-400' : 'bg-slate-100 text-emerald-700'}`}>
-                        {diaNome.split('-')[0]}
+                      <td className={`py-2 px-1 text-center sticky left-0 z-30 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)] truncate max-w-[80px] ${isDarkMode ? 'bg-slate-800' : 'bg-slate-100'}`}>
+                        <div className="flex flex-col items-center gap-1.5">
+                           <span className={`text-[10px] font-black uppercase tracking-widest ${isDarkMode ? 'text-emerald-400' : 'text-emerald-700'}`}>{diaNome.split('-')[0]}</span>
+                           <button onClick={() => toggleDisabledDay(diaNome)} title={disabledDays.has(diaNome) ? "Ativar dia letivo manual" : "Marcar como Feriado ou Não Letivo"} className={`px-2 py-0.5 rounded text-[8px] font-black uppercase tracking-widest transition-all hover:scale-105 active:scale-95 shadow-sm ${disabledDays.has(diaNome) ? 'bg-rose-500 text-white' : 'bg-transparent border border-emerald-500 text-emerald-600 dark:text-emerald-400 dark:border-emerald-400'}`}>
+                              {disabledDays.has(diaNome) ? "Feriado" : "Letivo"}
+                           </button>
+                        </div>
                       </td>
                       <td colSpan={turmasDoCurso.filter(t => !hiddenClasses.includes(t.id)).length} className={`p-0 border-none ${isDarkMode ? 'bg-slate-700/50' : 'bg-emerald-50'}`}></td>
                     </tr>
                     
+                    {disabledDays.has(diaNome) && (
+                      <tr className={`border-b-4 ${isDarkMode ? 'border-slate-800/80 bg-slate-900/50' : 'border-slate-100 bg-slate-50/50'}`}>
+                         <td className={`py-8 text-center sticky left-0 z-30 text-[9px] uppercase tracking-[0.3em] font-black opacity-30 ${isDarkMode ? 'text-slate-400 bg-slate-800' : 'text-slate-500 bg-slate-100'}`}></td>
+                         <td colSpan={turmasDoCurso.filter(t => !hiddenClasses.includes(t.id)).length} className="text-center font-black uppercase tracking-[0.5em] text-xs py-8 opacity-40 select-none">
+                            <div className="flex flex-col items-center justify-center gap-2">
+                               NÃO LETIVO / FERIADO
+                            </div>
+                         </td>
+                      </tr>
+                    )}
+
                     {/* Horários do Dia */}
-                    {horariosExibidos.map((hora, index) => {
+                    {!disabledDays.has(diaNome) && horariosExibidos.map((hora, index) => {
                       const numHora = parseInt(hora.split(':')[0], 10);
                       
                       const isMorning = numHora < 12;
