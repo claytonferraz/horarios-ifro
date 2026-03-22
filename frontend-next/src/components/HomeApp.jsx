@@ -4,6 +4,7 @@ import { useData } from "@/contexts/DataContext";
 import { useTheme } from "@/contexts/ThemeContext";
 import { useAuth } from "@/contexts/AuthContext";
 import { FloatingRequestsWidget } from './ui/admin/FloatingRequestsWidget';
+import { TeacherRequestsSection } from './ui/teacher/TeacherRequestsSection';
 import { MultiSelect } from "./ui/MultiSelect";
 import { SearchableSelect } from "./ui/SearchableSelect";
 import { InlineInput } from "./ui/InlineInput";
@@ -251,8 +252,32 @@ export function HomeApp({ appMode }) {
         )}
       </main>
       
-      {/* WIDGET FLUTUANTE DE VERIFICAÇÃO DE SOLICITAÇÕES E NOTIFICAÇÕES GLOBAIS */}
-      {isUnlocked && <FloatingRequestsWidget isDarkMode={isDarkMode} userRole={userRole} appMode={appMode} />}
+      {/* HUB WIDGET FLUTUANTE GLOBAL (NOTIFICAÇÕES E SOLICITAÇÕES) */}
+      {isUnlocked && (
+        <div className="fixed bottom-6 right-6 z-[9999] flex flex-col-reverse items-end group print:hidden">
+           {/* Notificações e Avisos (Base da Pilha) */}
+           <div className="pointer-events-auto">
+             <FloatingRequestsWidget isDarkMode={isDarkMode} userRole={userRole} appMode={appMode} />
+           </div>
+
+           {/* Opções extras que aparecem no Hover */}
+           <div className="mb-3 opacity-0 translate-y-10 group-hover:opacity-100 group-hover:translate-y-0 transition-all duration-300 pointer-events-none group-hover:pointer-events-auto">
+             {appMode === 'professor' && scheduleState.viewMode !== 'solicitacoes' && (
+               <TeacherRequestsSection 
+                  isFloating={true} 
+                  apiClient={apiClient}
+                  isDarkMode={isDarkMode}
+                  siape={siape}
+                  selectedWeek={scheduleState.selectedWeek}
+                  weekData={scheduleState.recordsForWeek ? scheduleState.recordsForWeek.filter(r => String(r.teacherId).includes(String(siape))) : []}
+                  activeDays={scheduleState.activeDays}
+                  classTimes={scheduleState.classTimes}
+                  onCancel={() => {}}
+               />
+             )}
+           </div>
+        </div>
+      )}
       
     </div>
   );

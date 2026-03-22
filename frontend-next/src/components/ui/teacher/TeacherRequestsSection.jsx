@@ -45,16 +45,16 @@ export function TeacherRequestsSection({ isDarkMode, siape, selectedWeek, weekDa
 
   if (isFloating && !isFloatingOpen) {
     return (
-      <button onClick={() => setIsFloatingOpen(true)} className="fixed bottom-6 left-6 p-4 rounded-full bg-indigo-600 hover:bg-indigo-500 text-white shadow-[0_10px_25px_-5px_rgba(79,70,229,0.5)] font-bold text-xs z-50 transition-all flex items-center gap-2 print:hidden group">
-        <MessageSquare size={18} className="group-hover:scale-110 transition-transform" />
-        <span className="hidden sm:inline">Solicitações Coord.</span>
-        {requests.length > 0 && <span className="bg-rose-500 text-white font-black text-[10px] px-2 py-0.5 rounded-full shadow-inner shadow-rose-900/50">{requests.length}</span>}
+      <button onClick={() => setIsFloatingOpen(true)} className="p-3 md:p-4 rounded-full bg-indigo-600 hover:bg-indigo-500 text-white shadow-xl font-bold flex items-center justify-center gap-2 group/fab relative z-50 transition-all print:hidden">
+        <MessageSquare size={20} className="group-hover/fab:scale-110 transition-transform" />
+        <span className="whitespace-nowrap overflow-hidden max-w-0 opacity-0 group-hover/fab:max-w-xs group-hover/fab:opacity-100 transition-all duration-300 group-hover/fab:ml-1 hidden sm:inline-block">DAPE</span>
+        {requests.length > 0 && <span className="absolute -top-1 -right-1 bg-rose-500 text-white font-black text-[10px] w-[20px] h-[20px] flex items-center justify-center rounded-full shadow-inner">{requests.length}</span>}
       </button>
     );
   }
 
   const containerClass = isFloating 
-    ? `fixed bottom-6 left-6 w-[500px] max-w-[90vw] p-5 rounded-[2rem] shadow-2xl z-[9000] flex flex-col max-h-[85vh] animate-in slide-in-from-bottom-5 print:relative print:w-auto print:max-w-none print:shadow-none print:bottom-auto print:left-auto print:p-0 print:border-none print:bg-transparent overflow-hidden ${isDarkMode ? 'bg-slate-900 border border-slate-700/50' : 'bg-white border border-slate-200'}`
+    ? `fixed bottom-20 right-6 w-[500px] max-w-[90vw] p-5 rounded-[2rem] shadow-[0_20px_50px_rgba(0,0,0,0.3)] z-[9000] flex flex-col max-h-[80vh] animate-in fade-in slide-in-from-bottom-5 duration-300 origin-bottom-right print:relative print:w-auto print:max-w-none print:shadow-none print:bottom-auto print:left-auto print:p-0 print:border-none print:bg-transparent overflow-hidden ${isDarkMode ? 'bg-slate-900 border border-slate-700/50' : 'bg-white border border-slate-200'}`
     : `mt-8 mb-12 animate-in slide-in-from-bottom-4 print:mt-0 print:mb-0 print:block`;
 
   return (

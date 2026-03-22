@@ -45,6 +45,7 @@ export function PortalView({
   }, [schedules, selectedConfigYear, scheduleMode, selectedWeek]);
   const [editorModal, setEditorModal] = useState(null);
   const [showOnlyMyClasses, setShowOnlyMyClasses] = useState(true);
+  const [padraoFilterTeacher, setPadraoFilterTeacher] = useState('Todos');
   const [pendingRequests, setPendingRequests] = useState([]);
   
   // New Requests Logic as requested
@@ -58,7 +59,7 @@ export function PortalView({
   const previousViewMode = React.useRef(viewMode);
   React.useEffect(() => {
     if (appMode === 'professor' && viewMode === 'curso' && previousViewMode.current !== 'curso') {
-       if (typeof setScheduleMode === 'function') setScheduleMode('consolidado');
+       if (typeof setScheduleMode === 'function') setScheduleMode('atual');
     }
     previousViewMode.current = viewMode;
   }, [viewMode, appMode, setScheduleMode]);
@@ -365,6 +366,28 @@ export function PortalView({
    const dynamicClassesList = React.useMemo(() => {
      return [...new Set(dbClasses.map(c => c.name))].filter(Boolean).sort((a,b) => a.localeCompare(b));
    }, [dbClasses]);
+
+   const filteredCourseClasses = React.useMemo(() => {
+     let classes = dynamicClassesList;
+     if (appMode === 'professor') {
+       if (scheduleMode === 'padrao' && padraoFilterTeacher && padraoFilterTeacher !== 'Todos') {
+         const teacherSchedules = schedules.filter(s => s.teacherId && String(s.teacherId).includes(String(padraoFilterTeacher)));
+         const classNames = new Set(teacherSchedules.map(s => {
+            const classObj = dbClasses.find(c => String(c.id) === String(s.classId));
+            return classObj ? classObj.name : s.className;
+         }));
+         classes = classes.filter(name => classNames.has(name));
+       } else if (showOnlyMyClasses && siape) {
+         const mySchedules = schedules.filter(s => s.teacherId && String(s.teacherId).includes(String(siape)));
+         const myClassNames = new Set(mySchedules.map(s => {
+            const classObj = dbClasses.find(c => String(c.id) === String(s.classId));
+            return classObj ? classObj.name : s.className;
+         }));
+         classes = classes.filter(name => myClassNames.has(name));
+       }
+     }
+     return classes;
+   }, [dynamicClassesList, appMode, scheduleMode, padraoFilterTeacher, showOnlyMyClasses, schedules, siape, dbClasses]);
 
     const filteredClassesList = React.useMemo(() => {
       let lists = dynamicClassesList;
@@ -791,11 +814,17 @@ export function PortalView({
                     <>
                       {appMode === 'professor' || appMode === 'gestao' || appMode === 'admin' ? (
                         <>
-                          <button onClick={() => setScheduleMode('consolidado')} className={`flex-1 md:flex-none flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all ${scheduleMode === 'consolidado' ? 'bg-emerald-500 text-white shadow-md' : (isDarkMode ? 'text-slate-400 hover:bg-slate-800 hover:text-white' : 'text-slate-500 hover:bg-slate-100 hover:text-slate-800')}`}>
-                            <Calendar size={14} /> Consolidado
-                          </button>
                           <button onClick={() => setScheduleMode('atual')} className={`flex-1 md:flex-none flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all ${scheduleMode === 'atual' ? 'bg-teal-500 text-white shadow-md' : (isDarkMode ? 'text-slate-400 hover:bg-slate-800 hover:text-white' : 'text-slate-500 hover:bg-slate-100 hover:text-slate-800')}`}>
                             <Sun size={14} /> Semana Atual
+                          </button>
+                          <button onClick={() => setScheduleMode('previa')} className={`flex-1 md:flex-none flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all ${scheduleMode === 'previa' ? 'bg-violet-500 text-white shadow-md' : (isDarkMode ? 'text-slate-400 hover:bg-slate-800 hover:text-white' : 'text-slate-500 hover:bg-slate-100 hover:text-slate-800')}`}>
+                            <Eye size={14} /> Prévia (Futuro)
+                          </button>
+                          <button onClick={() => setScheduleMode('padrao')} className={`flex-1 md:flex-none flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all ${scheduleMode === 'padrao' ? 'bg-blue-500 text-white shadow-md' : (isDarkMode ? 'text-slate-400 hover:bg-slate-800 hover:text-white' : 'text-slate-500 hover:bg-slate-100 hover:text-slate-800')}`}>
+                            <BookOpen size={14} /> Padrão Anual
+                          </button>
+                          <button onClick={() => setScheduleMode('consolidado')} className={`flex-1 md:flex-none flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all ${scheduleMode === 'consolidado' ? 'bg-emerald-500 text-white shadow-md' : (isDarkMode ? 'text-slate-400 hover:bg-slate-800 hover:text-white' : 'text-slate-500 hover:bg-slate-100 hover:text-slate-800')}`}>
+                            <Calendar size={14} /> Consolidado
                           </button>
                         </>
                       ) : (
@@ -803,13 +832,6 @@ export function PortalView({
                           <Calendar size={14} /> Horário Oficial
                         </button>
                       )}
-                      
-                      <button onClick={() => setScheduleMode('previa')} className={`flex-1 md:flex-none flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all ${scheduleMode === 'previa' ? 'bg-violet-500 text-white shadow-md' : (isDarkMode ? 'text-slate-400 hover:bg-slate-800 hover:text-white' : 'text-slate-500 hover:bg-slate-100 hover:text-slate-800')}`}>
-                        <Eye size={14} /> Prévia (Futuro)
-                      </button>
-                      <button onClick={() => setScheduleMode('padrao')} className={`flex-1 md:flex-none flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all ${scheduleMode === 'padrao' ? 'bg-blue-500 text-white shadow-md' : (isDarkMode ? 'text-slate-400 hover:bg-slate-800 hover:text-white' : 'text-slate-500 hover:bg-slate-100 hover:text-slate-800')}`}>
-                        <BookOpen size={14} /> Padrão Anual
-                      </button>
                     </>
                   )}
                 </div>
@@ -1103,15 +1125,37 @@ export function PortalView({
 
                   {/* GRADE DE HORÁRIO (Visão Curso MATRIZ) */}
                   {viewMode === 'curso' && (
-                    <DragDropContext onDragStart={onDragStart} onDragEnd={onDragEnd}>
-                      <div className="flex flex-col lg:flex-row gap-4 animate-in zoom-in-95 duration-500">
-                        <CourseGrid 
-                          mappedSchedules={mappedSchedules}
-                          isDarkMode={isDarkMode}
-                          scheduleMode={scheduleMode}
-                          userRole={userRole}
-                          globalTeachers={globalTeachers}
-                          activeCourseClasses={activeCourseClasses}
+                    <div className="flex flex-col gap-4 animate-in zoom-in-95 duration-500">
+                      {appMode === 'professor' && (
+                         <div className={`p-4 rounded-xl border flex flex-col md:flex-row gap-4 md:items-center no-print ${isDarkMode ? 'bg-slate-900/50 border-slate-800' : 'bg-slate-50 border-slate-100'}`}>
+                             {/* Teacher select filter (Apenas Padrão) */}
+                            {scheduleMode === 'padrao' && (
+                              <div className="w-full md:w-72">
+                                <SearchableSelect 
+                                   isDarkMode={isDarkMode}
+                                   options={[
+                                     {value: 'Todos', label: 'Qualquer Colega (Mostrar Todas as Turmas)'},
+                                     ...(globalTeachers || []).map(t => ({value: String(t.siape || t.id), label: t.nome_exibicao || t.nome_completo || t.name || 'Sem Nome'}))
+                                   ]} 
+                                   value={padraoFilterTeacher} 
+                                   onChange={setPadraoFilterTeacher} 
+                                   colorClass={isDarkMode ? 'bg-blue-900/30 border-blue-800/50 text-blue-200 shadow-sm' : 'bg-blue-50 border-blue-200 text-blue-900 shadow-sm'}
+                                   placeholder="Procurar turmas do colega..."
+                                />
+                              </div>
+                            )}
+                         </div>
+                      )}
+                      
+                      <DragDropContext onDragStart={onDragStart} onDragEnd={onDragEnd}>
+                        <div className="flex flex-col lg:flex-row gap-4">
+                          <CourseGrid 
+                            mappedSchedules={mappedSchedules}
+                            isDarkMode={isDarkMode}
+                            scheduleMode={scheduleMode}
+                            userRole={userRole}
+                            globalTeachers={globalTeachers}
+                            activeCourseClasses={filteredCourseClasses}
                           safeDays={safeDays}
                           safeTimes={safeTimes}
                           intervals={intervals}
@@ -1130,9 +1174,13 @@ export function PortalView({
                           subjectHoursMeta={subjectHoursMeta}
                           activeData={activeData}
                           getFormattedDayLabel={getFormattedDayLabel}
+                          appMode={appMode}
+                          showOnlyMyClasses={showOnlyMyClasses}
+                          setShowOnlyMyClasses={setShowOnlyMyClasses}
                         />
-                      </div>
-                    </DragDropContext>
+                        </div>
+                      </DragDropContext>
+                    </div>
                   )}
 
                   {/* GRADE DE HORÁRIO DO PROFESSOR (Separada por Curso) */}
@@ -1246,9 +1294,9 @@ export function PortalView({
          />
       )}
 
-      {/* SISTEMA DE SOLICITAÇÕES PARA O PROFESSOR (Visível flutuante nos painéis, ou fullscreen se na aba própria) */}
-      {appMode === 'professor' && (
-        <div className={viewMode === 'solicitacoes' ? "mt-4 w-full animate-in fade-in slide-in-from-bottom-4" : ""}>
+      {/* SISTEMA DE SOLICITAÇÕES PARA O PROFESSOR (Apenas Fullscreen, Hub Flutuante movido globalmente para HomeApp) */}
+      {appMode === 'professor' && viewMode === 'solicitacoes' && (
+        <div className="mt-4 w-full animate-in fade-in slide-in-from-bottom-4">
           <TeacherRequestsSection 
             requests={requests} 
             apiClient={apiClient}
@@ -1263,7 +1311,7 @@ export function PortalView({
             activeDays={activeDays}
             classTimes={classTimes}
             weekData={recordsForWeek ? recordsForWeek.filter(r => String(r.teacherId).includes(String(siape))) : []}
-            isFloating={viewMode !== 'solicitacoes'}
+            isFloating={false}
           />
         </div>
       )}
