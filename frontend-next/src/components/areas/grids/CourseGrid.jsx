@@ -42,16 +42,25 @@ export const CourseGrid = React.memo(
     setShowOnlyMyClasses,
     padraoFilterTeacher,
     setPadraoFilterTeacher,
+    siape,
   }) => {
     const [mobileSelectedClasses, setMobileSelectedClasses] = useState({});
     const [activeCourseTab, setActiveCourseTab] = useState("Todos");
     const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
 
+    const activeTeacherFilter = padraoFilterTeacher && padraoFilterTeacher !== "Todos" ? padraoFilterTeacher : (showOnlyMyClasses ? siape : null);
+
     const availableCourses = useMemo(() => {
-      return [...new Set(mappedSchedules.map((r) => r.course))]
+      let schedulesToConsider = mappedSchedules;
+      if (activeTeacherFilter) {
+          schedulesToConsider = mappedSchedules.filter(r => 
+             r.teacherId && String(r.teacherId).split(',').includes(String(activeTeacherFilter))
+          );
+      }
+      return [...new Set(schedulesToConsider.map((r) => r.course))]
         .filter(Boolean)
         .sort((a, b) => a.localeCompare(b));
-    }, [mappedSchedules]);
+    }, [mappedSchedules, activeTeacherFilter]);
 
     useEffect(() => {
       if (

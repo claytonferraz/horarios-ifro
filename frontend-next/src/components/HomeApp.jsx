@@ -253,7 +253,7 @@ export function HomeApp({ appMode }) {
       </main>
       
       {/* HUB WIDGET FLUTUANTE GLOBAL (NOTIFICAÇÕES E SOLICITAÇÕES) */}
-      {isUnlocked && (
+      {isUnlocked && !(appMode === 'admin' && adminTab === 'master_grid') && (
         <div className="fixed bottom-6 right-6 z-[9999] flex flex-col-reverse items-end group print:hidden">
            {/* Notificações e Avisos (Base da Pilha) */}
            <div className="pointer-events-auto">

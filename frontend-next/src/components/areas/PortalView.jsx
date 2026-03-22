@@ -1160,6 +1160,7 @@ export function PortalView({
                           setShowOnlyMyClasses={setShowOnlyMyClasses}
                           padraoFilterTeacher={padraoFilterTeacher}
                           setPadraoFilterTeacher={setPadraoFilterTeacher}
+                          siape={siape}
                         />
                         </div>
                       </DragDropContext>
