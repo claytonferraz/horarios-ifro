@@ -32,7 +32,27 @@ export function DataProvider({ children }) {
       let combinedData = [];
       if (schedules && Array.isArray(schedules)) {
         schedules.forEach(d => {
-          if (d.records) {
+          if (d.courseName || d.courseId) {
+            // New Flat Array model from relational DB
+            let extra = {};
+            try { if (d.records) extra = JSON.parse(d.records); } catch(e){}
+            combinedData.push({
+              id: d.id,
+              course: d.courseName || d.courseId,
+              className: d.className || d.classId,
+              day: d.dayOfWeek,
+              time: d.slotId,
+              teacher: String(d.teacherId || ''),
+              subject: d.subjectName || d.disciplineId,
+              room: d.room || '',
+              type: d.type,
+              week: String(d.week_id || ''),
+              year: String(d.academic_year || ''),
+              updatedAt: d.updatedAt,
+              ...extra
+            });
+          } else if (d.records) {
+            // Old JSON format block compatibility
             const parsed = JSON.parse(d.records);
             combinedData = [...combinedData, ...parsed.map(r => ({ ...r, updatedAt: d.updatedAt }))];
           }

@@ -385,20 +385,46 @@ app.get('/api/schedules', (req, res) => {
   const courseId = req.query.courseId;
   const academicYear = req.query.academicYear;
   
-  let q = "SELECT * FROM schedules WHERE 1=1";
+  let q = `
+    SELECT 
+      s.*, 
+      c.payload as coursePayload, 
+      cl.payload as classPayload, 
+      d.payload as discPayload 
+    FROM schedules s
+    LEFT JOIN curriculum_data c ON s.courseId = c.id AND c.dataType = 'course'
+    LEFT JOIN curriculum_data cl ON s.classId = cl.id AND cl.dataType = 'class'
+    LEFT JOIN curriculum_data d ON s.disciplineId = d.id AND d.dataType = 'discipline'
+    WHERE 1=1
+  `;
   let params = [];
   if (courseId) {
-    q += " AND courseId = ?";
+    q += " AND s.courseId = ?";
     params.push(courseId);
   }
   if (academicYear) {
-    q += " AND (academic_year = ? OR academic_year IS NULL)";
+    q += " AND (s.academic_year = ? OR s.academic_year IS NULL)";
     params.push(academicYear);
   }
   
   db.all(q, params, (err, rows) => {
     if (err) return res.status(500).json({ error: err.message });
-    res.json(rows || []);
+    const mapped = (rows || []).map(r => {
+      let cName = r.courseId; let clName = r.classId; let discName = r.disciplineId;
+      try { if (r.coursePayload) cName = JSON.parse(r.coursePayload).name || cName; } catch(e){}
+      try { if (r.classPayload) clName = JSON.parse(r.classPayload).name || clName; } catch(e){}
+      try { if (r.discPayload) discName = JSON.parse(r.discPayload).name || discName; } catch(e){}
+      return {
+        ...r,
+        courseName: cName,
+        className: clName,
+        subjectName: discName,
+        coursePayload: undefined,
+        classPayload: undefined,
+        discPayload: undefined
+      };
+    });
+    res.json(mapped);
   });
 });
 
