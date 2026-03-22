@@ -652,7 +652,17 @@ export function MasterGrid({ isDarkMode, ...props }) {
   }, [changeRequests, selectedWeek, selectedType]);
 
   const filteredRequests = activeRequestsForWeek.filter(req => !dismissedRequests.includes(req.id));
-  const totalAlerts = dashboardAlerts.list.length + filteredRequests.length;
+  const totalAlerts = filteredRequests.length;
+
+  const [isAlertsMinimized, setIsAlertsMinimized] = useState(false);
+  const [prevAlertCount, setPrevAlertCount] = useState(0);
+
+  useEffect(() => {
+     if (dashboardAlerts.list.length > prevAlertCount) {
+         setIsAlertsMinimized(false);
+     }
+     setPrevAlertCount(dashboardAlerts.list.length);
+  }, [dashboardAlerts.list.length, prevAlertCount]);
 
   return (
     <div className={`flex flex-col gap-4 animate-in fade-in duration-300 ${isDarkMode ? 'text-slate-200' : 'text-slate-800'}`}>
@@ -893,18 +903,6 @@ export function MasterGrid({ isDarkMode, ...props }) {
           ) : (
             <table className="w-full text-left border-collapse min-w-[800px]">
               <thead className={`sticky top-0 z-40 shadow-sm ${isDarkMode ? 'bg-slate-800' : 'bg-white'}`}>
-                {dashboardAlerts.list.length > 0 && (
-                   <tr className="shadow-sm">
-                     <td colSpan={turmasDoCurso.filter(t => !hiddenClasses.includes(t.id)).length + 1} className={`w-full p-1.5 border-b-2 text-center text-xs font-bold text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-950/80`}>
-                        <div className="flex bg-transparent rounded border-none w-full max-w-full overflow-x-auto gap-4 py-1 pb-1 scrollbar-hide snap-x items-center justify-start px-2">
-                           <span className="shrink-0 font-black uppercase text-[10px] tracking-widest flex items-center gap-1"><AlertTriangle size={12}/> {dashboardAlerts.list.length} Choque(s) na Grade:</span>
-                           {dashboardAlerts.list.map((msg, i) => (
-                             <span key={i} className="whitespace-nowrap shrink-0 snap-center bg-red-100 dark:bg-red-900/60 text-[10px] px-3 py-1 rounded-full border border-red-200 dark:border-red-800/80 shadow-sm">{msg}</span>
-                           ))}
-                        </div>
-                     </td>
-                   </tr>
-                )}
                 <tr>
                   <th className={`py-2 px-2 w-20 sticky left-0 top-0 z-50 ${isDarkMode ? 'bg-slate-800' : 'bg-white'}`}></th>
                   {turmasDoCurso.filter(t => !hiddenClasses.includes(t.id)).map(turma => (
@@ -1190,6 +1188,40 @@ export function MasterGrid({ isDarkMode, ...props }) {
           </div>
         </div>
       )}
+
+      {dashboardAlerts.list.length > 0 && (
+         <div className={`fixed bottom-4 left-4 sm:bottom-6 sm:left-6 z-[9990] flex flex-col items-start gap-2 max-w-[90vw] sm:max-w-sm transition-all duration-300 pointer-events-none`}>
+            {!isAlertsMinimized ? (
+               <div className={`w-full rounded-2xl shadow-2xl border overflow-hidden flex flex-col pointer-events-auto animate-in slide-in-from-bottom-5 fade-in ${isDarkMode ? 'bg-slate-900 border-slate-700' : 'bg-white border-slate-300'}`}>
+                  <div className={`p-3 border-b flex justify-between items-center ${isDarkMode ? 'bg-red-950/40 border-slate-800' : 'bg-red-50 border-slate-100'}`}>
+                     <div className="flex flex-col gap-0.5">
+                        <span className={`text-[11px] font-black uppercase tracking-widest flex items-center gap-1.5 ${isDarkMode ? 'text-red-400' : 'text-red-600'}`}>
+                           <AlertTriangle size={14} className="animate-pulse shrink-0" /> Choques Operacionais ({dashboardAlerts.list.length})
+                        </span>
+                        <span className="text-[9px] font-bold text-slate-500 uppercase tracking-widest">Alerta em Tempo Real</span>
+                     </div>
+                     <button onClick={() => setIsAlertsMinimized(true)} className={`p-1.5 rounded transition-colors self-start shrink-0 ${isDarkMode ? 'text-slate-400 hover:bg-slate-800 hover:text-white' : 'text-slate-500 hover:bg-slate-200 hover:text-black'}`}>
+                        <X size={16} />
+                     </button>
+                  </div>
+                  <div className="p-3 max-h-[30vh] sm:max-h-[40vh] overflow-y-auto w-full">
+                     <ul className="flex flex-col gap-2">
+                        {dashboardAlerts.list.map((msg, i) => (
+                           <li key={i} className={`text-[10px] font-bold flex items-start gap-2 p-2 rounded-lg ${isDarkMode ? 'bg-red-900/20 text-red-300/80 border border-red-500/10' : 'bg-red-50 text-red-800/80 border border-red-200/50 shadow-sm'}`}>
+                              <span className="mt-0.5 pointer-events-none shrink-0">•</span> <span>{msg}</span>
+                           </li>
+                        ))}
+                     </ul>
+                  </div>
+               </div>
+            ) : (
+               <button onClick={() => setIsAlertsMinimized(false)} className={`pointer-events-auto flex items-center gap-2 px-4 py-2.5 rounded-full shadow-lg border backdrop-blur-md transition-all hover:scale-105 active:scale-95 animate-in zoom-in duration-300 ${isDarkMode ? 'bg-red-950/90 border-red-800/50 text-red-400' : 'bg-white border-red-200 text-red-600'}`}>
+                  <AlertTriangle size={16} className="animate-pulse shrink-0" /> <span className="text-[10px] font-black uppercase tracking-widest">{dashboardAlerts.list.length} Choque(s) Ativo(s)</span>
+               </button>
+            )}
+         </div>
+      )}
+
       {isRightPanelOpen && <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-[9998]" onClick={() => setIsRightPanelOpen(false)} />}
       <div className={`fixed top-0 right-0 h-full w-full sm:w-[400px] shadow-2xl z-[9999] transition-transform transform duration-300 flex flex-col ${isRightPanelOpen ? 'translate-x-0' : 'translate-x-full'} ${isDarkMode ? 'bg-slate-900 border-l border-slate-700' : 'bg-slate-50 border-l border-slate-300'}`}>
          <div className={`p-5 border-b flex justify-between items-center shadow-sm ${isDarkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'}`}>
