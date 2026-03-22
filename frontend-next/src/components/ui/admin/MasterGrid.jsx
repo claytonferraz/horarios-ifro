@@ -3,6 +3,7 @@ import { CalendarDays, GripVertical, AlertCircle, Save, Filter, MapPin, Loader2,
 import { useData } from '@/contexts/DataContext';
 import { MAP_DAYS, getColorHash, resolveTeacherName } from '@/lib/dates';
 import { apiClient, getHeaders } from '@/lib/apiClient';
+import FloatingRequestsWidget from './FloatingRequestsWidget';
 
 const getCardStyle = (courseId, classId, subjectName, isDarkMode) => {
     const strToNum = (str) => {
@@ -104,6 +105,13 @@ export function MasterGrid({ isDarkMode, ...props }) {
   const [schedules, setSchedules] = useState([]);
   const [loadingInitial, setLoadingInitial] = useState(true);
   const [changeRequests, setChangeRequests] = useState([]);
+
+  const [pendingRequests, setPendingRequests] = useState([]);
+  const [isRequestsWidgetOpen, setIsRequestsWidgetOpen] = useState(false);
+
+  React.useEffect(() => {
+    apiClient.getRequests().then(data => setPendingRequests(data.filter(r => r.status === 'pronto_para_homologacao'))).catch(console.error);
+  }, []);
 
   const horariosExibidos = useMemo(() => {
     if (!classTimes || classTimes.length === 0) {
@@ -1379,6 +1387,26 @@ export function MasterGrid({ isDarkMode, ...props }) {
             )}
          </div>
       </div>
+      
+      <FloatingRequestsWidget 
+         isOpen={isRequestsWidgetOpen}
+         setIsOpen={setIsRequestsWidgetOpen}
+         requests={pendingRequests}
+         isDarkMode={isDarkMode}
+         onApprove={(req) => {
+           apiClient.updateRequestStatus(req.id, 'aprovado').then(() => {
+             alert('Solicitação Homologada! O sistema agora a considera válida para o histórico.');
+             setPendingRequests(prev => prev.filter(r => r.id !== req.id));
+           }).catch(e => alert(e.message));
+         }}
+         onReject={(req) => {
+           apiClient.updateRequestStatus(req.id, 'recusado').then(() => {
+             alert('Solicitação recusada. O professor será notificado.');
+             setPendingRequests(prev => prev.filter(r => r.id !== req.id));
+           }).catch(e => alert(e.message));
+         }}
+      />
+
     </div>
   );
 }

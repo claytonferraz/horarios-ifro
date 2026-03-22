@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { MessageSquare, Send, AlertCircle, CheckCircle2, Clock, XCircle, Printer } from 'lucide-react';
 import { apiClient } from '@/lib/apiClient';
 
-export function TeacherRequestsSection({ isDarkMode, siape, selectedWeek, weekData, activeDays, classTimes }) {
+export function TeacherRequestsSection({ isDarkMode, siape, selectedWeek, weekData, activeDays, classTimes, onCancel }) {
   const [requests, setRequests] = useState([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -142,6 +142,18 @@ export function TeacherRequestsSection({ isDarkMode, siape, selectedWeek, weekDa
                         </div>
                       )}
                     </div>
+
+                    {req.status === 'aguardando_colega' && String(req.substitute_id) === String(siape) && (
+                      <div className="mt-3 flex justify-end print:hidden">
+                        <button onClick={() => {
+                          apiClient.updateRequestStatus(req.id, 'pronto_para_homologacao').then(() => {
+                            alert('Permuta Aceita! A coordenação foi notificada para homologar.');
+                            loadRequests();
+                            if (typeof onCancel === 'function') onCancel();
+                          });
+                        }} className="px-4 py-2 text-[10px] font-black uppercase tracking-widest rounded-lg bg-emerald-600 text-white shadow-md hover:bg-emerald-500">Aceitar Permuta</button>
+                      </div>
+                    )}
                     
                     {req.admin_feedback && (
                       <div className={`w-full sm:max-w-[200px] print:w-[35%] print:max-w-[300px] p-3 rounded-lg border text-[10px] mt-3 sm:mt-0 print:mt-0 animate-in fade-in slide-in-from-right-2 print:border-dashed print:border-slate-400 print:bg-slate-50/50 print:text-black print:p-3 ${isDarkMode ? 'bg-indigo-900/20 border-indigo-800/50 text-indigo-300' : 'bg-indigo-50 border-indigo-100 text-indigo-800'}`}>

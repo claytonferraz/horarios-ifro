@@ -118,6 +118,22 @@ db.serialize(() => {
     closedAt TEXT -- Data de fechamento para 'Consolidado'
   )`);
 
+  db.run(`CREATE TABLE IF NOT EXISTS exchange_requests (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    action_type TEXT,
+    requester_id TEXT,
+    substitute_id TEXT,
+    target_class TEXT,
+    original_day TEXT,
+    original_time TEXT,
+    subject TEXT,
+    return_week TEXT,
+    reason TEXT,
+    obs TEXT,
+    status TEXT DEFAULT 'pendente',
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+  )`);
+
   db.run(`CREATE TABLE IF NOT EXISTS config (
     id TEXT PRIMARY KEY, -- config_2026
     disabledWeeks TEXT,
@@ -1213,159 +1229,42 @@ app.put('/api/teachers/:siape/admin-status', verifyToken, (req, res) => {
 });
 
 // ==========================================
-// ROTAS DE SOLICITAÇÕES DE MUDANÇA (PROMPT 2)
+// ROTAS DE SOLICITAÇÕES DE TROCA E VAGA
 // ==========================================
 app.get('/api/requests', (req, res) => {
-  const { siape } = req.query;
-  const query = siape ? "SELECT * FROM change_requests WHERE siape = ? ORDER BY createdAt DESC" : "SELECT * FROM change_requests ORDER BY createdAt DESC";
-  const params = siape ? [siape] : [];
-  
-  db.all(query, params, (err, rows) => {
-    if (err) return res.status(500).json({ error: err.message });
-    res.json(rows || []);
-  });
+  try {
+    db.all('SELECT * FROM exchange_requests ORDER BY created_at DESC', [], (err, rows) => {
+      if (err) return res.status(500).json({ error: err.message });
+      res.json(rows || []);
+    });
+  } catch(e) { res.status(500).json({error: e.message}); }
 });
 
-app.post('/api/professor/request', verifyToken, (req, res) => {
-  const { week_id, description, original_slot, proposed_slot } = req.body;
-  const siape = req.userId;
-  const now = new Date().toISOString();
+app.post('/api/requests', (req, res) => {
+  try {
+    const { action, requester_id, substituteId, targetClass, originalRecord, returnWeekId, reason, obs } = req.body;
+    // Regra: Vaga vai direto para a gestão. Troca vai para o colega aceitar primeiro.
+    const status = action === 'troca' ? 'aguardando_colega' : 'pronto_para_homologacao';
 
-  const insertRequest = () => {
     db.run(
-      "INSERT INTO change_requests (siape, week_id, description, original_slot, proposed_slot, createdAt) VALUES (?, ?, ?, ?, ?, ?)",
-      [siape, week_id, description, JSON.stringify(original_slot), JSON.stringify(proposed_slot), now],
+      'INSERT INTO exchange_requests (action_type, requester_id, substitute_id, target_class, original_day, original_time, subject, return_week, reason, obs, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+      [action, requester_id || '', substituteId || '', targetClass, originalRecord?.day || '', originalRecord?.time || '', originalRecord?.subject || '', returnWeekId || '', reason, obs || '', status],
       function(err) {
         if (err) return res.status(500).json({ error: err.message });
-        
-        io.emit('schedule_updated'); // <-- EMIT PUSH ATUALIZACAO VIA SOCKET
-        
-        res.json({ id: this.lastID, success: true });
+        res.json({ success: true, id: this.lastID });
       }
     );
-  };
-
-  // Anti-choque de horários
-  if (proposed_slot && proposed_slot.day && proposed_slot.time) {
-    db.get("SELECT records FROM schedules WHERE id = ?", [week_id], (err, row) => {
-      if (err) return res.status(500).json({ error: "Erro ao buscar a semana" });
-      if (row && row.records) {
-        let records = [];
-        try { records = JSON.parse(row.records); } catch(e){}
-        if (!Array.isArray(records)) records = [];
-        const conflict = records.find(r => r.teacher === siape && r.day === proposed_slot.day && r.time === proposed_slot.time);
-        if (conflict) {
-          return res.status(400).json({ error: `Choque de Horários: Você já possui aula de ${conflict.subject} na turma ${conflict.className} neste horário.` });
-        }
-      }
-      insertRequest();
-    });
-  } else {
-    insertRequest();
-  }
+  } catch(e) { res.status(500).json({error: e.message}); }
 });
 
-app.put('/api/requests/:id', verifyToken, (req, res) => {
-  const { status, admin_feedback } = req.body;
-  const reqId = req.params.id;
-
-  db.serialize(() => {
-    db.run(
-      "UPDATE change_requests SET status = ?, admin_feedback = ? WHERE id = ?",
-      [status, admin_feedback, reqId],
-      (err) => {
-        if (err) return res.status(500).json({ error: err.message });
-        
-        // ENVIA NOTIFICACAO AO PROFESSOR
-        db.get("SELECT * FROM change_requests WHERE id = ?", [reqId], (errReq, rowReq) => {
-          if (rowReq) {
-             let proposedDesc = "";
-             try {
-                let p = JSON.parse(rowReq.proposed_slot);
-                if (typeof p === 'string') p = JSON.parse(p);
-                if (p && p.day && p.time && p.className) {
-                   proposedDesc = `\nAula: ${p.subject || ''} - Turma: ${p.className} - Horário: ${p.day} às ${p.time}`;
-                }
-             } catch(e) {}
-             const now = new Date().toISOString();
-             const msg = status === 'aprovado' ? `Seu pedido de aula foi Aprovado pela gestão.${proposedDesc}` : 'Seu pedido de aula foi Rejeitado.';
-             db.run("INSERT INTO notifications (target, type, title, message, createdAt) VALUES (?, ?, ?, ?, ?)", [rowReq.siape, 'STATUS_UPDATE', 'Aviso sobre Solicitação', msg, now], () => {
-                 io.emit('schedule_updated'); // alerta widget
-             });
-          }
-          
-          if (status === 'aprovado' && rowReq) {
-            try {
-              let proposed = JSON.parse(rowReq.proposed_slot);
-              if (typeof proposed === 'string') proposed = JSON.parse(proposed);
-              
-              if (proposed && proposed.day && proposed.time && proposed.className && proposed.subject) {
-                // 1. UPDATE for OLD STRUCTURE (Legacy JSON Monolith - PortalView V1)
-                db.get("SELECT records FROM schedules WHERE id = ?", [rowReq.week_id], (errSched, rowSched) => {
-                  if (!errSched && rowSched && rowSched.records) {
-                    try {
-                      let foiAtualizado = false;
-                      const records = JSON.parse(rowSched.records);
-                      const updatedRecords = records.map(r => {
-                        if (r.className === proposed.className && String(r.day) === String(proposed.day) && String(r.time) === String(proposed.time)) {
-                           const isVaga = (!r.teacher || r.teacher === 'A Definir' || r.teacher === '-');
-                           if (isVaga) {
-                             foiAtualizado = true;
-                             return { ...r, teacher: rowReq.siape, subject: proposed.subject, isSubstituted: true, originRequest: reqId };
-                           }
-                        }
-                        return r;
-                      });
-                      if (foiAtualizado) {
-                        db.run("UPDATE schedules SET records = ?, updatedAt = ? WHERE id = ?", [JSON.stringify(updatedRecords), new Date().toISOString(), rowReq.week_id], () => {
-                           try { if (io) io.emit('schedule_updated'); } catch(e){}
-                        });
-                      }
-                    } catch(e) { }
-                  }
-                });
-
-                // 2. UPDATE for NEW STRUCTURE (Bulk Slots DB - MasterGrid V2)
-                db.all("SELECT id, dataType, payload as data FROM curriculum_data WHERE dataType IN ('class', 'discipline')", [], (errC, rowsC) => {
-                  if (errC || !rowsC) return;
-                  let targetClassId = null;
-                  let targetDiscId = null;
-                  for (let row of rowsC) {
-                      try { 
-                          const d = JSON.parse(row.data); 
-                          if (row.dataType === 'class' && d.name === proposed.className) { targetClassId = row.id; } 
-                          if (row.dataType === 'discipline' && d.name === proposed.subject) { targetDiscId = row.id; }
-                      } catch(e){}
-                  }
-
-                  let dayIndex = String(['Domingo', 'Segunda-feira', 'Terça-feira', 'Quarta-feira', 'Quinta-feira', 'Sexta-feira', 'Sábado'].indexOf(proposed.day));
-                  
-                  if (targetClassId) {
-                      db.all("SELECT * FROM schedules WHERE week_id = ? AND (dayOfWeek = ? OR dayOfWeek = ?) AND slotId = ? AND classId = ?", 
-                         [rowReq.week_id, proposed.day, dayIndex, proposed.time, targetClassId], 
-                         (errS, rowsS) => {
-                           if (!errS && rowsS && rowsS.length > 0) {
-                               rowsS.forEach(sRow => {
-                                   const oldSubj = proposed.originalSubject || proposed.subject;
-                                   const recFlag = JSON.stringify({ isSubstituted: true, originRequest: reqId, originalSubject: oldSubj });
-                                   const finalDiscId = targetDiscId || proposed.subject; // Fallback to raw string if ID not found, just in case
-                                   db.run("UPDATE schedules SET teacherId = ?, disciplineId = ?, records = ?, updatedAt = ? WHERE id = ?", 
-                                       [rowReq.siape, finalDiscId, recFlag, new Date().toISOString(), sRow.id], 
-                                       () => { try { if (io) io.emit('schedule_updated'); } catch(e){} });
-                               });
-                           }
-                         });
-                  }
-                });
-              }
-            } catch(e) { console.error("Erro na conversão do motor de aprovação:", e) }
-          }
-        });
-          
-        res.json({ success: true });
-      }
-    );
-  });
+app.put('/api/requests/:id/status', (req, res) => {
+  try {
+    const { status } = req.body;
+    db.run('UPDATE exchange_requests SET status = ? WHERE id = ?', [status, req.params.id], function(err) {
+      if (err) return res.status(500).json({ error: err.message });
+      res.json({ success: true });
+    });
+  } catch(e) { res.status(500).json({error: e.message}); }
 });
 
 const PORT = process.env.PORT || 3012;

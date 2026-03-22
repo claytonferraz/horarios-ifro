@@ -23,7 +23,6 @@ import { PublicHome } from './areas/PublicHome';
 import { AlunoView } from './areas/AlunoView';
 import { ProfessorView } from './areas/ProfessorView';
 import { GestaoHorarios } from './areas/GestaoHorarios';
-import { FloatingRequestsWidget } from './ui/admin/FloatingRequestsWidget';
 
 // Utility for fetching status data internally inside the generic view
 import { Calendar, Upload, Clock, BookOpen, Users, ChevronDown, FileText, AlertCircle, Trash2, UserCircle, BarChart3, Lock, Unlock, X, AlertTriangle, Settings, ShieldCheck, Power, Database, Edit3, Check, Download, Eye, Layers, Home, GraduationCap, UserCheck, Printer, ListTodo, KeyRound, CheckCircle, Link as LinkIcon, Loader2, Sun, Moon, Menu, UserPlus, ClipboardList, CalendarDays } from 'lucide-react';
@@ -252,8 +251,7 @@ export function HomeApp({ appMode }) {
         )}
       </main>
       
-      {/* WIDGET FLUTUANTE DE VERIFICAÇÃO DE SOLICITAÇÕES E NOTIFICAÇÕES GLOBAIS */}
-      {isUnlocked && <FloatingRequestsWidget isDarkMode={isDarkMode} userRole={userRole} appMode={appMode} />}
+      {/* WIDGET FLUTUANTE SUBSTITUIDO PARA O MASTERGRID */}
       
     </div>
   );

@@ -370,6 +370,9 @@ export const apiClient = {
   },
 
   // --- SOLICITAÇÕES DE MUDANÇA (PROMPT 2) ---
+  async getRequests() {
+    return this.fetchRequests();
+  },
   async fetchRequests(siape = null) {
     try {
       const url = siape ? `${API_URL}/requests?siape=${siape}` : `${API_URL}/requests`;

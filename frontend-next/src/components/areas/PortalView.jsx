@@ -44,6 +44,19 @@ export function PortalView({
   }, [schedules, selectedConfigYear, scheduleMode, selectedWeek]);
   const [editorModal, setEditorModal] = useState(null);
   const [pendingRequests, setPendingRequests] = useState([]);
+  
+  // New Requests Logic as requested
+  const [requests, setRequests] = useState([]);
+  const fetchRequests = () => {
+    if (appMode === 'professor') {
+      apiClient.getRequests().then(data => setRequests(data)).catch(console.error);
+    }
+  };
+
+  React.useEffect(() => { 
+    fetchRequests(); 
+  }, [appMode]);
+
   const [showVacantInMyClasses, setShowVacantInMyClasses] = useState(false);
   const [vacantRequestModal, setVacantRequestModal] = useState(null);
   const [alertModal, setAlertModal] = useState(null);
@@ -1160,8 +1173,13 @@ export function PortalView({
       {viewMode === 'solicitacoes' && appMode === 'professor' && (
         <div className="mt-4 w-full animate-in fade-in slide-in-from-bottom-4">
           <TeacherRequestsSection 
-            requests={typeof pendingRequests !== 'undefined' ? pendingRequests : []} 
-            onCancel={typeof handleCancelRequest === 'function' ? handleCancelRequest : () => {}} 
+            requests={requests} 
+            apiClient={apiClient}
+            onCancel={() => {
+              if (typeof handleCancelRequest === 'function') handleCancelRequest();
+              fetchRequests();
+              loadPendingRequests();
+            }} 
             isDarkMode={isDarkMode}
             siape={siape}
             selectedWeek={selectedWeek}
@@ -1235,6 +1253,12 @@ export function PortalView({
           globalTeachers={globalTeachersList}
           apiClient={apiClient}
           selectedWeek={selectedWeek}
+          onSubmit={(payload) => {
+            apiClient.submitRequest({ ...payload, requester_id: selectedTeacher }).then(() => {
+              alert('Solicitação enviada!');
+              fetchRequests();
+            }).catch(e => alert(e.message));
+          }}
         />
       )}
 
