@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { MessageSquare, X, ChevronDown, CheckCircle2, XCircle, Bell, Maximize2, Loader2, Send } from 'lucide-react';
+import { MessageSquare, X, ChevronDown, CheckCircle2, XCircle, Bell, Maximize2, Loader2, Send, CalendarDays, RefreshCcw } from 'lucide-react';
 import { apiClient } from '@/lib/apiClient';
 import { useData } from '@/contexts/DataContext';
 import { useAuth } from '@/contexts/AuthContext';
@@ -238,40 +238,46 @@ function ChatItem({ req, isDarkMode, loadingId, handleUpdate, globalTeachers }) 
   } catch(e) {}
 
   return (
-    <div className={`flex flex-col text-[11px] font-medium leading-relaxed max-w-[90%] ${req.status === 'rejeitado' || req.status === 'rejected' ? 'ml-auto items-end' : 'mr-auto items-start'}`}>
-      <span className="text-[9px] font-black uppercase tracking-widest opacity-50 mb-1 ml-2">{teacherName}</span>
+    <div className={`flex flex-col text-[11px] font-medium leading-relaxed max-w-[95%] w-full items-start mx-auto mb-2`}>
+      <span className="text-[9px] font-black uppercase tracking-widest opacity-50 mb-1 ml-2">Solicitação de Troca - {teacherName}</span>
       
-      <div className={`p-3 rounded-2xl shadow-sm border ${isPending ? (isDarkMode ? 'bg-slate-800 border-slate-700 rounded-tl-sm' : 'bg-white border-slate-200 rounded-tl-sm') : req.status === 'aprovado' || req.status === 'approved' ? (isDarkMode ? 'bg-emerald-900/20 border-emerald-800/50 rounded-tr-sm' : 'bg-emerald-50 border-emerald-200 rounded-tl-sm') : (isDarkMode ? 'bg-slate-800/40 border-slate-700 rounded-tr-sm opacity-60' : 'bg-slate-100 border-slate-200 rounded-tr-sm opacity-60')}`}>
-        <p className={isDarkMode ? 'text-slate-300' : 'text-slate-700'}>{desc}</p>
+      <div className={`w-full p-3 rounded-2xl shadow-sm border flex gap-3 ${isPending ? (isDarkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200') : req.status === 'aprovado' || req.status === 'approved' ? (isDarkMode ? 'bg-emerald-900/30 border-emerald-800/50' : 'bg-emerald-50 border-emerald-200') : (isDarkMode ? 'bg-rose-900/10 border-rose-800/30 opacity-70' : 'bg-slate-50 border-slate-200 opacity-70')}`}>
+        <div className={`p-2 rounded-full shrink-0 flex items-center justify-center self-start shadow-inner ${isDarkMode ? 'bg-indigo-900/50 border border-indigo-500/30' : 'bg-indigo-100/80 border border-indigo-200/50'}`}>
+           <RefreshCcw size={20} className={isDarkMode ? 'text-indigo-300' : 'text-indigo-600'} />
+        </div>
         
-        {req.admin_feedback && !isPending && (
-          <div className={`mt-2 p-2 rounded-lg text-xs italic ${isDarkMode ? 'bg-black/20 text-slate-400' : 'bg-black/5 text-slate-600'}`}>
-            &quot;{req.admin_feedback}&quot;
-          </div>
-        )}
+        <div className="flex-1 flex flex-col justify-center gap-2">
+           <p className={isDarkMode ? 'text-slate-200' : 'text-slate-800'}>{desc}</p>
+           
+           {req.admin_feedback && !isPending && (
+             <div className={`p-2 rounded-lg text-xs italic ${isDarkMode ? 'bg-black/20 text-slate-400' : 'bg-black/5 text-slate-600'}`}>
+               &quot;{req.admin_feedback}&quot;
+             </div>
+           )}
 
-        {isPending && (
-          <div className="mt-3 flex gap-2">
-            <button 
-              onClick={() => handleUpdate(req.id, 'aprovado', 'Aprovado via Chat')}
-              disabled={loadingId === req.id}
-              className="flex-1 py-1.5 px-3 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-[9px] font-black uppercase tracking-widest flex justify-center items-center gap-1 transition-all"
-            >
-              {loadingId === req.id ? <Loader2 size={12} className="animate-spin" /> : <CheckCircle2 size={12} />} Aprovar
-            </button>
-            <button 
-              onClick={() => handleUpdate(req.id, 'rejeitado', 'Inviável no momento')}
-              disabled={loadingId === req.id}
-              className="flex-1 py-1.5 px-3 bg-rose-600 hover:bg-rose-500 text-white rounded-lg text-[9px] font-black uppercase tracking-widest flex justify-center items-center gap-1 transition-all"
-            >
-              <XCircle size={12} /> Rejeitar
-            </button>
-          </div>
-        )}
+           {isPending && (
+             <div className="flex flex-col sm:flex-row gap-2 mt-1">
+               <button 
+                 onClick={() => handleUpdate(req.id, 'aprovado', 'Aprovado')}
+                 disabled={loadingId === req.id}
+                 className="flex-1 py-1.5 px-3 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-[9px] font-black uppercase tracking-widest flex justify-center items-center gap-1 transition-all"
+               >
+                 {loadingId === req.id ? <Loader2 size={12} className="animate-spin" /> : <CheckCircle2 size={12} />} Aprovar
+               </button>
+               <button 
+                 onClick={() => handleUpdate(req.id, 'rejeitado', 'Inviável no momento')}
+                 disabled={loadingId === req.id}
+                 className="flex-1 py-1.5 px-3 bg-rose-600 hover:bg-rose-500 text-white rounded-lg text-[9px] font-black uppercase tracking-widest flex justify-center items-center gap-1 transition-all"
+               >
+                 <XCircle size={12} /> Rejeitar
+               </button>
+             </div>
+           )}
+        </div>
       </div>
       
       <span className="text-[8px] font-black uppercase tracking-widest opacity-40 mt-1 ml-2">
-        {new Date(req.createdAt).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
+        {new Date(req.createdAt).toLocaleString([], {day: '2-digit', month: '2-digit', hour: '2-digit', minute:'2-digit'})}
       </span>
     </div>
   );
@@ -281,15 +287,17 @@ function AlertItem({ notif, isDarkMode }) {
   const isPrevia = notif.type === 'previa' || notif.type === 'NEW_PREVIA';
   
   return (
-    <div className={`flex flex-col text-[11px] font-medium leading-relaxed max-w-[90%] mx-auto w-full items-center`}>
-      <span className="text-[9px] font-black uppercase tracking-widest opacity-50 mb-1">{notif.title || 'ALERTA DO SISTEMA'}</span>
+    <div className={`flex flex-col text-[11px] font-medium leading-relaxed max-w-[95%] w-full items-start mx-auto mb-2`}>
+      <span className="text-[9px] font-black uppercase tracking-widest opacity-50 mb-1 ml-2">{notif.title || 'ALERTA DO SISTEMA'}</span>
       
-      <div className={`w-full p-3 rounded-2xl shadow-sm border text-center ${isPrevia ? (isDarkMode ? 'bg-indigo-900/30 border-indigo-800/50 text-indigo-200' : 'bg-indigo-50 border-indigo-200 text-indigo-900') : (isDarkMode ? 'bg-amber-900/30 border-amber-800/50 text-amber-200' : 'bg-amber-50 border-amber-200 text-amber-900')}`}>
-        <Bell size={16} className={`mx-auto mb-2 opacity-70 ${isPrevia ? 'animate-pulse' : 'animate-bounce'}`} />
-        <p className="font-bold">{notif.message}</p>
+      <div className={`w-full p-3 rounded-2xl shadow-sm border flex items-center gap-3 ${isPrevia ? (isDarkMode ? 'bg-indigo-900/40 border-indigo-800/50 text-indigo-100' : 'bg-indigo-50 border-indigo-200 text-indigo-900') : (isDarkMode ? 'bg-emerald-900/40 border-emerald-800/50 text-emerald-100' : 'bg-emerald-50 border-emerald-200 text-emerald-900')}`}>
+         <div className={`p-2 rounded-full shrink-0 flex items-center justify-center shadow-lg ${isPrevia ? (isDarkMode ? 'bg-indigo-800 border border-indigo-500/50 text-indigo-100' : 'bg-indigo-500 text-white border border-indigo-600') : (isDarkMode ? 'bg-emerald-800 border border-emerald-500/50 text-emerald-100' : 'bg-emerald-600 text-white border border-emerald-700')}`}>
+           {isPrevia ? <CalendarDays size={20} className="animate-pulse" /> : <RefreshCcw size={20} />}
+         </div>
+         <p className="font-bold flex-1 text-left">{notif.message}</p>
       </div>
       
-      <span className="text-[8px] font-black uppercase tracking-widest opacity-40 mt-1">
+      <span className="text-[8px] font-black uppercase tracking-widest opacity-40 mt-1 ml-2">
         {new Date(notif.createdAt).toLocaleString([], {day: '2-digit', month: '2-digit', hour: '2-digit', minute:'2-digit'})}
       </span>
     </div>

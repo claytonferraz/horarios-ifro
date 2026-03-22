@@ -539,8 +539,9 @@ app.post('/api/schedules/bulk-course', verifyToken, (req, res) => {
 
           // Notificações
           involvedTeachers.forEach(t => {
+            const targetWeekDesc = req.body.weekLabel || `da Semana ${weekId || ''}`;
             let title = type === 'previa' ? "Nova Prévia Publicada" : "Horário Alterado";
-            let msg = type === 'previa' ? `A prévia da Semana ${weekId || ''} foi publicada e está disponível.` : `Sua aula na Semana ${weekId || ''} sofreu uma alteração.`;
+            let msg = type === 'previa' ? `A prévia das aulas ${targetWeekDesc} já está publicada.` : `Sua aula nas datas ${targetWeekDesc} sofreu uma alteração.`;
             db.run("INSERT INTO notifications (target, type, title, message, createdAt) VALUES (?, ?, ?, ?, ?)", [t, type, title, msg, now]);
           });
 
@@ -704,8 +705,9 @@ app.post('/api/schedules', verifyToken, (req, res) => {
           
           // Grava Notificações
           involvedTeachers.forEach(t => {
+            const targetWeekDesc = req.body.weekLabel || `da Semana ${week}`;
             let title = type === 'previa' ? "Nova Prévia Publicada" : "Horário Alterado";
-            let msg = type === 'previa' ? `A prévia da Semana ${week} foi publicada e está disponível.` : `Sua aula na Semana ${week} sofreu uma alteração de professor/sala.`;
+            let msg = type === 'previa' ? `A prévia das aulas ${targetWeekDesc} já está publicada.` : `Sua aula nas datas ${targetWeekDesc} sofreu uma alteração de professor/sala.`;
             db.run("INSERT INTO notifications (target, type, title, message, createdAt) VALUES (?, ?, ?, ?, ?)", [t, type, title, msg, now]);
           });
 

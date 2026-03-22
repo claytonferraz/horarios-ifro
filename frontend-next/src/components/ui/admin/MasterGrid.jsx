@@ -646,6 +646,19 @@ export function MasterGrid({ isDarkMode, ...props }) {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [grade, schedules, horariosExibidos]);
 
+  const weeksWithData = useMemo(() => {
+     if (!schedules || !Array.isArray(schedules) || selectedCourses.length === 0) return new Set();
+     const s = new Set();
+     schedules.forEach(sch => {
+        if (sch.type === selectedType && String(sch.academic_year) === String(selectedConfigYear)) {
+           if (selectedCourses.includes(String(sch.courseId))) {
+               if (sch.week_id) s.add(String(sch.week_id));
+           }
+        }
+     });
+     return s;
+  }, [schedules, selectedType, selectedConfigYear, selectedCourses]);
+
   const activeRequestsForWeek = useMemo(() => {
      if (selectedType === 'padrao' || !selectedWeek || changeRequests.length === 0) return [];
      return changeRequests.filter(req => String(req.week_id) === String(selectedWeek));
@@ -775,7 +788,14 @@ export function MasterGrid({ isDarkMode, ...props }) {
           {selectedType !== 'padrao' && (
             <select value={selectedWeek} onChange={(e) => setSelectedWeek(e.target.value)} className={`px-4 py-2.5 rounded-lg border shadow-sm outline-none cursor-pointer text-xs font-bold uppercase tracking-wider text-amber-600 dark:text-amber-400 ${isDarkMode ? 'bg-slate-800 border-slate-600' : 'bg-white border-slate-200'}`}>
               <option value="">-- Semana --</option>
-              {academicWeeks?.filter(w => String(w.academic_year) === String(selectedConfigYear)).map(w => <option key={w.id} value={w.id}>{formatWeekLabel ? formatWeekLabel(w) : w.name}</option>)}
+              {academicWeeks?.filter(w => String(w.academic_year) === String(selectedConfigYear)).map(w => {
+                 const hasData = weeksWithData.has(String(w.id));
+                 return (
+                    <option key={w.id} value={w.id} className={hasData ? (isDarkMode ? 'bg-emerald-900/60 text-emerald-400 font-black' : 'bg-emerald-100 text-emerald-700 font-black') : (isDarkMode ? 'text-slate-400' : 'text-slate-500')}>
+                       {hasData ? '✔ ' : '⏳ '}{formatWeekLabel ? formatWeekLabel(w) : w.name} {hasData ? '(Preenchida)' : ''}
+                    </option>
+                 )
+              })}
             </select>
           )}
 
@@ -1301,11 +1321,21 @@ function SaveMatrixModal({ isDarkMode, grade, selectedCourses, saveOptions, setS
          return { courseId: aula.courseId, classId, dayOfWeek, slotId, teacherId: aula.teacherIds ? aula.teacherIds.join(',') : 'A Definir', disciplineId: aula.disciplineId || aula.id, room: aula.sala };
       });
 
+      let weekText = saveOptions.weekId;
+      if (saveOptions.weekId) {
+          const wObj = academicWeeks?.find(w => String(w.id) === String(saveOptions.weekId));
+          if (wObj && wObj.start_date && wObj.end_date) {
+              const d1 = wObj.start_date.split('-');
+              const d2 = wObj.end_date.split('-');
+              if (d1.length === 3 && d2.length === 3) weekText = `de ${d1[2]}/${d1[1]} a ${d2[2]}/${d2[1]}`;
+          }
+      }
+
       setIsSaving(true);
       try {
           const resp = await fetch('/api/schedules/bulk-course', {
             method: 'POST', headers: getHeaders(),
-            body: JSON.stringify({ courseIds: selectedCourses, type: saveOptions.type, weekId: saveOptions.weekId || null, academicYear: selectedConfigYear, schedules: payload })
+            body: JSON.stringify({ courseIds: selectedCourses, type: saveOptions.type, weekId: saveOptions.weekId || null, weekLabel: weekText, academicYear: selectedConfigYear, schedules: payload })
           });
           if(!resp.ok) {
               const errData = await resp.json().catch(() => ({}));
