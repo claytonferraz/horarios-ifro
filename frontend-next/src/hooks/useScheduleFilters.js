@@ -65,9 +65,9 @@ export function useScheduleFilters({
     return daysToUse.filter(day => recordsForWeek.some(r => r.course === selectedCourse && r.day === day));
   }, [viewMode, selectedCourse, recordsForWeek, activeDays]);
 
-  // Maintain valid class selection automatically
+  // Maintain valid class selection automatically (but allow empty classes to remain selected)
   useEffect(() => {
-    if (classesList.length > 0 && (!selectedClass || !classesList.includes(selectedClass))) {
+    if (classesList.length > 0 && !selectedClass) {
       setSelectedClass(classesList[0]);
     }
   }, [classesList, selectedClass, setSelectedClass]);

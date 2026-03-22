@@ -131,7 +131,9 @@ export function useScheduleDataTransform({
     if (viewMode === 'total') return data.filter(r => r.type === 'oficial');
     if (scheduleMode === 'previa') return data.filter(r => r.type === 'previa');
     if (scheduleMode === 'padrao') return data.filter(r => r.type === 'padrao');
-    return data.filter(r => r.type === scheduleMode);
+
+    const dbType = (scheduleMode === 'consolidado' || scheduleMode === 'atual') ? 'oficial' : scheduleMode;
+    return data.filter(r => r.type === dbType);
   }, [activeData, viewMode, scheduleMode]);
 
   return {

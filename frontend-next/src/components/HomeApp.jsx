@@ -1,9 +1,9 @@
-
 "use client";
 /* eslint-disable react-hooks/refs */
 import { useData } from "@/contexts/DataContext";
 import { useTheme } from "@/contexts/ThemeContext";
 import { useAuth } from "@/contexts/AuthContext";
+import { FloatingRequestsWidget } from './ui/admin/FloatingRequestsWidget';
 import { MultiSelect } from "./ui/MultiSelect";
 import { SearchableSelect } from "./ui/SearchableSelect";
 import { InlineInput } from "./ui/InlineInput";
@@ -251,7 +251,8 @@ export function HomeApp({ appMode }) {
         )}
       </main>
       
-      {/* WIDGET FLUTUANTE SUBSTITUIDO PARA O MASTERGRID */}
+      {/* WIDGET FLUTUANTE DE VERIFICAÇÃO DE SOLICITAÇÕES E NOTIFICAÇÕES GLOBAIS */}
+      {isUnlocked && <FloatingRequestsWidget isDarkMode={isDarkMode} userRole={userRole} appMode={appMode} />}
       
     </div>
   );

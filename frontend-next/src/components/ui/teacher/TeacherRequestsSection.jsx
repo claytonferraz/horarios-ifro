@@ -2,9 +2,10 @@ import React, { useState } from 'react';
 import { MessageSquare, Send, AlertCircle, CheckCircle2, Clock, XCircle, Printer } from 'lucide-react';
 import { apiClient } from '@/lib/apiClient';
 
-export function TeacherRequestsSection({ isDarkMode, siape, selectedWeek, weekData, activeDays, classTimes, onCancel }) {
+export function TeacherRequestsSection({ isDarkMode, siape, selectedWeek, weekData, activeDays, classTimes, onCancel, isFloating }) {
   const [requests, setRequests] = useState([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isFloatingOpen, setIsFloatingOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [newRequest, setNewRequest] = useState({ description: '', original_slot: '', proposed_day: '', proposed_time: '', proposed_type: 'Regular' });
 
@@ -42,8 +43,33 @@ export function TeacherRequestsSection({ isDarkMode, siape, selectedWeek, weekDa
     }
   };
 
+  if (isFloating && !isFloatingOpen) {
+    return (
+      <button onClick={() => setIsFloatingOpen(true)} className="fixed bottom-6 left-6 p-4 rounded-full bg-indigo-600 hover:bg-indigo-500 text-white shadow-[0_10px_25px_-5px_rgba(79,70,229,0.5)] font-bold text-xs z-50 transition-all flex items-center gap-2 print:hidden group">
+        <MessageSquare size={18} className="group-hover:scale-110 transition-transform" />
+        <span className="hidden sm:inline">Solicitações Coord.</span>
+        {requests.length > 0 && <span className="bg-rose-500 text-white font-black text-[10px] px-2 py-0.5 rounded-full shadow-inner shadow-rose-900/50">{requests.length}</span>}
+      </button>
+    );
+  }
+
+  const containerClass = isFloating 
+    ? `fixed bottom-6 left-6 w-[500px] max-w-[90vw] p-5 rounded-[2rem] shadow-2xl z-[9000] flex flex-col max-h-[85vh] animate-in slide-in-from-bottom-5 print:relative print:w-auto print:max-w-none print:shadow-none print:bottom-auto print:left-auto print:p-0 print:border-none print:bg-transparent overflow-hidden ${isDarkMode ? 'bg-slate-900 border border-slate-700/50' : 'bg-white border border-slate-200'}`
+    : `mt-8 mb-12 animate-in slide-in-from-bottom-4 print:mt-0 print:mb-0 print:block`;
+
   return (
-    <div className="mt-8 mb-12 animate-in slide-in-from-bottom-4 print:mt-0 print:mb-0 print:block">
+    <div className={containerClass}>
+      {isFloating && (
+         <div className="flex justify-between items-center mb-4 border-b pb-3 print:hidden border-slate-200 dark:border-slate-800 shrink-0">
+            <h2 className={`font-black uppercase tracking-widest text-sm flex items-center gap-2 ${isDarkMode ? 'text-indigo-400' : 'text-indigo-600'}`}>
+              <MessageSquare size={16} /> Solicitações Coordenação
+            </h2>
+            <button onClick={() => setIsFloatingOpen(false)} className="text-slate-400 hover:bg-rose-500 hover:text-white rounded-full p-1 transition-colors">
+              <XCircle size={20} />
+            </button>
+         </div>
+      )}
+      
       {/* Header específico para impressão (só aparece em modo print) */}
       <div className="hidden print:block mb-8 border-b-2 border-slate-800 pb-4">
          <h1 className="text-2xl font-black uppercase tracking-widest text-slate-900">Relatório de Solicitações</h1>
@@ -51,8 +77,9 @@ export function TeacherRequestsSection({ isDarkMode, siape, selectedWeek, weekDa
          <p className="text-xs font-medium text-slate-400 mt-1">Gerado em: {new Date().toLocaleDateString('pt-BR')} às {new Date().toLocaleTimeString('pt-BR')}</p>
       </div>
 
-      <div className={`rounded-2xl shadow-lg border overflow-hidden transition-all print:shadow-none print:border-none print:bg-transparent ${isDarkMode ? 'bg-slate-900 border-slate-700' : 'bg-white border-slate-200'}`}>
-        <div className={`px-6 py-4 flex flex-col sm:flex-row items-center justify-between border-b print:hidden gap-4 ${isDarkMode ? 'border-slate-800 bg-slate-800/50' : 'border-slate-100 bg-slate-50'}`}>
+      <div className={`rounded-xl shadow-lg border overflow-y-auto flex-1 custom-scrollbar transition-all print:overflow-visible print:shadow-none print:border-none print:bg-transparent ${!isFloating && 'rounded-3xl'} ${isDarkMode ? 'bg-slate-900 border-slate-700' : 'bg-white border-slate-200'} ${isFloating ? 'border-none shadow-none' : ''}`}>
+        {!isFloating && (
+          <div className={`px-6 py-4 flex flex-col sm:flex-row items-center justify-between border-b print:hidden gap-4 ${isDarkMode ? 'border-slate-800 bg-slate-800/50' : 'border-slate-100 bg-slate-50'}`}>
           <div className="flex items-center gap-3">
             <div className={`p-2 rounded-lg ${isDarkMode ? 'bg-indigo-900/50 text-indigo-400' : 'bg-indigo-50 text-indigo-600'}`}>
               <MessageSquare size={20} />
@@ -61,7 +88,7 @@ export function TeacherRequestsSection({ isDarkMode, siape, selectedWeek, weekDa
               <h3 className={`text-sm font-black uppercase tracking-widest ${isDarkMode ? 'text-white' : 'text-slate-900'}`}>Minhas Solicitações de Mudança</h3>
               <p className={`text-[10px] font-bold opacity-60 uppercase tracking-widest ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>Coordenação DAPE</p>
             </div>
-          </div>
+            </div>
           <div className="flex items-center gap-3 w-full sm:w-auto">
             <button 
               onClick={() => window.print()}
@@ -77,6 +104,7 @@ export function TeacherRequestsSection({ isDarkMode, siape, selectedWeek, weekDa
             </button>
           </div>
         </div>
+        )}
 
         <div className="p-4">
           {requests.length === 0 ? (

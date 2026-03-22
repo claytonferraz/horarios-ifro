@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
 import { 
-  ChevronDown, Clock, Printer, CheckCircle, Eye, BookOpen, FileText, Users,
+  ChevronDown, Clock, Printer, CheckCircle, Check, Eye, BookOpen, FileText, Users,
   MessageSquare, Send, CheckCircle2, XCircle, AlertCircle, GripVertical,
-  Calendar, UserCircle, Layers, AlertTriangle, BarChart3, ListTodo, CalendarDays, Settings, Bell
+  Calendar, UserCircle, Layers, AlertTriangle, BarChart3, ListTodo, CalendarDays, Settings, Bell, Sun
 } from 'lucide-react';
 import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd';
 import { SearchableSelect } from '../ui/SearchableSelect';
@@ -34,15 +34,17 @@ export function PortalView({
   const horariosFiltrados = React.useMemo(() => {
     if (!schedules || !Array.isArray(schedules)) return [];
     
+    const dbType = (scheduleMode === 'consolidado' || scheduleMode === 'atual') ? 'oficial' : scheduleMode;
+
     return schedules.filter(schedule => {
       if (String(schedule.academic_year) !== String(selectedConfigYear)) return false;
-      if (schedule.type !== scheduleMode) return false;
+      if (schedule.type !== dbType) return false;
       if (scheduleMode !== 'padrao' && String(schedule.week_id) !== String(selectedWeek)) return false;
-      // Pre-filtering removed: PortalView internal loops will filter locally using actual resolved text strings
       return true;
     });
   }, [schedules, selectedConfigYear, scheduleMode, selectedWeek]);
   const [editorModal, setEditorModal] = useState(null);
+  const [showOnlyMyClasses, setShowOnlyMyClasses] = useState(true);
   const [pendingRequests, setPendingRequests] = useState([]);
   
   // New Requests Logic as requested
@@ -52,6 +54,14 @@ export function PortalView({
       apiClient.getRequests().then(data => setRequests(data)).catch(console.error);
     }
   };
+
+  const previousViewMode = React.useRef(viewMode);
+  React.useEffect(() => {
+    if (appMode === 'professor' && viewMode === 'curso' && previousViewMode.current !== 'curso') {
+       if (typeof setScheduleMode === 'function') setScheduleMode('consolidado');
+    }
+    previousViewMode.current = viewMode;
+  }, [viewMode, appMode, setScheduleMode]);
 
   React.useEffect(() => { 
     fetchRequests(); 
@@ -356,42 +366,81 @@ export function PortalView({
      return [...new Set(dbClasses.map(c => c.name))].filter(Boolean).sort((a,b) => a.localeCompare(b));
    }, [dbClasses]);
 
-   const filteredClassesList = React.useMemo(() => {
-     if (!selectedCourse || selectedCourse === 'Todos' || selectedCourse === '') {
-       return dynamicClassesList;
-     }
-     
-     // Find the selected course IDs (because multiple matrices can have the same course link):
-     const courseObjs = dbCourses.filter(c => c.course === selectedCourse);
-     if (courseObjs.length === 0) return dynamicClassesList;
+    const filteredClassesList = React.useMemo(() => {
+      let lists = dynamicClassesList;
+      if (selectedCourse && selectedCourse !== 'Todos' && selectedCourse !== '') {
+        const courseObjs = dbCourses.filter(c => c.course === selectedCourse);
+        if (courseObjs.length > 0) {
+          const validMatrixIds = courseObjs.map(c => String(c.id));
+          lists = dbClasses
+            .filter(c => validMatrixIds.includes(String(c.matrixId)))
+            .map(c => c.name)
+            .filter(Boolean)
+            .sort((a,b) => a.localeCompare(b));
+        }
+      }
+      
+      if (appMode === 'professor' && showOnlyMyClasses && siape) {
+        const mySchedules = schedules.filter(s => s.teacherId && String(s.teacherId).includes(String(siape)));
+        const myClassNames = new Set(mySchedules.map(s => {
+           const classObj = dbClasses.find(c => String(c.id) === String(s.classId));
+           return classObj ? classObj.name : s.className;
+        }));
+        lists = lists.filter(name => myClassNames.has(name));
+      }
 
-     const validMatrixIds = courseObjs.map(c => String(c.id));
-
-     // Filter classes by this course ID correctly linking relational ID
-     const classesForCourse = dbClasses
-       .filter(c => validMatrixIds.includes(String(c.matrixId)))
-       .map(c => c.name)
-       .filter(Boolean)
-       .sort((a,b) => a.localeCompare(b));
-
-     return classesForCourse.length > 0 ? classesForCourse : dynamicClassesList;
-   }, [selectedCourse, dbClasses, dbCourses, dynamicClassesList]);
+      return lists.length > 0 ? lists : dynamicClassesList;
+    }, [selectedCourse, dbClasses, dbCourses, dynamicClassesList, appMode, showOnlyMyClasses, schedules, siape]);
 
    const dynamicWeeksList = React.useMemo(() => {
      if (!schedules || !Array.isArray(schedules) || !academicWeeks) return [];
-     const modeSchedules = schedules.filter(s => s.type === scheduleMode && String(s.academic_year) === String(selectedConfigYear));
      
-     let uniqueWeekIds = [...new Set(modeSchedules.map(s => String(s.week_id)))].filter(Boolean);
+     const now = new Date();
+     now.setHours(0,0,0,0);
+     const sortedWeeks = [...academicWeeks].sort((a,b) => new Date(a.start_date) - new Date(b.start_date));
+
+     let modeSchedules = [];
+     if (scheduleMode === 'consolidado' || scheduleMode === 'atual') {
+        modeSchedules = schedules.filter(s => s.type === 'oficial' && String(s.academic_year) === String(selectedConfigYear));
+     } else if (scheduleMode === 'previa') {
+        modeSchedules = schedules.filter(s => s.type === 'previa' && String(s.academic_year) === String(selectedConfigYear));
+     } else if (scheduleMode === 'padrao') {
+        modeSchedules = []; // no explicit DB filter for padrao weeks, padrao uses generic template
+     } else {
+        modeSchedules = schedules.filter(s => s.type === scheduleMode && String(s.academic_year) === String(selectedConfigYear));
+     }
+
+     let uniqueWeekIds = [];
+     if (scheduleMode === 'padrao') {
+        uniqueWeekIds = [...new Set(academicWeeks.map(w => String(w.id)))];
+     } else {
+        uniqueWeekIds = [...new Set(modeSchedules.map(s => String(s.week_id)))].filter(Boolean);
+     }
+
+     uniqueWeekIds = uniqueWeekIds.filter(id => {
+        const w = academicWeeks.find(week => String(week.id) === String(id));
+        if (!w) return false;
+        const s = new Date(w.start_date + 'T00:00:00');
+        const e = new Date(w.end_date + 'T23:59:59');
+        
+        const isPast = e < now;
+        const isCurrent = now >= s && now <= e;
+        const isFuture = s > now;
+        
+        if (scheduleMode === 'consolidado') return isPast;
+        if (scheduleMode === 'atual') return isCurrent;
+        if (scheduleMode === 'previa') return isFuture;
+        if (scheduleMode === 'padrao') return isFuture || isCurrent;
+        return true;
+     });
 
      // Regra Aluno Prévia Estrita: Apenas exibir prévia na exata Próxima Semana letiva
      if (appMode === 'aluno' && scheduleMode === 'previa') {
-         const now = new Date();
          const refDate = new Date(now);
          if (now.getDay() === 6) refDate.setDate(refDate.getDate() + 2);
          else if (now.getDay() === 0) refDate.setDate(refDate.getDate() + 1);
          refDate.setHours(0,0,0,0);
          
-         const sortedWeeks = [...academicWeeks].sort((a,b) => new Date(a.start_date) - new Date(b.start_date));
          const currWeekIndex = sortedWeeks.findIndex(w => {
              const s = new Date(w.start_date + 'T00:00:00'); 
              const e = new Date(w.end_date + 'T23:59:59');
@@ -431,7 +480,11 @@ export function PortalView({
            value: id,
            label: labelStr
         };
-     }).sort((a,b) => b.label.localeCompare(a.label));
+     }).sort((a,b) => {
+        // Mode consolidado defaults descending logic implicitly by mapping? Let's just do it cleanly:
+        if (scheduleMode === 'consolidado') return b.label.localeCompare(a.label);
+        return a.label.localeCompare(b.label);
+     });
    }, [schedules, scheduleMode, selectedConfigYear, academicWeeks, appMode]);
 
    React.useEffect(() => {
@@ -444,12 +497,10 @@ export function PortalView({
    }, [dynamicWeeksList, selectedWeek, setSelectedWeek]);
 
    React.useEffect(() => {
-     if (selectedCourse && selectedCourse !== 'Todos' && selectedClass) {
-        if (!filteredClassesList.includes(selectedClass) && typeof setSelectedClass === 'function') {
-           setSelectedClass('');
-        }
+     if (!selectedClass && filteredClassesList.length > 0 && typeof setSelectedClass === 'function') {
+         setSelectedClass(filteredClassesList[0]);
      }
-   }, [selectedCourse, filteredClassesList, selectedClass, setSelectedClass]);
+   }, [filteredClassesList, selectedClass, setSelectedClass]);
 
    const handleAlunoScheduleTab = React.useCallback((mode) => {
        setScheduleMode(mode);
@@ -612,7 +663,19 @@ export function PortalView({
                       <div className="space-y-1 lg:col-span-2"><label className="text-[9px] font-black tracking-[0.2em] text-slate-400 uppercase ml-1">Filtrar por Curso</label>
                         <SearchableSelect isDarkMode={isDarkMode} options={dynamicCoursesList} value={selectedCourse} onChange={setSelectedCourse} colorClass={isDarkMode ? 'bg-slate-800 border-slate-700 text-slate-200 shadow-sm' : 'bg-white border-slate-200 text-slate-700 shadow-sm'} />
                       </div>
-                      <div className="space-y-1 lg:col-span-2"><label className="text-[9px] font-black tracking-[0.2em] text-slate-400 uppercase ml-1">Visualizar Turma</label>
+                      <div className="space-y-1 lg:col-span-2">
+                        <div className="flex items-center justify-between">
+                           <label className="text-[9px] font-black tracking-[0.2em] text-slate-400 uppercase ml-1">Visualizar Turma</label>
+                           {appMode === 'professor' && (
+                              <label className="flex items-center gap-1.5 cursor-pointer hover:bg-black/5 dark:hover:bg-white/5 px-2 py-0.5 rounded transition-colors group">
+                                <input type="checkbox" checked={showOnlyMyClasses} onChange={e => setShowOnlyMyClasses(e.target.checked)} className="peer sr-only" />
+                                <div className={`w-3 h-3 rounded-sm border flex items-center justify-center transition-colors ${showOnlyMyClasses ? 'bg-indigo-500 border-indigo-500' : 'bg-transparent border-slate-300 dark:border-slate-600 group-hover:border-indigo-400'} ${isDarkMode ? 'peer-focus:ring-indigo-800' : 'peer-focus:ring-indigo-200'}`}>
+                                  {showOnlyMyClasses && <Check size={8} className="text-white" />}
+                                </div>
+                                <span className={`text-[8px] font-black tracking-widest uppercase transition-colors ${showOnlyMyClasses ? 'text-indigo-600 dark:text-indigo-400' : 'text-slate-400 group-hover:text-slate-600 dark:group-hover:text-slate-300'}`}>Apenas Minhas Turmas</span>
+                              </label>
+                           )}
+                        </div>
                         <SearchableSelect isDarkMode={isDarkMode} options={filteredClassesList} value={selectedClass} onChange={setSelectedClass} colorClass={scheduleMode === 'previa' ? (isDarkMode ? "bg-violet-900/30 border-violet-800/50 text-violet-200 shadow-sm" : "bg-violet-50 border-violet-100 text-violet-900 shadow-sm") : viewMode === 'hoje' ? (isDarkMode ? "bg-blue-900/30 border-blue-800/50 text-blue-200 shadow-sm" : "bg-blue-50 border-blue-100 text-blue-900 shadow-sm") : (isDarkMode ? "bg-emerald-900/30 border-emerald-800/50 text-emerald-200 shadow-sm" : "bg-emerald-50 border-emerald-100 text-emerald-900 shadow-sm")} />
                       </div>
                     </>
@@ -726,11 +789,23 @@ export function PortalView({
                     </>
                   ) : (
                     <>
-                      <button onClick={() => setScheduleMode('oficial')} className={`flex-1 md:flex-none flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all ${scheduleMode === 'oficial' ? 'bg-emerald-500 text-white shadow-md' : (isDarkMode ? 'text-slate-400 hover:bg-slate-800 hover:text-white' : 'text-slate-500 hover:bg-slate-100 hover:text-slate-800')}`}>
-                        <Calendar size={14} /> Horário Consolidado
-                      </button>
+                      {appMode === 'professor' || appMode === 'gestao' || appMode === 'admin' ? (
+                        <>
+                          <button onClick={() => setScheduleMode('consolidado')} className={`flex-1 md:flex-none flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all ${scheduleMode === 'consolidado' ? 'bg-emerald-500 text-white shadow-md' : (isDarkMode ? 'text-slate-400 hover:bg-slate-800 hover:text-white' : 'text-slate-500 hover:bg-slate-100 hover:text-slate-800')}`}>
+                            <Calendar size={14} /> Consolidado
+                          </button>
+                          <button onClick={() => setScheduleMode('atual')} className={`flex-1 md:flex-none flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all ${scheduleMode === 'atual' ? 'bg-teal-500 text-white shadow-md' : (isDarkMode ? 'text-slate-400 hover:bg-slate-800 hover:text-white' : 'text-slate-500 hover:bg-slate-100 hover:text-slate-800')}`}>
+                            <Sun size={14} /> Semana Atual
+                          </button>
+                        </>
+                      ) : (
+                        <button onClick={() => setScheduleMode('consolidado')} className={`flex-1 md:flex-none flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all ${scheduleMode === 'consolidado' || scheduleMode === 'oficial' ? 'bg-emerald-500 text-white shadow-md' : (isDarkMode ? 'text-slate-400 hover:bg-slate-800 hover:text-white' : 'text-slate-500 hover:bg-slate-100 hover:text-slate-800')}`}>
+                          <Calendar size={14} /> Horário Oficial
+                        </button>
+                      )}
+                      
                       <button onClick={() => setScheduleMode('previa')} className={`flex-1 md:flex-none flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all ${scheduleMode === 'previa' ? 'bg-violet-500 text-white shadow-md' : (isDarkMode ? 'text-slate-400 hover:bg-slate-800 hover:text-white' : 'text-slate-500 hover:bg-slate-100 hover:text-slate-800')}`}>
-                        <Eye size={14} /> Prévia
+                        <Eye size={14} /> Prévia (Futuro)
                       </button>
                       <button onClick={() => setScheduleMode('padrao')} className={`flex-1 md:flex-none flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all ${scheduleMode === 'padrao' ? 'bg-blue-500 text-white shadow-md' : (isDarkMode ? 'text-slate-400 hover:bg-slate-800 hover:text-white' : 'text-slate-500 hover:bg-slate-100 hover:text-slate-800')}`}>
                         <BookOpen size={14} /> Padrão Anual
@@ -739,10 +814,10 @@ export function PortalView({
                   )}
                 </div>
 
-                {scheduleMode !== 'padrao' && (appMode !== 'aluno' || viewMode === 'historico') && dynamicWeeksList.length > 0 && (
+                {(scheduleMode === 'padrao' || appMode !== 'aluno' || viewMode === 'historico') && dynamicWeeksList.length > 0 && (
                     <div className={`p-1 flex items-center gap-2 rounded-lg border cursor-pointer hover:bg-black/5 dark:hover:bg-white/5 transition-colors ${isDarkMode ? 'bg-slate-800/80 border-slate-700' : 'bg-slate-50 border-slate-100'}`}>
                     <CalendarDays size={18} className={`shrink-0 ml-2 opacity-50 ${isDarkMode ? 'text-white' : 'text-slate-700'}`} />
-                    <SearchableSelect isDarkMode={isDarkMode} options={dynamicWeeksList} value={selectedWeek} onChange={setSelectedWeek} colorClass={`bg-transparent border-none font-black uppercase tracking-tighter text-[11px] ${isDarkMode ? 'text-white' : 'text-slate-900'}`} placeholder="Selecione..." />
+                    <SearchableSelect isDarkMode={isDarkMode} options={dynamicWeeksList} value={selectedWeek} onChange={setSelectedWeek} colorClass={`bg-transparent border-none font-black uppercase tracking-tighter text-[11px] ${isDarkMode ? 'text-white' : 'text-slate-900'}`} placeholder={scheduleMode === 'padrao' ? "A qual semana aplicar?" : "Selecione..."} />
                   </div>
                   )}
               </div>
@@ -752,7 +827,7 @@ export function PortalView({
             <div id="printable-area">
               
               {/* TRATAMENTO DE ESTADO VAZIO */}
-              {viewMode !== 'total' && scheduleMode !== 'padrao' && (dynamicWeeksList.length === 0 || horariosFiltrados.length === 0) ? (
+              {viewMode !== 'total' && (dynamicWeeksList.length === 0 || (scheduleMode !== 'padrao' && horariosFiltrados.length === 0)) ? (
                 <div className={`rounded-2xl border p-12 text-center shadow-sm no-print ${isDarkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'}`}>
                   {scheduleMode === 'previa' ? <Eye size={36} className={`mx-auto mb-3 ${isDarkMode ? 'text-slate-600' : 'text-slate-300'}`} /> : <Calendar size={36} className={`mx-auto mb-3 ${isDarkMode ? 'text-slate-600' : 'text-slate-300'}`} />}
                   <h3 className={`text-lg font-black uppercase tracking-widest ${isDarkMode ? 'text-slate-200' : 'text-slate-700'}`}>
@@ -1116,6 +1191,8 @@ export function PortalView({
                       getFormattedDayLabel={getFormattedDayLabel}
                       onDragEnd={onDragEnd}
                       setEditorModal={setEditorModal}
+                      setExchangeTarget={setExchangeTarget}
+                      siape={siape}
                     />
                   )}
 
@@ -1169,9 +1246,9 @@ export function PortalView({
          />
       )}
 
-      {/* SISTEMA DE SOLICITAÇÕES PARA O PROFESSOR */}
-      {viewMode === 'solicitacoes' && appMode === 'professor' && (
-        <div className="mt-4 w-full animate-in fade-in slide-in-from-bottom-4">
+      {/* SISTEMA DE SOLICITAÇÕES PARA O PROFESSOR (Visível flutuante nos painéis, ou fullscreen se na aba própria) */}
+      {appMode === 'professor' && (
+        <div className={viewMode === 'solicitacoes' ? "mt-4 w-full animate-in fade-in slide-in-from-bottom-4" : ""}>
           <TeacherRequestsSection 
             requests={requests} 
             apiClient={apiClient}
@@ -1186,6 +1263,7 @@ export function PortalView({
             activeDays={activeDays}
             classTimes={classTimes}
             weekData={recordsForWeek ? recordsForWeek.filter(r => String(r.teacherId).includes(String(siape))) : []}
+            isFloating={viewMode !== 'solicitacoes'}
           />
         </div>
       )}

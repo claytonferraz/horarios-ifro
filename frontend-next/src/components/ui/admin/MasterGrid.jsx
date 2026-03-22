@@ -3,7 +3,7 @@ import { CalendarDays, GripVertical, AlertCircle, Save, Filter, MapPin, Loader2,
 import { useData } from '@/contexts/DataContext';
 import { MAP_DAYS, getColorHash, resolveTeacherName } from '@/lib/dates';
 import { apiClient, getHeaders } from '@/lib/apiClient';
-import FloatingRequestsWidget from './FloatingRequestsWidget';
+import DapeRequestsWidget from './DapeRequestsWidget';
 
 const getCardStyle = (courseId, classId, subjectName, isDarkMode) => {
     const strToNum = (str) => {
@@ -1388,7 +1388,7 @@ export function MasterGrid({ isDarkMode, ...props }) {
          </div>
       </div>
       
-      <FloatingRequestsWidget 
+      <DapeRequestsWidget 
          isOpen={isRequestsWidgetOpen}
          setIsOpen={setIsRequestsWidgetOpen}
          requests={pendingRequests}

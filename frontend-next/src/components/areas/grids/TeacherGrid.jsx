@@ -44,8 +44,8 @@ export const TeacherGrid = React.memo(({
   return (
     <div className="flex flex-col xl:flex-row gap-6 items-start animate-in zoom-in-95 duration-500">
       
-      {/* Lado Esquerdo: Grade (70%) */}
-      <div className={`w-full ${appMode === 'professor' && viewMode === 'professor' && ['servidor', 'admin', 'gestao'].includes(userRole) ? 'xl:w-[70%]' : ''} space-y-6`}>
+      {/* Lado Principal: Grade (100% agora, porque solicitações são flutuantes) */}
+      <div className={`w-full space-y-6`}>
         {profCourses.length === 0 ? (
           <div className={`rounded-2xl border p-12 text-center shadow-sm no-print ${isDarkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'}`}>
             <UserCircle size={40} className={`mx-auto mb-3 ${isDarkMode ? 'text-slate-600' : 'text-slate-300'}`} />
@@ -168,9 +168,13 @@ export const TeacherGrid = React.memo(({
                                                 const isLocked = isVaga && isSlotLocked && isSlotLocked(r);
                                                 return (
                                                   <div
-                                                    key={r.id || idx}
+                                                    key={r.id ? `prof-rec-${r.id}-${idx}` : `prof-rec-idx-${idx}`}
                                                     onClick={() => {
                                                       if (appMode === 'professor') {
+                                                        if (scheduleMode === 'consolidado' || scheduleMode === 'oficial') {
+                                                          alert("As aulas do horário consolidado não podem mais ser substituídas no portal do professor. Em caso de necessidade técnica, a retificação deve ser lançada pela gestão no MasterGrid.");
+                                                          return;
+                                                        }
                                                         if (isVaga) {
                                                           if (isLocked) {
                                                               alert("Esta vaga já está sendo analisada pela direção.");
@@ -264,7 +268,7 @@ export const TeacherGrid = React.memo(({
                                   {records.map(r => {
                                     const isPending = isTeacherPending(r.teacher);
                                     return (
-                                      <div key={`mob-rec-${r.id}`} className={`p-2.5 rounded-lg border shadow-sm flex flex-col justify-center ${isPending ? (isDarkMode ? 'bg-red-900/30 border-red-800/50 text-red-300' : 'bg-red-50 border-red-200 text-red-900') : getColorHash(r.className, isDarkMode)}`}>
+                                      <div key={`mob-rec-${r.id}-${idx}`} className={`p-2.5 rounded-lg border shadow-sm flex flex-col justify-center ${isPending ? (isDarkMode ? 'bg-red-900/30 border-red-800/50 text-red-300' : 'bg-red-50 border-red-200 text-red-900') : getColorHash(r.className, isDarkMode)}`}>
                                         <div className="flex items-center gap-1.5 flex-1 w-full">
                                           <span className={`text-[8px] font-black uppercase rounded px-1 shrink-0 ${isDarkMode ? 'bg-white/20' : 'bg-black/10'}`}>{r.className}</span>
                                           <span className="font-bold text-[10px] leading-tight truncate">{r.subject}</span>
@@ -299,19 +303,7 @@ export const TeacherGrid = React.memo(({
         )}
       </div>
 
-      {/* Lado Direito: Solicitações (30%) */}
-      {appMode === 'professor' && viewMode === 'professor' && ['servidor', 'admin', 'gestao'].includes(userRole) && (
-        <div className="w-full xl:w-[30%] shrink-0 sticky top-20 no-print">
-          <TeacherRequestsSection 
-            isDarkMode={isDarkMode}
-            siape={selectedTeacher}
-            selectedWeek={selectedWeek}
-            weekData={recordsForWeek.filter(r => r.teacher === selectedTeacher)}
-            activeDays={activeDays}
-            classTimes={classTimes}
-          />
-        </div>
-      )}
+      {/* Widget flutuante movido globalmente para PortalView.jsx para acompanhar fluxo em todas as abas */}
       
     </div>
   );

@@ -24,7 +24,9 @@ export const ClassGrid = React.memo(({
   getColorHash,
   getFormattedDayLabel,
   onDragEnd,
-  setEditorModal
+  setEditorModal,
+  setExchangeTarget,
+  siape
 }) => {
   return (
     <div className="space-y-4">
@@ -128,7 +130,15 @@ export const ClassGrid = React.memo(({
                                                   {...drgProvided.draggableProps}
                                                   {...drgProvided.dragHandleProps}
                                                   onClick={(e) => {
-                                                    if (appMode !== 'aluno') {
+                                                    if (scheduleMode === 'consolidado' || scheduleMode === 'oficial') {
+                                                      alert("As aulas do histórico não podem ser substituídas pelo portal do professor. Em caso de necessidade técnica ou retificação, a alteração deve ser lançada pela gestão.");
+                                                      return;
+                                                    }
+                                                    if (appMode === 'professor') {
+                                                      if (typeof setExchangeTarget === 'function') {
+                                                        setExchangeTarget({ targetClass: selectedClass, targetCourse: aulaNesteSlot.course || '', originalRecord: aulaNesteSlot });
+                                                      }
+                                                    } else if (appMode !== 'aluno') {
                                                       setEditorModal({ cls: selectedClass, day, time, tObj: timeObj });
                                                     }
                                                   }}
