@@ -220,7 +220,7 @@ export function HomeApp({ appMode }) {
                             </p>
                         </div>
                     </div>
-                    {['admin', 'gestao'].includes(userRole) && (
+                    {userRole === 'admin' && (
                         <button onClick={() => { setAdminTab('master_grid'); scheduleState.setScheduleMode('previa'); scheduleState.setViewMode('curso'); router.push('/admin'); }} className={`mt-4 sm:mt-0 flex items-center justify-center gap-2 px-6 py-2.5 rounded-lg shadow-sm text-[11px] font-black uppercase tracking-widest transition-all ${isDarkMode ? 'bg-amber-600/20 text-amber-400 hover:bg-amber-600/40 border border-amber-600/50' : 'bg-amber-100 text-amber-700 hover:bg-amber-200 border border-amber-300'}`}>
                            <Settings size={16}/> Acessar Gestão Dinâmica
                         </button>

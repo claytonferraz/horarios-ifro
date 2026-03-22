@@ -75,9 +75,11 @@ export function Navbar() {
           <button onClick={() => navigateTo("/professor")} className={getLinkClass("/professor")}>
             Área do Professor
           </button>
-          <button onClick={() => navigateTo("/admin")} className={getLinkClass("/admin")}>
-            Administração
-          </button>
+          {isUnlocked && userRole === 'admin' && (
+            <button onClick={() => navigateTo("/admin")} className={getLinkClass("/admin")}>
+              Administração
+            </button>
+          )}
         </nav>
 
         <div className="flex items-center gap-3">
@@ -161,14 +163,16 @@ export function Navbar() {
           >
             Área do Professor
           </button>
-          <button
-            onClick={() => navigateTo("/admin")}
-            className={`text-left px-4 py-3 rounded-lg text-sm font-bold ${
-              isDarkMode ? "text-slate-300 hover:bg-slate-800" : "text-slate-700 hover:bg-slate-100"
-            }`}
-          >
-            Administração
-          </button>
+          {isUnlocked && userRole === 'admin' && (
+            <button
+              onClick={() => navigateTo("/admin")}
+              className={`text-left px-4 py-3 rounded-lg text-sm font-bold ${
+                isDarkMode ? "text-slate-300 hover:bg-slate-800" : "text-slate-700 hover:bg-slate-100"
+              }`}
+            >
+              Administração
+            </button>
+          )}
         </div>
       )}
     </header>

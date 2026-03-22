@@ -99,11 +99,11 @@ export function FloatingRequestsWidget({ isDarkMode, userRole, appMode }) {
 
   useEffect(() => {
     if (isOpen && typeof window !== 'undefined' && siape) {
-       const now = Date.now();
-       setLastReadTimestamp(now);
-       localStorage.setItem('last_read_notifs_' + siape, now);
+       const maxTime = Math.max(Date.now() - 60000, ...notifications.map(n => new Date(n.createdAt).getTime()));
+       setLastReadTimestamp(maxTime);
+       localStorage.setItem('last_read_notifs_' + siape, maxTime);
     }
-  }, [isOpen, siape]);
+  }, [isOpen, siape, notifications]);
 
   // Hide entirely if it's external page and no notifications are actually present
   if (appMode === 'home') return null;

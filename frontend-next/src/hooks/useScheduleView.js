@@ -24,6 +24,12 @@ export function useScheduleView({ appMode, rawData, disabledWeeks, targetData, d
   const [totalFilterClass, setTotalFilterClass] = useState('Todas');
   const [totalFilterSubject, setTotalFilterSubject] = useState('Todas');
 
+  useEffect(() => {
+    if (appMode === 'professor' && siape && !selectedTeacher) {
+      setSelectedTeacher(String(siape));
+    }
+  }, [appMode, siape, selectedTeacher]);
+
   const activeData = useMemo(() => rawData.filter(r => !disabledWeeks.includes(`${r.week}-${r.type}`)), [rawData, disabledWeeks]);
 
   const {
