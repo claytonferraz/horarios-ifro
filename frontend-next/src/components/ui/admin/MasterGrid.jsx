@@ -1229,6 +1229,7 @@ export function MasterGrid({ isDarkMode, ...props }) {
            academicWeeks={academicWeeks} schedules={schedules} selectedConfigYear={selectedConfigYear}
            loadedType={selectedType} loadedWeek={selectedWeek} 
            onClose={() => setModalMode(null)} 
+           formatWeekLabel={formatWeekLabel}
            onSuccess={() => { setModalMode(null); setSystemDialog({ isOpen: true, type: 'alert', title: 'Sucesso!', message: 'Grade armazenada com sucesso no banco de dados.' }); setRefreshTrigger(prev => prev + 1); }} 
            setSystemDialog={setSystemDialog}
          />
@@ -1385,7 +1386,7 @@ export function MasterGrid({ isDarkMode, ...props }) {
 // -------------------------------------------------------------
 // SUB-COMPONENTES DE AÇÃO (SALVAR E IMPORTAR)
 // -------------------------------------------------------------
-function SaveMatrixModal({ isDarkMode, grade, selectedCourses, courses, saveOptions, setSaveOptions, academicWeeks, schedules, selectedConfigYear, loadedType, loadedWeek, onClose, onSuccess, setSystemDialog }) {
+function SaveMatrixModal({ isDarkMode, grade, selectedCourses, courses, saveOptions, setSaveOptions, academicWeeks, schedules, selectedConfigYear, loadedType, loadedWeek, onClose, onSuccess, setSystemDialog, formatWeekLabel }) {
   const [isSaving, setIsSaving] = useState(false);
   const [padraoBaseVersion, setPadraoBaseVersion] = useState('V1');
 
@@ -1494,7 +1495,7 @@ function SaveMatrixModal({ isDarkMode, grade, selectedCourses, courses, saveOpti
               <select value={saveOptions.weekId} onChange={e => setSaveOptions(p => ({...p, weekId: e.target.value}))} className={`w-full p-3.5 rounded-xl border text-sm font-bold outline-none transition-colors ${isDarkMode ? 'bg-slate-950 border-slate-700 focus:border-indigo-500' : 'bg-white border-slate-300 focus:border-indigo-500 text-black'}`}>
                  <option value="">Selecione...</option>
                  {currentYearWeeks.map(w => (
-                     <option key={w.id} value={w.id}>{w.name}</option>
+                     <option key={w.id} value={w.id}>{formatWeekLabel ? formatWeekLabel(w) : w.name}</option>
                  ))}
               </select>
             </div>
@@ -1505,7 +1506,7 @@ function SaveMatrixModal({ isDarkMode, grade, selectedCourses, courses, saveOpti
                  {(loadedType === 'padrao' && loadedWeek) && (
                      <option value={loadedWeek}>Atualizar Versão Existente ({loadedWeek})</option>
                  )}
-                 <option value={`V${maxPadraoV + 1}`}>Salvar Nova Versão (V${maxPadraoV + 1})</option>
+                 <option value={`V${maxPadraoV + 1}`}>Salvar Nova Versão (V{maxPadraoV + 1})</option>
               </select>
             </div>
           )}
@@ -1516,10 +1517,9 @@ function SaveMatrixModal({ isDarkMode, grade, selectedCourses, courses, saveOpti
               <label className="block text-[11px] font-black uppercase tracking-widest text-amber-800 dark:text-amber-500 mb-2">Motor de Aulas Vagas</label>
               <p className="text-[11px] text-amber-700 dark:text-amber-600 mb-4 font-medium">O sistema comparará o que está na tela com o Padrão Anual. Os buracos da tela serão injetados automaticamente no banco como "Aulas Vagas" para substituição. Qual versão do Padrão usar como espelho?</p>
               <select value={padraoBaseVersion} onChange={e => setPadraoBaseVersion(e.target.value)} className={`w-full p-3 rounded-lg border border-amber-300 text-sm font-black outline-none cursor-pointer ${isDarkMode ? 'bg-amber-900/40 text-amber-400' : 'bg-white text-amber-700'}`}>
-                 <option value="V1">Espelhar com Padrão V1</option>
-                 <option value="V2">Espelhar com Padrão V2</option>
-                 <option value="V3">Espelhar com Padrão V3</option>
-                 <option value="V4">Espelhar com Padrão V4</option>
+                 {Array.from({ length: maxPadraoV }).map((_, i) => (
+                     <option key={`V${i + 1}`} value={`V${i + 1}`}>Espelhar com Padrão V{i + 1}</option>
+                 ))}
               </select>
            </div>
        )}
