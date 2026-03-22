@@ -1088,7 +1088,7 @@ export function PortalView({
                                                                                    </div>
                                                                                 )}
                                                                                 <p className={`subject font-bold text-[10px] print:text-[8.5px] leading-tight print:leading-[1.1] mb-1 print:mb-0.5 text-center ${isDarkMode ? 'text-slate-200' : 'text-slate-800'}`}>
-                                                                                  {r.subject}
+                                                                                  {r.subject} {r.isSubstituted && r.originalSubject && <span className="block text-[8px] sm:text-[9px] opacity-80 mt-1 uppercase">Era: {r.originalSubject}</span>}
                                                                                 </p>
                                                                                 <p className={`text-[8.5px] print:text-[7.5px] font-medium leading-none text-center opacity-90 ${isPending ? (isDarkMode ? 'text-red-400 font-bold' : 'text-red-600 font-bold') : ''}`}>
                                                                                   {resolveTeacherName(r.teacher, globalTeachers)} {r.room && <span className="font-black opacity-80 print:opacity-100">| S: {r.room}</span>}
@@ -1437,7 +1437,9 @@ export function PortalView({
                                                                     </React.Fragment>
                                                                   ) : (
                                                                     <React.Fragment>
-                                                                      <p className="subject font-black text-xs sm:text-sm leading-snug text-center drop-shadow-sm">{r.subject}</p>
+                                                                      <p className="subject font-black text-xs sm:text-sm leading-snug text-center drop-shadow-sm">
+                                                                         {r.subject} {r.isSubstituted && r.originalSubject && <span className="block text-[8px] sm:text-[9px] opacity-80 mt-1 uppercase">Era: {r.originalSubject}</span>}
+                                                                      </p>
                                                                       <span className={`details text-[10px] sm:text-xs font-black tracking-widest px-2 py-1 rounded mt-1.5 w-fit uppercase mx-auto shadow-sm ${isDarkMode ? 'bg-white/25 text-white' : 'bg-black/10 text-slate-900'}`}>{r.className} {r.room ? '- ' + r.room : ''}</span>
                                                                       {r.isSubstituted && (
                                                                          <div className="absolute top-0 right-0 z-10 pointer-events-none print:hidden">
@@ -2031,7 +2033,7 @@ export function PortalView({
                   week_id: selectedWeek,
                   description: 'Solicitação para assumir aula vaga na turma ' + vacantRequestModal.className + ' - Disciplina: ' + subj,
                   original_slot: JSON.stringify({ day: vacantRequestModal.day, time: vacantRequestModal.time, type: 'VAGA' }),
-                  proposed_slot: { day: vacantRequestModal.day, time: vacantRequestModal.time, className: vacantRequestModal.className, subject: subj, classType: 'Substituição' }
+                  proposed_slot: { day: vacantRequestModal.day, time: vacantRequestModal.time, className: vacantRequestModal.className, subject: subj, originalSubject: vacantRequestModal.subject, classType: 'Substituição' }
                 }).then(() => {
                   setAlertModal({ title: 'Tudo Certo!', message: 'Sua solicitação foi enviada com sucesso à coordenação.', type: 'success' });
                   setVacantRequestModal(null);

@@ -239,13 +239,20 @@ export function MasterGrid({ isDarkMode, ...props }) {
              }
              
              let flagIsSubstituted = false;
+             let flagOriginalSubject = null;
              if (schedule.records) {
                  try {
                      const recs = JSON.parse(schedule.records);
-                     if (recs.isSubstituted) flagIsSubstituted = true;
+                     if (recs.isSubstituted) {
+                         flagIsSubstituted = true;
+                         flagOriginalSubject = recs.originalSubject || null;
+                     }
                      if (Array.isArray(recs)) {
                          const found = recs.find(r => String(r.day) === String(schedule.dayOfWeek) && String(r.time) === String(schedule.slotId));
-                         if (found?.isSubstituted) flagIsSubstituted = true;
+                         if (found?.isSubstituted) {
+                             flagIsSubstituted = true;
+                             flagOriginalSubject = found?.originalSubject || null;
+                         }
                      }
                  } catch(e) {}
              }
@@ -256,7 +263,8 @@ export function MasterGrid({ isDarkMode, ...props }) {
                  teacherIds: dbTeacherIds || currentTeacherIds,
                  professores: dbTeacherIds ? dbTeacherIds.map(id => resolveTeacherName(id, globalTeachersList)) : refCard.professores,
                  teacherChanged: teacherChanged,
-                 isSubstituted: flagIsSubstituted
+                 isSubstituted: flagIsSubstituted,
+                 originalSubject: flagOriginalSubject
              };
              aulasAlocadasIds.push(String(refCard.id));
         }
@@ -1018,11 +1026,15 @@ export function MasterGrid({ isDarkMode, ...props }) {
                                   <span className="absolute top-0 right-0 bg-slate-200 dark:bg-slate-600 text-slate-500 dark:text-slate-300 font-bold px-1 rounded-bl-md text-[7px] group-hover/card:opacity-0 transition-opacity" title={`Qtd Total desta Aula no Horário da Turma`}>
                                      {Object.values(grade).filter(g => String(g.classId) === String(aulaNesteSlot.classId) && String(g.id) === String(aulaNesteSlot.id)).length}/{aulaNesteSlot.numAulas || 1}
                                   </span>
-                                  
                                   {aulaNesteSlot.isSubstituted && (
-                                     <div title="Assumido via Solicitação de Vaga do Professor" className="absolute top-0 right-3 bg-indigo-600 text-white text-[6.5px] font-black uppercase px-1.5 py-0.5 rounded-b shadow-[0_2px_4px_rgba(0,0,0,0.2)] tracking-widest pointer-events-none z-10 border border-t-0 border-indigo-400 group-hover/card:opacity-0 transition-opacity">Substituído</div>
+                                     <div className="absolute -top-1.5 -right-1 z-10 print:hidden shadow-sm pointer-events-none">
+                                        <span title="Aula assumida via Vaga" className="text-[5px] font-black uppercase tracking-widest text-white px-1.5 py-[2px] rounded border border-indigo-400 bg-indigo-600 block shadow-sm shadow-indigo-900/40">Substituição</span>
+                                     </div>
                                   )}
-
+                                  <div className="font-bold text-[9.5px] print:text-[8px] leading-[1.1] mb-0.5 mt-0.5 text-center px-0.5 min-h-[22px] flex flex-col items-center justify-center">
+                                      <span>{aulaNesteSlot.disciplina}</span>
+                                      {aulaNesteSlot.isSubstituted && aulaNesteSlot.originalSubject && <span className="text-[7px] opacity-80 uppercase mt-0.5">Era: {aulaNesteSlot.originalSubject}</span>}
+                                  </div>
                                   <div className="flex flex-col w-[85%] leading-none" title={`${aulaNesteSlot.disciplina} - ${aulaNesteSlot.className}`}>
                                     <span className="text-[10px] font-black uppercase tracking-widest truncate">{aulaNesteSlot.disciplina}</span>
                                     <span className="text-[7px] opacity-75 font-bold tracking-widest truncate mt-0.5">{aulaNesteSlot.className}</span>

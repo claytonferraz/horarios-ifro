@@ -1270,13 +1270,15 @@ app.put('/api/requests/:id', verifyToken, (req, res) => {
                 });
 
                 // 2. UPDATE for NEW STRUCTURE (Bulk Slots DB - MasterGrid V2)
-                db.all("SELECT id, payload as data FROM curriculum_data WHERE dataType = 'class'", [], (errC, rowsC) => {
+                db.all("SELECT id, dataType, payload as data FROM curriculum_data WHERE dataType IN ('class', 'discipline')", [], (errC, rowsC) => {
                   if (errC || !rowsC) return;
                   let targetClassId = null;
+                  let targetDiscId = null;
                   for (let row of rowsC) {
                       try { 
                           const d = JSON.parse(row.data); 
-                          if (d.name === proposed.className) { targetClassId = d.id; break; } 
+                          if (row.dataType === 'class' && d.name === proposed.className) { targetClassId = row.id; } 
+                          if (row.dataType === 'discipline' && d.name === proposed.subject) { targetDiscId = row.id; }
                       } catch(e){}
                   }
 
@@ -1288,9 +1290,11 @@ app.put('/api/requests/:id', verifyToken, (req, res) => {
                          (errS, rowsS) => {
                            if (!errS && rowsS && rowsS.length > 0) {
                                rowsS.forEach(sRow => {
-                                   const recFlag = JSON.stringify({ isSubstituted: true, originRequest: reqId, originalSubject: proposed.subject });
-                                   db.run("UPDATE schedules SET teacherId = ?, records = ?, updatedAt = ? WHERE id = ?", 
-                                       [rowReq.siape, recFlag, new Date().toISOString(), sRow.id], 
+                                   const oldSubj = proposed.originalSubject || proposed.subject;
+                                   const recFlag = JSON.stringify({ isSubstituted: true, originRequest: reqId, originalSubject: oldSubj });
+                                   const finalDiscId = targetDiscId || proposed.subject; // Fallback to raw string if ID not found, just in case
+                                   db.run("UPDATE schedules SET teacherId = ?, disciplineId = ?, records = ?, updatedAt = ? WHERE id = ?", 
+                                       [rowReq.siape, finalDiscId, recFlag, new Date().toISOString(), sRow.id], 
                                        () => { try { if (io) io.emit('schedule_updated'); } catch(e){} });
                                });
                            }
