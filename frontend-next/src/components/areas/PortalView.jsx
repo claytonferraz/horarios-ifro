@@ -28,7 +28,7 @@ export function PortalView({
   selectedDay, setSelectedDay, selectedWeek, setSelectedWeek, activeWeeksList,
   getCellRecords, activeCourseClasses, profStats, activeDays, classTimes, rawData, loadAdminMetadata
 }) {
-  const { globalTeachers, refreshData, subjectHoursMeta, intervals, selectedConfigYear, disciplinesMeta, schedules, academicWeeks } = useData();
+  const { globalTeachers, refreshData, subjectHoursMeta, intervals, selectedConfigYear, disciplinesMeta, schedules, academicWeeks, bimesters } = useData();
 
   const horariosFiltrados = React.useMemo(() => {
     if (!schedules || !Array.isArray(schedules)) return [];
@@ -621,7 +621,16 @@ export function PortalView({
                         <SearchableSelect isDarkMode={isDarkMode} options={availableClassesForTotal} value={totalFilterClass} onChange={setTotalFilterClass} colorClass={isDarkMode ? 'bg-slate-800 border-slate-700 text-slate-200 shadow-sm' : 'bg-white border-slate-200 text-slate-800 shadow-sm'} />
                       </div>
                       <div className="space-y-1"><label className="text-[9px] font-black tracking-[0.2em] text-slate-400 uppercase ml-1">Disciplina</label>
-                        <SearchableSelect isDarkMode={isDarkMode} options={availableSubjectsForTotal} value={totalFilterSubject} onChange={setTotalFilterSubject} colorClass={isDarkMode ? 'bg-slate-800 border-slate-700 text-slate-200 shadow-sm' : 'bg-white border-slate-200 text-slate-800 shadow-sm'} />
+                        <SearchableSelect 
+                           isDarkMode={isDarkMode} 
+                           options={availableSubjectsForTotal.map(s => ({
+                             value: s, 
+                             label: s
+                           }))} 
+                           value={totalFilterSubject} 
+                           onChange={setTotalFilterSubject} 
+                           colorClass={isDarkMode ? 'bg-slate-800 border-slate-700 text-slate-200 shadow-sm' : 'bg-white border-slate-200 text-slate-800 shadow-sm'} 
+                        />
                       </div>
                     </>
                   )}
@@ -904,60 +913,81 @@ export function PortalView({
                              </button>
                            </div>
                          </div>
-                         
-                         <div className="overflow-x-auto">
-                           <table className="w-full border-collapse table-fixed min-w-[1000px] text-xs">
-                              <thead>
-                                <tr className={`text-[9px] font-black uppercase tracking-[0.2em] border-b ${isDarkMode ? 'bg-slate-900/50 text-slate-400 border-slate-700' : 'bg-slate-100 text-slate-600 border-slate-200'}`}>
-                                  {[
-                                    {b:1, d:"04/02 a 21/04"},
-                                    {b:2, d:"22/04 a 03/07"},
-                                    {b:3, d:"22/07 a 28/09"},
-                                    {b:4, d:"29/09 a 10/12"}
-                                  ].map(bim => (
-                                    <th key={bim.b} className={`p-4 border-r last:border-0 text-center ${isDarkMode ? 'border-slate-700' : 'border-slate-200'}`}>
-                                      <div className="mb-1 text-xs">{bim.b}º Bimestre</div>
-                                      <div className={`text-white px-3 py-0.5 rounded-full text-[9px] inline-block font-black shadow-md uppercase tracking-tighter no-print ${isDarkMode ? 'bg-indigo-700 shadow-none' : 'bg-indigo-600 shadow-indigo-100'}`}>
-                                        {bimestresData[bim.b].length} aulas
-                                      </div>
-                                    </th>
-                                  ))}
-                                </tr>
-                              </thead>
-                              <tbody className="align-top">
-                                <tr>
-                                  {[1,2,3,4].map(b => {
-                                    let lastDate = "";
-                                    let zebra = false;
-                                    return (
-                                      <td key={b} className={`p-1 border-r last:border-0 ${isDarkMode ? 'border-slate-700/50 bg-slate-800/10' : 'border-slate-100 bg-slate-50/5'}`}>
-                                        <div className="space-y-1 max-h-[600px] overflow-y-auto pr-1 custom-scrollbar">
-                                          {bimestresData[b].length > 0 ? bimestresData[b].map(r => {
-                                            const currentDate = `${r.date}`;
-                                            if (currentDate !== lastDate) { lastDate = currentDate; zebra = !zebra; }
-                                            return (
-                                              <div key={r.id} className={`print-clean-card px-2.5 py-2 border-l-4 transition-all text-[10px] ${zebra ? (isDarkMode ? 'bg-slate-800 border-indigo-600 shadow-sm' : 'bg-slate-100/80 border-indigo-600 shadow-sm') : (isDarkMode ? 'bg-slate-900 border-slate-700' : 'bg-white border-slate-200')}`}>
-                                                <p className={`font-bold leading-relaxed ${isDarkMode ? 'text-slate-200' : 'text-slate-800'}`}>
-                                                  <span className={`font-black ${isDarkMode ? 'text-indigo-400' : 'text-indigo-600'}`}>{currentDate}</span> - {r.time.replace(' - ', ' às ')}  
-                                                  <span className={`subject font-medium uppercase tracking-tighter text-[10px] ${isDarkMode ? 'text-slate-100' : 'text-slate-900'}`}> - {r.subject}</span>
-                                                </p>
-                                              </div>
-                                            );
-                                          }) : (
-                                            <div className={`py-16 text-center flex flex-col items-center gap-2 select-none no-print ${isDarkMode ? 'opacity-20' : 'opacity-10'}`}>
-                                              <Calendar size={32} className={isDarkMode ? 'text-white' : ''} /><span className={`text-[9px] font-black uppercase tracking-widest ${isDarkMode ? 'text-white' : ''}`}>Sem Registros</span>
-                                            </div>
-                                          )}
+                         <div className="p-4 lg:p-6 space-y-6">
+                           {(() => {
+                              const bimsUI = (bimesters && bimesters.length > 0) ? bimesters.map((b, i) => {
+                                const fmtData = (iso) => iso ? iso.split('-').reverse().slice(0,2).join('/') : '';
+                                let diasLetivos = 0;
+                                const bStart = new Date(b.startDate + 'T00:00:00');
+                                const bEnd = new Date(b.endDate + 'T23:59:59');
+                                
+                                if (academicWeeks) {
+                                  academicWeeks.forEach(w => {
+                                    const wStart = new Date(w.start_date + 'T12:00:00');
+                                    if (wStart >= bStart && wStart <= bEnd) {
+                                      diasLetivos += (w.school_days || 0);
+                                    }
+                                  });
+                                }
+                                
+                                return {
+                                  b: i + 1,
+                                  name: b.name || `${i + 1}º Bimestre`,
+                                  d: fmtData(b.startDate) + ' a ' + fmtData(b.endDate),
+                                  start: fmtData(b.startDate),
+                                  diasLetivos
+                                };
+                              }) : [
+                                {b:1, name:'1º Bimestre', start: "04/02", diasLetivos: 0},
+                                {b:2, name:'2º Bimestre', start: "22/04", diasLetivos: 0},
+                                {b:3, name:'3º Bimestre', start: "22/07", diasLetivos: 0},
+                                {b:4, name:'4º Bimestre', start: "29/09", diasLetivos: 0}
+                              ];
+                              
+                              // Preenche o resto até dar 4
+                              while (bimsUI.length < 4) bimsUI.push({ b: bimsUI.length + 1, name: `${bimsUI.length + 1}º Bimestre`, start: "-", diasLetivos: 0 });
+                              
+                              return bimsUI.slice(0,4).map(bim => (
+                                <div key={bim.b} className={`rounded-xl border shadow-sm print:break-inside-avoid ${isDarkMode ? 'bg-slate-800/40 border-slate-700' : 'bg-slate-50 border-slate-200'}`}>
+                                  <div className={`p-4 border-b flex items-center justify-between ${isDarkMode ? 'border-slate-700' : 'border-slate-200'}`}>
+                                    <div>
+                                      <h4 className={`font-black text-sm uppercase tracking-wider ${isDarkMode ? 'text-indigo-400' : 'text-indigo-700'}`}>{bim.name}</h4>
+                                      <p className="text-[10px] uppercase tracking-widest mt-1 opacity-70">
+                                        Início do Bimestre: <b className="text-emerald-500 mr-2">{bim.start}</b> | Total de Dias Letivos: <b className="text-emerald-500">{bim.diasLetivos}</b>
+                                      </p>
+                                    </div>
+                                    <div className={`text-white px-3 py-1.5 rounded-lg text-[10px] uppercase font-bold tracking-widest shadow-sm flex flex-col items-center justify-center ${isDarkMode ? 'bg-indigo-600' : 'bg-indigo-600'}`}>
+                                      <span className="text-sm">{(bimestresData[bim.b] || []).length}</span>
+                                      <span className="text-[8px] opacity-80">Aulas Contabilizadas</span>
+                                    </div>
+                                  </div>
+                                  
+                                  <div className="p-2 md:p-4 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2">
+                                    {(bimestresData[bim.b] && bimestresData[bim.b].length > 0) ? bimestresData[bim.b].map(r => (
+                                        <div key={r.id} className={`flex items-center gap-3 p-2 rounded-lg border-l-4 transition-all hover:-translate-y-0.5 ${isDarkMode ? 'bg-slate-800 border-indigo-500 text-slate-300' : 'bg-white border-indigo-500 text-slate-700 shadow-sm'}`}>
+                                          <div className={`font-black w-10 text-center text-xs ${isDarkMode ? 'text-indigo-400' : 'text-indigo-600'}`}>{r.date}</div>
+                                          <div className="h-4 w-px bg-slate-500/20"></div>
+                                          <div className={`font-bold text-[9px] px-2 py-1 rounded tracking-[0.2em] ${isDarkMode ? 'bg-slate-700 text-slate-300' : 'bg-slate-100 text-slate-600'}`}>
+                                            {r.time.replace(' - ', ' ')}
+                                          </div>
+                                          <div className="h-4 w-px bg-slate-500/20"></div>
+                                          <div className="font-semibold text-[10px] flex-1 uppercase tracking-tighter truncate" title={r.subject}>
+                                            {r.subject} {r.className && <span className="opacity-50 inline-block ml-1">({r.className})</span>}
+                                          </div>
                                         </div>
-                                      </td>
-                                    );
-                                  })}
-                                </tr>
-                              </tbody>
-                           </table>
-                         </div>
+                                    )) : (
+                                        <div className="col-span-full text-center py-8 opacity-40 flex flex-col items-center justify-center gap-2 select-none no-print">
+                                          <Calendar size={24} />
+                                          <span className="text-[10px] font-black uppercase tracking-[0.2em]">Sem Aulas Registradas Neste Bimestre</span>
+                                        </div>
+                                    )}
+                                  </div>
+                                </div>
+                              ));
+                            })()}
+                          </div>
+                        </div>
                       </div>
-                    </div>
                   )}
 
                   {/* GRADE DE HORÁRIO (Visão Curso MATRIZ) */}

@@ -57,7 +57,7 @@ export function HomeApp({ appMode }) {
   const [adminFilterClasses, setAdminFilterClasses] = useState([]);
 
   const scheduleState = useScheduleView({
-    appMode, rawData, disabledWeeks, targetData: null, disciplinesMeta, subjectHoursMeta, adminFilterCourses, adminFilterClasses, setAdminFilterClasses, activeDays, classTimes, bimesters, siape, userRole
+    appMode, rawData, disabledWeeks, targetData: null, disciplinesMeta, subjectHoursMeta, adminFilterCourses, adminFilterClasses, setAdminFilterClasses, activeDays, classTimes, bimesters, siape, userRole, academicWeeks
   });
 
   const navigateTo = (mode) => {

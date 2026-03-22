@@ -44,6 +44,8 @@ export function DataProvider({ children }) {
               time: d.slotId,
               teacher: String(d.teacherId || ''),
               subject: d.subjectName || d.disciplineId,
+              totalHours: parseInt(d.totalHours) || 0,
+              suapHours: parseInt(d.suapHours) || 0,
               room: d.room || '',
               type: d.type,
               week: String(d.week_id || ''),

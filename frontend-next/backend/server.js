@@ -416,7 +416,7 @@ app.get('/api/schedules', (req, res) => {
       cl.payload as classPayload, 
       d.payload as discPayload 
     FROM schedules s
-    LEFT JOIN curriculum_data c ON s.courseId = c.id AND c.dataType = 'course'
+    LEFT JOIN curriculum_data c ON s.courseId = c.id AND c.dataType = 'matrix'
     LEFT JOIN curriculum_data cl ON s.classId = cl.id AND cl.dataType = 'class'
     LEFT JOIN curriculum_data d ON s.disciplineId = d.id AND d.dataType = 'discipline'
     WHERE 1=1
@@ -435,14 +435,37 @@ app.get('/api/schedules', (req, res) => {
     if (err) return res.status(500).json({ error: err.message });
     const mapped = (rows || []).map(r => {
       let cName = r.courseId; let clName = r.classId; let discName = r.disciplineId;
-      try { if (r.coursePayload) cName = JSON.parse(r.coursePayload).name || cName; } catch(e){}
+      let totalH = 0;
+      let suapH = 0;
+      
+      try { 
+        if (r.coursePayload) {
+           const cp = JSON.parse(r.coursePayload);
+           cName = cp.name || cName;
+           if (cp.series && r.disciplineId) {
+              cp.series.forEach(serie => {
+                 if (serie.disciplines) {
+                    const f = serie.disciplines.find(d => String(d.id) === String(r.disciplineId) || d.name === r.disciplineId);
+                    if (f) {
+                       discName = f.name;
+                       totalH = parseInt(f.hours) || 0;
+                       suapH = parseInt(f.hours) || 0; // Se não houver prop suap_hours específica na matriz, espelha total.
+                    }
+                 }
+              });
+           }
+        }
+      } catch(e){}
+      
       try { if (r.classPayload) clName = JSON.parse(r.classPayload).name || clName; } catch(e){}
-      try { if (r.discPayload) discName = JSON.parse(r.discPayload).name || discName; } catch(e){}
+      
       return {
         ...r,
         courseName: cName,
         className: clName,
         subjectName: discName,
+        totalHours: totalH,
+        suapHours: suapH,
         coursePayload: undefined,
         classPayload: undefined,
         discPayload: undefined

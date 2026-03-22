@@ -134,11 +134,13 @@ export function useScheduleStats({
       if (!uniqueDisciplines.has(discId)) {
         uniqueDisciplines.add(discId);
         
-        const metaDisc = disciplinesMeta[discId] || { suapHours: '0' };
-        const metaSubj = subjectHoursMeta[subjId] || { totalHours: '0' };
+        // Pega os metadados do BD caso o usuário tenha editado manuais no admin panel
+        const metaDisc = disciplinesMeta[discId] || { suapHours: null };
+        const metaSubj = subjectHoursMeta[subjId] || { totalHours: null };
         
-        suapMap[discId] = parseInt(metaDisc.suapHours) || 0;
-        totalHoursMap[discId] = parseInt(metaSubj.totalHours) || 0;
+        // Caso os metadados não existam, usa a carga horária embutida extraída automaticamente da matriz (backend JSON injection)
+        suapMap[discId] = metaDisc.suapHours !== null ? (parseInt(metaDisc.suapHours) || 0) : (r.suapHours || 0);
+        totalHoursMap[discId] = metaSubj.totalHours !== null ? (parseInt(metaSubj.totalHours) || 0) : (r.totalHours || 0);
       }
     });
 

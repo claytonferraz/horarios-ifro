@@ -5,7 +5,7 @@ import { useScheduleStats } from './useScheduleStats';
 import { useScheduleDataTransform } from './useScheduleDataTransform';
 import { DAYS, MAP_DAYS, isFutureWeek, isCurrentWeek, isDatePastOrToday, isTeacherPending } from "@/lib/dates";
 
-export function useScheduleView({ appMode, rawData, disabledWeeks, targetData, disciplinesMeta, subjectHoursMeta, adminFilterCourses, adminFilterClasses, setAdminFilterClasses, activeDays, classTimes, bimesters = [], siape = null, userRole = null }) {
+export function useScheduleView({ appMode, rawData, disabledWeeks, targetData, disciplinesMeta, subjectHoursMeta, adminFilterCourses, adminFilterClasses, setAdminFilterClasses, activeDays, classTimes, bimesters = [], siape = null, userRole = null, academicWeeks = [] }) {
   const [viewMode, setViewMode] = useState('hoje');
   const [scheduleMode, setScheduleMode] = useState('oficial'); 
 
@@ -72,58 +72,81 @@ export function useScheduleView({ appMode, rawData, disabledWeeks, targetData, d
 
   // Legacy activeWeeksList auto-reset logic disabled to allow PortalView's dynamicWeeksList exclusive control
 
-  const officialDataForTotal = activeData.filter(r => r.type === 'oficial');
+  const officialDataForTotal = useMemo(() => {
+    return activeData.filter(r => r.type === 'oficial').map(r => {
+      let actualDateStr = null;
+      if (r.week && academicWeeks && academicWeeks.length > 0) {
+        const weekObj = academicWeeks.find(w => String(w.id) === String(r.week));
+        if (weekObj && weekObj.start_date) {
+           const [y, m, d] = weekObj.start_date.split('-').map(Number);
+           const ref = new Date(y, m - 1, d, 12, 0, 0); 
+           const dayIdx = MAP_DAYS.indexOf(r.day);
+           
+           if (dayIdx >= 0) {
+              const diff = dayIdx - ref.getDay(); 
+              const targetDate = new Date(ref);
+              targetDate.setDate(ref.getDate() + diff);
+              
+              const dd = String(targetDate.getDate()).padStart(2, '0');
+              const mm = String(targetDate.getMonth() + 1).padStart(2, '0');
+              actualDateStr = `${dd}/${mm}`;
+           }
+        }
+      }
+      return { ...r, date: actualDateStr || r.date };
+    });
+  }, [activeData, academicWeeks]);
 
   const finalFilteredTotalData = useMemo(() => {
     return officialDataForTotal.filter(r => {
-      const passYear = totalFilterYear === 'Todos' || r.year === totalFilterYear;
-      const passTeacher = totalFilterTeacher === 'Todos' || r.teacher === totalFilterTeacher;
-      const passClass = totalFilterClass === 'Todas' || r.className === totalFilterClass;
-      const passSubject = totalFilterSubject === 'Todas' || r.subject === totalFilterSubject;
+      const passYear = totalFilterYear === 'Nenhum' || r.year === totalFilterYear;
+      const passTeacher = totalFilterTeacher === 'Nenhum' || r.teacher === totalFilterTeacher;
+      const passClass = totalFilterClass === 'Nenhum' || r.className === totalFilterClass;
+      const passSubject = totalFilterSubject === 'Nenhum' || r.subject === totalFilterSubject;
       return passYear && passTeacher && passClass && passSubject;
     });
   }, [officialDataForTotal, totalFilterYear, totalFilterTeacher, totalFilterClass, totalFilterSubject]);
 
   const availableYearsForTotal = useMemo(() => {
     const valid = officialDataForTotal.filter(r =>
-        (totalFilterTeacher === 'Todos' || r.teacher === totalFilterTeacher) &&
-        (totalFilterClass === 'Todas' || r.className === totalFilterClass) &&
-        (totalFilterSubject === 'Todas' || r.subject === totalFilterSubject)
+        (totalFilterTeacher === 'Nenhum' || r.teacher === totalFilterTeacher) &&
+        (totalFilterClass === 'Nenhum' || r.className === totalFilterClass) &&
+        (totalFilterSubject === 'Nenhum' || r.subject === totalFilterSubject)
     );
-    return ['Todos', ...[...new Set(valid.map(r => r.year))].sort()];
+    return ['Nenhum', ...[...new Set(valid.map(r => r.year))].sort()];
   }, [officialDataForTotal, totalFilterTeacher, totalFilterClass, totalFilterSubject]);
 
   const availableTeachersForTotal = useMemo(() => {
     const valid = officialDataForTotal.filter(r =>
-        (totalFilterYear === 'Todos' || r.year === totalFilterYear) &&
-        (totalFilterClass === 'Todas' || r.className === totalFilterClass) &&
-        (totalFilterSubject === 'Todas' || r.subject === totalFilterSubject)
+        (totalFilterYear === 'Nenhum' || r.year === totalFilterYear) &&
+        (totalFilterClass === 'Nenhum' || r.className === totalFilterClass) &&
+        (totalFilterSubject === 'Nenhum' || r.subject === totalFilterSubject)
     );
-    return ['Todos', ...[...new Set(valid.map(r => r.teacher))].sort((a,b) => a.localeCompare(b))];
+    return ['Nenhum', ...[...new Set(valid.map(r => r.teacher))].sort((a,b) => a.localeCompare(b))];
   }, [officialDataForTotal, totalFilterYear, totalFilterClass, totalFilterSubject]);
 
   const availableClassesForTotal = useMemo(() => {
     const valid = officialDataForTotal.filter(r =>
-        (totalFilterYear === 'Todos' || r.year === totalFilterYear) &&
-        (totalFilterTeacher === 'Todos' || r.teacher === totalFilterTeacher) &&
-        (totalFilterSubject === 'Todas' || r.subject === totalFilterSubject)
+        (totalFilterYear === 'Nenhum' || r.year === totalFilterYear) &&
+        (totalFilterTeacher === 'Nenhum' || r.teacher === totalFilterTeacher) &&
+        (totalFilterSubject === 'Nenhum' || r.subject === totalFilterSubject)
     );
-    return ['Todas', ...[...new Set(valid.map(r => r.className))].sort((a,b) => a.localeCompare(b))];
+    return ['Nenhum', ...[...new Set(valid.map(r => r.className))].sort((a,b) => a.localeCompare(b))];
   }, [officialDataForTotal, totalFilterYear, totalFilterTeacher, totalFilterSubject]);
 
   const availableSubjectsForTotal = useMemo(() => {
     const valid = officialDataForTotal.filter(r =>
-        (totalFilterYear === 'Todos' || r.year === totalFilterYear) &&
-        (totalFilterTeacher === 'Todos' || r.teacher === totalFilterTeacher) &&
-        (totalFilterClass === 'Todas' || r.className === totalFilterClass)
+        (totalFilterYear === 'Nenhum' || r.year === totalFilterYear) &&
+        (totalFilterTeacher === 'Nenhum' || r.teacher === totalFilterTeacher) &&
+        (totalFilterClass === 'Nenhum' || r.className === totalFilterClass)
     );
-    return ['Todas', ...[...new Set(valid.map(r => r.subject))].sort((a,b) => a.localeCompare(b))];
+    return ['Nenhum', ...[...new Set(valid.map(r => r.subject))].sort((a,b) => a.localeCompare(b))];
   }, [officialDataForTotal, totalFilterYear, totalFilterTeacher, totalFilterClass]);
 
-  useEffect(() => { if (!availableYearsForTotal.includes(totalFilterYear)) setTotalFilterYear('Todos'); }, [availableYearsForTotal, totalFilterYear]);
-  useEffect(() => { if (!availableTeachersForTotal.includes(totalFilterTeacher)) setTotalFilterTeacher('Todos'); }, [availableTeachersForTotal, totalFilterTeacher]);
-  useEffect(() => { if (!availableClassesForTotal.includes(totalFilterClass)) setTotalFilterClass('Todas'); }, [availableClassesForTotal, totalFilterClass]);
-  useEffect(() => { if (!availableSubjectsForTotal.includes(totalFilterSubject)) setTotalFilterSubject('Todas'); }, [availableSubjectsForTotal, totalFilterSubject]);
+  useEffect(() => { if (!availableYearsForTotal.includes(totalFilterYear)) setTotalFilterYear('Nenhum'); }, [availableYearsForTotal, totalFilterYear]);
+  useEffect(() => { if (!availableTeachersForTotal.includes(totalFilterTeacher)) setTotalFilterTeacher('Nenhum'); }, [availableTeachersForTotal, totalFilterTeacher]);
+  useEffect(() => { if (!availableClassesForTotal.includes(totalFilterClass)) setTotalFilterClass('Nenhum'); }, [availableClassesForTotal, totalFilterClass]);
+  useEffect(() => { if (!availableSubjectsForTotal.includes(totalFilterSubject)) setTotalFilterSubject('Nenhum'); }, [availableSubjectsForTotal, totalFilterSubject]);
 
   const sortedBimesters = useMemo(() => {
     return [...(bimesters || [])].filter(b => b.endDate).sort((a,b) => new Date(a.endDate) - new Date(b.endDate));
