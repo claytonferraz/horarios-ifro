@@ -38,11 +38,7 @@ export const TeacherGrid = React.memo(
     const profClasses = new Set(directRecords.map(r => r.className));
     // 2. Puxa TODA a grade dessas turmas para dar o contexto
     let profRecords = mappedSchedules.filter(r => profClasses.has(r.className));
-    // 3. Adiciona vagas se o toggle estiver ativo
-    if (showVacantInMyClasses) {
-      const vagas = mappedSchedules.filter(r => (!r.teacherId || r.teacherId === '-' || r.teacherId === 'A Definir') && profClasses.has(r.className));
-      profRecords = [...profRecords, ...vagas];
-    }
+    // 3. (Removido: Adicionar vagas se toggle estiver ativo)
 
     const profCourses = [...new Set(profRecords.map((r) => r.course))].sort(
       (a, b) => String(a).localeCompare(String(b)),
@@ -94,19 +90,7 @@ export const TeacherGrid = React.memo(
                 </div>
 
                 <div className="flex flex-col sm:flex-row items-start sm:items-center justify-end gap-3 mt-2 sm:mt-0">
-                  {appMode === "professor" && viewMode === "professor" && (
-                    <label className="flex items-center gap-2 cursor-pointer bg-black/20 hover:bg-black/30 px-3 py-2 rounded-xl transition-colors text-white text-[10px] uppercase font-black tracking-widest shadow-sm ring-1 ring-white/10">
-                      <input
-                        type="checkbox"
-                        checked={showVacantInMyClasses}
-                        onChange={(e) =>
-                          setShowVacantInMyClasses(e.target.checked)
-                        }
-                        className="accent-indigo-500 w-3.5 h-3.5"
-                      />
-                      Mostrar Vagas nas Minhas Turmas
-                    </label>
-                  )}
+
                   <button
                     onClick={handlePrint}
                     className="flex items-center gap-2 bg-white/20 hover:bg-white/30 text-white px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all shadow-sm active:scale-95 no-print ring-1 ring-white/10"
@@ -480,13 +464,13 @@ export const TeacherGrid = React.memo(
                                         </span>
                                       </div>
                                       <div className="flex-1 space-y-2">
-                                        {records.map((r) => {
+                                        {records.map((r, rIdx) => {
                                           const isPending = isTeacherPending(
                                             r.teacher,
                                           );
                                           return (
                                             <div
-                                              key={`mob-rec-${r.id}-${idx}`}
+                                              key={`mob-rec-${r.id || 'new'}-${idx}-${rIdx}`}
                                               className={`p-2.5 rounded-lg border shadow-sm flex flex-col justify-center ${isPending ? (isDarkMode ? "bg-red-900/30 border-red-800/50 text-red-300" : "bg-red-50 border-red-200 text-red-900") : getColorHash(r.className, isDarkMode)}`}
                                             >
                                               <div className="flex items-center gap-1.5 flex-1 w-full">

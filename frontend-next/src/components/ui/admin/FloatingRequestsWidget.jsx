@@ -39,9 +39,10 @@ export function FloatingRequestsWidget({ isDarkMode, userRole, appMode, controll
       setRequests(fReqs);
       setNotifications(fNotifs);
       
-      const pendingCount = fReqs.filter(r => r.status === 'pendente' || r.status === 'pending').length;
-      const unreadNotifs = fNotifs.filter(n => !n.read).length; // Backend doesn't support read yet, treat all as newly fetched if ID > last
-      const totalNew = pendingCount + fNotifs.length;
+      const pendingCount = fReqs.filter(r => r.status === 'pendente' || r.status === 'pending' || r.status === 'pronto_para_homologacao').length;
+      const unreadNotifs = fNotifs.filter(n => !n.read).length; // Backend doesn't support read yet
+      const maxNotifId = fNotifs.length > 0 ? Math.max(...fNotifs.map(n => n.id)) : 0;
+      const totalNew = pendingCount + maxNotifId;
       
       // Native Push Browser Alert if increased
       if (typeof window !== 'undefined' && totalNew > prevCountRef.current && prevCountRef.current > 0) {
@@ -115,8 +116,8 @@ export function FloatingRequestsWidget({ isDarkMode, userRole, appMode, controll
   // If student and 0 notifications, don't show the bubble
   if (!isAdmin && notifications.length === 0) return null;
 
-  const pendingRequests = requests.filter(r => r.status === 'pendente' || r.status === 'pending');
-  const resolvedRequests = requests.filter(r => r.status !== 'pendente' && r.status !== 'pending').slice(0, 10);
+  const pendingRequests = requests.filter(r => r.status === 'pendente' || r.status === 'pending' || r.status === 'pronto_para_homologacao');
+  const resolvedRequests = requests.filter(r => r.status !== 'pendente' && r.status !== 'pending' && r.status !== 'pronto_para_homologacao').slice(0, 10);
   
   // Mixed timeline Feed
   const feed = [
@@ -236,7 +237,7 @@ export function FloatingRequestsWidget({ isDarkMode, userRole, appMode, controll
 
 function ChatItem({ req, isDarkMode, loadingId, handleUpdate, globalTeachers }) {
   const teacherName = resolveTeacherName(req.siape, globalTeachers) || req.siape;
-  const isPending = req.status === 'pendente' || req.status === 'pending';
+  const isPending = req.status === 'pendente' || req.status === 'pending' || req.status === 'pronto_para_homologacao';
   
   let desc = req.description;
   try {

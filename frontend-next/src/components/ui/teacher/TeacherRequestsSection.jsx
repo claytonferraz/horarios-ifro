@@ -123,14 +123,15 @@ export function TeacherRequestsSection({ isDarkMode, siape, selectedWeek, weekDa
                           Semana/Versão: {req.week_id}
                         </span>
                         <span className={`text-[8px] font-black px-2 py-0.5 rounded-full uppercase tracking-widest flex items-center gap-1 print:bg-transparent print:border print:border-slate-300 print:text-black print:px-1 ${
-                          req.status === 'pendente' ? (isDarkMode ? 'bg-amber-900/30 text-amber-500' : 'bg-amber-50 text-amber-600') :
-                          req.status === 'aprovado' ? (isDarkMode ? 'bg-emerald-900/30 text-emerald-500' : 'bg-emerald-50 text-emerald-600') :
+                          (req.status === 'pendente' || req.status === 'aguardando_colega') ? (isDarkMode ? 'bg-amber-900/30 text-amber-500' : 'bg-amber-50 text-amber-600') :
+                          req.status === 'pronto_para_homologacao' ? (isDarkMode ? 'bg-blue-900/30 text-blue-500' : 'bg-blue-50 text-blue-600') :
+                          (req.status === 'aprovado' || req.status === 'approved') ? (isDarkMode ? 'bg-emerald-900/30 text-emerald-500' : 'bg-emerald-50 text-emerald-600') :
                           (isDarkMode ? 'bg-rose-900/30 text-rose-500' : 'bg-rose-50 text-rose-600')
                         }`}>
-                          {req.status === 'pendente' && <Clock size={10} />}
-                          {req.status === 'aprovado' && <CheckCircle2 size={10} />}
+                          {(req.status === 'pendente' || req.status === 'aguardando_colega' || req.status === 'pronto_para_homologacao') && <Clock size={10} />}
+                          {(req.status === 'aprovado' || req.status === 'approved') && <CheckCircle2 size={10} />}
                           {req.status === 'rejeitado' && <XCircle size={10} />}
-                          {req.status}
+                          {req.status === 'aguardando_colega' ? 'Aguardando Colega' : req.status === 'pronto_para_homologacao' ? 'Pronto p/ Homologação' : req.status}
                         </span>
                       </div>
                       <p className={`text-xs font-bold leading-relaxed mb-1 print:text-sm print:text-black ${isDarkMode ? 'text-slate-300' : 'text-slate-700'}`}>{req.description}</p>
@@ -173,6 +174,14 @@ export function TeacherRequestsSection({ isDarkMode, siape, selectedWeek, weekDa
 
                     {req.status === 'aguardando_colega' && String(req.substitute_id) === String(siape) && (
                       <div className="mt-3 flex justify-end print:hidden">
+                        <button onClick={() => {
+                          apiClient.updateRequestStatus(req.id, 'rejeitado').then(() => {
+                            alert('Permuta Rejeitada! O colega solicitante será notificado.');
+                            loadRequests();
+                            if (typeof onCancel === 'function') onCancel();
+                          });
+                        }} className="px-4 py-2 text-[10px] font-black uppercase tracking-widest rounded-lg bg-rose-100 hover:bg-rose-200 text-rose-700 shadow-sm border border-rose-200 transition-all mr-2">Recusar</button>
+                        
                         <button onClick={() => {
                           apiClient.updateRequestStatus(req.id, 'pronto_para_homologacao').then(() => {
                             alert('Permuta Aceita! A coordenação foi notificada para homologar.');

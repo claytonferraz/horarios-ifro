@@ -274,6 +274,7 @@ app.get('/api/notifications', (req, res) => {
     targets.push('ALL_STUDENT');
   } else if (['professor', 'servidor', 'admin', 'gestao'].includes(userRole)) {
     targets.push('ALL_PROF');
+    if (['admin', 'gestao'].includes(userRole)) targets.push('ALL_ADMIN');
     if (siape && siape !== 'undefined') targets.push(siape);
   }
 
@@ -1234,7 +1235,13 @@ app.put('/api/teachers/:siape/admin-status', verifyToken, (req, res) => {
 // ==========================================
 app.get('/api/requests', (req, res) => {
   try {
-    db.all('SELECT * FROM exchange_requests ORDER BY created_at DESC', [], (err, rows) => {
+    let query = 'SELECT * FROM exchange_requests ORDER BY created_at DESC';
+    let params = [];
+    if (req.query.siape) {
+        query = 'SELECT * FROM exchange_requests WHERE requester_id = ? OR substitute_id = ? ORDER BY created_at DESC';
+        params = [req.query.siape, req.query.siape];
+    }
+    db.all(query, params, (err, rows) => {
       if (err) return res.status(500).json({ error: err.message });
       res.json(rows || []);
     });
@@ -1250,16 +1257,24 @@ app.post('/api/requests', (req, res) => {
     let returnWeekId = data.returnWeekId || data.week_id;
     let reason = data.reason || data.description;
     let obs = data.obs || (data.proposed_slot ? JSON.stringify(data.proposed_slot) : '');
-    
     let originalDay = '', originalTime = '', subject = '';
+    
+    let classIdToUpdate = targetClass;
+    let disciplineIdToUpdate = subject;
+    let originalSubjectName = 'A Definir';
+    let teacherNameDesc = `SIApE: ${requester}`;
 
     // Extracao Modal 1: VacantRequestModal
     if (!action && data.proposed_slot && data.proposed_slot.classType === 'Substituição') {
         action = 'vaga';
         targetClass = data.proposed_slot.className;
+        classIdToUpdate = data.proposed_slot.classId || targetClass;
         originalDay = data.proposed_slot.day;
         originalTime = data.proposed_slot.time;
         subject = data.proposed_slot.subject;
+        disciplineIdToUpdate = data.proposed_slot.disciplineId || subject;
+        originalSubjectName = data.proposed_slot.originalSubject || 'A Definir';
+        if (data.proposed_slot.teacherName) teacherNameDesc = data.proposed_slot.teacherName;
     }
     // Extracao Modal 2: TeacherExchangeModal
     else if (action === 'vaga' && data.proposedSlot) {
@@ -1278,16 +1293,41 @@ app.post('/api/requests', (req, res) => {
         // Substituicao Automática da Vaga (Auto-Homologação)
         let type = returnWeekId ? 'previa' : 'padrao';
 
-        const updateQ = `UPDATE schedules SET teacherId = ?, disciplineId = ? WHERE classId = ? AND dayOfWeek = ? AND slotId = ? AND type = ? AND (week_id = ? OR (? IS NULL AND (week_id IS NULL OR week_id = '')))`;
-        db.run(updateQ, [requester, subject, targetClass, originalDay, originalTime, type, returnWeekId || null, returnWeekId || null], function(err) {
+        const updateQ = `UPDATE schedules SET teacherId = ?, disciplineId = ?, records = json_patch(COALESCE(records, '{}'), ?) WHERE classId = ? AND dayOfWeek = ? AND slotId = ? AND type = ? AND (week_id = ? OR (? IS NULL AND (week_id IS NULL OR week_id = '')))`;
+        const newRecordsFragment = JSON.stringify({ isSubstituted: true, originalSubject: originalSubjectName });
+        db.run(updateQ, [requester, disciplineIdToUpdate, newRecordsFragment, classIdToUpdate, originalDay, originalTime, type, returnWeekId || null, returnWeekId || null], function(err) {
            if (err) return res.status(500).json({ error: err.message });
            
            db.run('INSERT INTO exchange_requests (action_type, requester_id, target_class, original_day, original_time, subject, return_week, reason, obs, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
              [action, requester, targetClass, originalDay, originalTime, subject, returnWeekId || '', reason || '', obs || '', 'aprovada'],
              function(err2) {
                if (err2) return res.status(500).json({ error: err2.message });
-               io.emit('schedule_updated');
-               res.json({ success: true, id: this.lastID, automatic: true });
+               
+               const insertedId = this.lastID;
+               
+               const finalizeVaga = (weekText) => {
+                 const now = new Date().toISOString();
+                 const notifyMsg = `Professor(a) ${teacherNameDesc}: assumiu aula vaga de (${originalSubjectName}) com a disciplina (${subject}) na turma ${targetClass} em ${originalDay} às ${originalTime}${weekText} (Auto-Homologada).`;
+                 db.run("INSERT INTO notifications (type, target, title, message, createdAt) VALUES ('SYSTEM', 'ALL_ADMIN', 'Substituição Automática', ?, ?)", [notifyMsg, now], function(){});
+                 
+                 io.emit('schedule_updated');
+                 res.json({ success: true, id: insertedId, automatic: true });
+               };
+
+               if (returnWeekId && returnWeekId !== 'padrao') {
+                 db.get("SELECT name, start_date, end_date FROM academic_weeks WHERE id = ?", [returnWeekId], (err3, row) => {
+                   if (!err3 && row && row.start_date && row.end_date) {
+                     const pS = row.start_date.split('-');
+                     const pE = row.end_date.split('-');
+                     const dStr = ` (Semana: ${pS[2]}/${pS[1]} a ${pE[2]}/${pE[1]})`;
+                     finalizeVaga(dStr);
+                   } else {
+                     finalizeVaga('');
+                   }
+                 });
+               } else {
+                 finalizeVaga(' (Matriz Padrão)');
+               }
              }
            );
         });
@@ -1309,9 +1349,16 @@ app.post('/api/requests', (req, res) => {
 
 app.put('/api/requests/:id/status', (req, res) => {
   try {
-    const { status } = req.body;
-    db.run('UPDATE exchange_requests SET status = ? WHERE id = ?', [status, req.params.id], function(err) {
+    const { status, admin_feedback } = req.body;
+    db.run('UPDATE exchange_requests SET status = ?, admin_feedback = COALESCE(?, admin_feedback) WHERE id = ?', [status, admin_feedback || null, req.params.id], function(err) {
       if (err) return res.status(500).json({ error: err.message });
+      
+      if (status === 'pronto_para_homologacao') {
+        const now = new Date().toISOString();
+        db.run("INSERT INTO notifications (type, target, title, message, createdAt) VALUES ('SYSTEM', 'ALL_ADMIN', 'Permuta Aceita pelo Colega', 'Um pedido de mudança acaba de receber o aceite do professor substituto. Aguardando sua homologação.', ?)", [now], function(){});
+        io.emit('schedule_updated');
+      }
+
       res.json({ success: true });
     });
   } catch(e) { res.status(500).json({error: e.message}); }

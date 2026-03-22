@@ -39,9 +39,9 @@ export function AdminRequestsManager({ isDarkMode }) {
   };
 
   // Extrair listas únicas para os filtros
-  const uniqueTeachers = [...new Set(requests.map(r => r.siape))].map(siape => {
+  const uniqueTeachers = [...new Set(requests.map(r => r.requester_id))].filter(Boolean).map(siape => {
     return { siape, name: globalTeachers?.find(t => t.siape === siape)?.nome_exibicao || siape };
-  }).sort((a, b) => a.name.localeCompare(b.name));
+  }).sort((a, b) => String(a.name).localeCompare(String(b.name)));
 
   const uniqueWeeks = [...new Set(requests.map(r => String(r.week_id)))].sort((a,b)=> a.localeCompare(b)).map(wId => {
     if (wId === 'padrao') return { id: wId, label: 'Grade Matriz Oficial (Padrão)' };
@@ -54,7 +54,7 @@ export function AdminRequestsManager({ isDarkMode }) {
 
   // Aplicar filtros
   const filteredRequests = requests.filter(req => {
-    if (filterTeacher && req.siape !== filterTeacher) return false;
+    if (filterTeacher && req.requester_id !== filterTeacher) return false;
     if (filterWeek && String(req.week_id) !== filterWeek) return false;
     if (filterStatus) {
        const mappedStatus = req.status === 'pending' ? 'pendente' : req.status;
@@ -180,7 +180,7 @@ export function AdminRequestsManager({ isDarkMode }) {
 }
 
 function RequestCard({ req, isDarkMode, loadingId, handleUpdate, globalTeachers, academicWeeks }) {
-  const teacherName = globalTeachers?.find(t => t.siape === req.siape)?.nome_exibicao || req.siape;
+  const teacherName = globalTeachers?.find(t => t.siape === req.requester_id)?.nome_exibicao || req.requester_id || 'Desconhecido';
   const [feedback, setFeedback] = React.useState(req.admin_feedback || '');
 
   const weekData = typeof req.week_id === 'string' && req.week_id === 'padrao' ? null : academicWeeks?.find(w => String(w.id) === String(req.week_id));
@@ -199,15 +199,15 @@ function RequestCard({ req, isDarkMode, loadingId, handleUpdate, globalTeachers,
               </div>
               <div>
                  <p className={`text-xs font-black uppercase tracking-tight print:text-sm print:text-black ${isDarkMode ? 'text-white' : 'text-slate-900'}`}>{teacherName}</p>
-                 <p className="text-[10px] font-bold text-slate-500">SIAPE: {req.siape}</p>
+                 <p className="text-[10px] font-bold text-slate-500">SIAPE: {req.requester_id}</p>
               </div>
             </div>
             <span className={`text-[8px] font-black px-2 py-0.5 rounded-full uppercase tracking-widest print:bg-transparent print:text-slate-800 print:border print:border-slate-300 print:px-1 ${
-              (req.status === 'pendente' || req.status === 'pending') ? (isDarkMode ? 'bg-amber-900/30 text-amber-500' : 'bg-amber-50 text-amber-600') :
+              (req.status === 'pendente' || req.status === 'pending' || req.status === 'pronto_para_homologacao') ? (isDarkMode ? 'bg-amber-900/30 text-amber-500' : 'bg-amber-50 text-amber-600') :
               req.status === 'aprovado' ? (isDarkMode ? 'bg-emerald-900/30 text-emerald-500' : 'bg-emerald-50 text-emerald-600') :
               (isDarkMode ? 'bg-rose-900/30 text-rose-500' : 'bg-rose-50 text-rose-600')
             }`}>
-              {req.status === 'pending' ? 'pendente' : req.status}
+              {req.status === 'pending' ? 'pendente' : req.status === 'pronto_para_homologacao' ? 'Pronto p/ Homologação' : req.status}
             </span>
           </div>
 
@@ -262,14 +262,14 @@ function RequestCard({ req, isDarkMode, loadingId, handleUpdate, globalTeachers,
               <label className="text-[9px] font-black uppercase text-slate-500 tracking-widest print:opacity-100 print:text-black">Ação / Resposta</label>
               <textarea 
                 placeholder="Feedback para o professor..."
-                className={`w-full min-h-[80px] p-3 rounded-xl border text-[11px] font-bold outline-none resize-none transition-all print:border-dashed print:border-slate-400 print:bg-slate-50/50 print:text-black print:min-h-0 print:h-auto ${req.status !== 'pendente' && req.status !== 'pending' ? 'opacity-50 print:opacity-100 cursor-not-allowed pointer-events-none' : ''} ${isDarkMode ? 'bg-slate-950 border-slate-700 text-white focus:border-indigo-500' : 'bg-white border-slate-200 text-slate-900 focus:border-indigo-600'}`}
+                className={`w-full min-h-[80px] p-3 rounded-xl border text-[11px] font-bold outline-none resize-none transition-all print:border-dashed print:border-slate-400 print:bg-slate-50/50 print:text-black print:min-h-0 print:h-auto ${req.status !== 'pendente' && req.status !== 'pending' && req.status !== 'pronto_para_homologacao' ? 'opacity-50 print:opacity-100 cursor-not-allowed pointer-events-none' : ''} ${isDarkMode ? 'bg-slate-950 border-slate-700 text-white focus:border-indigo-500' : 'bg-white border-slate-200 text-slate-900 focus:border-indigo-600'}`}
                 value={feedback}
                 onChange={e => setFeedback(e.target.value)}
-                readOnly={req.status !== 'pendente' && req.status !== 'pending'}
+                readOnly={req.status !== 'pendente' && req.status !== 'pending' && req.status !== 'pronto_para_homologacao'}
               />
            </div>
            
-           {(req.status === 'pendente' || req.status === 'pending') ? (
+           {(req.status === 'pendente' || req.status === 'pending' || req.status === 'pronto_para_homologacao') ? (
                <div className="grid grid-cols-2 gap-2 print:hidden">
                   <button 
                     disabled={loadingId === req.id}

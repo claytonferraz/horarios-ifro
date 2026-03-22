@@ -34,7 +34,7 @@ export function PortalView({
   const horariosFiltrados = React.useMemo(() => {
     if (!schedules || !Array.isArray(schedules)) return [];
     
-    const dbType = (scheduleMode === 'consolidado' || scheduleMode === 'atual') ? 'oficial' : scheduleMode;
+    const dbType = scheduleMode === 'consolidado' ? 'oficial' : scheduleMode;
 
     return schedules.filter(schedule => {
       if (String(schedule.academic_year) !== String(selectedConfigYear)) return false;
@@ -321,9 +321,11 @@ export function PortalView({
                id: s.id,
                course: courseObj ? courseObj.course : (s.courseName || s.courseId),
                className: classObj ? classObj.name : (s.className || s.classId),
+               classId: s.classId,
                day: MAP_DAYS[s.dayOfWeek],
                time: s.slotId,
                subject: discName,
+               disciplineId: s.disciplineId,
                teacher: s.teacherId ? String(s.teacherId).split(',').map(id => resolveTeacherName(id, globalTeachers)).join(',') : 'A Definir',
                teacherId: s.teacherId || '',
                room: s.room || '',
@@ -424,22 +426,25 @@ export function PortalView({
      const sortedWeeks = [...academicWeeks].sort((a,b) => new Date(a.start_date) - new Date(b.start_date));
 
      let modeSchedules = [];
-     if (scheduleMode === 'consolidado' || scheduleMode === 'atual') {
+     if (scheduleMode === 'consolidado') {
         modeSchedules = schedules.filter(s => s.type === 'oficial' && String(s.academic_year) === String(selectedConfigYear));
+     } else if (scheduleMode === 'atual') {
+        modeSchedules = schedules.filter(s => s.type === 'atual' && String(s.academic_year) === String(selectedConfigYear));
      } else if (scheduleMode === 'previa') {
         modeSchedules = schedules.filter(s => s.type === 'previa' && String(s.academic_year) === String(selectedConfigYear));
      } else if (scheduleMode === 'padrao') {
-        modeSchedules = []; // no explicit DB filter for padrao weeks, padrao uses generic template
+        modeSchedules = schedules.filter(s => s.type === 'padrao' && String(s.academic_year) === String(selectedConfigYear));
      } else {
         modeSchedules = schedules.filter(s => s.type === scheduleMode && String(s.academic_year) === String(selectedConfigYear));
      }
 
-     let uniqueWeekIds = [];
      if (scheduleMode === 'padrao') {
-        uniqueWeekIds = [...new Set(academicWeeks.map(w => String(w.id)))];
-     } else {
-        uniqueWeekIds = [...new Set(modeSchedules.map(s => String(s.week_id)))].filter(Boolean);
+        const versions = [...new Set(modeSchedules.map(s => String(s.week_id)))].filter(v => typeof v === 'string' && v.startsWith('V'));
+        if (versions.length === 0) return [{ value: 'V1', label: 'Versão 1 (V1)' }];
+        return versions.sort((a,b) => (parseInt(a.replace('V',''))||0) - (parseInt(b.replace('V',''))||0)).map(v => ({ value: v, label: `Versão ${v.replace('V', '')} (${v})` }));
      }
+
+     let uniqueWeekIds = [...new Set(modeSchedules.map(s => String(s.week_id)))].filter(Boolean);
 
      uniqueWeekIds = uniqueWeekIds.filter(id => {
         const w = academicWeeks.find(week => String(week.id) === String(id));
@@ -447,14 +452,18 @@ export function PortalView({
         const s = new Date(w.start_date + 'T00:00:00');
         const e = new Date(w.end_date + 'T23:59:59');
         
-        const isPast = e < now;
-        const isCurrent = now >= s && now <= e;
-        const isFuture = s > now;
+        // Ajuste inteligente: no sábado e domingo, avançamos "now" virtualmente para segunda para que a semana que vai começar já conste como 'atual'
+        const shiftedNow = new Date(now);
+        if (shiftedNow.getDay() === 6) shiftedNow.setDate(shiftedNow.getDate() + 2);
+        else if (shiftedNow.getDay() === 0) shiftedNow.setDate(shiftedNow.getDate() + 1);
+
+        const isPast = e < now; 
+        const isCurrent = shiftedNow >= s && shiftedNow <= e;
+        const isFuture = s > shiftedNow;
         
         if (scheduleMode === 'consolidado') return isPast;
         if (scheduleMode === 'atual') return isCurrent;
         if (scheduleMode === 'previa') return isFuture;
-        if (scheduleMode === 'padrao') return isFuture || isCurrent;
         return true;
      });
 
@@ -505,7 +514,6 @@ export function PortalView({
            label: labelStr
         };
      }).sort((a,b) => {
-        // Mode consolidado defaults descending logic implicitly by mapping? Let's just do it cleanly:
         if (scheduleMode === 'consolidado') return b.label.localeCompare(a.label);
         return a.label.localeCompare(b.label);
      });
@@ -519,32 +527,6 @@ export function PortalView({
         }
      }
    }, [dynamicWeeksList, selectedWeek, setSelectedWeek]);
-
-   // Regra de Negócio: Auto-avançar para a Prévia no Final de Semana se não houver aulas
-   React.useEffect(() => {
-       if (scheduleMode === 'atual' && dynamicWeeksList.length > 0 && selectedWeek && horariosFiltrados) {
-           const now = new Date();
-           const isWeekend = now.getDay() === 6 || now.getDay() === 0;
-
-           if (isWeekend) {
-               let myNextClasses = [];
-               
-               if (appMode === 'professor' && siape) {
-                   myNextClasses = horariosFiltrados.filter(s => s.teacherId && String(s.teacherId).split(',').includes(String(siape)));
-               } else if (appMode === 'aluno' && selectedClass) {
-                   myNextClasses = horariosFiltrados.filter(s => String(s.classId) === String(selectedClass));
-               } else {
-                   myNextClasses = horariosFiltrados;
-               }
-
-               const hasWeekendClasses = myNextClasses.some(s => s.dayOfWeek && (s.dayOfWeek.includes('Sábado') || s.dayOfWeek.includes('Domingo')));
-               
-               if (!hasWeekendClasses && typeof setScheduleMode === 'function') {
-                   setScheduleMode('previa');
-               }
-           }
-       }
-   }, [scheduleMode, dynamicWeeksList, selectedWeek, horariosFiltrados, appMode, siape, selectedClass, setScheduleMode]);
 
    React.useEffect(() => {
      if (!selectedClass && filteredClassesList.length > 0 && typeof setSelectedClass === 'function') {
@@ -1351,22 +1333,30 @@ export function PortalView({
             <label className="block text-[10px] font-black uppercase text-slate-500 mb-1">Qual disciplina você vai lecionar?</label>
             <select id="vacantSubject" className={"w-full p-3 rounded-xl border mb-4 text-xs font-bold outline-none " + (isDarkMode ? 'bg-slate-950 border-slate-700' : 'bg-white border-slate-200')}>
               <option value="">Selecione a disciplina...</option>
-              {[...new Set(mappedSchedules.filter(r => r.teacherId && String(r.teacherId).split(',').includes(String(selectedTeacher || siape)) && r.className === vacantRequestModal.className).map(r => r.subject))].map(sub => (
-                <option key={sub} value={sub}>{sub}</option>
+              {Object.values(mappedSchedules.filter(r => r.teacherId && String(r.teacherId).split(',').includes(String(selectedTeacher || siape)) && r.className === vacantRequestModal.className).reduce((acc, curr) => { 
+                  if (!acc[curr.subject]) acc[curr.subject] = { id: curr.disciplineId, name: curr.subject };
+                  return acc;
+              }, {})).map(sub => (
+                <option key={sub.id} value={`${sub.id}|${sub.name}`}>{sub.name}</option>
               ))}
             </select>
             <div className="flex gap-3 mt-6">
               <button onClick={() => setVacantRequestModal(null)} className="flex-1 py-3 rounded-xl bg-slate-200 text-slate-700 text-xs font-bold transition-all hover:bg-slate-300">Cancelar</button>
               <button onClick={() => {
-                const subj = document.getElementById('vacantSubject').value;
-                if (!subj) return setAlertModal({ title: 'Atenção', message: 'Selecione a disciplina que deseja lecionar antes de enviar o pedido.', type: 'alert' });
+                const subjVal = document.getElementById('vacantSubject').value;
+                if (!subjVal) return setAlertModal({ title: 'Atenção', message: 'Selecione a disciplina que deseja lecionar antes de enviar o pedido.', type: 'alert' });
                 
+                const [discId, subjName] = subjVal.split('|');
+                const teachersArray = globalTeachers || globalTeachersList || [];
+                const matchedTeacher = teachersArray.find(t => String(t.siape) === String(selectedTeacher || siape));
+                const requesterName = matchedTeacher?.nome_exibicao || matchedTeacher?.nome_completo || selectedTeacher || siape;
+
                 apiClient.submitRequest({
                   siape: selectedTeacher || siape,
                   week_id: selectedWeek,
-                  description: 'Solicitação para assumir aula vaga na turma ' + vacantRequestModal.className + ' - Disciplina: ' + subj,
+                  description: 'Solicitação para assumir aula vaga na turma ' + vacantRequestModal.className + ' - Disciplina: ' + subjName,
                   original_slot: JSON.stringify({ day: vacantRequestModal.day, time: vacantRequestModal.time, type: 'VAGA' }),
-                  proposed_slot: { day: vacantRequestModal.day, time: vacantRequestModal.time, className: vacantRequestModal.className, subject: subj, originalSubject: vacantRequestModal.subject, classType: 'Substituição' }
+                  proposed_slot: { day: vacantRequestModal.day, time: vacantRequestModal.time, className: vacantRequestModal.className, classId: vacantRequestModal.classId, subject: subjName, disciplineId: discId, originalSubject: vacantRequestModal.subject, classType: 'Substituição', teacherName: requesterName }
                 }).then(() => {
                   setAlertModal({ title: 'Tudo Certo!', message: 'Sua solicitação foi enviada com sucesso à coordenação.', type: 'success' });
                   setVacantRequestModal(null);

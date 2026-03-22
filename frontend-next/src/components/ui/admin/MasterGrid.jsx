@@ -1194,6 +1194,8 @@ export function MasterGrid({ isDarkMode, ...props }) {
                           const profMsgText = alertasObj.profAlertMsg?.length > 0 ? alertasObj.profAlertMsg.join('\n') : 'Conflito de Professor.';
                           const temAlertaSala = alertasObj.salaAlert;
                           
+                          const isVaga = !aulaNesteSlot?.professores || aulaNesteSlot.professores.length === 0 || aulaNesteSlot.professores.some(p => !p || p === 'A Definir' || p === '-');
+                          
                           return (
                             <td 
                               key={slotKey} 
@@ -1206,9 +1208,14 @@ export function MasterGrid({ isDarkMode, ...props }) {
                                   draggable
                                   onDragStart={(e) => handleDragStart(e, aulaNesteSlot, slotKey)}
                                   onDragEnd={handleDragEnd}
-                                  className={`group/card w-[95%] sm:w-[90%] mx-auto min-h-[56px] rounded border flex flex-col justify-between p-2 cursor-grab hover:ring-2 ring-emerald-500 transition-all shadow-sm overflow-hidden relative`}
-                                  style={getCardStyle(aulaNesteSlot.courseId, aulaNesteSlot.classId, aulaNesteSlot.disciplina, isDarkMode)}
+                                  className={`group/card w-[95%] sm:w-[90%] mx-auto min-h-[56px] rounded flex flex-col justify-between p-2 cursor-grab transition-all shadow-sm overflow-hidden relative ${isVaga ? 'border-[2px] border-rose-500 shadow-[0_0_10px_rgba(244,63,94,0.4)] ring-2 ring-rose-500/50 hover:ring-rose-400' : 'border hover:ring-2 ring-emerald-500'}`}
+                                  style={isVaga ? { backgroundColor: isDarkMode ? 'rgba(225,29,72,0.15)' : 'rgba(255,228,230,0.8)', color: isDarkMode ? '#fecdd3' : '#881337', borderColor: '#e11d48' } : getCardStyle(aulaNesteSlot.courseId, aulaNesteSlot.classId, aulaNesteSlot.disciplina, isDarkMode)}
                                 >
+                                  {isVaga && (
+                                    <div className="absolute top-0 right-0 left-0 bg-rose-600 text-white text-[7px] font-black uppercase text-center py-[1px] shadow-sm tracking-[0.2em] animate-pulse">
+                                      ⚠ Aula Vaga
+                                    </div>
+                                  )}
                                   <button onClick={(e) => { e.preventDefault(); e.stopPropagation(); setGrade(prev => { const n = {...prev}; delete n[slotKey]; return n; }); }} className="absolute top-0 right-0 bg-rose-500 hover:bg-rose-600 text-white font-bold p-1 rounded-bl-md z-20 opacity-0 group-hover/card:opacity-100 cursor-pointer transition-opacity shadow-sm" title="Remover Aula do Horário" >
                                     <X size={8} strokeWidth={4} />
                                   </button>
@@ -1221,23 +1228,21 @@ export function MasterGrid({ isDarkMode, ...props }) {
                                         <span title="Aula assumida via Vaga" className="text-[5px] font-black uppercase tracking-widest text-white px-1.5 py-[2px] rounded border border-indigo-400 bg-indigo-600 block shadow-sm shadow-indigo-900/40">Substituição</span>
                                      </div>
                                   )}
-                                  <div className="flex flex-col flex-1 shrink-0 mt-3.5 mb-1" title={`${aulaNesteSlot.disciplina} - ${aulaNesteSlot.className}`}>
-                                     <span className="text-[10px] font-black uppercase tracking-widest leading-none">{aulaNesteSlot.disciplina}</span>
+                                  <div className={`flex flex-col flex-1 shrink-0 ${isVaga ? 'mt-4 mb-1' : 'mt-3.5 mb-1'}`} title={`${aulaNesteSlot.disciplina} - ${aulaNesteSlot.className}`}>
+                                     <span className="text-[10px] font-black uppercase tracking-widest leading-none drop-shadow-sm">{aulaNesteSlot.disciplina}</span>
                                      {aulaNesteSlot.isSubstituted && aulaNesteSlot.originalSubject && <span className="text-[7.5px] opacity-90 uppercase mt-0.5 leading-tight text-white bg-indigo-900/60 border border-indigo-400/30 rounded px-1 py-[1px] w-fit shadow-sm">Era: {aulaNesteSlot.originalSubject}</span>}
-                                     <span className="text-[7.5px] opacity-75 font-bold tracking-widest truncate mt-1">{aulaNesteSlot.className}</span>
+                                     <span className="text-[7.5px] opacity-90 font-bold tracking-widest truncate mt-1 break-words">{aulaNesteSlot.className}</span>
                                   </div>
                                   <div className="flex justify-between items-center mt-auto pt-1 gap-1" title={temAlertaProf ? profMsgText : "Professor e Local"}>
                                     <div className={`flex items-center gap-1 overflow-hidden flex-1 ${temAlertaProf ? 'text-red-500 dark:text-red-400 bg-red-500/10 px-0.5 rounded border border-red-500/20' : 'text-slate-500 dark:text-slate-300'}`}>
-                                       {temAlertaProf && <AlertTriangle size={8} className="shrink-0" />}
+                                       {temAlertaProf && !isVaga && <AlertTriangle size={8} className="shrink-0" />}
                                        <span className="truncate text-[9px] font-bold" title={aulaNesteSlot.professores?.join(' + ')}>
-                                           {aulaNesteSlot.professores && aulaNesteSlot.professores.length > 0
-                                               ? aulaNesteSlot.professores.map(p => {
-                                                   if (!p || p === 'A Definir' || p === '-') return 'A Def.';
-                                                   return p.split(' ')[0];
-                                               }).join(' + ')
-                                               : 'A Def.'}
+                                           {isVaga ? 'PRECISA-SE DE PROF.' : 
+                                              (aulaNesteSlot.professores && aulaNesteSlot.professores.length > 0
+                                               ? aulaNesteSlot.professores.map(p => p.split(' ')[0]).join(' + ')
+                                               : 'A Def.')}
                                        </span>
-                                       {aulaNesteSlot.teacherChanged && (
+                                       {aulaNesteSlot.teacherChanged && !isVaga && (
                                            <Clock size={11} className="text-amber-500 dark:text-amber-400 shrink-0" title="Registro Histórico: Professor diverge da matriz atual." />
                                        )}
                                     </div>
