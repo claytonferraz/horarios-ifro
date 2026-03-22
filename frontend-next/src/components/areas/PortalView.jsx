@@ -638,16 +638,6 @@ export function PortalView({
                         <BarChart3 size={14} /> Controle de Aulas
                       </button>
 
-                      {/* Dropdown Outras Ações (Professor) mantido intacto */}
-                      <div className="relative group flex-1 md:flex-none ml-auto">
-                        <button className={`w-full md:w-auto flex items-center justify-center gap-2 px-4 py-3 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all ${['outro_professor', 'sem_professor'].includes(viewMode) ? (isDarkMode ? 'bg-slate-800 border border-slate-700 text-emerald-400' : 'bg-white border border-slate-300 text-emerald-600') : (isDarkMode ? 'bg-slate-800/50 text-slate-400 hover:text-slate-200' : 'bg-white/50 text-slate-500 hover:text-slate-800 border border-transparent')}`}>
-                          <Settings size={14} /> Mais Funções
-                        </button>
-                        <div className={`absolute right-0 top-full mt-2 w-56 rounded-xl shadow-2xl p-2 z-[99] opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 ${isDarkMode ? 'bg-slate-800 border border-slate-700' : 'bg-white border border-slate-200'}`}>
-                           <button onClick={() => setViewMode('outro_professor')} className={`w-full text-left flex items-center gap-3 px-4 py-3 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all mb-1 ${viewMode === 'outro_professor' ? (isDarkMode ? 'bg-slate-900 text-cyan-400' : 'bg-slate-100 text-cyan-600') : (isDarkMode ? 'hover:bg-slate-700 text-slate-300' : 'hover:bg-slate-50 text-slate-600')}`}><Users size={14} /> Ver Colegas</button>
-                           <button onClick={() => setViewMode('sem_professor')} className={`w-full text-left flex items-center gap-3 px-4 py-3 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all ${viewMode === 'sem_professor' ? (isDarkMode ? 'bg-slate-900 text-red-400' : 'bg-slate-100 text-red-600') : (isDarkMode ? 'hover:bg-slate-700 text-slate-300' : 'hover:bg-slate-50 text-slate-600')}`}><AlertTriangle size={14} /> Aulas Vagas</button>
-                        </div>
-                      </div>
                     </>
                   )}
 
