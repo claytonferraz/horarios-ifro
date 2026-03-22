@@ -107,7 +107,7 @@ export function HomeApp({ appMode }) {
       />
 
 
-      <main className="flex-1 max-w-[1400px] w-full mx-auto p-4 lg:px-6 mt-2 space-y-4">
+      <main className="flex-1 w-full max-w-none px-2 sm:px-6 mx-auto mt-2 space-y-4">
         {security.errorMsg && !security.authModal.show && !security.pwdModal.show && !adminActions.importUrlModal.show && !adminActions.conflictModal.show && !adminActions.deleteModal.show && (
           <div className={`border-l-4 p-2 flex items-center justify-between shadow-sm px-4 md:px-6 text-xs font-bold animate-in slide-in-from-top-2 rounded-r-lg ${isDarkMode ? 'bg-red-900/20 border-red-500 text-red-300' : 'bg-red-50 border-red-500 text-red-800'}`}>
             <div className="flex items-center gap-2">

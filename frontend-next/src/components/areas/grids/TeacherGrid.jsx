@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState, useEffect } from "react";
 import { UserCircle, Printer } from "lucide-react";
 import { TeacherRequestsSection } from "../../ui/teacher/TeacherRequestsSection";
 
@@ -185,7 +185,7 @@ export const TeacherGrid = React.memo(
                         </span>
                       </div>
                       <div className="hidden md:block overflow-x-auto print:overflow-visible">
-                        <table className="w-full min-w-[600px] border-collapse relative text-xs print:w-full print:min-w-0">
+                        <table className="w-full min-w-[600px] border-collapse relative text-xs print:w-full print:max-w-none print:table-fixed print:border-collapse">
                           <thead>
                             <tr
                               className={`border-b text-[9px] font-black uppercase tracking-widest text-slate-400 ${isDarkMode ? "bg-slate-900 border-slate-700" : "bg-slate-50 border-slate-200"}`}
@@ -474,7 +474,7 @@ export const TeacherGrid = React.memo(
                                         </tr>
                                         {isLunch && (
                                           <tr
-                                            className={`print-interval text-[8px] font-black uppercase tracking-[0.4em] border-y-[3px] ${isDarkMode ? "bg-slate-800/60 text-slate-500 border-slate-700" : "bg-slate-100/60 text-slate-400 border-slate-300"}`}
+                                            className={`print-interval print:break-inside-avoid print:bg-slate-200 print:text-black print:overflow-hidden text-[8px] font-black uppercase tracking-[0.4em] border-y-[3px] ${isDarkMode ? "bg-slate-800/60 text-slate-500 border-slate-700" : "bg-slate-100/60 text-slate-400 border-slate-300"}`}
                                           >
                                             <td
                                               colSpan={courseClasses.length + 1}

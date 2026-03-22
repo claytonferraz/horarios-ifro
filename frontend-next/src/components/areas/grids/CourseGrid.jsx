@@ -45,6 +45,7 @@ export const CourseGrid = React.memo(
   }) => {
     const [mobileSelectedClasses, setMobileSelectedClasses] = useState({});
     const [activeCourseTab, setActiveCourseTab] = useState("Todos");
+    const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
 
     const availableCourses = useMemo(() => {
       return [...new Set(mappedSchedules.map((r) => r.course))]
@@ -64,6 +65,7 @@ export const CourseGrid = React.memo(
     }, [availableCourses, activeCourseTab]);
 
     return (
+      <React.Fragment>
       <DragDropContext onDragStart={onDragStart} onDragEnd={onDragEnd}>
         <div className="flex flex-col lg:flex-row gap-4 animate-in zoom-in-95 duration-500">
           <div className="flex-1 space-y-6">
@@ -244,7 +246,7 @@ export const CourseGrid = React.memo(
                               </span>
                             </div>
                             <div className="hidden md:block overflow-x-auto print:overflow-visible">
-                              <table className="w-full min-w-[800px] border-collapse relative text-xs print:w-full print:min-w-0">
+                              <table className="w-full min-w-[800px] border-collapse relative text-xs print:w-full print:max-w-none print:table-fixed print:border-collapse">
                                 <thead>
                                   <tr
                                     className={`border-b text-[9px] font-black uppercase tracking-widest text-slate-400 ${isDarkMode ? "bg-slate-900 border-slate-700" : "bg-slate-50 border-slate-200"}`}
@@ -631,7 +633,7 @@ export const CourseGrid = React.memo(
                                               </tr>
                                               {intervalMatched && (
                                                 <tr
-                                                  className={`print-interval text-[9px] font-black uppercase tracking-widest ${isDarkMode ? "bg-amber-900/40 text-amber-500 border-amber-900/50" : "bg-amber-50 text-amber-700 border-amber-200"} border-y`}
+                                                  className={`print-interval print:break-inside-avoid print:bg-slate-200 print:text-black print:overflow-hidden text-[9px] font-black uppercase tracking-widest ${isDarkMode ? "bg-amber-900/40 text-amber-500 border-amber-900/50" : "bg-amber-50 text-amber-700 border-amber-200"} border-y`}
                                                 >
                                                   <td
                                                     className={`sticky left-[40px] z-10 py-2 px-3 text-center border-r-[3px] bg-transparent ${isDarkMode ? "border-amber-900/50" : "border-amber-200"}`}
@@ -934,12 +936,6 @@ export const CourseGrid = React.memo(
           {["admin", "gestao"].includes(userRole) &&
             scheduleMode === "previa" && (
               <div className="w-full lg:w-72 shrink-0 space-y-4 sticky top-20 flex flex-col items-end no-print">
-                <ScheduleNotifications
-                  recordsForWeek={activeData}
-                  subjectHoursMeta={subjectHoursMeta}
-                  isDarkMode={isDarkMode}
-                />
-
                 <div
                   className={`w-full rounded-2xl border shadow-sm p-4 ${isDarkMode ? "bg-slate-800 border-slate-700" : "bg-white border-slate-200"}`}
                 >
@@ -1024,6 +1020,40 @@ export const CourseGrid = React.memo(
             )}
         </div>
       </DragDropContext>
+
+      {/* HUB GLOBAL DE NOTIFICAÇÕES - WIDGET FLUTUANTE (Exclusivo para Gestores) */}
+      {["admin", "gestao"].includes(userRole) && scheduleMode === "previa" && (
+        <div className="fixed bottom-6 right-6 z-[99] flex flex-col-reverse items-end gap-3 print:hidden">
+           {!isNotificationsOpen ? (
+              <div className="group relative flex items-center justify-end">
+                <div className="absolute right-full mr-4 px-3 py-1.5 bg-slate-800 text-white text-[10px] font-black uppercase tracking-widest rounded-lg opacity-0 pointer-events-none group-hover:opacity-100 transition-opacity whitespace-nowrap shadow-lg">
+                  Ver Alertas da Grade
+                </div>
+                <button onClick={() => setIsNotificationsOpen(true)} className="relative p-4 rounded-full bg-amber-500 text-white shadow-xl hover:scale-110 hover:bg-amber-400 transition-all flex items-center justify-center">
+                  ⚠️
+                </button>
+              </div>
+           ) : (
+              <div className={`fixed bottom-6 right-6 z-[100] w-96 max-w-[90vw] animate-in slide-in-from-bottom-10`}>
+                 <div className={`rounded-2xl shadow-2xl flex flex-col max-h-[70vh] border ${isDarkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'}`}>
+                    <div className="flex justify-between items-center p-4 border-b border-slate-200 dark:border-slate-700 shrink-0">
+                      <h3 className="font-black uppercase tracking-widest text-sm text-amber-500">Alertas da Grade</h3>
+                      <button onClick={() => setIsNotificationsOpen(false)} className="text-slate-400 hover:text-rose-500 font-bold p-2 transition-colors">X</button>
+                    </div>
+                    <div className="overflow-y-auto flex-1 custom-scrollbar p-0">
+                      <ScheduleNotifications
+                        recordsForWeek={activeData}
+                        subjectHoursMeta={subjectHoursMeta}
+                        isDarkMode={isDarkMode}
+                      />
+                    </div>
+                 </div>
+              </div>
+           )}
+        </div>
+      )}
+
+    </React.Fragment>
     );
   },
 );

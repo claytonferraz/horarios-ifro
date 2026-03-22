@@ -37,7 +37,7 @@ export function Navbar() {
         isDarkMode ? "bg-slate-900 border-slate-800" : "bg-white border-slate-200"
       }`}
     >
-      <div className="max-w-[1400px] mx-auto px-4 lg:px-6 h-16 flex items-center justify-between">
+      <div className="w-full max-w-none mx-auto px-4 lg:px-6 h-16 flex items-center justify-between">
         <div
           className="flex items-center gap-3 cursor-pointer"
           onClick={() => navigateTo("/")}

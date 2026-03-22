@@ -78,6 +78,7 @@ export function MasterGrid({ isDarkMode, ...props }) {
   const [selectedType, setSelectedType] = useState('previa'); 
   const [selectedWeek, setSelectedWeek] = useState('');
   const [shiftFilter, setShiftFilter] = useState('todos');
+  const [teacherFilter, setTeacherFilter] = useState('');
   const [refreshTrigger, setRefreshTrigger] = useState(0);
   const [draggedItem, setDraggedItem] = useState(null);
 
@@ -293,7 +294,8 @@ export function MasterGrid({ isDarkMode, ...props }) {
         selectedCourses.includes(String(s.courseId)) &&
         s.type === selectedType &&
         (s.academic_year === selectedConfigYear || !s.academic_year) &&
-        (selectedType === 'padrao' ? (String(s.week_id) === String(selectedWeek) || (!s.week_id && selectedWeek === 'V1')) : String(s.week_id) === String(selectedWeek))
+        (selectedType === 'padrao' ? (String(s.week_id) === String(selectedWeek) || (!s.week_id && selectedWeek === 'V1')) : String(s.week_id) === String(selectedWeek)) &&
+        (!teacherFilter || String(s.teacherId).includes(String(teacherFilter)))
       );
       filtered.forEach(schedule => {
         let refCard;
@@ -347,7 +349,7 @@ export function MasterGrid({ isDarkMode, ...props }) {
     }
     setAulasNeutras(aulasReais); 
     setGrade(initialGrade);
-  }, [selectedCourses, turmasDoCurso, curriculumData, globalTeachersList, schedules, selectedType, selectedWeek, selectedConfigYear]);
+  }, [selectedCourses, turmasDoCurso, curriculumData, globalTeachersList, schedules, selectedType, selectedWeek, selectedConfigYear, teacherFilter]);
 
   // Agrupa as aulas pendentes por Turma (Ordenadas Alfabeticamente)
   const neutrasPorTurma = useMemo(() => {
@@ -847,6 +849,13 @@ export function MasterGrid({ isDarkMode, ...props }) {
             <option value="noturno">Noturno</option>
           </select>
 
+          {globalTeachersList?.length > 0 && (
+            <select value={teacherFilter || ''} onChange={(e) => setTeacherFilter(e.target.value)} className={`px-4 py-2.5 rounded-lg border shadow-sm outline-none cursor-pointer text-xs font-bold uppercase tracking-wider text-sky-600 dark:text-sky-400 ${isDarkMode ? 'bg-slate-800 border-slate-600' : 'bg-white border-slate-200'}`}>
+              <option value="">-- Filtrar por Professor --</option>
+              {globalTeachersList.map(t => <option key={t.id || t.siape} value={t.id || t.siape}>{t.nome_exibicao || t.nome_completo || t.name}</option>)}
+            </select>
+          )}
+
           <select value={selectedType} onChange={e => setSelectedType(e.target.value)} className={`px-4 py-2.5 rounded-lg border shadow-sm outline-none cursor-pointer text-xs font-bold uppercase tracking-wider text-indigo-600 dark:text-indigo-400 ${isDarkMode ? 'bg-slate-800 border-slate-600' : 'bg-white border-slate-200'}`}>
               <option value="padrao">Padrão Anual (Base)</option>
               <option value="previa">Prévia Semanal</option>
@@ -997,7 +1006,7 @@ export function MasterGrid({ isDarkMode, ...props }) {
                Nenhum curso selecionado.
              </div>
           ) : (
-            <table className="w-full text-left border-collapse min-w-[800px]">
+            <table className="w-full text-left border-collapse min-w-[800px] print:w-full print:max-w-none print:table-fixed print:border-collapse">
               <thead className={`sticky top-0 z-40 shadow-sm ${isDarkMode ? 'bg-slate-800' : 'bg-white'}`}>
                 <tr>
                   <th className={`py-2 px-2 w-20 sticky left-0 top-0 z-50 ${isDarkMode ? 'bg-slate-800' : 'bg-white'}`}></th>
@@ -1388,24 +1397,39 @@ export function MasterGrid({ isDarkMode, ...props }) {
          </div>
       </div>
       
-      <DapeRequestsWidget 
-         isOpen={isRequestsWidgetOpen}
-         setIsOpen={setIsRequestsWidgetOpen}
-         requests={pendingRequests}
-         isDarkMode={isDarkMode}
-         onApprove={(req) => {
-           apiClient.updateRequestStatus(req.id, 'aprovado').then(() => {
-             alert('Solicitação Homologada! O sistema agora a considera válida para o histórico.');
-             setPendingRequests(prev => prev.filter(r => r.id !== req.id));
-           }).catch(e => alert(e.message));
-         }}
-         onReject={(req) => {
-           apiClient.updateRequestStatus(req.id, 'recusado').then(() => {
-             alert('Solicitação recusada. O professor será notificado.');
-             setPendingRequests(prev => prev.filter(r => r.id !== req.id));
-           }).catch(e => alert(e.message));
-         }}
-      />
+      {/* WIDGETS FLUTUANTES (DAPE, etc) */}
+      <div className="fixed bottom-6 right-6 z-[99] flex flex-col-reverse items-end gap-3 print:hidden">
+         {!isRequestsWidgetOpen && (
+            <div className="group relative flex items-center justify-end">
+               <div className="absolute right-full mr-4 px-3 py-1.5 bg-slate-800 text-white text-[10px] font-black uppercase tracking-widest rounded-lg opacity-0 pointer-events-none group-hover:opacity-100 transition-opacity whitespace-nowrap shadow-lg">
+                  Prévia: Solicitações Pendentes (DAPE)
+               </div>
+               <button onClick={() => setIsRequestsWidgetOpen(true)} className="relative p-4 rounded-full bg-emerald-600 text-white shadow-xl hover:scale-110 hover:bg-emerald-500 transition-all flex items-center justify-center">
+                  🔔
+                  {pendingRequests?.length > 0 && <span className="absolute -top-1 -right-1 bg-red-500 rounded-full px-2 py-0.5 text-[10px] font-bold shadow-sm">{pendingRequests.length}</span>}
+               </button>
+            </div>
+         )}
+         
+         <DapeRequestsWidget 
+            isOpen={isRequestsWidgetOpen}
+            setIsOpen={setIsRequestsWidgetOpen}
+            requests={pendingRequests}
+            isDarkMode={isDarkMode}
+            onApprove={(req) => {
+               apiClient.updateRequestStatus(req.id, 'aprovado').then(() => {
+                 alert('Solicitação Homologada! O sistema agora a considera válida para o histórico.');
+                 setPendingRequests(prev => prev.filter(r => r.id !== req.id));
+               }).catch(e => alert(e.message));
+            }}
+            onReject={(req) => {
+               apiClient.updateRequestStatus(req.id, 'recusado').then(() => {
+                 alert('Solicitação recusada. O professor será notificado.');
+                 setPendingRequests(prev => prev.filter(r => r.id !== req.id));
+               }).catch(e => alert(e.message));
+            }}
+         />
+      </div>
 
     </div>
   );
