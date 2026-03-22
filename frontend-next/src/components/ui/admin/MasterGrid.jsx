@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { CalendarDays, GripVertical, AlertCircle, Save, Filter, MapPin, Loader2, Download, X, Check, Layers, Trash2, Eye, EyeOff, Target, CheckCircle2, AlertTriangle, Clock } from 'lucide-react';
+import { CalendarDays, GripVertical, AlertCircle, Save, Filter, MapPin, Loader2, Download, X, Check, Layers, Trash2, Eye, EyeOff, Target, CheckCircle2, AlertTriangle, Clock, Bell } from 'lucide-react';
 import { useData } from '@/contexts/DataContext';
 import { MAP_DAYS, getColorHash, resolveTeacherName } from '@/lib/dates';
 import { apiClient, getHeaders } from '@/lib/apiClient';
@@ -62,6 +62,12 @@ export function MasterGrid({ isDarkMode, ...props }) {
  
   const [showCloneModal, setShowCloneModal] = useState(false);
   const [cloneSourceYear, setCloneSourceYear] = useState('');
+
+  const [isRightPanelOpen, setIsRightPanelOpen] = useState(false);
+  const [dismissedRequests, setDismissedRequests] = useState(() => {
+     if (typeof window !== 'undefined') return JSON.parse(localStorage.getItem('dismissed_requests') || '[]');
+     return [];
+  });
 
   const [aulasNeutras, setAulasNeutras] = useState([]);
   const [grade, setGrade] = useState({});
@@ -645,6 +651,9 @@ export function MasterGrid({ isDarkMode, ...props }) {
      return changeRequests.filter(req => String(req.week_id) === String(selectedWeek));
   }, [changeRequests, selectedWeek, selectedType]);
 
+  const filteredRequests = activeRequestsForWeek.filter(req => !dismissedRequests.includes(req.id));
+  const totalAlerts = dashboardAlerts.list.length + filteredRequests.length;
+
   return (
     <div className={`flex flex-col gap-4 animate-in fade-in duration-300 ${isDarkMode ? 'text-slate-200' : 'text-slate-800'}`}>
       
@@ -714,6 +723,11 @@ export function MasterGrid({ isDarkMode, ...props }) {
 
            <button onClick={() => { setSaveOptions({ type: selectedType, weekId: selectedWeek }); setModalMode('save'); }} disabled={selectedCourses.length === 0} className="flex items-center justify-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white disabled:opacity-50 px-6 py-3 rounded-xl text-xs font-black uppercase tracking-widest transition-all shadow-md hover:shadow-lg">
               <Save size={16} /> Alterar / Salvar Novo
+           </button>
+           
+           <button onClick={() => setIsRightPanelOpen(true)} className={`relative flex items-center justify-center gap-2 disabled:opacity-50 px-6 py-3 rounded-xl text-xs font-black uppercase tracking-widest transition-all shadow-sm border ${isDarkMode ? 'bg-slate-800 text-slate-300 border-slate-700 hover:bg-slate-700' : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50'}`}>
+              <Bell size={16} /> Central de Alertas
+              {totalAlerts > 0 && <span className="absolute -top-1.5 -right-1.5 bg-rose-500 text-white w-5 h-5 flex flex-col items-center justify-center rounded-full text-[10px] animate-pulse shadow">{totalAlerts > 9 ? '9+' : totalAlerts}</span>}
            </button>
           </div>
         </div>
@@ -788,47 +802,6 @@ export function MasterGrid({ isDarkMode, ...props }) {
            </div>
         </div>
       </div>
-
-      {dashboardAlerts.list.length > 0 && (
-         <div className={`p-4 rounded-xl border flex flex-col gap-2 ${isDarkMode ? 'bg-red-500/10 border-red-500/20' : 'bg-red-50 border-red-200'}`}>
-            <h3 className={`text-[11px] font-black uppercase tracking-widest flex items-center gap-2 ${isDarkMode ? 'text-red-400' : 'text-red-600'}`}>
-               <AlertTriangle size={16} /> Relatório de Alertas Ativos na Grade de Edição ({dashboardAlerts.list.length})
-            </h3>
-            <ul className="flex flex-col gap-1.5 mt-1">
-               {dashboardAlerts.list.map((msg, i) => (
-                 <li key={i} className={`text-[11px] font-bold flex items-start gap-2 ${isDarkMode ? 'text-red-300/80' : 'text-red-800/80'}`}>
-                    <span className="mt-0.5">•</span> <span>{msg}</span>
-                 </li>
-               ))}
-            </ul>
-         </div>
-      )}
-
-      {activeRequestsForWeek.length > 0 && (
-         <div className={`p-4 rounded-xl border flex flex-col gap-3 ${isDarkMode ? 'bg-indigo-950/20 border-indigo-900/50' : 'bg-indigo-50/50 border-indigo-200/50'}`}>
-            <h3 className={`text-[11px] font-black uppercase tracking-widest flex items-center gap-2 ${isDarkMode ? 'text-indigo-400' : 'text-indigo-600'}`}>
-               <AlertCircle size={16} /> Status das Modificações Solicitadas para esta Grade ({activeRequestsForWeek.length})
-            </h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-2 mt-1">
-               {activeRequestsForWeek.map((req, i) => {
-                  const profName = globalTeachersList?.find(t => t.siape === req.siape)?.nome_exibicao || req.siape;
-                  return (
-                     <div key={i} className={`p-3 rounded-lg border flex flex-col gap-1.5 ${isDarkMode ? 'bg-slate-900 border-slate-700' : 'bg-white border-slate-200'}`}>
-                        <div className="flex items-center justify-between">
-                           <span className={`text-[9px] font-black uppercase truncate max-w-[150px] ${isDarkMode ? 'text-slate-300' : 'text-slate-700'}`}>{profName}</span>
-                           <span className={`text-[8px] font-black px-2 py-0.5 rounded-full uppercase tracking-widest ${
-                              req.status === 'aprovado' ? (isDarkMode ? 'bg-emerald-900/30 text-emerald-500' : 'bg-emerald-50 text-emerald-600') :
-                              req.status === 'rejeitado' ? (isDarkMode ? 'bg-rose-900/30 text-rose-500' : 'bg-rose-50 text-rose-600') :
-                              (isDarkMode ? 'bg-amber-900/30 text-amber-500' : 'bg-amber-50 text-amber-600')
-                           }`}>{req.status}</span>
-                        </div>
-                        <p className={`text-[10px] font-bold leading-relaxed opacity-80 ${isDarkMode ? 'text-slate-400' : 'text-slate-600'}`}>{req.description}</p>
-                     </div>
-                  );
-               })}
-            </div>
-         </div>
-      )}
 
       <div className="flex flex-col lg:flex-row gap-4">
         
@@ -928,12 +901,21 @@ export function MasterGrid({ isDarkMode, ...props }) {
                          <span className="truncate px-4">{turma.name}</span>
                          <div className="absolute right-0 flex items-center gap-1 opacity-0 group-hover/th:opacity-100 transition-opacity bg-inherit pl-2">
                             <button 
-                              onClick={() => setHiddenClasses(turmasDoCurso.map(t => t.id).filter(id => String(id) !== String(turma.id)))} 
-                              title="Modo Foco: Isolar esta turma (Ocultar as outras)" 
-                              className={`hover:text-indigo-500 transition-colors rounded shadow-sm border p-0.5 ${isDarkMode ? 'bg-slate-800 border-slate-700 text-slate-400' : 'bg-white border-slate-200 text-slate-500'}`}
-                            >
-                               <Target size={12} />
-                            </button>
+                               onClick={() => {
+                                  const otherClassIds = turmasDoCurso.map(t => String(t.id)).filter(id => id !== String(turma.id));
+                                  if (otherClassIds.length === 0) return;
+                                  const isIsolated = otherClassIds.every(id => hiddenClasses.includes(id));
+                                  if (isIsolated) {
+                                      setHiddenClasses(prev => prev.filter(id => !otherClassIds.includes(id)));
+                                  } else {
+                                      setHiddenClasses(prev => [...prev.filter(id => !otherClassIds.includes(id)), ...otherClassIds]);
+                                  }
+                               }} 
+                               title={hiddenClasses.length > 0 && turmasDoCurso.map(t => String(t.id)).filter(id => id !== String(turma.id)).every(id => hiddenClasses.includes(id)) ? "Remover Modo Foco (Mostrar outras turmas)" : "Modo Foco: Isolar esta turma (Ocultar as outras)"} 
+                               className={`hover:text-indigo-500 transition-colors rounded shadow-sm border p-0.5 ${isDarkMode ? 'bg-slate-800 border-slate-700 text-slate-400' : 'bg-white border-slate-200 text-slate-500'}`}
+                             >
+                                <Target size={12} />
+                             </button>
                             <button 
                               onClick={() => setHiddenClasses(prev => [...prev, turma.id])} 
                               title="Ocultar Turma" 
@@ -1199,6 +1181,74 @@ export function MasterGrid({ isDarkMode, ...props }) {
           </div>
         </div>
       )}
+      {isRightPanelOpen && <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-[9998]" onClick={() => setIsRightPanelOpen(false)} />}
+      <div className={`fixed top-0 right-0 h-full w-full sm:w-[400px] shadow-2xl z-[9999] transition-transform transform duration-300 flex flex-col ${isRightPanelOpen ? 'translate-x-0' : 'translate-x-full'} ${isDarkMode ? 'bg-slate-900 border-l border-slate-700' : 'bg-slate-50 border-l border-slate-300'}`}>
+         <div className={`p-5 border-b flex justify-between items-center shadow-sm ${isDarkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'}`}>
+            <h2 className="text-sm font-black uppercase tracking-widest flex items-center gap-2">
+               <Bell size={18} className="text-indigo-500" />
+               Central de Alertas ({totalAlerts})
+            </h2>
+            <button onClick={() => setIsRightPanelOpen(false)} className={`p-1.5 rounded transition-colors ${isDarkMode ? 'hover:bg-slate-700 text-slate-400' : 'hover:bg-slate-100 text-slate-500'}`}>
+               <X size={20} />
+            </button>
+         </div>
+         <div className="flex-1 overflow-y-auto p-5 pb-20 space-y-6">
+            
+            {dashboardAlerts.list.length > 0 && (
+               <div className={`p-4 rounded-xl border flex flex-col gap-3 shadow-sm ${isDarkMode ? 'bg-red-950/20 border-red-900/50' : 'bg-white border-red-200'}`}>
+                  <h3 className={`text-[12px] font-black uppercase tracking-widest flex items-center gap-2 ${isDarkMode ? 'text-red-400' : 'text-red-600'}`}>
+                     <AlertTriangle size={16} /> Choques na Grade ({dashboardAlerts.list.length})
+                  </h3>
+                  <div className="flex-1 border-t border-red-500/20"></div>
+                  <ul className="flex flex-col gap-2 mt-1">
+                     {dashboardAlerts.list.map((msg, i) => (
+                       <li key={i} className={`text-[11px] font-bold flex items-start gap-2 p-2 rounded-lg ${isDarkMode ? 'bg-red-900/20 text-red-300/80' : 'bg-red-50 text-red-800/80'}`}>
+                          <span className="mt-0.5 pointer-events-none">•</span> <span>{msg}</span>
+                       </li>
+                     ))}
+                  </ul>
+               </div>
+            )}
+
+            {filteredRequests.length > 0 && (
+               <div className={`p-4 rounded-xl border flex flex-col gap-3 shadow-sm ${isDarkMode ? 'bg-indigo-950/20 border-indigo-900/50' : 'bg-white border-indigo-200'}`}>
+                  <h3 className={`text-[12px] font-black uppercase tracking-widest flex items-center gap-2 ${isDarkMode ? 'text-indigo-400' : 'text-indigo-600'}`}>
+                     <AlertCircle size={16} /> Status de Solicitações ({filteredRequests.length})
+                  </h3>
+                  <div className="flex-1 border-t border-indigo-500/20"></div>
+                  <div className="flex flex-col gap-3 mt-1">
+                     {filteredRequests.map((req, i) => {
+                        const profName = globalTeachersList?.find(t => t.siape === req.siape)?.nome_exibicao || req.siape;
+                        return (
+                           <div key={i} className={`p-3.5 rounded-xl border flex flex-col gap-2 shadow-sm relative group transition-all ${isDarkMode ? 'bg-slate-800 border-slate-700 hover:border-slate-600' : 'bg-slate-50 border-slate-200 hover:border-indigo-100'}`}>
+                              <button onClick={() => setDismissedRequests(p => { const nv = [...p, req.id]; if(typeof window !== 'undefined') localStorage.setItem('dismissed_requests', JSON.stringify(nv)); return nv; })} title="Finalizar/Ocultar Notificação para Mim" className={`absolute -top-3 -right-3 p-1.5 rounded-full shadow-lg border transition-transform opacity-0 group-hover:opacity-100 group-hover:scale-110 ${isDarkMode ? 'bg-slate-700 border-slate-600 hover:bg-rose-900 text-slate-300 hover:text-rose-400' : 'bg-white border-slate-200 hover:bg-rose-100 text-slate-500 hover:text-rose-600'}`}>
+                                 <X size={12} strokeWidth={3} />
+                              </button>
+                              <div className="flex items-center justify-between">
+                                 <span className={`text-[10px] font-black uppercase truncate max-w-[150px] ${isDarkMode ? 'text-slate-300' : 'text-slate-700'}`}>{profName}</span>
+                                 <span className={`text-[8px] font-black px-2 py-0.5 rounded-full uppercase tracking-widest ${
+                                    req.status === 'aprovado' ? (isDarkMode ? 'bg-emerald-900/30 text-emerald-500' : 'bg-emerald-50 text-emerald-600') :
+                                    req.status === 'rejeitado' ? (isDarkMode ? 'bg-rose-900/30 text-rose-500' : 'bg-rose-50 text-rose-600') :
+                                    (isDarkMode ? 'bg-amber-900/30 text-amber-500' : 'bg-amber-50 text-amber-600')
+                                 }`}>{req.status}</span>
+                              </div>
+                              <p className={`text-[11px] font-bold leading-relaxed ${isDarkMode ? 'text-slate-400' : 'text-slate-600'}`}>{req.description}</p>
+                           </div>
+                        );
+                     })}
+                  </div>
+               </div>
+            )}
+
+            {totalAlerts === 0 && (
+               <div className="flex flex-col items-center justify-center p-8 mt-10 text-center opacity-50">
+                  <Bell size={48} className="mb-4 stroke-1" />
+                  <p className="text-sm font-bold uppercase tracking-widest">Tudo Limpo!</p>
+                  <p className="text-[11px] font-bold mt-2 max-w-[200px]">Não há nenhuma notificação ou choque para visualizar no momento.</p>
+               </div>
+            )}
+         </div>
+      </div>
     </div>
   );
 }
