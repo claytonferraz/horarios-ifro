@@ -1291,11 +1291,12 @@ app.post('/api/requests', (req, res) => {
 
     if (action === 'vaga') {
         // Substituicao Automática da Vaga (Auto-Homologação)
-        let type = returnWeekId ? 'previa' : 'padrao';
+        const REVERSE_MAP_DAYS = { 'Segunda-feira': 1, 'Terça-feira': 2, 'Quarta-feira': 3, 'Quinta-feira': 4, 'Sexta-feira': 5, 'Sábado': 6 };
+        const dayOfWeekToUpdate = REVERSE_MAP_DAYS[originalDay] || originalDay;
 
-        const updateQ = `UPDATE schedules SET teacherId = ?, disciplineId = ?, records = json_patch(COALESCE(records, '{}'), ?) WHERE classId = ? AND dayOfWeek = ? AND slotId = ? AND type = ? AND (week_id = ? OR (? IS NULL AND (week_id IS NULL OR week_id = '')))`;
+        const updateQ = `UPDATE schedules SET teacherId = ?, disciplineId = ?, records = json_patch(COALESCE(records, '{}'), ?) WHERE classId = ? AND dayOfWeek = ? AND slotId = ? AND ( (week_id = ? AND type IN ('previa', 'atual', 'oficial')) OR (? IS NULL AND type = 'padrao' AND (week_id IS NULL OR week_id = '')) )`;
         const newRecordsFragment = JSON.stringify({ isSubstituted: true, originalSubject: originalSubjectName });
-        db.run(updateQ, [requester, disciplineIdToUpdate, newRecordsFragment, classIdToUpdate, originalDay, originalTime, type, returnWeekId || null, returnWeekId || null], function(err) {
+        db.run(updateQ, [requester, disciplineIdToUpdate, newRecordsFragment, classIdToUpdate, dayOfWeekToUpdate, originalTime, returnWeekId || null, returnWeekId || null], function(err) {
            if (err) return res.status(500).json({ error: err.message });
            
            db.run('INSERT INTO exchange_requests (action_type, requester_id, target_class, original_day, original_time, subject, return_week, reason, obs, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
