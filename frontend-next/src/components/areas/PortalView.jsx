@@ -1126,26 +1126,7 @@ export function PortalView({
                   {/* GRADE DE HORÁRIO (Visão Curso MATRIZ) */}
                   {viewMode === 'curso' && (
                     <div className="flex flex-col gap-4 animate-in zoom-in-95 duration-500">
-                      {appMode === 'professor' && (
-                         <div className={`p-4 rounded-xl border flex flex-col md:flex-row gap-4 md:items-center no-print ${isDarkMode ? 'bg-slate-900/50 border-slate-800' : 'bg-slate-50 border-slate-100'}`}>
-                             {/* Teacher select filter (Apenas Padrão) */}
-                            {scheduleMode === 'padrao' && (
-                              <div className="w-full md:w-72">
-                                <SearchableSelect 
-                                   isDarkMode={isDarkMode}
-                                   options={[
-                                     {value: 'Todos', label: 'Qualquer Colega (Mostrar Todas as Turmas)'},
-                                     ...(globalTeachers || []).map(t => ({value: String(t.siape || t.id), label: t.nome_exibicao || t.nome_completo || t.name || 'Sem Nome'}))
-                                   ]} 
-                                   value={padraoFilterTeacher} 
-                                   onChange={setPadraoFilterTeacher} 
-                                   colorClass={isDarkMode ? 'bg-blue-900/30 border-blue-800/50 text-blue-200 shadow-sm' : 'bg-blue-50 border-blue-200 text-blue-900 shadow-sm'}
-                                   placeholder="Procurar turmas do colega..."
-                                />
-                              </div>
-                            )}
-                         </div>
-                      )}
+
                       
                       <DragDropContext onDragStart={onDragStart} onDragEnd={onDragEnd}>
                         <div className="flex flex-col lg:flex-row gap-4">
@@ -1177,6 +1158,8 @@ export function PortalView({
                           appMode={appMode}
                           showOnlyMyClasses={showOnlyMyClasses}
                           setShowOnlyMyClasses={setShowOnlyMyClasses}
+                          padraoFilterTeacher={padraoFilterTeacher}
+                          setPadraoFilterTeacher={setPadraoFilterTeacher}
                         />
                         </div>
                       </DragDropContext>
