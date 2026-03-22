@@ -509,8 +509,13 @@ app.post('/api/schedules/bulk-course', verifyToken, (req, res) => {
     db.all(`SELECT * FROM schedules WHERE (${cond} OR courseId IS NULL) AND type = ?`, [...coursesToClear, type], (err, existingRows) => {
       if (err) return res.status(500).json({ error: err.message });
 
-      // Se for um horário específico de uma semana (previa ou oficial), validar apenas se for cruzamento crítico padrao
-      const relevantRows = type === 'padrao' ? existingRows.filter(r => (!weekId || r.week_id === weekId) && (!academicYear || r.academic_year === academicYear)) : [];
+      // Isolamento de Choques de Horário (Padrão Versions)
+      let relevantRows = [];
+      if (type === 'padrao' && weekId) {
+          relevantRows = existingRows.filter(r => String(r.academic_year) === String(academicYear) && String(r.week_id) === String(weekId));
+      } else {
+          relevantRows = existingRows.filter(r => String(r.academic_year) === String(academicYear) && (!weekId || String(r.week_id) === String(weekId)));
+      }
 
       if (type === 'padrao') {
         for (const slot of schedules) {
@@ -546,7 +551,7 @@ app.post('/api/schedules/bulk-course', verifyToken, (req, res) => {
       }
 
       // No conflicts! Faz a transação massiva
-      let condStr = weekId ? `type = ? AND (week_id = ? OR week_id IS NULL)` : `type = ? AND (week_id IS NULL)`;
+      let condStr = weekId ? `type = ? AND week_id = ?` : `type = ? AND (week_id IS NULL OR week_id = '')`;
       let params = weekId ? [type, weekId] : [type];
       
       db.all(`SELECT * FROM schedules WHERE courseId IN (${placeholders}) AND ${condStr}`, [...coursesToClear, ...params], (errOld, oldRows) => {
@@ -572,14 +577,12 @@ app.post('/api/schedules/bulk-course', verifyToken, (req, res) => {
           db.run("BEGIN TRANSACTION");
           
           if (weekId) {
-              db.run(`DELETE FROM schedules WHERE courseId IN (${placeholders}) AND type = ? AND (week_id = ? OR week_id IS NULL) AND (academic_year = ? OR academic_year IS NULL)`, [...coursesToClear, type, weekId, academicYear || '']);
+              db.run(`DELETE FROM schedules WHERE courseId IN (${placeholders}) AND type = ? AND week_id = ? AND academic_year = ?`, [...coursesToClear, type, weekId, academicYear || '']);
           } else {
-              db.run(`DELETE FROM schedules WHERE courseId IN (${placeholders}) AND type = ? AND (academic_year = ? OR academic_year IS NULL)`, [...coursesToClear, type, academicYear || '']);
+              db.run(`DELETE FROM schedules WHERE courseId IN (${placeholders}) AND type = ? AND (academic_year = ? OR academic_year IS NULL) AND (week_id IS NULL OR week_id = '')`, [...coursesToClear, type, academicYear || '']);
           }
 
           const stmt = db.prepare("INSERT INTO schedules (id, courseId, academic_year, classId, dayOfWeek, slotId, teacherId, disciplineId, room, type, week_id, updatedAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
-          const now = new Date().toISOString();
-
           for (const slot of schedules) {
             const id = `s_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
             const targetCourse = slot.courseId || coursesToClear[0];
@@ -635,9 +638,9 @@ app.delete('/api/schedules/bulk-course', verifyToken, (req, res) => {
     db.serialize(() => {
         db.run("BEGIN TRANSACTION");
         if (weekId) {
-            db.run(`DELETE FROM schedules WHERE courseId IN (${placeholders}) AND type = ? AND (week_id = ? OR week_id IS NULL) AND (academic_year = ? OR academic_year IS NULL)`, [...courseIds, type, weekId, academicYear || '']);
+            db.run(`DELETE FROM schedules WHERE courseId IN (${placeholders}) AND type = ? AND week_id = ? AND (academic_year = ? OR academic_year IS NULL)`, [...courseIds, type, weekId, academicYear || '']);
         } else {
-            db.run(`DELETE FROM schedules WHERE courseId IN (${placeholders}) AND type = ? AND (academic_year = ? OR academic_year IS NULL)`, [...courseIds, type, academicYear || '']);
+            db.run(`DELETE FROM schedules WHERE courseId IN (${placeholders}) AND type = ? AND (academic_year = ? OR academic_year IS NULL) AND (week_id IS NULL OR week_id = '')`, [...courseIds, type, academicYear || '']);
         }
         db.run("COMMIT", (err) => {
           if (err) return res.status(500).json({ error: err.message });

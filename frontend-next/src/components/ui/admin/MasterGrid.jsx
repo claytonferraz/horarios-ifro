@@ -118,6 +118,28 @@ export function MasterGrid({ isDarkMode, ...props }) {
   }, [classTimes, shiftFilter]);
   const diasExibidos = activeDays && activeDays.length > 0 ? activeDays : ['Segunda-feira', 'Terça-feira', 'Quarta-feira', 'Quinta-feira', 'Sexta-feira'];
 
+  // Auto-preenche os Cursos com base nos dados salvos no respectivo Padrão/Semana
+  useEffect(() => {
+    if (!schedules || schedules.length === 0) {
+        if (schedules && schedules.length === 0) setSelectedCourses([]);
+        return;
+    }
+    const coursesWithData = new Set();
+    schedules.forEach(s => {
+      if (
+        s.type === selectedType &&
+        (String(s.academic_year) === String(selectedConfigYear) || !s.academic_year) &&
+        (selectedType === 'padrao' 
+          ? (String(s.week_id) === String(selectedWeek) || (!s.week_id && selectedWeek === 'V1')) 
+          : String(s.week_id) === String(selectedWeek)
+        )
+      ) {
+        if (s.courseId) coursesWithData.add(String(s.courseId));
+      }
+    });
+    setSelectedCourses(Array.from(coursesWithData));
+  }, [selectedType, selectedWeek, selectedConfigYear, schedules]);
+
   useEffect(() => {
     if (selectedType === 'padrao' || !selectedWeek || !academicWeeks) {
       setDisabledDays(new Set());
@@ -259,11 +281,11 @@ export function MasterGrid({ isDarkMode, ...props }) {
     }));
     const initialGrade = {}; const aulasAlocadasIds = [];
     if (schedules && schedules.length > 0) {
-      const filtered = schedules.filter(s => 
-        selectedCourses.includes(String(s.courseId)) && 
-        s.type === selectedType && 
-        (s.academic_year === selectedConfigYear || !s.academic_year) && 
-        (selectedType === 'padrao' ? true : String(s.week_id) === String(selectedWeek))
+      const filtered = schedules.filter(s =>
+        selectedCourses.includes(String(s.courseId)) &&
+        s.type === selectedType &&
+        (s.academic_year === selectedConfigYear || !s.academic_year) &&
+        (selectedType === 'padrao' ? (String(s.week_id) === String(selectedWeek) || (!s.week_id && selectedWeek === 'V1')) : String(s.week_id) === String(selectedWeek))
       );
       filtered.forEach(schedule => {
         let refCard;
@@ -824,7 +846,14 @@ export function MasterGrid({ isDarkMode, ...props }) {
               <option value="oficial">Histórico Oficial</option>
           </select>
 
-          {selectedType !== 'padrao' && (
+          {selectedType === 'padrao' ? (
+            <select value={selectedWeek} onChange={(e) => setSelectedWeek(e.target.value)} className={`px-4 py-2.5 rounded-lg border shadow-sm outline-none cursor-pointer text-xs font-bold uppercase tracking-wider text-rose-600 dark:text-rose-400 ${isDarkMode ? 'bg-slate-800 border-slate-600' : 'bg-white border-slate-200'}`}>
+              <option value="">-- Versão do Padrão --</option>
+              {Array.from({ length: Math.max(4, schedules.filter(s => s.type === 'padrao' && s.week_id?.startsWith('V')).reduce((max, s) => Math.max(max, parseInt(s.week_id.replace('V', '')) || 1), 1)) }).map((_, i) => (
+                  <option key={`V${i + 1}`} value={`V${i + 1}`}>Versão {i + 1} (V{i + 1})</option>
+              ))}
+            </select>
+          ) : (
             <select value={selectedWeek} onChange={(e) => setSelectedWeek(e.target.value)} className={`px-4 py-2.5 rounded-lg border shadow-sm outline-none cursor-pointer text-xs font-bold uppercase tracking-wider text-amber-600 dark:text-amber-400 ${isDarkMode ? 'bg-slate-800 border-slate-600' : 'bg-white border-slate-200'}`}>
               <option value="">-- Semana --</option>
               {academicWeeks?.filter(w => String(w.academic_year) === String(selectedConfigYear)).map(w => {
@@ -1356,92 +1385,150 @@ export function MasterGrid({ isDarkMode, ...props }) {
 // -------------------------------------------------------------
 // SUB-COMPONENTES DE AÇÃO (SALVAR E IMPORTAR)
 // -------------------------------------------------------------
-function SaveMatrixModal({ isDarkMode, grade, selectedCourses, saveOptions, setSaveOptions, academicWeeks, selectedConfigYear, loadedType, loadedWeek, onClose, onSuccess, setSystemDialog }) {
+function SaveMatrixModal({ isDarkMode, grade, selectedCourses, courses, saveOptions, setSaveOptions, academicWeeks, schedules, selectedConfigYear, loadedType, loadedWeek, onClose, onSuccess, setSystemDialog }) {
   const [isSaving, setIsSaving] = useState(false);
+  const [padraoBaseVersion, setPadraoBaseVersion] = useState('V1');
+
+  const maxPadraoV = useMemo(() => {
+     let m = 1;
+     schedules.forEach(s => {
+       if (s.type === 'padrao' && s.week_id && s.week_id.startsWith('V')) {
+          const num = parseInt(s.week_id.replace('V', ''));
+          if (!isNaN(num) && num > m) m = num;
+       }
+     });
+     return m;
+  }, [schedules]);
+
   const currentYearWeeks = useMemo(() => academicWeeks?.filter(w => String(w.academic_year) === String(selectedConfigYear)) || [], [academicWeeks, selectedConfigYear]);
 
   const availableOptions = useMemo(() => {
-      if (loadedType === 'padrao') return [{ value: 'padrao', label: '0. Atualizar: Padrão Anual (Base)' }, { value: 'previa', label: '1. Criar: Prévia Semanal' }];
-      if (loadedType === 'previa') return [{ value: 'previa', label: '1. Atualizar: Prévia' }, { value: 'atual', label: '2. Promover para: Atual' }];
-      if (loadedType === 'atual') return [{ value: 'atual', label: '2. Atualizar: Atual' }, { value: 'oficial', label: '3. Promover para: Oficial' }];
-      if (loadedType === 'oficial') return [{ value: 'oficial', label: '3. Retificar: Oficial' }];
-      return [{ value: 'padrao', label: '0. Criar: Padrão Anual (Base)' }, { value: 'previa', label: '1. Criar: Prévia Semanal' }];
+    if (loadedType === 'padrao') return [{ value: 'padrao', label: '0. Atualizar: Padrão Anual (Base)' }, { value: 'previa', label: '1. Criar: Prévia Semanal' }];
+    if (loadedType === 'previa') return [{ value: 'previa', label: '1. Atualizar: Prévia' }, { value: 'atual', label: '2. Promover para: Atual' }];
+    if (loadedType === 'atual') return [{ value: 'atual', label: '2. Atualizar: Atual' }, { value: 'oficial', label: '3. Promover para: Oficial' }];
+    if (loadedType === 'oficial') return [{ value: 'oficial', label: '3. Retificar: Oficial' }];
+    return [{ value: 'padrao', label: '0. Criar: Padrão Anual (Base)' }, { value: 'previa', label: '1. Criar: Prévia Semanal' }];
   }, [loadedType]);
 
-  useEffect(() => { setSaveOptions({ type: availableOptions[0].value, weekId: loadedWeek }); }, [loadedType, loadedWeek, availableOptions]);
+  useEffect(() => {
+    if (saveOptions.type === 'padrao') {
+      setSaveOptions(p => ({...p, weekId: (loadedType === 'padrao' && loadedWeek) ? loadedWeek : `V${maxPadraoV + 1}`}));
+    } else {
+      setSaveOptions(p => ({...p, weekId: (loadedType !== 'padrao' && loadedWeek) ? loadedWeek : ''}));
+    }
+  }, [saveOptions.type, loadedType, loadedWeek, setSaveOptions, maxPadraoV]);
 
   const executarSalvamentoNoBackend = async () => {
-      const payload = Object.entries(grade).map(([key, aula]) => {
-         const [classId, dayOfWeek, slotId] = key.split('|');
-         return { courseId: aula.courseId, classId, dayOfWeek, slotId, teacherId: aula.teacherIds ? aula.teacherIds.join(',') : 'A Definir', disciplineId: aula.disciplineId || aula.id, room: aula.sala };
-      });
+    const payload = Object.entries(grade).map(([key, aula]) => {
+      const [classId, dayOfWeek, slotId] = key.split('|');
+      return { courseId: aula.courseId, classId, dayOfWeek, slotId, teacherId: aula.teacherIds ? aula.teacherIds.join(',') : 'A Definir', disciplineId: aula.disciplineId || aula.id, room: aula.sala };
+    });
 
-      let weekText = saveOptions.weekId;
-      if (saveOptions.weekId) {
-          const wObj = academicWeeks?.find(w => String(w.id) === String(saveOptions.weekId));
-          if (wObj && wObj.start_date && wObj.end_date) {
-              const d1 = wObj.start_date.split('-');
-              const d2 = wObj.end_date.split('-');
-              if (d1.length === 3 && d2.length === 3) weekText = `de ${d1[2]}/${d1[1]} a ${d2[2]}/${d2[1]}`;
-          }
-      }
+    if (saveOptions.type !== 'padrao') {
+        const padraoBase = schedules.filter(s => s.type === 'padrao' && selectedCourses.includes(String(s.courseId)) && (s.week_id === padraoBaseVersion || (!s.week_id && padraoBaseVersion === 'V1')));
+        
+        padraoBase.forEach(pSlot => {
+            const exists = payload.some(pl => String(pl.classId) === String(pSlot.classId) && String(pl.dayOfWeek) === String(pSlot.dayOfWeek) && String(pl.slotId) === String(pSlot.slotId));
+            if (!exists) {
+                payload.push({
+                    courseId: pSlot.courseId, classId: pSlot.classId, dayOfWeek: pSlot.dayOfWeek,
+                    slotId: pSlot.slotId, teacherId: 'A Definir', disciplineId: pSlot.disciplineId, room: pSlot.room
+                });
+            }
+        });
+    }
 
-      setIsSaving(true);
-      try {
-          const resp = await fetch('/api/schedules/bulk-course', {
-            method: 'POST', headers: getHeaders(),
-            body: JSON.stringify({ courseIds: selectedCourses, type: saveOptions.type, weekId: saveOptions.weekId || null, weekLabel: weekText, academicYear: selectedConfigYear, schedules: payload })
-          });
-          if(!resp.ok) {
-              const errData = await resp.json().catch(() => ({}));
-              throw new Error(errData.error || 'Erro Crítico desconhecido no Backend!');
-          }
-          onSuccess();
-      } catch(e) { setSystemDialog({ isOpen: true, type: 'alert', title: 'Falha ao Salvar', message: e.message }); } finally { setIsSaving(false); }
+    let weekText = saveOptions.weekId;
+    if (saveOptions.weekId && saveOptions.type !== 'padrao') {
+        const wObj = academicWeeks?.find(w => String(w.id) === String(saveOptions.weekId));
+        if (wObj && wObj.start_date && wObj.end_date) {
+            const d1 = wObj.start_date.split('-');
+            const d2 = wObj.end_date.split('-');
+            if (d1.length === 3 && d2.length === 3) weekText = `de ${d1[2]}/${d1[1]} a ${d2[2]}/${d2[1]}`;
+        }
+    }
+
+    setIsSaving(true);
+    try {
+        const resp = await fetch('/api/schedules/bulk-course', {
+          method: 'POST', headers: getHeaders(),
+          body: JSON.stringify({ courseIds: selectedCourses, type: saveOptions.type, weekId: saveOptions.weekId || null, weekLabel: weekText, academicYear: selectedConfigYear, schedules: payload })
+        });
+        if(!resp.ok) {
+            const errData = await resp.json().catch(() => ({}));
+            throw new Error(errData.error || 'Erro Crítico desconhecido no Backend!');
+        }
+        onSuccess();
+    } catch(e) { setSystemDialog({ isOpen: true, type: 'alert', title: 'Falha ao Salvar', message: e.message }); } finally { setIsSaving(false); }
   };
 
   const handleConfirmSave = async () => {
-      if (saveOptions.type !== 'padrao' && !saveOptions.weekId) return setSystemDialog({ isOpen: true, type: 'alert', title: 'Atenção', message: 'Selecione uma semana letiva de destino!' });
-      
-      if (saveOptions.type === 'oficial') {
-          setSystemDialog({
-              isOpen: true, type: 'confirm', title: 'Confirmação Crítica',
-              message: 'Você está prestes a salvar um histórico Oficial e Imutável. Tem certeza que deseja consolidar essa grade?',
-              onConfirm: () => executarSalvamentoNoBackend()
-          });
-          return;
-      }
-      executarSalvamentoNoBackend();
+    if (!saveOptions.weekId) return setSystemDialog({ isOpen: true, type: 'alert', title: 'Atenção', message: 'Selecione uma semana/versão de destino!' });
+    if (saveOptions.type === 'oficial') {
+      setSystemDialog({
+        isOpen: true, type: 'confirm', title: 'Confirmação Crítica',
+        message: 'Você está prestes a salvar um histórico Oficial e Imutável. Tem certeza que deseja consolidar essa grade?',
+        onConfirm: () => executarSalvamentoNoBackend()
+      });
+      return;
+    }
+    executarSalvamentoNoBackend();
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
-      <div className={`w-full max-w-2xl rounded-xl p-6 ${isDarkMode ? 'bg-slate-900 text-white' : 'bg-white'}`}>
-         <h2 className="text-lg font-black uppercase mb-4">Pipeline de Aprovação</h2>
-          <div className={`grid ${saveOptions.type !== 'padrao' ? 'grid-cols-2' : 'grid-cols-1'} gap-4 mb-6`}>
+    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-200">
+      <div className={`w-full max-w-2xl rounded-2xl p-6 shadow-2xl border ${isDarkMode ? 'bg-slate-900 border-slate-700 text-white' : 'bg-white border-slate-200'}`}>
+        <h2 className="text-xl font-black uppercase mb-6 tracking-widest text-indigo-500">Pipeline de Gravação</h2>
+
+        <div className={`grid ${saveOptions.type !== 'padrao' ? 'grid-cols-2' : 'grid-cols-1'} gap-5 mb-6`}>
+          <div>
+            <label className="block text-[10px] font-black uppercase opacity-60 mb-2">Ação Permitida</label>
+            <select value={saveOptions.type} onChange={e => setSaveOptions(p => ({...p, type: e.target.value}))} className={`w-full p-3.5 rounded-xl border text-sm font-bold outline-none transition-colors ${isDarkMode ? 'bg-slate-950 border-slate-700 focus:border-indigo-500' : 'bg-white border-slate-300 focus:border-indigo-500 text-black'}`}>
+               {availableOptions.map(opt => <option key={opt.value} value={opt.value}>{opt.label}</option>)}
+            </select>
+          </div>
+          
+          {saveOptions.type !== 'padrao' ? (
             <div>
-              <label className="block text-[10px] font-black uppercase opacity-60 mb-2">Ação Permitida</label>
-              <select value={saveOptions.type} onChange={e => setSaveOptions(p => ({...p, type: e.target.value}))} className="w-full p-3 rounded border text-xs font-bold text-black">
-                 {availableOptions.map(opt => <option key={opt.value} value={opt.value}>{opt.label}</option>)}
+              <label className="block text-[10px] font-black uppercase opacity-60 mb-2">Semana Destino</label>
+              <select value={saveOptions.weekId} onChange={e => setSaveOptions(p => ({...p, weekId: e.target.value}))} className={`w-full p-3.5 rounded-xl border text-sm font-bold outline-none transition-colors ${isDarkMode ? 'bg-slate-950 border-slate-700 focus:border-indigo-500' : 'bg-white border-slate-300 focus:border-indigo-500 text-black'}`}>
+                 <option value="">Selecione...</option>
+                 {currentYearWeeks.map(w => (
+                     <option key={w.id} value={w.id}>{w.name}</option>
+                 ))}
               </select>
             </div>
-            {saveOptions.type !== 'padrao' && (
-              <div>
-                <label className="block text-[10px] font-black uppercase opacity-60 mb-2">Semana Destino</label>
-                <select value={saveOptions.weekId} onChange={e => setSaveOptions(p => ({...p, weekId: e.target.value}))} className="w-full p-3 rounded border text-xs text-black">
-                   <option value="">Selecione...</option>
-                   {currentYearWeeks.map(w => (
-                       <option key={w.id} value={w.id}>{formatWeekLabel(w)}</option>
-                   ))}
-                </select>
-              </div>
-            )}
-         </div>
-         <div className="flex justify-end gap-3 border-t pt-4">
-             <button onClick={onClose} className="px-4 py-2 font-bold text-xs bg-slate-200 text-slate-700 rounded">Cancelar</button>
-             <button onClick={handleConfirmSave} disabled={isSaving} className="px-4 py-2 font-bold text-xs bg-emerald-600 text-white rounded">{isSaving ? 'Aguarde...' : 'Confirmar Gravação'}</button>
-         </div>
-      </div>
+          ) : (
+            <div>
+              <label className="block text-[10px] font-black uppercase opacity-60 mb-2">Salvar como Versão do Padrão</label>
+              <select value={saveOptions.weekId} onChange={e => setSaveOptions(p => ({...p, weekId: e.target.value}))} className={`w-full p-3.5 rounded-xl border text-sm font-black outline-none transition-colors ${isDarkMode ? 'bg-slate-950 border-rose-500/50 text-rose-400' : 'bg-rose-50 border-rose-300 text-rose-700'}`}>
+                 {(loadedType === 'padrao' && loadedWeek) && (
+                     <option value={loadedWeek}>Atualizar Versão Existente ({loadedWeek})</option>
+                 )}
+                 <option value={`V${maxPadraoV + 1}`}>Salvar Nova Versão (V${maxPadraoV + 1})</option>
+              </select>
+            </div>
+          )}
+       </div>
+
+       {saveOptions.type !== 'padrao' && (
+           <div className="mb-6 p-5 rounded-xl bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-900/50">
+              <label className="block text-[11px] font-black uppercase tracking-widest text-amber-800 dark:text-amber-500 mb-2">Motor de Aulas Vagas</label>
+              <p className="text-[11px] text-amber-700 dark:text-amber-600 mb-4 font-medium">O sistema comparará o que está na tela com o Padrão Anual. Os buracos da tela serão injetados automaticamente no banco como "Aulas Vagas" para substituição. Qual versão do Padrão usar como espelho?</p>
+              <select value={padraoBaseVersion} onChange={e => setPadraoBaseVersion(e.target.value)} className={`w-full p-3 rounded-lg border border-amber-300 text-sm font-black outline-none cursor-pointer ${isDarkMode ? 'bg-amber-900/40 text-amber-400' : 'bg-white text-amber-700'}`}>
+                 <option value="V1">Espelhar com Padrão V1</option>
+                 <option value="V2">Espelhar com Padrão V2</option>
+                 <option value="V3">Espelhar com Padrão V3</option>
+                 <option value="V4">Espelhar com Padrão V4</option>
+              </select>
+           </div>
+       )}
+
+       <div className="flex justify-end gap-3 border-t pt-5 border-slate-200 dark:border-slate-700">
+           <button onClick={onClose} className={`px-6 py-3 font-black text-xs uppercase tracking-widest rounded-xl transition-colors ${isDarkMode ? 'bg-slate-800 text-slate-400 hover:bg-slate-700' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}>Cancelar</button>
+           <button onClick={handleConfirmSave} disabled={isSaving} className={`px-6 py-3 font-black text-xs uppercase tracking-widest rounded-xl shadow-lg transition-all hover:scale-105 active:scale-95 ${isSaving ? 'bg-slate-500' : 'bg-indigo-600 hover:bg-indigo-500 text-white'}`}>{isSaving ? 'Gravando...' : 'Confirmar Gravação'}</button>
+       </div>
     </div>
+  </div>
   );
 }
