@@ -67,7 +67,7 @@ export const CourseGrid = React.memo(
     return (
       <React.Fragment>
       <DragDropContext onDragStart={onDragStart} onDragEnd={onDragEnd}>
-        <div className="flex flex-col lg:flex-row gap-4 animate-in zoom-in-95 duration-500">
+        <div className={`flex flex-col lg:flex-row gap-6 w-full ${appMode === 'professor' ? 'max-w-full' : 'max-w-7xl'} mx-auto px-2 sm:px-6 mt-6 transition-all duration-500`}>
           <div className="flex-1 space-y-6">
             {(() => {
               if (availableCourses.length === 0) {
@@ -246,7 +246,7 @@ export const CourseGrid = React.memo(
                               </span>
                             </div>
                             <div className="hidden md:block overflow-x-auto print:overflow-visible">
-                              <table className="w-full min-w-[800px] border-collapse relative text-xs print:w-full print:max-w-none print:table-fixed print:border-collapse">
+                              <table className="w-full min-w-[800px] border-collapse relative text-xs print:w-full print:min-w-0 print:max-w-none print:table-fixed print:border-collapse">
                                 <thead>
                                   <tr
                                     className={`border-b text-[9px] font-black uppercase tracking-widest text-slate-400 ${isDarkMode ? "bg-slate-900 border-slate-700" : "bg-slate-50 border-slate-200"}`}
@@ -697,7 +697,7 @@ export const CourseGrid = React.memo(
                                         })}
                                         {dayIndex < safeDays.length - 1 && (
                                           <tr
-                                            className={`border-y-[4px] ${isDarkMode ? "bg-slate-700/40 border-slate-700" : "bg-slate-300/40 border-slate-300"}`}
+                                            className={`border-y-[4px] print:hidden ${isDarkMode ? "bg-slate-700/40 border-slate-700" : "bg-slate-300/40 border-slate-300"}`}
                                           >
                                             <td
                                               colSpan={
@@ -933,8 +933,7 @@ export const CourseGrid = React.memo(
           </div>
 
           {/* Sidebar de Elementos Nao Alocados e Notificacoes */}
-          {["admin", "gestao"].includes(userRole) &&
-            scheduleMode === "previa" && (
+          {appMode !== 'professor' && ["admin", "gestao"].includes(userRole) && scheduleMode === "previa" && (
               <div className="w-full lg:w-72 shrink-0 space-y-4 sticky top-20 flex flex-col items-end no-print">
                 <div
                   className={`w-full rounded-2xl border shadow-sm p-4 ${isDarkMode ? "bg-slate-800 border-slate-700" : "bg-white border-slate-200"}`}

@@ -185,7 +185,7 @@ export const TeacherGrid = React.memo(
                         </span>
                       </div>
                       <div className="hidden md:block overflow-x-auto print:overflow-visible">
-                        <table className="w-full min-w-[600px] border-collapse relative text-xs print:w-full print:max-w-none print:table-fixed print:border-collapse">
+                        <table className="w-full min-w-[600px] border-collapse relative text-xs print:w-full print:min-w-0 print:max-w-none print:table-fixed print:border-collapse">
                           <thead>
                             <tr
                               className={`border-b text-[9px] font-black uppercase tracking-widest text-slate-400 ${isDarkMode ? "bg-slate-900 border-slate-700" : "bg-slate-50 border-slate-200"}`}
@@ -490,7 +490,7 @@ export const TeacherGrid = React.memo(
                                   {/* Separador entre os dias na matriz */}
                                   {dayIndex < courseDays.length - 1 && (
                                     <tr
-                                      className={`border-y-[4px] ${isDarkMode ? "bg-slate-700/40 border-slate-700" : "bg-slate-300/40 border-slate-300"}`}
+                                      className={`border-y-[4px] print:hidden ${isDarkMode ? "bg-slate-700/40 border-slate-700" : "bg-slate-300/40 border-slate-300"}`}
                                     >
                                       <td
                                         colSpan={courseClasses.length + 2}

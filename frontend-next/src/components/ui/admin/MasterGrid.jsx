@@ -1006,7 +1006,7 @@ export function MasterGrid({ isDarkMode, ...props }) {
                Nenhum curso selecionado.
              </div>
           ) : (
-            <table className="w-full text-left border-collapse min-w-[800px] print:w-full print:max-w-none print:table-fixed print:border-collapse">
+            <table className="w-full text-left border-collapse min-w-[800px] print:w-full print:min-w-0 print:max-w-none print:table-fixed print:border-collapse">
               <thead className={`sticky top-0 z-40 shadow-sm ${isDarkMode ? 'bg-slate-800' : 'bg-white'}`}>
                 <tr>
                   <th className={`py-2 px-2 w-20 sticky left-0 top-0 z-50 ${isDarkMode ? 'bg-slate-800' : 'bg-white'}`}></th>

@@ -62,7 +62,7 @@ export const ClassGrid = React.memo(({
         TURMA: {selectedClass} <span className="float-right font-medium text-[10px] bg-black text-white px-2 py-1 rounded-sm">{scheduleMode === 'padrao' ? 'HORÁRIO PADRÃO' : `HORÁRIO ${scheduleMode.toUpperCase()} - ${(weekLabel || selectedWeek).replace('SEM ', 'SEMANA ')}`}</span>
       </div>
       <div className="hidden md:block overflow-x-auto print:overflow-visible">
-        <table className="w-full min-w-[750px] border-collapse relative text-xs print:w-full print:max-w-none print:table-fixed print:border-collapse">
+        <table className="w-full min-w-[750px] border-collapse relative text-xs print:w-full print:min-w-0 print:max-w-none print:table-fixed print:border-collapse">
           <thead>
             <tr className={`border-b text-[9px] font-black uppercase tracking-widest text-slate-400 ${isDarkMode ? 'bg-slate-900 border-slate-700' : 'bg-slate-50 border-slate-200'}`}>
               <th className={`sticky left-0 z-20 py-3 px-4 border-r-[3px] w-28 text-center ${isDarkMode ? 'bg-slate-900 border-slate-700 shadow-[2px_0_5px_rgba(0,0,0,0.2)]' : 'bg-slate-100 border-slate-300 shadow-[2px_0_5px_rgba(0,0,0,0.02)]'}`}>Horários</th>
