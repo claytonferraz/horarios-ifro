@@ -3,7 +3,7 @@ import { CalendarDays, GripVertical, AlertCircle, Save, Filter, MapPin, Loader2,
 import { useData } from '@/contexts/DataContext';
 import { MAP_DAYS, getColorHash, resolveTeacherName } from '@/lib/dates';
 import { apiClient, getHeaders } from '@/lib/apiClient';
-import DapeRequestsWidget from './DapeRequestsWidget';
+import { FloatingRequestsWidget } from './FloatingRequestsWidget';
 import { SearchableSelect } from '../SearchableSelect';
 
 const getCardStyle = (courseId, classId, subjectName, isDarkMode) => {
@@ -157,7 +157,7 @@ export function MasterGrid({ isDarkMode, ...props }) {
         )
       ) {
         if (teacherFilter) {
-           if (s.courseId && teachableCourses.has(String(s.courseId))) {
+           if (s.courseId && (teachableCourses.has(String(s.courseId)) || (s.teacherId && String(s.teacherId).includes(String(teacherFilter))))) {
               coursesWithData.add(String(s.courseId));
            }
         } else {
@@ -277,14 +277,30 @@ export function MasterGrid({ isDarkMode, ...props }) {
   const turmasDoCurso = useMemo(() => {
     if (selectedCourses.length === 0 || !classesList) return [];
     
-    // Primeiro avalia se a turma possui o professor da busca (via currículo)
+    // Primeiro avalia se a turma possui o professor da busca (via currículo ou via schedule)
     const validClassIds = new Set();
-    if (teacherFilter && curriculumData) {
-       curriculumData.forEach(disc => {
-          if (disc.teacherIds && disc.teacherIds.includes(String(teacherFilter))) {
-             validClassIds.add(String(disc.classId));
-          }
-       });
+    if (teacherFilter) {
+       if (curriculumData) {
+         curriculumData.forEach(disc => {
+            if (disc.teacherIds && disc.teacherIds.includes(String(teacherFilter))) {
+               validClassIds.add(String(disc.classId));
+            }
+         });
+       }
+       if (schedules) {
+         schedules.forEach(s => {
+            if (
+              s.type === selectedType &&
+              (selectedType === 'padrao' 
+                ? (String(s.week_id) === String(selectedWeek) || (!s.week_id && selectedWeek === 'V1')) 
+                : String(s.week_id) === String(selectedWeek)
+              ) &&
+              s.teacherId && String(s.teacherId).includes(String(teacherFilter))
+            ) {
+               validClassIds.add(String(s.classId));
+            }
+         });
+       }
     }
 
     return classesList.filter(cls => {
@@ -299,7 +315,7 @@ export function MasterGrid({ isDarkMode, ...props }) {
         // Depois ordena alfabeticamente pela Turma
         return a.name.localeCompare(b.name);
       });
-  }, [selectedCourses, classesList, teacherFilter, curriculumData]);
+  }, [selectedCourses, classesList, teacherFilter, curriculumData, schedules, selectedType, selectedWeek]);
 
  // Estrutura do Grid Baseado no Estado Global de Schedules + Alocação Neutra
 // Estrutura do Grid Baseado no Estado Global de Schedules + Alocação Neutra
@@ -1448,7 +1464,7 @@ export function MasterGrid({ isDarkMode, ...props }) {
                         <button onClick={() => setIsWidgetMenuOpen(false)} className="text-slate-400 hover:text-rose-500 font-bold px-2">X</button>
                      </div>
                      <button onClick={() => { setIsRequestsWidgetOpen(true); setIsWidgetMenuOpen(false); }} className={`flex items-center justify-between gap-4 px-4 py-3 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all ${isDarkMode ? 'bg-indigo-900/40 text-indigo-300 hover:bg-indigo-600 hover:text-white' : 'bg-indigo-50 text-indigo-700 hover:bg-indigo-600 hover:text-white'}`}>
-                        <span>🔔 DAPE Homologações</span>
+                        <span>🔔 DAPE Central de Pedidos</span>
                         {pendingRequests?.length > 0 && <span className="bg-red-500 text-white rounded-full px-2 py-0.5 text-[10px]">{pendingRequests.length}</span>}
                      </button>
                      <button onClick={() => { setIsRightPanelOpen(true); setIsWidgetMenuOpen(false); }} className={`flex items-center justify-between gap-4 px-4 py-3 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all ${isDarkMode ? 'bg-amber-900/40 text-amber-300 hover:bg-amber-500 hover:text-slate-900' : 'bg-amber-50 text-amber-700 hover:bg-amber-500 hover:text-white'}`}>
@@ -1469,24 +1485,18 @@ export function MasterGrid({ isDarkMode, ...props }) {
             </>
          )}
          
-         <DapeRequestsWidget 
-            isOpen={isRequestsWidgetOpen}
-            setIsOpen={setIsRequestsWidgetOpen}
-            requests={pendingRequests}
-            isDarkMode={isDarkMode}
-            onApprove={(req) => {
-               apiClient.updateRequestStatus(req.id, 'aprovado').then(() => {
-                 alert('Solicitação Homologada! O sistema agora a considera válida para o histórico.');
-                 setPendingRequests(prev => prev.filter(r => r.id !== req.id));
-               }).catch(e => alert(e.message));
-            }}
-            onReject={(req) => {
-               apiClient.updateRequestStatus(req.id, 'recusado').then(() => {
-                 alert('Solicitação recusada. O professor será notificado.');
-                 setPendingRequests(prev => prev.filter(r => r.id !== req.id));
-               }).catch(e => alert(e.message));
-            }}
-         />
+         {isRequestsWidgetOpen && (
+           <div className="animate-in slide-in-from-bottom-10 z-[100]">
+             <FloatingRequestsWidget 
+               isDarkMode={isDarkMode} 
+               userRole="admin" 
+               appMode="admin" 
+               controlledIsOpen={isRequestsWidgetOpen} 
+               setControlledIsOpen={setIsRequestsWidgetOpen} 
+               hideButton={true} 
+             />
+           </div>
+         )}
       </div>
 
     </div>

@@ -139,7 +139,6 @@ export const CourseGrid = React.memo(
 
                     <div className="flex flex-col sm:flex-row items-start sm:items-center justify-end gap-3 mt-2 sm:mt-0 w-full sm:w-auto">
                       {appMode === "professor" &&
-                        scheduleMode === "padrao" &&
                         setPadraoFilterTeacher && (
                           <div className="w-full sm:w-56 text-black">
                             <SearchableSelect

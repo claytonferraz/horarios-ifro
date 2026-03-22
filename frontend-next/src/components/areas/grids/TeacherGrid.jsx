@@ -350,51 +350,29 @@ export const TeacherGrid = React.memo(
                                                                 : `prof-rec-idx-${idx}`
                                                             }
                                                             onClick={() => {
-                                                              if (
-                                                                appMode ===
-                                                                "professor"
-                                                              ) {
-                                                                if (
-                                                                  scheduleMode ===
-                                                                    "consolidado" ||
-                                                                  scheduleMode ===
-                                                                    "oficial"
-                                                                ) {
-                                                                  alert(
-                                                                    "As aulas do horário consolidado não podem mais ser substituídas no portal do professor. Em caso de necessidade técnica, a retificação deve ser lançada pela gestão no MasterGrid.",
-                                                                  );
-                                                                  return;
+                                                              if (appMode === "professor") {
+                                                                // Bloqueio de Segurança: Professor comum só pode solicitar troca/vaga se ele leciona na turma clicada.
+                                                                if (userRole !== "admin" && userRole !== "gestao") {
+                                                                  if (!profClasses.has(r.className)) {
+                                                                     alert("Você só pode solicitar trocas ou assumir vagas em turmas onde você já leciona ao menos uma disciplina.");
+                                                                     return;
+                                                                  }
                                                                 }
+
                                                                 if (isVaga) {
-                                                                  if (
-                                                                    isLocked
-                                                                  ) {
-                                                                    alert(
-                                                                      "Esta vaga já está sendo analisada pela direção.",
-                                                                    );
+                                                                  if (isLocked) {
+                                                                    alert("Esta vaga já está sendo analisada pela direção.");
                                                                     return;
                                                                   }
-                                                                  if (
-                                                                    typeof setVacantRequestModal ===
-                                                                    "function"
-                                                                  )
-                                                                    setVacantRequestModal(
-                                                                      r,
-                                                                    );
-                                                                } else if (
-                                                                  typeof setExchangeTarget ===
-                                                                  "function"
-                                                                ) {
-                                                                  setExchangeTarget(
-                                                                    {
-                                                                      targetClass:
-                                                                        r.className,
-                                                                      targetCourse:
-                                                                        r.course,
-                                                                      originalRecord:
-                                                                        r,
-                                                                    },
-                                                                  );
+                                                                  if (typeof setVacantRequestModal === "function") {
+                                                                    setVacantRequestModal(r);
+                                                                  }
+                                                                } else if (typeof setExchangeTarget === "function") {
+                                                                  setExchangeTarget({
+                                                                    targetClass: r.className,
+                                                                    targetCourse: r.course,
+                                                                    originalRecord: r,
+                                                                  });
                                                                 }
                                                               }
                                                             }}

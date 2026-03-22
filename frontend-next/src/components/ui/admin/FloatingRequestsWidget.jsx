@@ -6,8 +6,11 @@ import { useAuth } from '@/contexts/AuthContext';
 import { resolveTeacherName } from '@/lib/dates';
 import { io } from "socket.io-client";
 
-export function FloatingRequestsWidget({ isDarkMode, userRole, appMode }) {
-  const [isOpen, setIsOpen] = useState(false);
+export function FloatingRequestsWidget({ isDarkMode, userRole, appMode, controlledIsOpen, setControlledIsOpen, hideButton }) {
+  const [localIsOpen, setLocalIsOpen] = useState(false);
+  const isOpen = controlledIsOpen !== undefined ? controlledIsOpen : localIsOpen;
+  const setIsOpen = setControlledIsOpen !== undefined ? setControlledIsOpen : setLocalIsOpen;
+
   const [requests, setRequests] = useState([]);
   const [notifications, setNotifications] = useState([]);
   const [loadingId, setLoadingId] = useState(null);
@@ -28,6 +31,8 @@ export function FloatingRequestsWidget({ isDarkMode, userRole, appMode }) {
 
       if (isAdmin) {
         fReqs = await apiClient.fetchRequests() || [];
+      } else if (appMode === 'professor' || userRole === 'professor') {
+        fReqs = await apiClient.fetchRequests(siape) || [];
       }
       fNotifs = await apiClient.fetchNotifications(siape, activeRole) || [];
       
@@ -211,18 +216,20 @@ export function FloatingRequestsWidget({ isDarkMode, userRole, appMode }) {
       </div>
 
       {/* FLOATING BUTTON (FAB) */}
-      <button 
-        onClick={toggleOpen}
-        className={`relative w-14 h-14 rounded-full shadow-[0_8px_30px_rgb(0,0,0,0.2)] flex items-center justify-center transition-all hover:scale-105 active:scale-95 ${isOpen ? (isDarkMode ? 'bg-slate-800 text-slate-400' : 'bg-white text-slate-600') : (isAdmin ? 'bg-rose-600 text-white hover:bg-rose-500' : 'bg-indigo-600 text-white hover:bg-indigo-500')}`}
-      >
-        {isOpen ? <X size={24} /> : (isAdmin ? <MessageSquare size={24} /> : <Bell size={24} />)}
-        
-        {!isOpen && bubbleCount > 0 && (
-          <span className="absolute -top-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full bg-amber-500 text-[10px] font-black ring-2 ring-white text-slate-900">
-            {bubbleCount > 9 ? '9+' : bubbleCount}
-          </span>
-        )}
-      </button>
+      {!hideButton && (
+        <button 
+          onClick={toggleOpen}
+          className={`relative w-14 h-14 rounded-full shadow-[0_8px_30px_rgb(0,0,0,0.2)] flex items-center justify-center transition-all hover:scale-105 active:scale-95 ${isOpen ? (isDarkMode ? 'bg-slate-800 text-slate-400' : 'bg-white text-slate-600') : (isAdmin ? 'bg-rose-600 text-white hover:bg-rose-500' : 'bg-indigo-600 text-white hover:bg-indigo-500')}`}
+        >
+          {isOpen ? <X size={24} /> : (isAdmin ? <MessageSquare size={24} /> : <Bell size={24} />)}
+          
+          {!isOpen && bubbleCount > 0 && (
+            <span className="absolute -top-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full bg-amber-500 text-[10px] font-black ring-2 ring-white text-slate-900">
+              {bubbleCount > 9 ? '9+' : bubbleCount}
+            </span>
+          )}
+        </button>
+      )}
     </div>
   );
 }
