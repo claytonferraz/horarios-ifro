@@ -9,8 +9,8 @@ import { useAuth } from "@/contexts/AuthContext";
 export function Navbar() {
   const router = useRouter();
   const pathname = usePathname();
-  const { isDarkMode, toggleTheme } = useTheme();
-  const { isUnlocked, logout } = useAuth();
+    const { isDarkMode, toggleTheme } = useTheme();
+  const { isUnlocked, logout, userName, userRole } = useAuth();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   const navigateTo = (path) => {
@@ -65,7 +65,7 @@ export function Navbar() {
         </div>
 
         {/* Links Desktop */}
-        <nav className="hidden md:flex items-center gap-6">
+        <nav className="hidden md:flex items-center gap-6 z-10">
           <button onClick={() => navigateTo("/")} className={getLinkClass("/")}>
             Início
           </button>
@@ -82,12 +82,22 @@ export function Navbar() {
 
         <div className="flex items-center gap-3">
           {isUnlocked && (
+            <div className="hidden sm:flex flex-col items-end mr-1 mt-1 justify-center">
+              <span className={`text-[11px] font-black uppercase tracking-widest leading-none ${isDarkMode ? 'text-slate-200' : 'text-slate-800'}`}>
+                {userName || "Autenticado"}
+              </span>
+              <span className={`text-[9px] font-bold uppercase tracking-widest ${isDarkMode ? 'text-indigo-400' : 'text-indigo-600'}`}>
+                {userRole === 'admin' ? 'Administrador' : (userRole === 'gestao' ? 'Gestão' : 'Servidor(a)')}
+              </span>
+            </div>
+          )}
+          {isUnlocked && (
             <button
               onClick={() => {
                 logout();
                 router.push("/");
               }}
-              title="Sair do Modo Administrador"
+              title="Sair da Conta"
               className={`p-2 rounded-full transition-colors focus:outline-none ${
                 isDarkMode
                   ? "text-red-400 hover:bg-slate-800"

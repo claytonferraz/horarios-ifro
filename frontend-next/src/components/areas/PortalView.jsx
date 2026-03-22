@@ -67,15 +67,19 @@ export function PortalView({
     }
   }, [appMode, selectedCourse, selectedClass]);
 
-  React.useEffect(() => {
-    if (scheduleMode === 'previa' && selectedWeek) {
+  const loadPendingRequests = React.useCallback(() => {
+    if (selectedWeek) {
       apiClient.fetchRequests().then(reqs => {
         if (reqs) {
           setPendingRequests(reqs.filter(r => (r.status === 'pendente' || r.status === 'pending') && r.week_id === selectedWeek));
         }
-      }).catch(e => console.error("Error fetching requests for previa alerts", e));
+      }).catch(e => console.error("Error fetching requests for alerts", e));
     }
-  }, [scheduleMode, selectedWeek]);
+  }, [selectedWeek]);
+
+  React.useEffect(() => {
+    loadPendingRequests();
+  }, [loadPendingRequests, scheduleMode]);
 
   const [draggingRecord, setDraggingRecord] = useState(null);
   const [exchangeTarget, setExchangeTarget] = useState(null);
@@ -2031,6 +2035,7 @@ export function PortalView({
                 }).then(() => {
                   setAlertModal({ title: 'Tudo Certo!', message: 'Sua solicitação foi enviada com sucesso à coordenação.', type: 'success' });
                   setVacantRequestModal(null);
+                  loadPendingRequests();
                 }).catch(e => {
                   setAlertModal({ 
                     title: 'Ops, algo deu errado!', 

@@ -40,8 +40,19 @@ export function FloatingRequestsWidget({ isDarkMode, userRole, appMode }) {
       
       // Native Push Browser Alert if increased
       if (typeof window !== 'undefined' && totalNew > prevCountRef.current && prevCountRef.current > 0) {
-         if (Notification.permission === 'granted') {
-           new Notification("Novidades no Portal", { body: "Uma nova solicitação ou alteração de horário acabou de chegar." });
+         if ('Notification' in window && Notification.permission === 'granted') {
+           if ('serviceWorker' in navigator && navigator.serviceWorker.ready) {
+             navigator.serviceWorker.ready.then(reg => {
+               reg.showNotification("Novidades no Portal", { 
+                 body: "Uma nova solicitação ou alteração de horário acabou de chegar.",
+                 icon: "/icon-192x192.png"
+               });
+             }).catch(e => {
+               try { new Notification("Novidades no Portal", { body: "Nova solicitação ou alteração de horário." }); } catch(err){}
+             });
+           } else {
+             try { new Notification("Novidades no Portal", { body: "Nova solicitação ou alteração de horário." }); } catch(err){}
+           }
          }
          // Som suave (Opcional, ignorado se arquivo não existir ou autoplay bloquado)
          if (audioRef.current) audioRef.current.play().catch(e => {});
@@ -55,9 +66,6 @@ export function FloatingRequestsWidget({ isDarkMode, userRole, appMode }) {
   };
 
   useEffect(() => {
-    if (typeof window !== 'undefined' && Notification.permission === 'default') {
-      Notification.requestPermission();
-    }
     
     if (appMode === 'home') return; // hide from completely public homepage
 
@@ -80,6 +88,23 @@ export function FloatingRequestsWidget({ isDarkMode, userRole, appMode }) {
     };
   }, [isOpen, userRole, appMode, siape]);
 
+  const [lastReadTimestamp, setLastReadTimestamp] = useState(0);
+
+  useEffect(() => {
+    if (typeof window !== 'undefined' && siape) {
+      const lr = localStorage.getItem('last_read_notifs_' + siape);
+      if (lr) setLastReadTimestamp(parseInt(lr));
+    }
+  }, [siape]);
+
+  useEffect(() => {
+    if (isOpen && typeof window !== 'undefined' && siape) {
+       const now = Date.now();
+       setLastReadTimestamp(now);
+       localStorage.setItem('last_read_notifs_' + siape, now);
+    }
+  }, [isOpen, siape]);
+
   // Hide entirely if it's external page and no notifications are actually present
   if (appMode === 'home') return null;
   // If student and 0 notifications, don't show the bubble
@@ -94,6 +119,8 @@ export function FloatingRequestsWidget({ isDarkMode, userRole, appMode }) {
     ...resolvedRequests.map(r => ({...r, isReq: true, time: new Date(r.createdAt).getTime()}))
   ].sort((a,b) => b.time - a.time).slice(0, 20);
 
+
+
   const handleUpdate = async (id, status, feedback) => {
     setLoadingId(id);
     try {
@@ -106,7 +133,15 @@ export function FloatingRequestsWidget({ isDarkMode, userRole, appMode }) {
     }
   };
 
-  const bubbleCount = pendingRequests.length + (notifications.length > 0 ? 1 : 0);
+  const unreadCount = notifications.filter(n => new Date(n.createdAt).getTime() > lastReadTimestamp).length;
+  const bubbleCount = pendingRequests.length + unreadCount;
+
+  const toggleOpen = () => {
+    if (typeof window !== 'undefined' && 'Notification' in window && Notification.permission === 'default') {
+      Notification.requestPermission().catch(() => {});
+    }
+    setIsOpen(!isOpen);
+  };
 
   return (
     <div className="fixed bottom-6 right-6 z-[9999] flex flex-col items-end">
@@ -177,7 +212,7 @@ export function FloatingRequestsWidget({ isDarkMode, userRole, appMode }) {
 
       {/* FLOATING BUTTON (FAB) */}
       <button 
-        onClick={() => setIsOpen(!isOpen)}
+        onClick={toggleOpen}
         className={`relative w-14 h-14 rounded-full shadow-[0_8px_30px_rgb(0,0,0,0.2)] flex items-center justify-center transition-all hover:scale-105 active:scale-95 ${isOpen ? (isDarkMode ? 'bg-slate-800 text-slate-400' : 'bg-white text-slate-600') : (isAdmin ? 'bg-rose-600 text-white hover:bg-rose-500' : 'bg-indigo-600 text-white hover:bg-indigo-500')}`}
       >
         {isOpen ? <X size={24} /> : (isAdmin ? <MessageSquare size={24} /> : <Bell size={24} />)}
