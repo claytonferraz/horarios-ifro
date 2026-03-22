@@ -7,7 +7,7 @@ services:
       dockerfile: Dockerfile
     container_name: horarios-backend
     ports:
-      - "3000:3000"
+      - "3012:3012"
     volumes:
       # Regra de proteção: Impede que arquivos compilados localmente no Mac quebrem o ambiente Linux do container
       - /app/node_modules

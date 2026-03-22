@@ -12,7 +12,7 @@ RUN npm install --production
 
 # Copia o resto do código da aplicação (o .dockerignore vai ignorar o node_modules local)
 COPY . .
-EXPOSE 3000
+EXPOSE 3012
 
 # Inicia o servidor Node.js
 CMD ["node", "server.js"]

@@ -102,14 +102,19 @@ export function DataProvider({ children }) {
   useEffect(() => {
     loadData();
     
+    let socketTimer;
     // Real-Time Socket Connection
     const socket = io(process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3012');
     socket.on('schedule_updated', () => {
-      console.log('Real-time: Schedule Updated Event Reached. Refreshing data...');
-      loadData();
+      console.log('Real-time: Schedule Updated Event Reached. Throttling and refreshing data...');
+      clearTimeout(socketTimer);
+      socketTimer = setTimeout(() => {
+        loadData();
+      }, 500); // 500ms debounce
     });
 
     return () => {
+      clearTimeout(socketTimer);
       socket.disconnect();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps

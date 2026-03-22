@@ -67,7 +67,7 @@ export function HomeApp({ appMode }) {
     else if (mode === 'admin') { router.push('/admin'); setAdminTab('planilhas'); setMobileMenuOpen(false); }
   };
 
-  const executePrint = () => {
+  const executePrint = React.useCallback(() => {
     let weekStr = scheduleState.selectedWeek;
     if (academicWeeks && scheduleState.selectedWeek && scheduleState.scheduleMode !== 'padrao') {
         const w = academicWeeks.find(week => String(week.id) === String(scheduleState.selectedWeek));
@@ -90,7 +90,7 @@ export function HomeApp({ appMode }) {
       selectedTeacher: scheduleState.selectedTeacher,
       selectedWeek: weekStr
     });
-  };
+  }, [academicWeeks, appMode, scheduleState.selectedWeek, scheduleState.scheduleMode, scheduleState.viewMode, scheduleState.selectedClass, scheduleState.selectedDay, scheduleState.selectedTeacher]);
 
   return (
     <div className={`min-h-screen font-sans flex flex-col transition-colors duration-300 ${isDarkMode ? 'bg-slate-950 text-slate-100' : 'bg-slate-50 text-slate-800'}`}>
@@ -253,7 +253,7 @@ export function HomeApp({ appMode }) {
       </main>
       
       {/* WIDGET FLUTUANTE DE VERIFICAÇÃO DE SOLICITAÇÕES E NOTIFICAÇÕES GLOBAIS */}
-      <FloatingRequestsWidget isDarkMode={isDarkMode} userRole={userRole} appMode={appMode} />
+      {isUnlocked && <FloatingRequestsWidget isDarkMode={isDarkMode} userRole={userRole} appMode={appMode} />}
       
     </div>
   );

@@ -67,13 +67,24 @@ require('dotenv').config();
 const path = require('path');
 const JWT_SECRET = process.env.JWT_SECRET || 'SUA_CHAVE_SECRETA_AQUI_MUITO_SEGURA_2026';
 const dbPath = path.join(__dirname, process.env.DB_FILENAME || 'horarios.db');
-const db = new sqlite3.Database(dbPath);
-console.log('Banco de dados conectado em:', dbPath);
+const db = new sqlite3.Database(dbPath, (err) => {
+    if (err) {
+        console.error('Erro ao conectar no banco de dados:', err.message);
+    } else {
+        console.log('Banco de dados conectado em:', dbPath);
+        // Habilitar modo WAL e tempo de timeout para alta escalabilidade horizontal de writes
+        db.run('PRAGMA journal_mode = WAL;');
+        db.run('PRAGMA synchronous = NORMAL;');
+        db.run('PRAGMA busy_timeout = 5000;');
+        db.run('PRAGMA cache_size = -20000;');
+        db.run('PRAGMA temp_store = MEMORY;');
+    }
+});
+
 // CONTROLE DE SMART POLLING
 // ==========================================
 // Registra o tempo exato da última alteração no banco. 
 // O frontend pergunta essa variável a cada 5 min para saber se precisa baixar os dados.
-
 
 // ==========================================
 // CRIAÇÃO DAS TABELAS NO SQLITE
@@ -381,10 +392,23 @@ app.get('/api/auth/me', verifyToken, (req, res) => {
 // ==========================================
 // ROTAS DE HORÁRIOS
 // ==========================================
+const scheduleMemCache = new Map();
+const SCHEDULE_CACHE_TTL_MS = 5000; // 5 segundos de cache para suportar milisegundos com 500+ leituras simultâneas
+
 app.get('/api/schedules', (req, res) => {
   const courseId = req.query.courseId;
   const academicYear = req.query.academicYear;
   
+  const cacheKey = `sch_${courseId || 'all'}_${academicYear || 'all'}`;
+  const now = Date.now();
+  
+  if (scheduleMemCache.has(cacheKey)) {
+     const cached = scheduleMemCache.get(cacheKey);
+     if (now - cached.timestamp < SCHEDULE_CACHE_TTL_MS) {
+         return res.json(cached.data);
+     }
+  }
+
   let q = `
     SELECT 
       s.*, 
@@ -424,6 +448,10 @@ app.get('/api/schedules', (req, res) => {
         discPayload: undefined
       };
     });
+    
+    // Salva no cache
+    scheduleMemCache.set(cacheKey, { data: mapped, timestamp: now });
+    
     res.json(mapped);
   });
 });
@@ -1314,4 +1342,5 @@ app.put('/api/requests/:id', verifyToken, (req, res) => {
   });
 });
 
-server.listen(3012, () => console.log('Backend rodando na porta 3012'));
+const PORT = process.env.PORT || 3012;
+server.listen(PORT, () => console.log(`Backend rodando com alta performance na porta ${PORT}`));

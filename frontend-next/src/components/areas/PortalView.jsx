@@ -13,6 +13,10 @@ import { ScheduleNotifications } from '../ui/admin/ScheduleNotifications';
 import { MAP_DAYS, getColorHash, isTeacherPending, resolveTeacherName } from '@/lib/dates';
 import { useData } from '@/contexts/DataContext';
 import { apiClient } from '@/lib/apiClient';
+import { CourseGrid } from './grids/CourseGrid';
+import { TeacherGrid } from './grids/TeacherGrid';
+import { ClassGrid } from './grids/ClassGrid';
+import { VacantGrid } from './grids/VacantGrid';
 
 export function PortalView({
   appMode, isDarkMode, viewMode, setViewMode, scheduleMode, setScheduleMode, userRole, siape,
@@ -96,7 +100,22 @@ export function PortalView({
       });
   }, [pendingRequests]);
 
-  const checkConflict = (record, dDay, dTime, dCls) => {
+  const safeDays = [...(activeDays || ['Segunda-feira', 'Terça-feira', 'Quarta-feira', 'Quinta-feira', 'Sexta-feira'])].sort((a,b) => MAP_DAYS.indexOf(a) - MAP_DAYS.indexOf(b));
+  const shiftOrder = { 'Matutino': 1, 'Vespertino': 2, 'Noturno': 3 };
+  const safeTimes = [...(classTimes || [])].sort((a, b) => {
+    const shiftA = typeof a === 'object' ? a.shift : '';
+    const shiftB = typeof b === 'object' ? b.shift : '';
+    const orderA = shiftOrder[shiftA] || 99;
+    const orderB = shiftOrder[shiftB] || 99;
+    
+    if (orderA !== orderB) return orderA - orderB;
+    
+    const timeA = typeof a === 'object' ? a.timeStr : a;
+    const timeB = typeof b === 'object' ? b.timeStr : b;
+    return timeA.localeCompare(timeB);
+  });
+
+  const checkConflict = React.useCallback((record, dDay, dTime, dCls) => {
     if (!record || !record.teacher || record.teacher === 'A Definir' || record.teacher === '-') return null;
     const sameTeacherOtherClass = activeData.find(r => r.id !== record.id && r.teacher === record.teacher && r.day === dDay && r.time === dTime && r.className !== dCls);
     if (sameTeacherOtherClass) return 'Choque de horário';
@@ -117,14 +136,14 @@ export function PortalView({
       if (roomOccupied) return 'Ocupação de sala';
     }
     return null;
-  };
+  }, [activeData, safeTimes]);
 
-  const onDragStart = (start) => {
+  const onDragStart = React.useCallback((start) => {
     const record = activeData.find(r => r.id === start.draggableId);
     setDraggingRecord(record || null);
-  };
+  }, [activeData]);
 
-  const onDragEnd = async (result) => {
+  const onDragEnd = React.useCallback(async (result) => {
     setDraggingRecord(null);
     if (!result.destination) return;
     const { source, destination, draggableId } = result;
@@ -164,22 +183,9 @@ export function PortalView({
       // Rollback on Error
       if (typeof refreshData === 'function') await refreshData();
     }
-  };
+  }, [activeData, checkConflict, selectedWeek, refreshData]);
 
-  const safeDays = [...(activeDays || ['Segunda-feira', 'Terça-feira', 'Quarta-feira', 'Quinta-feira', 'Sexta-feira'])].sort((a,b) => MAP_DAYS.indexOf(a) - MAP_DAYS.indexOf(b));
-  const shiftOrder = { 'Matutino': 1, 'Vespertino': 2, 'Noturno': 3 };
-  const safeTimes = [...(classTimes || [])].sort((a, b) => {
-    const shiftA = typeof a === 'object' ? a.shift : '';
-    const shiftB = typeof b === 'object' ? b.shift : '';
-    const orderA = shiftOrder[shiftA] || 99;
-    const orderB = shiftOrder[shiftB] || 99;
-    
-    if (orderA !== orderB) return orderA - orderB;
-    
-    const timeA = typeof a === 'object' ? a.timeStr : a;
-    const timeB = typeof b === 'object' ? b.timeStr : b;
-    return timeA.localeCompare(timeB);
-  });
+
   const getFormattedDayLabel = (dayName) => {
     if (scheduleMode === 'padrao') return dayName.split('-')[0].toUpperCase();
     if (!selectedWeek || !academicWeeks) return dayName.split('-')[0].toUpperCase();
@@ -204,7 +210,7 @@ export function PortalView({
     return `${dayName.split('-')[0].toUpperCase()} ${dayFmt}/${monthFmt}`;
   };
 
-  const [mobileSelectedClasses, setMobileSelectedClasses] = React.useState({});
+
 
   React.useEffect(() => {
     if (viewMode === 'hoje' && scheduleMode !== 'padrao' && selectedWeek && academicWeeks) {
@@ -957,1151 +963,111 @@ export function PortalView({
                   {/* GRADE DE HORÁRIO (Visão Curso MATRIZ) */}
                   {viewMode === 'curso' && (
                     <DragDropContext onDragStart={onDragStart} onDragEnd={onDragEnd}>
-                    <div className="flex flex-col lg:flex-row gap-4 animate-in zoom-in-95 duration-500">
-                      <div className="flex-1 space-y-6">
-                      {(() => {
-                        const currentCourses = [...new Set(mappedSchedules.map(r => r.course))].filter(Boolean);
-                        const availableCourses = currentCourses.sort((a,b) => a.localeCompare(b));
-
-                        if (availableCourses.length === 0) {
-                          return (
-                            <div className={`rounded-2xl border p-12 text-center shadow-sm no-print ${isDarkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'}`}>
-                              <CheckCircle size={40} className="mx-auto text-emerald-400 mb-3" />
-                              <h3 className={`text-lg font-black uppercase tracking-widest ${isDarkMode ? 'text-slate-200' : 'text-slate-700'}`}>Nenhuma Aula</h3>
-                              <p className={`text-sm font-medium mt-1 max-w-md mx-auto ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>
-                                Não há horários cadastrados para exibir nesta semana.
-                              </p>
-                            </div>
-                          );
-                        }
-
-                        return availableCourses.map(course => {
-                          // Find all classes registered for this course in activeData to ensure no class is missed
-                          const courseClassesGlobais = mappedSchedules.filter(r => r.course === course).map(r => r.className);
-                          const courseClasses = [...new Set(courseClassesGlobais)].sort();
-                          const courseRecords = mappedSchedules.filter(r => r.course === course);
-
-                          if (courseClasses.length === 0) return null;
-
-                          return (
-                            <div key={course} className={`print:break-inside-avoid print:break-after-page rounded-2xl shadow-sm print:shadow-none border print:border-none overflow-hidden print:overflow-visible mb-6 print:mb-0 ${isDarkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'}`}>
-                              <div className={`text-white px-6 py-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 no-print ${scheduleMode === 'padrao' ? (isDarkMode ? 'bg-blue-950' : 'bg-blue-900') : scheduleMode === 'previa' ? (isDarkMode ? 'bg-violet-950' : 'bg-violet-900') : (isDarkMode ? 'bg-rose-950' : 'bg-rose-900')}`}>
-                                <div className="flex items-center gap-2.5">
-                                  <Layers size={18} className="opacity-80" />
-                                  <h2 className="font-black text-sm uppercase tracking-widest flex items-center gap-2">
-                                    {scheduleMode === 'padrao' && <span className="bg-white/20 px-1.5 py-0.5 rounded text-[8px]">PADRÃO</span>}
-                                    {scheduleMode === 'previa' && <span className="bg-white/20 px-1.5 py-0.5 rounded text-[8px]">PRÉVIA</span>}
-                                    Horário dos Cursos: {course}
-                                  </h2>
-                                  {scheduleMode !== 'padrao' && <span className="text-[9px] font-black bg-white/20 px-3 py-1 rounded-full tracking-widest uppercase shadow-sm ml-2">{dynamicWeeksList.find(w => w.value === selectedWeek)?.label || selectedWeek}</span>}
-                                </div>
-                                <button onClick={handlePrint} className="hidden md:flex items-center gap-2 bg-white/20 hover:bg-white/30 text-white px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all shadow-sm active:scale-95 no-print">
-                                  <Printer size={14} /> Imprimir Horário do Curso
-                                </button>
-                              </div>
-                              <div className="hidden print:block font-black text-[14px] uppercase mb-2 border-b-[3px] border-black pb-2 tracking-widest mt-4 text-black">
-                                {course} <span className="float-right font-medium text-[10px] bg-black text-white px-2 py-1 rounded-sm">{scheduleMode === 'padrao' ? 'HORÁRIO PADRÃO' : `HORÁRIO ${scheduleMode.toUpperCase()} - ${(weekLabel || selectedWeek).replace('SEM ', 'SEMANA ')}`}</span>
-                              </div>
-                              <div className="hidden md:block overflow-x-auto print:overflow-visible">
-                                <table className="w-full min-w-[800px] border-collapse relative text-xs print:w-full print:min-w-0">
-                                  <thead>
-                                    <tr className={`border-b text-[9px] font-black uppercase tracking-widest text-slate-400 ${isDarkMode ? 'bg-slate-900 border-slate-700' : 'bg-slate-50 border-slate-200'}`}>
-                                      <th className={`sticky left-0 z-30 py-3 px-2 border-r-[3px] w-10 min-w-[40px] text-center shadow-sm ${isDarkMode ? 'bg-slate-900 border-slate-700' : 'bg-slate-100 border-slate-300'}`}>Dia</th>
-                                      <th className={`sticky left-[40px] z-20 py-3 px-3 border-r-[3px] w-28 min-w-[112px] text-center shadow-sm ${isDarkMode ? 'bg-slate-900 border-slate-700' : 'bg-slate-100 border-slate-300'}`}>Horários</th>
-                                      {courseClasses.map(cls => (
-                                        <th key={cls} className={`py-3 px-4 border-r-[3px] last:border-r-0 text-center ${isDarkMode ? 'border-slate-700 text-slate-200' : 'border-slate-300 text-slate-800'}`}>{cls}</th>
-                                      ))}
-                                    </tr>
-                                  </thead>
-                                  <tbody className={`divide-y ${isDarkMode ? 'divide-slate-800' : 'divide-slate-100'}`}>
-                                    {safeDays.map((day, dayIndex) => {
-                                      const dayRecords = courseRecords.filter(r => r.day === day);
-                                      const activeTimes = safeTimes.filter(timeObj => courseRecords.some(r => r.day === day && r.time === (timeObj.timeStr || timeObj)));
-                                      const hasClassesToday = activeTimes.length > 0;
-
-                                      if (!hasClassesToday || activeTimes.length === 0) {
-                                        return (
-                                          <React.Fragment key={`day-block-${day}-empty`}>
-                                            <tr className="group transition-colors">
-                                              <td className={`sticky left-0 z-20 border-r-[3px] align-middle text-center ${isDarkMode ? 'bg-slate-900 border-slate-700 shadow-[2px_0_5px_rgba(0,0,0,0.2)]' : 'bg-slate-50 border-slate-300 shadow-[2px_0_5px_rgba(0,0,0,0.02)]'}`}>
-                                                <div className="flex items-center justify-center h-full w-full min-h-[120px] p-2">
-                                                  <span className="text-[9px] font-black uppercase tracking-widest text-slate-500" style={{ writingMode: 'vertical-rl', transform: 'rotate(180deg)' }}>
-                                                    {getFormattedDayLabel(day)}
-                                                  </span>
-                                                </div>
-                                              </td>
-                                              <td colSpan={courseClasses.length + 1} className={`py-4 text-center font-bold text-xs uppercase tracking-widest ${isDarkMode ? 'text-slate-500 bg-slate-800/20' : 'text-slate-400 bg-slate-50/50'}`}>
-                                                NÃO LETIVO
-                                              </td>
-                                            </tr>
-                                            {dayIndex < safeDays.length - 1 && (
-                                              <tr className={`border-y-[4px] print:hidden ${isDarkMode ? 'bg-slate-700/40 border-slate-700' : 'bg-slate-300/40 border-slate-300'}`}>
-                                                <td colSpan={courseClasses.length + 2} className="py-1 shadow-inner"></td>
-                                              </tr>
-                                            )}
-                                          </React.Fragment>
-                                        );
-                                      }
-
-                                      let currentShift = '';
-                                      let classPositionInShift = 0;
-                                      const activeIntervals = (intervals || []).filter(inv => displayShiftsDay.has(inv.shift));
-                                      const shiftCount = new Set(activeTimes.map(i => i.shift)).size;
-                                      const spanSize = activeTimes.length + shiftCount + activeIntervals.length;
-
-                                      return (
-                                        <React.Fragment key={`day-block-${day}`}>
-                                          {activeTimes.map((timeObj, index) => {
-                                            const time = timeObj.timeStr;
-                                            const shift = timeObj.shift;
-                                            const isNewShift = shift !== currentShift;
-                                            if (isNewShift) {
-                                               currentShift = shift;
-                                               classPositionInShift = 1;
-                                            } else {
-                                               classPositionInShift++;
-                                            }
-                                            const isFirstRowOfDay = index === 0;
-
-                                            const intervalMatched = activeIntervals.find(inv => inv.shift === shift && Number(inv.position) === classPositionInShift);
-
-                                            return (
-                                              <React.Fragment key={`${day}-${time}`}>
-                                                {isNewShift && (
-                                                  <tr className={`print-interval text-[7px] font-black uppercase tracking-[0.4em] border-y-[2px] ${isDarkMode ? 'bg-slate-800/80 text-slate-400 border-slate-700' : 'bg-slate-200/50 text-slate-500 border-slate-300'}`}>
-                                                    {isFirstRowOfDay && (
-                                                      <td 
-                                                        rowSpan={spanSize} 
-                                                        className={`sticky left-0 z-20 border-r-[3px] align-middle text-center bg-white ${isDarkMode ? '!bg-slate-900 border-slate-700 shadow-[2px_0_5px_rgba(0,0,0,0.2)]' : '!bg-slate-50 border-slate-300 shadow-[2px_0_5px_rgba(0,0,0,0.02)]'}`}
-                                                      >
-                                                        <div className="flex items-center justify-center h-full w-full min-h-[120px]">
-                                                          <span className="text-[9px] font-black uppercase tracking-widest text-slate-500" style={{ writingMode: 'vertical-rl', transform: 'rotate(180deg)' }}>
-                                                            {getFormattedDayLabel(day)}
-                                                          </span>
-                                                        </div>
-                                                      </td>
-                                                    )}
-                                                    <td colSpan={courseClasses.length + 1} className="py-1 text-center shadow-inner">{shift}</td>
-                                                  </tr>
-                                                )}
-                                                <tr className="group transition-colors">
-                                                  {!isNewShift && isFirstRowOfDay && (
-                                                    <td 
-                                                      rowSpan={spanSize} 
-                                                      className={`sticky left-0 z-20 border-r-[3px] align-middle text-center bg-white ${isDarkMode ? '!bg-slate-900 border-slate-700 shadow-[2px_0_5px_rgba(0,0,0,0.2)]' : '!bg-slate-50 border-slate-300 shadow-[2px_0_5px_rgba(0,0,0,0.02)]'}`}
-                                                    >
-                                                      <div className="flex items-center justify-center h-full w-full min-h-[120px]">
-                                                        <span className="text-[9px] font-black uppercase tracking-widest text-slate-500" style={{ writingMode: 'vertical-rl', transform: 'rotate(180deg)' }}>
-                                                          {getFormattedDayLabel(day)}
-                                                        </span>
-                                                      </div>
-                                                    </td>
-                                                  )}
-                                                  <td className={`sticky left-[40px] z-10 py-3 px-3 border-r-[3px] font-bold text-xs whitespace-nowrap text-center ${isDarkMode ? 'bg-slate-800 group-hover:bg-slate-700/50 border-slate-700 text-slate-400 shadow-[2px_0_5px_rgba(0,0,0,0.2)]' : 'bg-white group-hover:bg-slate-50 border-slate-300 text-slate-500 shadow-[2px_0_5px_rgba(0,0,0,0.02)]'}`}>
-                                                    {time}
-                                                  </td>
-                                                  {courseClasses.map(cls => {
-                                                    const records = courseRecords.filter(r => r.className === cls && r.day === day && r.time === time);
-                                                    return (
-                                                    <td 
-                                                      key={`${cls}-${time}`} 
-                                                      className={`p-1 border-r-[3px] last:border-r-0 align-top min-w-[140px] transition-all ${isDarkMode ? 'border-slate-700' : 'border-slate-300'}`}
-                                                    >
-                                                       <Droppable droppableId={`${day}|${time}|${cls}`}>
-                                                          {(provided, snapshot) => {
-                                                             let conflictMsg = null;
-                                                             if (draggingRecord && snapshot.isDraggingOver) {
-                                                                conflictMsg = checkConflict(draggingRecord, day, time, cls);
-                                                             }
-                                                             return (
-                                                               <div ref={provided.innerRef} {...provided.droppableProps} 
-                                                                 onClick={() => {
-                                                                     if (['admin','gestao'].includes(userRole)) setEditorModal({ cls, day, time, tObj: timeObj });
-                                                                 }}
-                                                                 className={`w-full h-full min-h-[50px] p-0.5 rounded-lg transition-colors ${['admin','gestao'].includes(userRole) ? 'cursor-pointer hover:ring-2 hover:ring-indigo-500 hover:z-30 relative' : ''} ${conflictMsg ? 'bg-red-500/20 ring-2 ring-red-500 !bg-red-500/20' : snapshot.isDraggingOver ? (isDarkMode ? 'bg-slate-700/50' : 'bg-slate-100') : (isDarkMode ? 'group-hover:bg-slate-700/30 bg-slate-800/20' : 'group-hover:bg-slate-50/50 bg-slate-50/20')}`}
-                                                               >
-                                                                  {conflictMsg && snapshot.isDraggingOver && <div className="absolute -top-6 left-0 bg-red-600 text-white text-[9px] font-black uppercase px-2 py-0.5 rounded z-50 whitespace-nowrap shadow-md">{conflictMsg}</div>}
-                                                                  {records.length > 0 ? records.map((r, rIndex) => {
-                                                                      const isPending = isTeacherPending(r.teacher);
-                                                                      return (
-                                                                         <Draggable key={r.id} draggableId={r.id} index={rIndex} isDragDisabled={!(scheduleMode === 'previa' && ['admin','gestao'].includes(userRole))}>
-                                                                           {(prov2, snap2) => (
-                                                                             <div ref={prov2.innerRef} {...prov2.draggableProps} {...prov2.dragHandleProps} 
-                                                                               className={`print-clean-card p-1.5 print:p-1 rounded-xl print:rounded-none border-b-[3px] print:border-b-[1px] print:border-slate-400 shadow-sm print:shadow-none flex flex-col justify-center min-h-[46px] print:min-h-0 transition-all mb-1 print:mb-0 last:mb-0 hover:scale-[1.02] relative overflow-visible ${snap2.isDragging ? 'shadow-xl scale-105 z-50' : ''} ${isPending ? (isDarkMode ? 'bg-red-900/30 border-red-800/50 text-red-300' : 'bg-red-50 border-red-300 text-red-800') : getColorHash(r.subject, isDarkMode)}`}
-                                                                             >
-                                                                                {r.isSubstituted && (
-                                                                                   <div className="absolute -top-1.5 -right-1 z-10 print:hidden shadow-sm pointer-events-none">
-                                                                                     <span title="Aula assumida de Vaga via Troca" className="text-[5px] font-black uppercase tracking-widest text-white px-1.5 py-[2px] rounded border border-indigo-400 bg-indigo-600 block animate-pulse shadow-sm shadow-indigo-900/40">Substituição</span>
-                                                                                   </div>
-                                                                                )}
-                                                                                <p className={`subject font-bold text-[10px] print:text-[8.5px] leading-tight print:leading-[1.1] mb-1 print:mb-0.5 text-center ${isDarkMode ? 'text-slate-200' : 'text-slate-800'}`}>
-                                                                                  {r.subject} {r.isSubstituted && r.originalSubject && <span className="block text-[8px] sm:text-[9px] opacity-80 mt-1 uppercase">Era: {r.originalSubject}</span>}
-                                                                                </p>
-                                                                                <p className={`text-[8.5px] print:text-[7.5px] font-medium leading-none text-center opacity-90 ${isPending ? (isDarkMode ? 'text-red-400 font-bold' : 'text-red-600 font-bold') : ''}`}>
-                                                                                  {resolveTeacherName(r.teacher, globalTeachers)} {r.room && <span className="font-black opacity-80 print:opacity-100">| S: {r.room}</span>}
-                                                                                </p>
-                                                                             </div>
-                                                                           )}
-                                                                        </Draggable>
-                                                                     );
-                                                                  }) : <div className={`h-[46px] print:min-h-[22px] flex items-center justify-center font-black text-[9px] tracking-widest uppercase select-none pointer-events-none ${isDarkMode ? 'opacity-20' : 'opacity-5'}`}>-</div>}
-                                                                  {provided.placeholder}
-                                                               </div>
-                                                             );
-                                                          }}
-                                                       </Droppable>
-                                                    </td>
-                                                    );
-                                                  })}
-                                                </tr>
-                                                {intervalMatched && (
-                                                  <tr className={`print-interval text-[9px] font-black uppercase tracking-widest ${isDarkMode ? 'bg-amber-900/40 text-amber-500 border-amber-900/50' : 'bg-amber-50 text-amber-700 border-amber-200'} border-y`}>
-                                                    <td className={`sticky left-[40px] z-10 py-2 px-3 text-center border-r-[3px] bg-transparent ${isDarkMode ? 'border-amber-900/50' : 'border-amber-200'}`}>
-                                                       <span className="opacity-80 font-bold block whitespace-nowrap">
-                                                          {(() => {
-                                                              let endStr = timeObj.timeStr.split('-')[1];
-                                                              if(!endStr) return '';
-                                                              endStr = endStr.trim();
-                                                              let [hh, mm] = endStr.split(':').map(Number);
-                                                              if(isNaN(hh) || isNaN(mm)) return '';
-                                                              let startText = endStr;
-                                                              let endMins = hh * 60 + mm + Number(intervalMatched.duration);
-                                                              let outHH = Math.floor(endMins / 60).toString().padStart(2, '0');
-                                                              let outMM = (endMins % 60).toString().padStart(2, '0');
-                                                              return `${startText} - ${outHH}:${outMM}`;
-                                                          })()}
-                                                       </span>
-                                                    </td>
-                                                    <td colSpan={courseClasses.length} className="py-2 px-4 shadow-sm relative text-center">
-                                                      <div className="flex items-center justify-center gap-2">
-                                                        <Clock size={12}/> {intervalMatched.description || 'Intervalo'} ({intervalMatched.duration} min)
-                                                      </div>
-                                                    </td>
-                                                  </tr>
-                                                )}
-                                              </React.Fragment>
-                                            );
-                                          })}
-                                          {/* Separador entre os dias na matriz */}
-                                          {dayIndex < safeDays.length - 1 && (
-                                            <tr className={`border-y-[4px] ${isDarkMode ? 'bg-slate-700/40 border-slate-700' : 'bg-slate-300/40 border-slate-300'}`}>
-                                              <td colSpan={activeCourseClasses.length + 2} className="py-1 shadow-inner"></td>
-                                            </tr>
-                                          )}
-                                        </React.Fragment>
-                                      );
-                                    })}
-                                  </tbody>
-                                </table>
-                              </div>
-                              
-                              {/* Mobile Stacked View (Curso) */}
-                              <div className="md:hidden no-print p-4 space-y-4">
-                                 {(() => {
-                                   const activeMobileCls = mobileSelectedClasses[course] || courseClasses[0];
-                                   const clsRecordsAll = courseRecords.filter(r => r.className === activeMobileCls);
-                                   
-                                   return (
-                                     <div className="animate-in fade-in zoom-in-95">
-                                       <div className="mb-4">
-                                          <label className={`block text-[10px] font-black uppercase tracking-widest mb-2 pl-1 ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>Visualizar Turma</label>
-                                          <div className={`flex items-center gap-3 border rounded-xl px-4 py-3 shadow-sm relative ${isDarkMode ? 'bg-slate-800 border-slate-700' : 'bg-slate-50 border-slate-200'}`}>
-                                            <Layers className={isDarkMode ? 'text-indigo-400' : 'text-indigo-600'} size={18} />
-                                            <select 
-                                              value={activeMobileCls}
-                                              onChange={(e) => setMobileSelectedClasses(prev => ({...prev, [course]: e.target.value}))}
-                                              className={`flex-1 bg-transparent font-bold text-sm outline-none appearance-none cursor-pointer ${isDarkMode ? 'text-white' : 'text-slate-800'}`}
-                                            >
-                                              {courseClasses.map(cls => (
-                                                <option key={`${course}-mob-opt-${cls}`} value={cls} className={isDarkMode ? 'bg-slate-800 text-white' : 'bg-white text-slate-900'}>{cls}</option>
-                                              ))}
-                                            </select>
-                                            <ChevronDown size={16} className={`pointer-events-none opacity-50 ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`} />
-                                          </div>
-                                       </div>
-                                       
-                                       {clsRecordsAll.length === 0 ? (
-                                         <div className={`p-8 rounded-xl border text-center font-bold text-xs uppercase tracking-widest shadow-sm ${isDarkMode ? 'bg-slate-900 border-slate-700 text-slate-500' : 'bg-slate-50 border-slate-200 text-slate-400'}`}>
-                                           Nenhuma Atividade
-                                         </div>
-                                       ) : (
-                                         <div className="space-y-4">
-                                           {safeDays.map(day => {
-                                              const dayRecords = clsRecordsAll.filter(r => r.day === day);
-                                              if (dayRecords.length === 0) return null;
-                                              
-                                              const dayShifts = new Set(dayRecords.map(r => safeTimes.find(t => t.timeStr === r.time)?.shift).filter(Boolean));
-                                              const displayShifts = new Set();
-                                              if (dayShifts.has('Matutino')) displayShifts.add('Matutino');
-                                              if (dayShifts.has('Vespertino')) displayShifts.add('Vespertino');
-                                              if (dayShifts.has('Noturno')) displayShifts.add('Noturno');
-                                              const activeTimes = safeTimes.filter(t => displayShifts.has(t.shift));
-                                              
-                                              return (
-                                                <div key={`mob-${course}-${activeMobileCls}-${day}`} className={`rounded-xl border overflow-hidden shadow-sm ${isDarkMode ? 'border-slate-700 bg-slate-800/30' : 'border-slate-200 bg-white'}`}>
-                                                  <div className={`px-4 py-2.5 font-black text-[10px] uppercase tracking-widest ${isDarkMode ? 'bg-slate-800 text-slate-300' : 'bg-slate-100 text-slate-600'}`}>
-                                                    {getFormattedDayLabel(day)}
-                                                  </div>
-                                                  <div className={`divide-y ${isDarkMode ? 'divide-slate-800' : 'divide-slate-100'}`}>
-                                                    {activeTimes.map((timeObj, idx) => {
-                                                      const time = timeObj.timeStr || timeObj;
-                                                      const records = dayRecords.filter(r => r.time === time);
-                                                      const isLunch = time === '11:10 - 12:00';
-                                                      
-                                                      const timeRow = (
-                                                        <div key={`${course}-${activeMobileCls}-${day}-${time}-row`} className={`flex items-start gap-3 p-3 transition-colors ${isDarkMode ? 'hover:bg-slate-800/50' : 'hover:bg-slate-50'}`}>
-                                                          <div className="w-16 shrink-0 text-center">
-                                                             <span className={`block border font-black text-[9px] px-1 py-1 rounded-md shadow-sm opacity-80 ${isDarkMode ? 'bg-slate-900 border-slate-700 text-slate-400' : 'bg-white border-slate-200 text-slate-500'}`}>{time}</span>
-                                                          </div>
-                                                          <div className="flex-1 space-y-2">
-                                                            {records.length > 0 ? records.map(r => {
-                                                              const isPending = isTeacherPending(r.teacher);
-                                                              return (
-                                                                <div key={`mob-rec-${r.id}`} className={`p-2.5 flex items-center justify-between gap-2 rounded-lg border shadow-sm ${isPending ? (isDarkMode ? 'bg-red-900/30 border-red-800/50 text-red-300' : 'bg-red-50 border-red-200 text-red-800') : getColorHash(r.subject, isDarkMode)}`}>
-                                                                  <div className="flex items-center gap-1.5 flex-1 max-w-[calc(100%-60px)]">
-                                                                    <span className="font-bold text-[10px] leading-tight break-words pr-1">{r.subject}</span>
-                                                                  </div>
-                                                                  <span className={`text-[8px] font-bold uppercase tracking-wide shrink-0 bg-white/10 px-1 rounded ${isPending ? (isDarkMode ? 'text-red-400' : 'text-red-600') : 'opacity-80'}`}>{isPending ? 'SEM PROF.' : resolveTeacherName(r.teacher, globalTeachers).split(' ')[0]}</span>
-                                                                </div>
-                                                              )
-                                                            }) : (
-                                                              <div className={`font-black tracking-widest text-[9px] opacity-20 uppercase mt-1`}>Sem Aulas</div>
-                                                            )}
-                                                          </div>
-                                                        </div>
-                                                      );
-                                                      
-                                                      return (
-                                                        <React.Fragment key={`${course}-${activeMobileCls}-${day}-${time}-frag`}>
-                                                          {timeRow}
-                                                          {isLunch && (
-                                                             <div className={`py-1.5 text-center text-[7px] font-black uppercase tracking-[0.4em] border-y-[2px] ${isDarkMode ? 'bg-slate-800/40 text-slate-500 border-slate-700' : 'bg-slate-50 text-slate-400 border-slate-200'}`}>
-                                                               Intervalo
-                                                             </div>
-                                                          )}
-                                                        </React.Fragment>
-                                                      );
-                                                    })}
-                                                  </div>
-                                                </div>
-                                              );
-                                           })}
-                                         </div>
-                                       )}
-                                     </div>
-                                   );
-                                 })()}
-                              </div>
-                            </div>
-                          );
-                        });
-                      })()}
-                     </div>
-
-                      {/* Sidebar de Elementos Nao Alocados e Notificacoes */}
-                      {['admin','gestao'].includes(userRole) && scheduleMode === 'previa' && (
-                        <div className="w-full lg:w-72 shrink-0 space-y-4 sticky top-20 flex flex-col items-end no-print">
-                          
-                          <ScheduleNotifications 
-                            recordsForWeek={activeData} 
-                            subjectHoursMeta={subjectHoursMeta} 
-                            isDarkMode={isDarkMode} 
-                          />
-
-                          <div className={`w-full rounded-2xl border shadow-sm p-4 ${isDarkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'}`}>
-                            <h3 className={`text-sm font-black uppercase tracking-widest mb-4 flex items-center gap-2 ${isDarkMode ? 'text-slate-200' : 'text-slate-700'}`}>
-                              <ListTodo size={16}/> Staging Area / Pendentes
-                            </h3>
-                            <Droppable droppableId="unallocated">
-                              {(provided, snapshot) => (
-                                <div ref={provided.innerRef} {...provided.droppableProps} className={`space-y-3 min-h-[300px] p-2 rounded-xl transition-colors ${snapshot.isDraggingOver ? (isDarkMode ? 'bg-slate-700/50' : 'bg-slate-50') : 'bg-transparent'}`}>
-                                  {mappedSchedules.filter(r => !r.day || r.day === 'A Definir' || r.day === '-').map((r, index) => (
-                                    <Draggable key={r.id} draggableId={r.id} index={index}>
-                                      {(prov2, snap2) => (
-                                        <div ref={prov2.innerRef} {...prov2.draggableProps} {...prov2.dragHandleProps} className={`p-4 rounded-xl border shadow-sm transition-all hover:scale-[1.02] cursor-grab active:cursor-grabbing ${snap2.isDragging ? 'shadow-2xl scale-[1.04] z-50 ring-2 ring-indigo-500' : 'hover:shadow-md'} ${getColorHash(r.subject, isDarkMode)}`}>
-                                          <p className={`font-black text-xs leading-tight ${isDarkMode ? 'text-white' : 'text-slate-800'}`}>{r.subject}</p>
-                                          <p className={`text-[10px] font-bold mt-1.5 opacity-80 uppercase tracking-widest ${isDarkMode ? 'text-slate-200' : 'text-slate-700'}`}>{r.className} <br/><span className="mt-1 block opacity-80">{resolveTeacherName(r.teacher, globalTeachers)}</span></p>
-                                          {r.room && <span className={`inline-block mt-3 bg-black/10 text-center px-2 py-1 rounded text-[8px] font-black uppercase tracking-[0.2em]`}>{r.room}</span>}
-                                        </div>
-                                      )}
-                                    </Draggable>
-                                  ))}
-                                  {provided.placeholder}
-                                  {mappedSchedules.filter(r => !r.day || r.day === 'A Definir' || r.day === '-').length === 0 && (
-                                    <div className={`h-full flex flex-col items-center justify-center opacity-30 text-center py-10 ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>
-                                       <ListTodo size={32} className="mb-2"/>
-                                       <span className="text-[10px] font-black uppercase tracking-[0.2em]">Nenhum bloco<br/>estacionado</span>
-                                    </div>
-                                  )}
-                                </div>
-                              )}
-                            </Droppable>
-                          </div>
-                        </div>
-                      )}
-
-                    </div>
+                      <div className="flex flex-col lg:flex-row gap-4 animate-in zoom-in-95 duration-500">
+                        <CourseGrid 
+                          mappedSchedules={mappedSchedules}
+                          isDarkMode={isDarkMode}
+                          scheduleMode={scheduleMode}
+                          userRole={userRole}
+                          globalTeachers={globalTeachers}
+                          activeCourseClasses={activeCourseClasses}
+                          safeDays={safeDays}
+                          safeTimes={safeTimes}
+                          intervals={intervals}
+                          dynamicWeeksList={dynamicWeeksList}
+                          selectedWeek={selectedWeek}
+                          weekLabel={weekLabel}
+                          draggingRecord={draggingRecord}
+                          checkConflict={checkConflict}
+                          setEditorModal={setEditorModal}
+                          handlePrint={handlePrint}
+                          getColorHash={getColorHash}
+                          resolveTeacherName={resolveTeacherName}
+                          isTeacherPending={isTeacherPending}
+                          onDragStart={onDragStart}
+                          onDragEnd={onDragEnd}
+                          subjectHoursMeta={subjectHoursMeta}
+                          activeData={activeData}
+                          getFormattedDayLabel={getFormattedDayLabel}
+                        />
+                      </div>
                     </DragDropContext>
                   )}
 
                   {/* GRADE DE HORÁRIO DO PROFESSOR (Separada por Curso) */}
                   {(viewMode === 'professor' || viewMode === 'outro_professor') && selectedTeacher && (
-                    <div className="flex flex-col xl:flex-row gap-6 items-start animate-in zoom-in-95 duration-500">
-                      
-                      {/* Lado Esquerdo: Grade (70%) */}
-                      <div className={`w-full ${appMode === 'professor' && viewMode === 'professor' && ['servidor', 'admin', 'gestao'].includes(userRole) ? 'xl:w-[70%]' : ''} space-y-6`}>
-                        {(() => {
-                          const baseProfRecords = mappedSchedules.filter(r => r.teacherId && String(r.teacherId).split(',').includes(String(selectedTeacher)));
-                        const profClasses = new Set(baseProfRecords.map(r => r.className));
-                        let profRecords = [...baseProfRecords];
-                        if (showVacantInMyClasses) {
-                          const vagas = mappedSchedules.filter(r => isTeacherPending(r.teacher) && profClasses.has(r.className));
-                          profRecords = [...profRecords, ...vagas];
-                        }
-                        const profCourses = [...new Set(profRecords.map(r => r.course))].sort((a,b) => String(a).localeCompare(String(b)));
-
-                        if (profCourses.length === 0) {
-                          return (
-                            <div className={`rounded-2xl border p-12 text-center shadow-sm no-print ${isDarkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'}`}>
-                              <UserCircle size={40} className={`mx-auto mb-3 ${isDarkMode ? 'text-slate-600' : 'text-slate-300'}`} />
-                              <h3 className={`text-lg font-black uppercase tracking-widest ${isDarkMode ? 'text-slate-200' : 'text-slate-700'}`}>Sem Aulas</h3>
-                              <p className={`text-sm font-medium mt-1 max-w-md mx-auto ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>
-                                O professor não possui aulas na semana selecionada.
-                              </p>
-                            </div>
-                          );
-                        }
-
-                        return profCourses.map(course => {
-                          const courseRecords = profRecords.filter(r => r.course === course);
-                          const courseClasses = [...new Set(courseRecords.map(r => r.className))].sort();
-                          const courseDays = safeDays.filter(day => courseRecords.some(r => r.day === day));
-
-                          return (
-                            <div key={`prof-course-${course}`} className={`rounded-2xl shadow-sm border overflow-hidden mb-6 ${isDarkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'}`}>
-                              <div className={`text-white px-6 py-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 no-print ${scheduleMode === 'padrao' ? (isDarkMode ? 'bg-blue-950' : 'bg-blue-900') : scheduleMode === 'previa' ? (isDarkMode ? 'bg-violet-950' : 'bg-violet-900') : (isDarkMode ? 'bg-indigo-950' : 'bg-indigo-900')}`}>
-                                <div className="flex items-center gap-2.5">
-                                  <UserCircle size={18} className="opacity-80" />
-                                  <h2 className="font-black text-sm uppercase tracking-widest flex items-center gap-2">
-                                    {scheduleMode === 'padrao' && <span className="bg-white/20 px-1.5 py-0.5 rounded text-[8px]">PADRÃO</span>}
-                                    {scheduleMode === 'previa' && <span className="bg-white/20 px-1.5 py-0.5 rounded text-[8px]">PRÉVIA</span>}
-                                    Horário: {resolveTeacherName(selectedTeacher, globalTeachers)} - {course}
-                                  </h2>
-                                  {scheduleMode !== 'padrao' && <span className="text-[9px] font-black bg-white/20 px-3 py-1 rounded-full tracking-widest uppercase shadow-sm ml-2">{dynamicWeeksList.find(w => w.value === selectedWeek)?.label || selectedWeek}</span>}
-                                </div>
-                                <div className="flex items-center justify-end">
-                                  {appMode === 'professor' && viewMode === 'professor' && (
-                                    <label className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-widest cursor-pointer bg-black/20 px-3 py-1.5 rounded-lg hover:bg-black/30 transition-colors text-white mr-2 no-print">
-                                      <input type="checkbox" checked={showVacantInMyClasses} onChange={e => setShowVacantInMyClasses(e.target.checked)} className="accent-white" />
-                                      Mostrar Vagas nas Minhas Turmas
-                                    </label>
-                                  )}
-                                  <button onClick={handlePrint} className="hidden md:flex items-center gap-2 bg-white/20 hover:bg-white/30 text-white px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all shadow-sm active:scale-95 no-print">
-                                    <Printer size={14} /> Imprimir Horário
-                                  </button>
-                                </div>
-                              </div>
-
-                              <div className="hidden print:block font-black text-[14px] uppercase border-b-[3px] border-black pb-2 tracking-widest mt-4 mb-4 text-black">
-                                PROFESSOR: {resolveTeacherName(selectedTeacher, globalTeachers)} <span className="float-right font-medium text-[10px] bg-black text-white px-2 py-1 rounded-sm">{scheduleMode === 'padrao' ? 'HORÁRIO PADRÃO' : `HORÁRIO ${scheduleMode.toUpperCase()} - ${(weekLabel || selectedWeek).replace('SEM ', 'SEMANA ')}`}</span>
-                              </div>
-                              <div className="hidden md:block overflow-x-auto print:overflow-visible">
-                                <table className="w-full min-w-[600px] border-collapse relative text-xs print:w-full print:min-w-0">
-                                  <thead>
-                                    <tr className={`border-b text-[9px] font-black uppercase tracking-widest text-slate-400 ${isDarkMode ? 'bg-slate-900 border-slate-700' : 'bg-slate-50 border-slate-200'}`}>
-                                      <th className={`sticky left-0 z-30 py-3 px-2 border-r-[3px] w-10 min-w-[40px] text-center shadow-sm ${isDarkMode ? 'bg-slate-900 border-slate-700' : 'bg-slate-100 border-slate-300'}`}>Dia</th>
-                                      <th className={`sticky left-[40px] z-20 py-3 px-3 border-r-[3px] w-28 min-w-[112px] text-center shadow-sm ${isDarkMode ? 'bg-slate-900 border-slate-700' : 'bg-slate-100 border-slate-300'}`}>Horários</th>
-                                      {courseClasses.map(cls => (
-                                        <th key={`head-${cls}`} className={`py-3 px-4 border-r-[3px] last:border-r-0 text-center ${isDarkMode ? 'border-slate-700 text-slate-200' : 'border-slate-300 text-slate-800'}`}>{cls}</th>
-                                      ))}
-                                    </tr>
-                                  </thead>
-                                  <tbody className={`divide-y ${isDarkMode ? 'divide-slate-800' : 'divide-slate-100'}`}>
-                                    {courseDays.map((day, dayIndex) => {
-                                      const activeTimes = safeTimes.filter(timeObj => courseRecords.some(r => r.day === day && r.time === (timeObj.timeStr || timeObj)));
-
-                                      if (activeTimes.length === 0) {
-                                        return (
-                                          <React.Fragment key={`prof-day-block-${day}-empty`}>
-                                            <tr className="group transition-colors">
-                                              <td className={`sticky left-0 z-20 border-r-[3px] align-middle text-center ${isDarkMode ? 'bg-slate-900 border-slate-700 shadow-[2px_0_5px_rgba(0,0,0,0.2)]' : 'bg-slate-50 border-slate-300 shadow-[2px_0_5px_rgba(0,0,0,0.02)]'}`}>
-                                                <div className="flex items-center justify-center h-full w-full min-h-[120px] p-2">
-                                                  <span className="text-[9px] font-black uppercase tracking-widest text-slate-500" style={{ writingMode: 'vertical-rl', transform: 'rotate(180deg)' }}>
-                                                    {getFormattedDayLabel(day)}
-                                                  </span>
-                                                </div>
-                                              </td>
-                                              <td colSpan={courseClasses.length + 1} className={`py-4 text-center font-bold text-xs uppercase tracking-widest ${isDarkMode ? 'text-slate-500 bg-slate-800/20' : 'text-slate-400 bg-slate-50/50'}`}>
-                                                NÃO LETIVO
-                                              </td>
-                                            </tr>
-                                            {dayIndex < courseDays.length - 1 && (
-                                              <tr className={`border-y-[4px] print:hidden ${isDarkMode ? 'bg-slate-700/40 border-slate-700' : 'bg-slate-300/40 border-slate-300'}`}>
-                                                <td colSpan={courseClasses.length + 2} className="h-0 p-0"></td>
-                                              </tr>
-                                            )}
-                                          </React.Fragment>
-                                        );
-                                      }
-
-                                      return (
-                                        <React.Fragment key={`prof-day-block-${day}`}>
-                                          {activeTimes.map((timeObj, index) => {
-                                            const timeStr = timeObj.timeStr || timeObj;
-                                            const isFirstRowOfDay = index === 0;
-                                            const hasLunch = activeTimes.some(t => (t.timeStr || t) === '11:10 - 12:00');
-                                            const isLunch = timeStr === '11:10 - 12:00';
-
-                                            return (
-                                              <React.Fragment key={`prof-${day}-${timeStr}`}>
-                                                <tr className="group transition-colors">
-                                                  {isFirstRowOfDay && (
-                                                    <td
-                                                      rowSpan={activeTimes.length + (hasLunch ? 1 : 0)}
-                                                      className={`sticky left-0 z-20 border-r-[3px] align-middle text-center ${isDarkMode ? 'bg-slate-900 border-slate-700 shadow-[2px_0_5px_rgba(0,0,0,0.2)]' : 'bg-slate-50 border-slate-300 shadow-[2px_0_5px_rgba(0,0,0,0.02)]'}`}
-                                                    >
-                                                      <div className="flex items-center justify-center h-full w-full min-h-[120px]">
-                                                        <span className="text-[9px] font-black uppercase tracking-widest text-slate-500" style={{ writingMode: 'vertical-rl', transform: 'rotate(180deg)' }}>
-                                                          {getFormattedDayLabel(day)}
-                                                        </span>
-                                                      </div>
-                                                    </td>
-                                                  )}
-                                                  <td className={`sticky left-[40px] z-10 py-3 px-3 border-r-[3px] font-bold text-xs whitespace-nowrap text-center ${isDarkMode ? 'bg-slate-800 group-hover:bg-slate-700/50 border-slate-700 text-slate-400 shadow-[2px_0_5px_rgba(0,0,0,0.2)]' : 'bg-white group-hover:bg-slate-50 border-slate-300 text-slate-500 shadow-[2px_0_5px_rgba(0,0,0,0.02)]'}`}>
-                                                    {timeStr}
-                                                  </td>
-                                                  {courseClasses.map(cls => {
-                                                    const recordsNesteSlot = courseRecords.filter(r => r.day === day && r.time === timeStr && r.className === cls);
-
-                                                    return (
-                                                      <td key={`prof-${cls}-${timeStr}`} className={`p-1 border align-top relative ${isDarkMode ? 'border-slate-700 group-hover:bg-slate-700/30' : 'border-slate-200 group-hover:bg-slate-50/50'}`}>
-                                                        <div className="flex flex-col gap-1 w-full h-full min-h-[76px]">
-                                                          {recordsNesteSlot.length === 0 ? (
-                                                            <div className={`flex items-center justify-center h-full font-black text-[9px] tracking-widest uppercase select-none flex-1 ${isDarkMode ? 'opacity-20' : 'opacity-5'}`}>-</div>
-                                                          ) : (
-                                                            recordsNesteSlot.map((r, idx) => {
-                                                              const isVaga = isTeacherPending(r.teacher);
-                                                              const hasClash = recordsNesteSlot.length > 1;
-                                                              const isLocked = isVaga && isSlotLocked(r);
-                                                              return (
-                                                                <div
-                                                                  key={r.id || idx}
-                                                                  onClick={() => {
-                                                                    if (appMode === 'professor') {
-                                                                      if (isVaga) {
-                                                                        if (isLocked) {
-                                                                           alert("Esta vaga já está sendo analisada pela direção.");
-                                                                           return;
-                                                                        }
-                                                                        if (typeof setVacantRequestModal === 'function') setVacantRequestModal(r);
-                                                                      } else if (typeof setExchangeTarget === 'function') {
-                                                                        setExchangeTarget({ targetClass: r.className, targetCourse: r.course, originalRecord: r });
-                                                                      }
-                                                                    }
-                                                                  }}
-                                                                  className={`print-clean-card p-2 rounded-xl border shadow-sm flex flex-col justify-center min-h-[76px] transition-all relative ${isLocked ? (isDarkMode ? 'bg-slate-800/80 border-slate-700 opacity-60 cursor-not-allowed' : 'bg-slate-200 border-slate-300 opacity-60 cursor-not-allowed') : (isVaga ? (isDarkMode ? 'bg-red-900/30 border-red-800/50 hover:scale-[1.02] cursor-pointer' : 'bg-red-50 border-red-300 hover:scale-[1.02] cursor-pointer') : `${getColorHash(r.className, isDarkMode)} hover:scale-[1.02] cursor-pointer`)} ${hasClash && isVaga && !isLocked ? ' ring-2 ring-amber-500 animate-pulse' : ''}`}
-                                                                >
-                                                                  {isVaga ? (
-                                                                    <React.Fragment>
-                                                                      <div className="absolute -top-2.5 left-1/2 -translate-x-1/2 w-max z-10">
-                                                                        <span className={`text-[9px] font-black uppercase tracking-widest text-white px-2 py-0.5 rounded shadow-sm ${isLocked ? 'bg-slate-500' : (isDarkMode ? 'bg-red-600 shadow-red-900' : 'bg-red-600 shadow-red-200')}`}>{isLocked ? 'EM ANÁLISE' : 'AULA VAGA'}</span>
-                                                                      </div>
-                                                                      <p className={`subject font-black text-xs leading-snug text-center mt-1 ${isLocked ? 'text-slate-400' : (isDarkMode ? 'text-red-100' : 'text-red-950')}`}>{r.subject || 'Pendente'}</p>
-                                                                      <span className={`details text-[10px] font-black tracking-widest px-1.5 py-0.5 rounded mt-1.5 w-fit uppercase mx-auto ${isLocked ? 'bg-slate-700/50 text-slate-300' : (isDarkMode ? 'bg-red-900/80 text-red-100' : 'bg-red-200 text-red-950')}`}>{r.className} {r.room ? '- ' + r.room : ''}</span>
-                                                                    </React.Fragment>
-                                                                  ) : (
-                                                                    <React.Fragment>
-                                                                      <p className="subject font-black text-xs sm:text-sm leading-snug text-center drop-shadow-sm">
-                                                                         {r.subject} {r.isSubstituted && r.originalSubject && <span className="block text-[8px] sm:text-[9px] opacity-80 mt-1 uppercase">Era: {r.originalSubject}</span>}
-                                                                      </p>
-                                                                      <span className={`details text-[10px] sm:text-xs font-black tracking-widest px-2 py-1 rounded mt-1.5 w-fit uppercase mx-auto shadow-sm ${isDarkMode ? 'bg-white/25 text-white' : 'bg-black/10 text-slate-900'}`}>{r.className} {r.room ? '- ' + r.room : ''}</span>
-                                                                      {r.isSubstituted && (
-                                                                         <div className="absolute top-0 right-0 z-10 pointer-events-none print:hidden">
-                                                                           <span title="Assumida no lugar de uma Vaga" className="text-[6px] font-black uppercase tracking-wide text-white px-1.5 py-0.5 rounded-bl-[8px] bg-indigo-600 border-l border-b border-indigo-700 block animate-pulse shadow-sm shadow-indigo-900/30">Substituição</span>
-                                                                         </div>
-                                                                      )}
-                                                                    </React.Fragment>
-                                                                  )}
-                                                                </div>
-                                                              );
-                                                            })
-                                                          )}
-                                                        </div>
-                                                      </td>
-                                                    );
-                                                  })}
-                                                </tr>
-                                                {isLunch && (
-                                                  <tr className={`print-interval text-[8px] font-black uppercase tracking-[0.4em] border-y-[3px] ${isDarkMode ? 'bg-slate-800/60 text-slate-500 border-slate-700' : 'bg-slate-100/60 text-slate-400 border-slate-300'}`}>
-                                                    <td colSpan={courseClasses.length + 1} className="py-2 text-center shadow-inner">Intervalo / Almoço</td>
-                                                  </tr>
-                                                )}
-                                              </React.Fragment>
-                                            );
-                                          })}
-                                          {/* Separador entre os dias na matriz */}
-                                          {dayIndex < courseDays.length - 1 && (
-                                            <tr className={`border-y-[4px] ${isDarkMode ? 'bg-slate-700/40 border-slate-700' : 'bg-slate-300/40 border-slate-300'}`}>
-                                              <td colSpan={courseClasses.length + 2} className="py-1 shadow-inner"></td>
-                                            </tr>
-                                          )}
-                                        </React.Fragment>
-                                      );
-                                    })}
-                                  </tbody>
-                                </table>
-                              </div>
-
-                              {/* Mobile Stacked View (Professor Full Week) */}
-                              <div className="md:hidden no-print p-4 space-y-4">
-                                {courseDays.map(day => {
-                                  const dayRecords = courseRecords.filter(r => r.day === day);
-                                  if (dayRecords.length === 0) return null;
-                                  
-                                  const dailyShifts = new Set(courseRecords.map(r => safeTimes.find(t => t.timeStr === r.time)?.shift).filter(Boolean));
-                                  const activeTimes = safeTimes.filter(timeObj => dailyShifts.has(timeObj.shift));
-                                  
-                                  return (
-                                    <div key={`mob-prof-${course}-${day}`} className={`rounded-xl border overflow-hidden shadow-sm animate-in fade-in ${isDarkMode ? 'border-slate-700 bg-slate-800/30' : 'border-slate-200 bg-white'}`}>
-                                      <div className={`px-4 py-2.5 font-black text-[10px] uppercase tracking-widest ${isDarkMode ? 'bg-indigo-950/50 text-indigo-400' : 'bg-indigo-50 text-indigo-700'}`}>
-                                        {getFormattedDayLabel(day)}
-                                      </div>
-                                      <div className={`divide-y ${isDarkMode ? 'divide-slate-800' : 'divide-slate-100'}`}>
-                                        {activeTimes.map((timeObj, idx) => {
-                                          const time = timeObj.timeStr || timeObj;
-                                          const records = dayRecords.filter(r => r.time === time);
-                                          const isLunch = time === '11:10 - 12:00';
-                                          
-                                          const timeRow = (
-                                            <div key={`mob-prof-${course}-${day}-${time}-row`} className={`flex items-start gap-3 p-3 transition-colors ${isDarkMode ? 'hover:bg-slate-800/50' : 'hover:bg-slate-50'}`}>
-                                              <div className="w-16 shrink-0 text-center">
-                                                 <span className={`block border font-black text-[9px] px-1 py-1 rounded-md shadow-sm opacity-80 ${isDarkMode ? 'bg-slate-900 border-slate-700 text-slate-400' : 'bg-white border-slate-200 text-slate-500'}`}>{time}</span>
-                                              </div>
-                                              <div className="flex-1 space-y-2">
-                                                {records.map(r => {
-                                                  const isPending = isTeacherPending(r.teacher);
-                                                  return (
-                                                    <div key={`mob-rec-${r.id}`} className={`p-2.5 rounded-lg border shadow-sm flex flex-col justify-center ${isPending ? (isDarkMode ? 'bg-red-900/30 border-red-800/50 text-red-300' : 'bg-red-50 border-red-200 text-red-900') : getColorHash(r.className, isDarkMode)}`}>
-                                                      <div className="flex items-center gap-1.5 flex-1 w-full">
-                                                        <span className={`text-[8px] font-black uppercase rounded px-1 shrink-0 ${isDarkMode ? 'bg-white/20' : 'bg-black/10'}`}>{r.className}</span>
-                                                        <span className="font-bold text-[10px] leading-tight truncate">{r.subject}</span>
-                                                      </div>
-                                                      {r.room && <span className={`text-[8px] font-black uppercase tracking-widest pl-1 mt-1 opacity-80 block`}>SALA: {r.room}</span>}
-                                                    </div>
-                                                  )
-                                                })}
-                                              </div>
-                                            </div>
-                                          );
-                                          
-                                          return (
-                                            <React.Fragment key={`mob-prof-${course}-${day}-${time}-frag`}>
-                                              {timeRow}
-                                              {isLunch && (
-                                                <div className={`py-1.5 text-center text-[7px] font-black uppercase tracking-[0.4em] border-y-[2px] ${isDarkMode ? 'bg-slate-800/40 text-slate-500 border-slate-700' : 'bg-slate-50 text-slate-400 border-slate-200'}`}>
-                                                  Intervalo
-                                                </div>
-                                              )}
-                                            </React.Fragment>
-                                          );
-                                        })}
-                                      </div>
-                                    </div>
-                                  );
-                                })}
-                              </div>
-                            </div>
-                          );
-                        });
-                      })()}
-                      </div>
-
-                      {/* Lado Direito: Solicitações (30%) */}
-                      {appMode === 'professor' && viewMode === 'professor' && ['servidor', 'admin', 'gestao'].includes(userRole) && (
-                        <div className="w-full xl:w-[30%] shrink-0 sticky top-20 no-print">
-                          <TeacherRequestsSection 
-                            isDarkMode={isDarkMode}
-                            siape={selectedTeacher}
-                            selectedWeek={selectedWeek}
-                            weekData={recordsForWeek.filter(r => r.teacher === selectedTeacher)}
-                            activeDays={activeDays}
-                            classTimes={classTimes}
-                          />
-                        </div>
-                      )}
-                      
-                    </div>
+                      <TeacherGrid 
+                        mappedSchedules={mappedSchedules}
+                        isDarkMode={isDarkMode}
+                        scheduleMode={scheduleMode}
+                        appMode={appMode}
+                        viewMode={viewMode}
+                        userRole={userRole}
+                        selectedTeacher={selectedTeacher}
+                        globalTeachers={globalTeachers}
+                        safeDays={safeDays}
+                        safeTimes={safeTimes}
+                        dynamicWeeksList={dynamicWeeksList}
+                        selectedWeek={selectedWeek}
+                        weekLabel={weekLabel}
+                        showVacantInMyClasses={showVacantInMyClasses}
+                        setShowVacantInMyClasses={setShowVacantInMyClasses}
+                        handlePrint={handlePrint}
+                        resolveTeacherName={resolveTeacherName}
+                        isTeacherPending={isTeacherPending}
+                        isSlotLocked={isSlotLocked}
+                        setVacantRequestModal={setVacantRequestModal}
+                        setExchangeTarget={setExchangeTarget}
+                        getColorHash={getColorHash}
+                        getFormattedDayLabel={getFormattedDayLabel}
+                        recordsForWeek={recordsForWeek}
+                        activeDays={activeDays}
+                        classTimes={classTimes}
+                      />
                   )}
 
                   {/* GRADE DE HORÁRIO GERAL (Turma COMPLETA E HISTORICO) */}
                   {['turma', 'historico'].includes(viewMode) && (
-                    <div className="space-y-4">
-                      {/* ALERTS DE SOLICITAÇÃO NA PRÉVIA */}
-                      {(appMode === 'admin' || userRole === 'gestao' || userRole === 'admin') && scheduleMode === 'previa' && pendingRequests.length > 0 && (
-                        <div className={`p-4 rounded-xl border shadow-sm flex items-start gap-4 animate-in slide-in-from-top-2 ${isDarkMode ? 'bg-amber-900/30 border-amber-800/50' : 'bg-amber-50 border-amber-200'}`}>
-                           <AlertCircle size={24} className="text-amber-500 shrink-0 mt-0.5" />
-                           <div>
-                              <h4 className={`text-sm font-black uppercase tracking-widest ${isDarkMode ? 'text-amber-400' : 'text-amber-700'}`}>Atenção: Solicitações Pendentes para esta Semana</h4>
-                              <p className={`text-xs font-bold mt-1 ${isDarkMode ? 'text-amber-300' : 'text-amber-800'}`}>Você possui {pendingRequests.length} solicitação(ões) de mudança de horário aguardando revisão nesta &quot;Prévia Semanal&quot;. Verifique no painel Administrativo (&quot;Solicitações&quot;).</p>
-                           </div>
-                        </div>
-                      )}
-                      
-                      <div className={`rounded-2xl shadow-sm border overflow-hidden animate-in zoom-in-95 duration-500 ${isDarkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'}`}>
-                      <div className={`text-white px-6 py-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 no-print ${scheduleMode === 'padrao' ? (isDarkMode ? 'bg-blue-950' : 'bg-blue-900') : scheduleMode === 'previa' ? (isDarkMode ? 'bg-violet-950' : 'bg-violet-900') : (isDarkMode ? 'bg-emerald-950' : 'bg-emerald-800')}`}>
-                        <div className="flex items-center gap-2.5">
-                          <Users size={18} className="opacity-80" />
-                          <h2 className="font-black text-sm uppercase tracking-widest flex items-center gap-2">
-                            {scheduleMode === 'padrao' && <span className="bg-white/20 px-1.5 py-0.5 rounded text-[8px]">PADRÃO</span>}
-                            {scheduleMode === 'previa' && <span className="bg-white/20 px-1.5 py-0.5 rounded text-[8px]">PRÉVIA</span>}
-                            Grade: {selectedClass}
-                          </h2>
-                          {scheduleMode !== 'padrao' && weekLabel && <span className="text-[9px] font-black bg-white/10 px-3 py-1 rounded-full tracking-widest uppercase shadow-inner ml-2">{weekLabel}</span>}
-                        </div>
-                        
-                        <button onClick={handlePrint} className="hidden md:flex items-center gap-2 bg-white/20 hover:bg-white/30 text-white px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all shadow-sm active:scale-95 no-print">
-                          <Printer size={14} /> Imprimir Grade
-                        </button>
-                      </div>
-                      
-                      <div className="hidden print:block font-black text-[14px] uppercase border-b-[3px] border-black pb-2 tracking-widest mt-4 mb-4 text-black">
-                        TURMA: {selectedClass} <span className="float-right font-medium text-[10px] bg-black text-white px-2 py-1 rounded-sm">{scheduleMode === 'padrao' ? 'HORÁRIO PADRÃO' : `HORÁRIO ${scheduleMode.toUpperCase()} - ${(weekLabel || selectedWeek).replace('SEM ', 'SEMANA ')}`}</span>
-                      </div>
-                      <div className="hidden md:block overflow-x-auto print:overflow-visible">
-                        <table className="w-full min-w-[750px] border-collapse relative text-xs print:w-full print:min-w-0">
-                          <thead>
-                            <tr className={`border-b text-[9px] font-black uppercase tracking-widest text-slate-400 ${isDarkMode ? 'bg-slate-900 border-slate-700' : 'bg-slate-50 border-slate-200'}`}>
-                              <th className={`sticky left-0 z-20 py-3 px-4 border-r-[3px] w-28 text-center ${isDarkMode ? 'bg-slate-900 border-slate-700 shadow-[2px_0_5px_rgba(0,0,0,0.2)]' : 'bg-slate-100 border-slate-300 shadow-[2px_0_5px_rgba(0,0,0,0.02)]'}`}>Horários</th>
-                              {safeDays.map(day => (<th key={day} className={`py-3 px-4 border-r-[3px] last:border-r-0 text-center ${isDarkMode ? 'border-slate-700' : 'border-slate-300'}`}>{getFormattedDayLabel(day)}</th>))}
-                            </tr>
-                          </thead>
-                          <tbody className={`divide-y ${isDarkMode ? 'divide-slate-800' : 'divide-slate-100'}`}>
-                            {(() => {
-                              const turmaRecords = mappedSchedules.filter(r => r.className === selectedClass);
-                              const entityShifts = new Set(turmaRecords.map(r => safeTimes.find(t => t.timeStr === r.time)?.shift).filter(Boolean));
-                              const displayShifts = new Set();
-                              if (entityShifts.has('Matutino')) displayShifts.add('Matutino');
-                              if (entityShifts.has('Vespertino')) displayShifts.add('Vespertino');
-                              if (entityShifts.has('Noturno')) displayShifts.add('Noturno');
-                              
-                              const entityTimes = safeTimes.filter(t => displayShifts.has(t.shift));
-
-                              let currentShift = '';
-                              if (entityTimes.length === 0) {
-                                return <tr><td colSpan={safeDays.length + 1} className="py-8 text-center text-slate-400 font-bold uppercase tracking-widest text-xs">- Não Letivo -</td></tr>;
-                              }
-                                return (
-                                  <DragDropContext onDragEnd={onDragEnd}>
-                                    {entityTimes.map((timeObj, index) => {
-                                      const time = timeObj.timeStr || timeObj;
-                                      const shift = timeObj.shift || '';
-                                      const isNewShift = shift && shift !== currentShift;
-                                      if (isNewShift) currentShift = shift;
-                                      const isLunch = time === '11:10 - 12:00';
-                                      
-                                      return (
-                                        <React.Fragment key={time}>
-                                        {isNewShift && (
-                                          <tr className={`print-interval text-[8px] font-black uppercase tracking-[0.4em] border-y-[3px] ${isDarkMode ? 'bg-slate-800/60 text-slate-500 border-slate-700' : 'bg-slate-100/60 text-slate-400 border-slate-300'}`}>
-                                            <td colSpan={safeDays.length + 1} className="py-2 text-center shadow-inner">{shift}</td>
-                                          </tr>
-                                        )}
-                                        <tr className="group transition-colors">
-                                          <td className={`sticky left-0 z-10 py-3 px-4 border-r-[3px] font-bold text-xs whitespace-nowrap text-center ${isDarkMode ? 'bg-slate-800 group-hover:bg-slate-700/50 border-slate-700 text-slate-400 shadow-[2px_0_5px_rgba(0,0,0,0.2)]' : 'bg-white group-hover:bg-slate-50 border-slate-300 text-slate-500 shadow-[2px_0_5px_rgba(0,0,0,0.02)]'}`}>{time}</td>
-                                          {safeDays.map(day => {
-                                            const diaIndex = MAP_DAYS.indexOf(day);
-                                            const aulaNesteSlot = turmaRecords.find(r => r.day === day && r.time === time);
-                                            const droppableId = `${day}|${time}|${selectedClass}`;
-                                            return (
-                                              <Droppable droppableId={droppableId} key={droppableId}>
-                                                {(provided, snapshot) => (
-                                                  <td 
-                                                    ref={provided.innerRef}
-                                                    {...provided.droppableProps}
-                                                    className={`p-1.5 border-r-[3px] last:border-r-0 align-top w-32 transition-colors ${snapshot.isDraggingOver ? (isDarkMode ? 'bg-indigo-900/40' : 'bg-indigo-100/50') : (isDarkMode ? 'border-slate-700 group-hover:bg-slate-700/30 bg-slate-800/20' : 'border-slate-300 group-hover:bg-slate-50/50 bg-slate-50/20')}`}
-                                                  >
-                                                    {aulaNesteSlot ? (
-                                                      <div className="flex flex-col gap-1.5">
-                                                        {(() => {
-                                                          const isPending = !aulaNesteSlot.teacherId || String(aulaNesteSlot.teacherId) === 'A Definir' || String(aulaNesteSlot.teacherId) === '-';
-                                                          const disciplineName = aulaNesteSlot.subject;
-                                                          const teacherName = aulaNesteSlot.teacher;
-                                                          const hasConflict = false; // Resolved in server side now
-                                                          
-                                                          return (
-                                                            <Draggable key={aulaNesteSlot.id || `dnd-${diaIndex}-${time}`} draggableId={String(aulaNesteSlot.id || `dnd-${diaIndex}-${time}`)} index={0} isDragDisabled={appMode === 'aluno'}>
-                                                              {(drgProvided, drgSnapshot) => (
-                                                                <div 
-                                                                  ref={drgProvided.innerRef}
-                                                                  {...drgProvided.draggableProps}
-                                                                  {...drgProvided.dragHandleProps}
-                                                                  onClick={(e) => {
-                                                                    if (appMode !== 'aluno') {
-                                                                      setEditorModal({ cls: selectedClass, day, time, tObj: timeObj });
-                                                                    }
-                                                                  }}
-                                                                  className={`print-clean-card p-2 rounded-xl border shadow-sm flex flex-col justify-center min-h-[60px] transition-all relative ${drgSnapshot.isDragging ? 'z-50 scale-105 shadow-2xl rotate-2' : 'hover:scale-[1.02] hover:shadow-md active:scale-95'} ${isPending ? (isDarkMode ? 'bg-red-900/30 border-red-800/50 text-red-300' : 'bg-red-50 border-red-300 text-red-800') : hasConflict ? (isDarkMode ? 'bg-rose-950/80 border-rose-500/80 text-rose-200 shadow-[0_0_10px_rgba(225,29,72,0.4)]' : 'bg-rose-100 border-rose-500 text-rose-900 shadow-[0_0_10px_rgba(225,29,72,0.3)]') : getColorHash(disciplineName, isDarkMode)}`}
-                                                                >
-                                                                  {appMode !== 'aluno' && (
-                                                                    <div className="absolute top-1 right-1 opacity-20 group-hover:opacity-100">
-                                                                       <GripVertical size={10} />
-                                                                    </div>
-                                                                  )}
-                                                                  {isPending && <span className={`text-[7px] font-black uppercase tracking-widest px-1.5 py-0.5 rounded w-fit mx-auto mb-0.5 ${isDarkMode ? 'text-red-400 bg-red-900/50' : 'text-red-600 bg-red-100'}`}>SEM PROFESSOR</span>}
-                                                                  {aulaNesteSlot.isSubstituted && (
-                                                                     <div className="absolute top-0 right-0 z-10 pointer-events-none print:hidden">
-                                                                         <span title="Assumida no lugar de uma Vaga" className="text-[6px] font-black uppercase tracking-wide text-white px-1.5 py-0.5 rounded-bl-[8px] bg-indigo-600 border-l border-b border-indigo-700 block animate-pulse shadow-sm shadow-indigo-900/30">Substituição</span>
-                                                                     </div>
-                                                                  )}
-                                                                  <p className="subject font-bold text-[10px] leading-tight mb-0.5 text-center">
-                                                                     {disciplineName}
-                                                                     {aulaNesteSlot.isSubstituted && aulaNesteSlot.originalSubject && <span className="block text-[8px] sm:text-[9.5px] opacity-80 mt-1 uppercase">Era: {aulaNesteSlot.originalSubject}</span>}
-                                                                  </p>
-                                                                  <p className="details text-[8px] font-bold opacity-80 flex items-center justify-center gap-1 uppercase truncate">
-                                                                    {teacherName}
-                                                                  </p>
-                                                                  {aulaNesteSlot.room && <span className={`details text-[8px] font-black tracking-tighter opacity-60 px-1.5 py-0.5 rounded mt-1 w-fit uppercase mx-auto ${isDarkMode ? 'bg-white/10' : 'bg-black/5'}`}>{aulaNesteSlot.room}</span>}
-                                                                </div>
-                                                              )}
-                                                            </Draggable>
-                                                          );
-                                                        })()}
-                                                      </div>
-                                                    ) : (() => {
-                                                        const dayHasClasses = turmaRecords.some(r => r.day === day);
-                                                        const shiftHasClasses = turmaRecords.some(r => r.day === day && safeTimes.find(t => t.timeStr === r.time)?.shift === shift);
-                                                        
-                                                        if (!dayHasClasses) {
-                                                            const isMidLabel = time.includes('08:50') || time.includes('15:00') || time.includes('20:40') || index === 2 || (entityTimes.length === 1 && index === 0);
-                                                            return (
-                                                                <div className="w-full h-full min-h-[60px] flex items-center justify-center opacity-60">
-                                                                    {isMidLabel && <span className="text-[10px] font-bold uppercase tracking-widest text-slate-400 print:text-black">Não Letivo</span>}
-                                                                </div>
-                                                            );
-                                                        }
-                                                        
-                                                        if (!shiftHasClasses) {
-                                                            return <div className="w-full h-full min-h-[60px]"></div>;
-                                                        }
-
-                                                        return (
-                                                          <div className={`w-full h-full min-h-[60px] flex flex-col items-center justify-center p-2 rounded-lg border border-dashed opacity-70 transition-colors ${isDarkMode ? 'bg-slate-800/40 border-slate-600' : 'bg-slate-100 border-slate-300'}`}>
-                                                              <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">Aula Vaga</span>
-                                                              
-                                                              {userRole === 'professor' && scheduleMode !== 'padrao' && (
-                                                                  <button
-                                                                      onClick={() => {
-                                                                          if(window.confirm(`Deseja solicitar à coordenação para assumir esta Aula Vaga na ${MAP_DAYS[diaIndex]} às ${time}?`)) {
-                                                                              alert('Solicitação registrada! A coordenação analisará seu pedido para assumir este horário.');
-                                                                          }
-                                                                      }}
-                                                                      className="mt-2 px-3 py-1.5 bg-emerald-100 hover:bg-emerald-200 text-emerald-700 text-[9px] font-black uppercase tracking-widest rounded-md shadow-sm transition-all active:scale-95 flex items-center gap-1 no-print"
-                                                                  >
-                                                                      <CheckCircle size={10} /> Assumir
-                                                                  </button>
-                                                              )}
-                                                          </div>
-                                                        );
-                                                    })()}
-                                                    {provided.placeholder}
-                                                  </td>
-                                                )}
-                                              </Droppable>
-                                            );
-                                          })}
-                                        </tr>
-                                        {isLunch && (
-                                          <tr className={`print-interval text-[8px] font-black uppercase tracking-[0.4em] border-y-[3px] ${isDarkMode ? 'bg-slate-800/60 text-slate-500 border-slate-700' : 'bg-slate-100/60 text-slate-400 border-slate-300'}`}>
-                                            <td colSpan={safeDays.length + 1} className="py-2 text-center shadow-inner">Intervalo / Almoço</td>
-                                          </tr>
-                                        )}
-                                        </React.Fragment>
-                                      );
-                                    })}
-                                  </DragDropContext>
-                                );
-                            })()}
-                          </tbody>
-                        </table>
-                      </div>
-                      
-                      {/* Mobile Stacked View (Turma) */}
-                      <div className="md:hidden no-print p-4 space-y-4">
-                        {(() => {
-                          const turmaRecords = mappedSchedules.filter(r => r.className === selectedClass);
-                          if (turmaRecords.length === 0) {
-                            return <div className="text-center text-slate-400 font-bold uppercase tracking-widest text-[10px] p-8 border rounded-xl border-dashed">Sem aulas programadas</div>;
-                          }
-                          return safeDays.map(day => {
-                            const dayRecords = turmaRecords.filter(r => r.day === day);
-                            if (dayRecords.length === 0) return null;
-                            
-                            const dayShifts = new Set(dayRecords.map(r => safeTimes.find(t => t.timeStr === r.time)?.shift).filter(Boolean));
-                            const displayShifts = new Set();
-                            if (dayShifts.has('Matutino')) displayShifts.add('Matutino');
-                            if (dayShifts.has('Vespertino')) displayShifts.add('Vespertino');
-                            if (dayShifts.has('Noturno')) displayShifts.add('Noturno');
-                            const activeTimes = safeTimes.filter(t => displayShifts.has(t.shift));
-                            
-                            return (
-                              <div key={`mob-${day}`} className={`rounded-xl border overflow-hidden shadow-sm animate-in fade-in slide-in-from-bottom-2 ${isDarkMode ? 'border-slate-700 bg-slate-800/30' : 'border-slate-200 bg-white'}`}>
-                                <div className={`px-4 py-2.5 font-black text-[10px] uppercase tracking-widest ${isDarkMode ? 'bg-slate-800 text-slate-300' : 'bg-slate-100 text-slate-600'}`}>
-                                  {getFormattedDayLabel(day)}
-                                </div>
-                                <div className={`divide-y ${isDarkMode ? 'divide-slate-800' : 'divide-slate-100'}`}>
-                                  {activeTimes.map((timeObj, idx) => {
-                                    const time = timeObj.timeStr || timeObj;
-                                    const records = dayRecords.filter(r => r.time === time);
-                                    const isLunch = time === '11:10 - 12:00';
-                                    
-                                    const timeRow = (
-                                      <div key={`${day}-${time}-row`} className={`flex items-center gap-3 p-3 transition-colors ${isDarkMode ? 'hover:bg-slate-800/50' : 'hover:bg-slate-50'}`}>
-                                        <div className="w-16 shrink-0 text-center">
-                                           <span className={`block border font-black text-[9px] px-1 py-1 rounded-md shadow-sm opacity-80 ${isDarkMode ? 'bg-slate-900 border-slate-700 text-slate-400' : 'bg-white border-slate-200 text-slate-500'}`}>{time}</span>
-                                        </div>
-                                        <div className="flex-1 space-y-2">
-                                          {records.length > 0 ? records.map(r => {
-                                            const isPending = isTeacherPending(r.teacher);
-                                            return (
-                                              <div key={`mob-rec-${r.id}`} className={`p-2.5 rounded-lg border shadow-sm flex flex-col justify-center ${isPending ? (isDarkMode ? 'bg-red-900/30 border-red-800/50 text-red-300' : 'bg-red-50 border-red-200 text-red-800') : getColorHash(r.subject, isDarkMode)}`}>
-                                                <p className="font-black text-[11px] leading-tight mb-1">{r.subject}</p>
-                                                <p className={`text-[9px] font-bold uppercase tracking-wide truncate ${isPending ? (isDarkMode ? 'text-red-400' : 'text-red-600') : 'opacity-80'}`}>{isPending ? 'SEM PROFESSOR' : resolveTeacherName(r.teacher, globalTeachers)}</p>
-                                                {r.room && <span className={`text-[8px] font-black uppercase tracking-widest mt-1.5 px-2 py-0.5 rounded w-fit ${isDarkMode ? 'bg-white/10' : 'bg-black/5'}`}>{r.room}</span>}
-                                              </div>
-                                            )
-                                          }) : <div className={`font-black tracking-widest text-[9px] opacity-20 uppercase mx-auto w-fit`}>-</div>}
-                                        </div>
-                                      </div>
-                                    );
-                                    
-                                    return (
-                                      <React.Fragment key={`${day}-${time}-frag`}>
-                                        {timeRow}
-                                        {isLunch && (
-                                           <div className={`py-1.5 text-center text-[7px] font-black uppercase tracking-[0.4em] border-y-[2px] ${isDarkMode ? 'bg-slate-800/40 text-slate-500 border-slate-700' : 'bg-slate-50 text-slate-400 border-slate-200'}`}>
-                                             Intervalo
-                                           </div>
-                                        )}
-                                      </React.Fragment>
-                                    );
-                                  })}
-                                </div>
-                              </div>
-                            );
-                          });
-                        })()}
-                      </div>
-                    </div>
-                  </div>
+                    <ClassGrid
+                      mappedSchedules={mappedSchedules}
+                      isDarkMode={isDarkMode}
+                      scheduleMode={scheduleMode}
+                      appMode={appMode}
+                      viewMode={viewMode}
+                      userRole={userRole}
+                      selectedClass={selectedClass}
+                      globalTeachers={globalTeachers}
+                      safeDays={safeDays}
+                      safeTimes={safeTimes}
+                      dynamicWeeksList={dynamicWeeksList}
+                      selectedWeek={selectedWeek}
+                      weekLabel={weekLabel}
+                      pendingRequests={pendingRequests}
+                      handlePrint={handlePrint}
+                      resolveTeacherName={resolveTeacherName}
+                      isTeacherPending={isTeacherPending}
+                      getColorHash={getColorHash}
+                      getFormattedDayLabel={getFormattedDayLabel}
+                      onDragEnd={onDragEnd}
+                      setEditorModal={setEditorModal}
+                    />
                   )}
 
                   {/* VISTA DE AULAS VAGAS: Separada por Curso */}
                   {viewMode === 'sem_professor' && (
-                    <div className="space-y-6 animate-in zoom-in-95 duration-500">
-                      {(() => {
-                        const pendingRecordsForWeek = mappedSchedules.filter(r => isTeacherPending(r.teacher));
-                        const pendingCourses = [...new Set(pendingRecordsForWeek.map(r => r.course))].sort((a,b) => a.localeCompare(b));
-
-                        if (pendingCourses.length === 0) {
-                          return (
-                            <div className={`rounded-2xl border p-12 text-center shadow-sm no-print ${isDarkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'}`}>
-                              <CheckCircle size={40} className="mx-auto text-emerald-400 mb-3" />
-                              <h3 className={`text-lg font-black uppercase tracking-widest ${isDarkMode ? 'text-slate-200' : 'text-slate-700'}`}>Nenhuma Aula Vaga</h3>
-                              <p className={`text-sm font-medium mt-1 max-w-md mx-auto ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>
-                                Todas as aulas da semana selecionada já possuem professor atribuído.
-                              </p>
-                            </div>
-                          );
-                        }
-
-                        return pendingCourses.map(course => {
-                          const courseRecords = pendingRecordsForWeek.filter(r => r.course === course);
-                          const courseClasses = [...new Set(courseRecords.map(r => r.className))].sort();
-                          const courseDays = safeDays.filter(day => courseRecords.some(r => r.day === day));
-
-                          return (
-                            <div key={course} className={`rounded-2xl shadow-sm border overflow-hidden mb-6 ${isDarkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'}`}>
-                              <div className={`text-white px-6 py-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 no-print ${isDarkMode ? 'bg-red-950' : 'bg-red-900'}`}>
-                                <div className="flex items-center gap-2.5">
-                                  <AlertTriangle size={18} className="opacity-80" />
-                                  <h2 className="font-black text-sm uppercase tracking-widest flex items-center gap-2">
-                                    {scheduleMode === 'padrao' && <span className="bg-white/20 px-1.5 py-0.5 rounded text-[8px]">PADRÃO</span>}
-                                    {scheduleMode === 'previa' && <span className="bg-white/20 px-1.5 py-0.5 rounded text-[8px]">PRÉVIA</span>}
-                                    Aulas Vagas: {course}
-                                  </h2>
-                                  {scheduleMode !== 'padrao' && <span className="text-[9px] font-black bg-white/20 px-3 py-1 rounded-full tracking-widest uppercase shadow-sm ml-2">{dynamicWeeksList.find(w => w.value === selectedWeek)?.label || selectedWeek}</span>}
-                                </div>
-                                <button onClick={handlePrint} className="hidden md:flex items-center gap-2 bg-white/20 hover:bg-white/30 text-white px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all shadow-sm active:scale-95 no-print">
-                                  <Printer size={14} /> Imprimir Aulas Vagas
-                                </button>
-                              </div>
-
-                              <div className="hidden print:block font-black text-[14px] uppercase border-b-[3px] border-black pb-2 tracking-widest mt-4 mb-4 text-black">
-                                AULAS VAGAS <span className="float-right font-medium text-[10px] bg-black text-white px-2 py-1 rounded-sm">{scheduleMode === 'padrao' ? 'HORÁRIO PADRÃO' : `HORÁRIO ${scheduleMode.toUpperCase()} - ${(weekLabel || selectedWeek).replace('SEM ', 'SEMANA ')}`}</span>
-                              </div>
-                              <div className="hidden md:block overflow-x-auto print:overflow-visible">
-                                <table className="w-full min-w-[600px] border-collapse relative text-xs print:w-full print:min-w-0">
-                                  <thead>
-                                    <tr className={`border-b text-[9px] font-black uppercase tracking-widest text-slate-400 ${isDarkMode ? 'bg-slate-900 border-slate-700' : 'bg-slate-50 border-slate-200'}`}>
-                                      <th className={`sticky left-0 z-30 py-3 px-2 border-r-[3px] w-10 min-w-[40px] text-center shadow-sm ${isDarkMode ? 'bg-slate-900 border-slate-700' : 'bg-slate-100 border-slate-300'}`}>Dia</th>
-                                      <th className={`sticky left-[40px] z-20 py-3 px-3 border-r-[3px] w-28 min-w-[112px] text-center shadow-sm ${isDarkMode ? 'bg-slate-900 border-slate-700' : 'bg-slate-100 border-slate-300'}`}>Horários</th>
-                                      {courseClasses.map(cls => (
-                                        <th key={cls} className={`py-3 px-4 border-r-[3px] last:border-r-0 text-center ${isDarkMode ? 'border-slate-700 text-slate-200' : 'border-slate-300 text-slate-800'}`}>{cls}</th>
-                                      ))}
-                                    </tr>
-                                  </thead>
-                                  <tbody className={`divide-y ${isDarkMode ? 'divide-slate-800' : 'divide-slate-100'}`}>
-                                    {courseDays.map((day, dayIndex) => {
-                                      const activeTimes = safeTimes.filter(timeObj => courseRecords.some(r => r.day === day && r.time === (timeObj.timeStr || timeObj)));
-
-                                      if (activeTimes.length === 0) {
-                                        return (
-                                          <React.Fragment key={`day-block-${day}-empty`}>
-                                            <tr className="group transition-colors">
-                                              <td className={`sticky left-0 z-20 border-r-[3px] align-middle text-center ${isDarkMode ? 'bg-slate-900 border-slate-700 shadow-[2px_0_5px_rgba(0,0,0,0.2)]' : 'bg-slate-50 border-slate-300 shadow-[2px_0_5px_rgba(0,0,0,0.02)]'}`}>
-                                                <div className="flex items-center justify-center h-full w-full min-h-[120px] p-2">
-                                                  <span className="text-[9px] font-black uppercase tracking-widest text-slate-500" style={{ writingMode: 'vertical-rl', transform: 'rotate(180deg)' }}>
-                                                    {getFormattedDayLabel(day)}
-                                                  </span>
-                                                </div>
-                                              </td>
-                                              <td colSpan={courseClasses.length + 1} className={`py-4 text-center font-bold text-xs uppercase tracking-widest ${isDarkMode ? 'text-slate-500 bg-slate-800/20' : 'text-slate-400 bg-slate-50/50'}`}>
-                                                NÃO LETIVO
-                                              </td>
-                                            </tr>
-                                            {dayIndex < courseDays.length - 1 && (
-                                              <tr className={`border-y-[4px] print:hidden ${isDarkMode ? 'bg-slate-700/40 border-slate-700' : 'bg-slate-300/40 border-slate-300'}`}>
-                                                <td colSpan={courseClasses.length + 2} className="h-0 p-0"></td>
-                                              </tr>
-                                            )}
-                                          </React.Fragment>
-                                        );
-                                      }
-
-                                      return (
-                                        <React.Fragment key={`day-block-${day}`}>
-                                          {activeTimes.map((timeObj, index) => {
-                                            const timeStr = timeObj.timeStr || timeObj;
-                                            const isFirstRowOfDay = index === 0;
-                                            const hasLunch = activeTimes.some(t => (t.timeStr || t) === '11:10 - 12:00');
-                                            const isLunch = timeStr === '11:10 - 12:00';
-
-                                            return (
-                                              <React.Fragment key={`${day}-${timeStr}`}>
-                                                <tr className="group transition-colors">
-                                                  {isFirstRowOfDay && (
-                                                    <td
-                                                      rowSpan={activeTimes.length + (hasLunch ? 1 : 0)}
-                                                      className={`sticky left-0 z-20 border-r-[3px] align-middle text-center ${isDarkMode ? 'bg-slate-900 border-slate-700 shadow-[2px_0_5px_rgba(0,0,0,0.2)]' : 'bg-slate-50 border-slate-300 shadow-[2px_0_5px_rgba(0,0,0,0.02)]'}`}
-                                                    >
-                                                      <div className="flex items-center justify-center h-full w-full min-h-[120px]">
-                                                        <span className="text-[9px] font-black uppercase tracking-widest text-slate-500" style={{ writingMode: 'vertical-rl', transform: 'rotate(180deg)' }}>
-                                                          {getFormattedDayLabel(day)}
-                                                        </span>
-                                                      </div>
-                                                    </td>
-                                                  )}
-                                                  <td className={`sticky left-[40px] z-10 py-3 px-3 border-r-[3px] font-bold text-xs whitespace-nowrap text-center ${isDarkMode ? 'bg-slate-800 group-hover:bg-slate-700/50 border-slate-700 text-slate-400 shadow-[2px_0_5px_rgba(0,0,0,0.2)]' : 'bg-white group-hover:bg-slate-50 border-slate-300 text-slate-500 shadow-[2px_0_5px_rgba(0,0,0,0.02)]'}`}>
-                                                    {timeStr}
-                                                  </td>
-                                                  {courseClasses.map(cls => {
-                                                    const records = courseRecords.filter(r => r.className === cls && r.day === day && r.time === timeStr);
-                                                    return (
-                                                      <td key={`${cls}-${timeStr}`} className={`p-1.5 border-r-[3px] last:border-r-0 align-top min-w-[140px] ${isDarkMode ? 'border-slate-700 group-hover:bg-slate-700/30 bg-slate-800/20' : 'border-slate-300 group-hover:bg-slate-50/50 bg-slate-50/20'}`}>
-                                                        {records.length > 0 ? records.map(r => (
-                                                          <div key={r.id} className={`print-clean-card p-2.5 rounded-xl border shadow-sm flex flex-col justify-center min-h-[60px] transition-all hover:scale-[1.02] hover:shadow-md active:scale-95 relative pt-4 ${isDarkMode ? 'bg-red-900/30 border-red-800/50' : 'bg-red-50 border-red-300'}`}>
-                                                            <div className="absolute -top-2 left-1/2 -translate-x-1/2 w-max">
-                                                              <span className={`text-[8px] font-black uppercase tracking-widest text-white px-2 py-0.5 rounded shadow-sm ${isDarkMode ? 'bg-red-600 shadow-red-900/50' : 'bg-red-600 shadow-red-200'}`}>Sem Professor</span>
-                                                            </div>
-                                                            <p className={`subject font-black text-[11px] leading-tight text-center ${isDarkMode ? 'text-red-300' : 'text-red-900'}`}>
-                                                              {r.subject}
-                                                            </p>
-                                                            {r.room && <span className={`details text-[8px] font-black tracking-tighter opacity-70 px-1.5 py-0.5 rounded mt-1 w-fit uppercase mx-auto ${isDarkMode ? 'bg-red-900/50 text-red-300' : 'bg-red-200/50 text-red-900'}`}>{r.room}</span>}
-                                                          </div>
-                                                        )) : <div className={`h-[60px] flex items-center justify-center font-black text-[9px] tracking-widest uppercase select-none ${isDarkMode ? 'opacity-20' : 'opacity-5'}`}>-</div>}
-                                                      </td>
-                                                    );
-                                                  })}
-                                                </tr>
-                                                {isLunch && (
-                                                  <tr className={`print-interval text-[8px] font-black uppercase tracking-[0.4em] border-y-[3px] ${isDarkMode ? 'bg-slate-800/60 text-slate-500 border-slate-700' : 'bg-slate-100/60 text-slate-400 border-slate-300'}`}>
-                                                    <td colSpan={courseClasses.length + 1} className="py-2 text-center shadow-inner">Intervalo / Almoço</td>
-                                                  </tr>
-                                                )}
-                                              </React.Fragment>
-                                            );
-                                          })}
-                                          {/* Separador entre os dias na matriz */}
-                                          {dayIndex < courseDays.length - 1 && (
-                                            <tr className={`border-y-[4px] ${isDarkMode ? 'bg-slate-700/40 border-slate-700' : 'bg-slate-300/40 border-slate-300'}`}>
-                                              <td colSpan={courseClasses.length + 2} className="py-1 shadow-inner"></td>
-                                            </tr>
-                                          )}
-                                        </React.Fragment>
-                                      );
-                                    })}
-                                  </tbody>
-                                </table>
-                              </div>
-
-                              {/* Mobile Stacked View (Aulas Vagas) */}
-                              <div className="md:hidden no-print p-4 space-y-4">
-                                {courseDays.map(day => {
-                                  const dayRecords = courseRecords.filter(r => r.day === day);
-                                  if (dayRecords.length === 0) return null;
-                                  
-                                  const activeTimes = safeTimes.filter(t => dayRecords.some(r => r.time === (t.timeStr || t)));
-                                  
-                                  return (
-                                    <div key={`mob-vagas-${course}-${day}`} className={`rounded-xl border overflow-hidden shadow-sm animate-in fade-in ${isDarkMode ? 'border-slate-700 bg-slate-800/30' : 'border-slate-200 bg-white'}`}>
-                                      <div className={`px-4 py-2.5 font-black text-[10px] uppercase tracking-widest ${isDarkMode ? 'bg-red-950/50 text-red-400' : 'bg-red-50 text-red-700'}`}>
-                                        {getFormattedDayLabel(day)}
-                                      </div>
-                                      <div className={`divide-y ${isDarkMode ? 'divide-slate-800' : 'divide-slate-100'}`}>
-                                        {activeTimes.map((timeObj, idx) => {
-                                          const time = timeObj.timeStr;
-                                          const records = dayRecords.filter(r => r.time === time);
-                                          const isLunch = time === '11:10 - 12:00';
-                                          
-                                          const timeRow = (
-                                            <div key={`${course}-${day}-${time}-row`} className={`flex items-start gap-3 p-3 transition-colors ${isDarkMode ? 'hover:bg-slate-800/50' : 'hover:bg-slate-50'}`}>
-                                              <div className="w-16 shrink-0 text-center">
-                                                 <span className={`block border font-black text-[9px] px-1 py-1 rounded-md shadow-sm opacity-80 ${isDarkMode ? 'bg-slate-900 border-slate-700 text-slate-400' : 'bg-white border-slate-200 text-slate-500'}`}>{time}</span>
-                                              </div>
-                                              <div className="flex-1 space-y-2">
-                                                {records.map(r => (
-                                                  <div key={`mob-rec-${r.id}`} className={`p-2.5 rounded-lg border shadow-sm flex flex-col justify-center ${isDarkMode ? 'bg-red-900/30 border-red-800/50 text-red-300' : 'bg-red-50 border-red-200 text-red-900'}`}>
-                                                    <div className="flex items-center gap-1.5 flex-1 w-full">
-                                                      <span className={`text-[8px] font-black uppercase rounded px-1 shrink-0 ${isDarkMode ? 'bg-red-950 text-red-400' : 'bg-red-200 text-red-800'}`}>{r.className}</span>
-                                                      <span className="font-bold text-[10px] leading-tight truncate">{r.subject}</span>
-                                                    </div>
-                                                  </div>
-                                                ))}
-                                              </div>
-                                            </div>
-                                          );
-                                          
-                                          return (
-                                            <React.Fragment key={`${course}-${day}-${time}-frag`}>
-                                              {timeRow}
-                                              {isLunch && (
-                                                <div className={`py-1.5 text-center text-[7px] font-black uppercase tracking-[0.4em] border-y-[2px] ${isDarkMode ? 'bg-slate-800/40 text-slate-500 border-slate-700' : 'bg-slate-50 text-slate-400 border-slate-200'}`}>
-                                                  Intervalo
-                                                </div>
-                                              )}
-                                            </React.Fragment>
-                                          );
-                                        })}
-                                      </div>
-                                    </div>
-                                  );
-                                })}
-                              </div>
-                            </div>
-                          );
-                        });
-                      })()}
-                    </div>
+                    <VacantGrid
+                      mappedSchedules={mappedSchedules}
+                      isDarkMode={isDarkMode}
+                      scheduleMode={scheduleMode}
+                      selectedWeek={selectedWeek}
+                      weekLabel={weekLabel}
+                      safeDays={safeDays}
+                      safeTimes={safeTimes}
+                      dynamicWeeksList={dynamicWeeksList}
+                      handlePrint={handlePrint}
+                      isTeacherPending={isTeacherPending}
+                      getFormattedDayLabel={getFormattedDayLabel}
+                    />
                   )}
                 </>
               )}
@@ -2227,250 +1193,4 @@ export function PortalView({
   );
 }
 
-function TeacherRequestsSection({ isDarkMode, siape, selectedWeek, weekData, activeDays, classTimes }) {
-  const [requests, setRequests] = useState([]);
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  const [loading, setLoading] = useState(false);
-  const [newRequest, setNewRequest] = useState({ description: '', original_slot: '', proposed_day: '', proposed_time: '', proposed_type: 'Regular' });
 
-  const loadRequests = async () => {
-    try {
-      const data = await apiClient.fetchRequests(siape);
-      setRequests(data || []);
-    } catch (e) {
-      console.error("Erro ao carregar solicitações", e);
-    }
-  };
-
-  React.useEffect(() => {
-    if (siape) loadRequests();
-  }, [siape]);
-
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    setLoading(true);
-    try {
-      await apiClient.submitRequest({
-        siape,
-        week_id: selectedWeek,
-        description: newRequest.description,
-        original_slot: newRequest.original_slot,
-        proposed_slot: { day: newRequest.proposed_day, time: newRequest.proposed_time, classType: newRequest.proposed_type }
-      });
-      setNewRequest({ description: '', original_slot: '', proposed_day: '', proposed_time: '', proposed_type: 'Regular' });
-      setIsModalOpen(false);
-      loadRequests();
-    } catch (err) {
-      alert("Erro ao enviar: " + err.message);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  return (
-    <div className="mt-8 mb-12 animate-in slide-in-from-bottom-4 no-print">
-      <div className={`rounded-2xl shadow-lg border overflow-hidden ${isDarkMode ? 'bg-slate-900 border-slate-700' : 'bg-white border-slate-200'}`}>
-        <div className={`px-6 py-4 flex items-center justify-between border-b ${isDarkMode ? 'border-slate-800 bg-slate-800/50' : 'border-slate-100 bg-slate-50'}`}>
-          <div className="flex items-center gap-3">
-            <div className={`p-2 rounded-lg ${isDarkMode ? 'bg-indigo-900/50 text-indigo-400' : 'bg-indigo-50 text-indigo-600'}`}>
-              <MessageSquare size={20} />
-            </div>
-            <div>
-              <h3 className={`text-sm font-black uppercase tracking-widest ${isDarkMode ? 'text-white' : 'text-slate-900'}`}>Minhas Solicitações de Mudança</h3>
-              <p className={`text-[10px] font-bold opacity-60 uppercase tracking-widest ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>Coordenação DAPE</p>
-            </div>
-          </div>
-          <button 
-            onClick={() => setIsModalOpen(true)}
-            className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all shadow-md active:scale-95 flex items-center gap-2 ${isDarkMode ? 'bg-indigo-600 hover:bg-indigo-500 text-white' : 'bg-indigo-600 hover:bg-indigo-700 text-white'}`}
-          >
-            <Send size={14} /> Nova Solicitação
-          </button>
-        </div>
-
-        <div className="p-4">
-          {requests.length === 0 ? (
-            <div className={`p-10 text-center rounded-xl border-2 border-dashed ${isDarkMode ? 'border-slate-800 text-slate-600' : 'border-slate-100 text-slate-400'}`}>
-              <MessageSquare size={32} className="mx-auto mb-2 opacity-20" />
-              <p className="text-[10px] font-black uppercase tracking-[0.2em]">Nenhuma solicitação enviada</p>
-            </div>
-          ) : (
-            <div className="space-y-3">
-              {requests.map(req => (
-                <div key={req.id} className={`p-4 rounded-xl border transition-all ${isDarkMode ? 'bg-slate-800 border-slate-700 hover:bg-slate-800/70' : 'bg-white border-slate-100 hover:border-slate-200 hover:shadow-sm'}`}>
-                  <div className="flex items-start justify-between gap-4">
-                    <div className="flex-1">
-                      <div className="flex items-center gap-2 mb-2">
-                        <span className={`text-[9px] font-black px-2 py-0.5 rounded-full uppercase tracking-widest ${isDarkMode ? 'bg-slate-900 text-slate-400' : 'bg-slate-100 text-slate-500'}`}>
-                          Semana: {req.week_id}
-                        </span>
-                        <span className={`text-[8px] font-black px-2 py-0.5 rounded-full uppercase tracking-widest flex items-center gap-1 ${
-                          req.status === 'pendente' ? (isDarkMode ? 'bg-amber-900/30 text-amber-500' : 'bg-amber-50 text-amber-600') :
-                          req.status === 'aprovado' ? (isDarkMode ? 'bg-emerald-900/30 text-emerald-500' : 'bg-emerald-50 text-emerald-600') :
-                          (isDarkMode ? 'bg-rose-900/30 text-rose-500' : 'bg-rose-50 text-rose-600')
-                        }`}>
-                          {req.status === 'pendente' && <Clock size={10} />}
-                          {req.status === 'aprovado' && <CheckCircle2 size={10} />}
-                          {req.status === 'rejeitado' && <XCircle size={10} />}
-                          {req.status}
-                        </span>
-                      </div>
-                      <p className={`text-xs font-bold leading-relaxed ${isDarkMode ? 'text-slate-300' : 'text-slate-700'}`}>{req.description}</p>
-                      {(req.original_slot || req.proposed_slot) && (
-                        <div className={`mt-3 grid grid-cols-2 gap-2 p-3 rounded-xl border text-[10px] font-bold uppercase tracking-widest ${isDarkMode ? 'bg-slate-950/50 border-slate-800' : 'bg-slate-50 border-slate-100'}`}>
-                          <div className={`flex flex-col gap-1 pr-2 border-r ${isDarkMode ? 'border-slate-800' : 'border-slate-200'}`}>
-                            <span className={isDarkMode ? 'text-slate-500' : 'text-slate-400'}>Original</span>
-                            <span className={isDarkMode ? 'text-slate-300' : 'text-slate-600'}>
-                              {(() => {
-                                try {
-                                  let parsed = req.original_slot;
-                                  if (typeof parsed === 'string' && parsed.startsWith('{')) parsed = JSON.parse(parsed);
-                                  if (typeof parsed === 'string' && parsed.startsWith('"')) parsed = JSON.parse(parsed);
-                                  if (typeof parsed === 'string' && parsed.startsWith('{')) parsed = JSON.parse(parsed);
-                                  if (typeof parsed === 'object' && parsed !== null) return `VAGA:\n${parsed.day} às ${parsed.time}`;
-                                  return String(req.original_slot).replace(/["{}]/g, '');
-                                } catch(e) { return String(req.original_slot); }
-                              })()}
-                            </span>
-                          </div>
-                          <div className={`flex flex-col gap-1 pl-1`}>
-                            <span className={isDarkMode ? 'text-slate-500' : 'text-slate-400'}>Proposta</span>
-                             <span className={isDarkMode ? 'text-indigo-400' : 'text-indigo-600'}>
-                              {(() => {
-                                try {
-                                  let parsed = req.proposed_slot;
-                                  if (typeof parsed === 'string' && parsed.startsWith('{')) parsed = JSON.parse(parsed);
-                                  if (typeof parsed === 'string' && parsed.startsWith('"')) parsed = JSON.parse(parsed);
-                                  if (typeof parsed === 'string' && parsed.startsWith('{')) parsed = JSON.parse(parsed);
-                                  if (typeof parsed === 'object' && parsed !== null) return `${parsed.subject || parsed.classType || 'Mudança'} - ${parsed.day} às ${parsed.time}`;
-                                  return String(req.proposed_slot).replace(/["{}]/g, '');
-                                } catch(e) { return String(req.proposed_slot); }
-                              })()}
-                            </span>
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                    {req.admin_feedback && (
-                      <div className={`max-w-[200px] p-3 rounded-lg border text-[10px] animate-in fade-in slide-in-from-right-2 ${isDarkMode ? 'bg-indigo-900/20 border-indigo-800/50 text-indigo-300' : 'bg-indigo-50 border-indigo-100 text-indigo-800'}`}>
-                        <div className="flex items-center gap-1.5 mb-1 opacity-70">
-                          <AlertCircle size={12} />
-                          <span className="font-black uppercase tracking-widest">Feedback DAPE</span>
-                        </div>
-                        <p className="font-bold leading-relaxed">{req.admin_feedback}</p>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-      </div>
-
-      {/* MODAL DE NOVA SOLICITAÇÃO */}
-      {isModalOpen && (
-        <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
-          <div className={`w-full max-w-lg rounded-3xl shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200 ${isDarkMode ? 'bg-slate-900 border border-slate-700' : 'bg-white'}`}>
-            <div className={`px-6 py-5 border-b flex items-center justify-between ${isDarkMode ? 'border-slate-800 bg-slate-800/30' : 'border-slate-100 bg-slate-50'}`}>
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-2xl bg-indigo-600 flex items-center justify-center text-white shadow-lg rotate-3">
-                  <Send size={18} />
-                </div>
-                <div>
-                  <h3 className={`text-base font-black uppercase tracking-tight ${isDarkMode ? 'text-white' : 'text-slate-900'}`}>Nova Solicitação</h3>
-                  <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Preencha os detalhes da mudança</p>
-                </div>
-              </div>
-              <button 
-                onClick={() => setIsModalOpen(false)}
-                className={`p-2 rounded-xl transition-colors ${isDarkMode ? 'hover:bg-slate-700 text-slate-400' : 'hover:bg-slate-200 text-slate-500'}`}
-              >
-                <XCircle size={20} />
-              </button>
-            </div>
-
-            <form onSubmit={handleSubmit} className="p-6 space-y-4">
-              <div className="space-y-1.5">
-                <label className="text-[10px] font-black uppercase tracking-widest text-slate-500 ml-1">Descrição do Pedido</label>
-                <textarea 
-                  required
-                  placeholder="Explique o motivo da solicitação e os detalhes da mudança..."
-                  className={`w-full min-h-[100px] p-4 rounded-2xl border text-sm font-medium focus:ring-2 focus:ring-indigo-500 transition-all outline-none resize-none ${isDarkMode ? 'bg-slate-950 border-slate-700 text-white placeholder-slate-600' : 'bg-slate-50 border-slate-200 text-slate-900 placeholder-slate-400'}`}
-                  value={newRequest.description}
-                  onChange={e => setNewRequest({...newRequest, description: e.target.value})}
-                />
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-1.5">
-                  <label className="text-[10px] font-black uppercase tracking-widest text-slate-500 ml-1">Horário Original (Selecione o slot atual)</label>
-                  <select 
-                    required
-                    className={`w-full p-3.5 rounded-xl border text-xs font-bold focus:ring-2 focus:ring-indigo-500 transition-all outline-none ${isDarkMode ? 'bg-slate-950 border-slate-700 text-white' : 'bg-white border-slate-200 text-slate-900'}`}
-                    value={newRequest.original_slot}
-                    onChange={e => setNewRequest({...newRequest, original_slot: e.target.value})}
-                  >
-                     <option value="">Selecione a aula atual</option>
-                     {weekData.map(r => (
-                        <option key={r.id} value={`${r.day} ${r.time} - ${r.className} (${r.subject})`}>
-                           {r.day} {r.time} | Turma: {r.className} | {r.subject}
-                        </option>
-                     ))}
-                  </select>
-                </div>
-                <div className="space-y-1.5 flex flex-col gap-2">
-                  <label className="text-[10px] font-black uppercase tracking-widest text-slate-500 ml-1">Horário Proposto</label>
-                  <div className="flex gap-2">
-                     <select required className={`w-1/2 p-2.5 rounded-xl border text-xs font-bold outline-none ${isDarkMode ? 'bg-slate-950 border-slate-700 text-white' : 'bg-white border-slate-200 text-slate-900'}`}
-                       value={newRequest.proposed_day} onChange={e => setNewRequest({...newRequest, proposed_day: e.target.value})}
-                     >
-                       <option value="">Selecione o Dia</option>
-                       {activeDays?.map(d => <option key={d} value={d}>{d}</option>)}
-                     </select>
-                     <select required className={`w-1/2 p-2.5 rounded-xl border text-xs font-bold outline-none ${isDarkMode ? 'bg-slate-950 border-slate-700 text-white' : 'bg-white border-slate-200 text-slate-900'}`}
-                       value={newRequest.proposed_time} onChange={e => setNewRequest({...newRequest, proposed_time: e.target.value})}
-                     >
-                       <option value="">Selecione a Hora</option>
-                       {classTimes?.map(t => <option key={t.timeStr} value={t.timeStr}>{t.timeStr} ({t.shift})</option>)}
-                     </select>
-                  </div>
-                  <select required className={`w-full p-2.5 rounded-xl border text-xs font-bold outline-none mt-1 ${isDarkMode ? 'bg-slate-950 border-slate-700 text-white' : 'bg-white border-slate-200 text-slate-900'}`}
-                    value={newRequest.proposed_type} onChange={e => setNewRequest({...newRequest, proposed_type: e.target.value})}
-                  >
-                    {['Regular', 'Recuperação', 'Exame', 'Atendimento'].map(t => <option key={t} value={t}>{t}</option>)}
-                  </select>
-                </div>
-              </div>
-
-              <div className={`p-4 rounded-2xl border flex items-start gap-3 mt-2 ${isDarkMode ? 'bg-amber-900/10 border-amber-800/30 text-amber-500' : 'bg-amber-50 border-amber-100 text-amber-700'}`}>
-                <AlertCircle size={16} className="shrink-0 mt-0.5" />
-                <p className="text-[10px] font-bold leading-relaxed uppercase tracking-wide">
-                  Sua solicitação será analisada pela coordenação. Você receberá o feedback diretamente nesta seção.
-                </p>
-              </div>
-
-              <div className="pt-4 flex gap-3">
-                <button 
-                  type="button"
-                  onClick={() => setIsModalOpen(false)}
-                  className={`flex-1 py-4 rounded-2xl text-[11px] font-black uppercase tracking-widest transition-all ${isDarkMode ? 'bg-slate-800 text-slate-400 hover:bg-slate-700' : 'bg-slate-100 text-slate-500 hover:bg-slate-200'}`}
-                >
-                  Cancelar
-                </button>
-                <button 
-                  type="submit"
-                  disabled={loading}
-                  className={`flex-1 py-4 rounded-2xl text-[11px] font-black uppercase tracking-widest transition-all shadow-xl shadow-indigo-500/20 active:scale-95 flex items-center justify-center gap-2 ${loading ? 'bg-slate-400 cursor-not-allowed text-white' : 'bg-indigo-600 hover:bg-indigo-700 text-white'}`}
-                >
-                  {loading ? <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : <Send size={14} />}
-                  Enviar Solicitação
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-    </div>
-  );
-}

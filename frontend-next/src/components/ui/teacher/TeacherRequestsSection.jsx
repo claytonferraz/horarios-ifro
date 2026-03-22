@@ -1,0 +1,251 @@
+import React, { useState } from 'react';
+import { MessageSquare, Send, AlertCircle, CheckCircle2, Clock, XCircle } from 'lucide-react';
+import { apiClient } from '@/lib/apiClient';
+
+export function TeacherRequestsSection({ isDarkMode, siape, selectedWeek, weekData, activeDays, classTimes }) {
+  const [requests, setRequests] = useState([]);
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [newRequest, setNewRequest] = useState({ description: '', original_slot: '', proposed_day: '', proposed_time: '', proposed_type: 'Regular' });
+
+  const loadRequests = async () => {
+    try {
+      const data = await apiClient.fetchRequests(siape);
+      setRequests(data || []);
+    } catch (e) {
+      console.error("Erro ao carregar solicitações", e);
+    }
+  };
+
+  React.useEffect(() => {
+    if (siape) loadRequests();
+  }, [siape]);
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setLoading(true);
+    try {
+      await apiClient.submitRequest({
+        siape,
+        week_id: selectedWeek,
+        description: newRequest.description,
+        original_slot: newRequest.original_slot,
+        proposed_slot: { day: newRequest.proposed_day, time: newRequest.proposed_time, classType: newRequest.proposed_type }
+      });
+      setNewRequest({ description: '', original_slot: '', proposed_day: '', proposed_time: '', proposed_type: 'Regular' });
+      setIsModalOpen(false);
+      loadRequests();
+    } catch (err) {
+      alert("Erro ao enviar: " + err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="mt-8 mb-12 animate-in slide-in-from-bottom-4 no-print">
+      <div className={`rounded-2xl shadow-lg border overflow-hidden ${isDarkMode ? 'bg-slate-900 border-slate-700' : 'bg-white border-slate-200'}`}>
+        <div className={`px-6 py-4 flex items-center justify-between border-b ${isDarkMode ? 'border-slate-800 bg-slate-800/50' : 'border-slate-100 bg-slate-50'}`}>
+          <div className="flex items-center gap-3">
+            <div className={`p-2 rounded-lg ${isDarkMode ? 'bg-indigo-900/50 text-indigo-400' : 'bg-indigo-50 text-indigo-600'}`}>
+              <MessageSquare size={20} />
+            </div>
+            <div>
+              <h3 className={`text-sm font-black uppercase tracking-widest ${isDarkMode ? 'text-white' : 'text-slate-900'}`}>Minhas Solicitações de Mudança</h3>
+              <p className={`text-[10px] font-bold opacity-60 uppercase tracking-widest ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>Coordenação DAPE</p>
+            </div>
+          </div>
+          <button 
+            onClick={() => setIsModalOpen(true)}
+            className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all shadow-md active:scale-95 flex items-center gap-2 ${isDarkMode ? 'bg-indigo-600 hover:bg-indigo-500 text-white' : 'bg-indigo-600 hover:bg-indigo-700 text-white'}`}
+          >
+            <Send size={14} /> Nova Solicitação
+          </button>
+        </div>
+
+        <div className="p-4">
+          {requests.length === 0 ? (
+            <div className={`p-10 text-center rounded-xl border-2 border-dashed ${isDarkMode ? 'border-slate-800 text-slate-600' : 'border-slate-100 text-slate-400'}`}>
+              <MessageSquare size={32} className="mx-auto mb-2 opacity-20" />
+              <p className="text-[10px] font-black uppercase tracking-[0.2em]">Nenhuma solicitação enviada</p>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {requests.map(req => (
+                <div key={req.id} className={`p-4 rounded-xl border transition-all ${isDarkMode ? 'bg-slate-800 border-slate-700 hover:bg-slate-800/70' : 'bg-white border-slate-100 hover:border-slate-200 hover:shadow-sm'}`}>
+                  <div className="flex items-start justify-between gap-4">
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2 mb-2">
+                        <span className={`text-[9px] font-black px-2 py-0.5 rounded-full uppercase tracking-widest ${isDarkMode ? 'bg-slate-900 text-slate-400' : 'bg-slate-100 text-slate-500'}`}>
+                          Semana: {req.week_id}
+                        </span>
+                        <span className={`text-[8px] font-black px-2 py-0.5 rounded-full uppercase tracking-widest flex items-center gap-1 ${
+                          req.status === 'pendente' ? (isDarkMode ? 'bg-amber-900/30 text-amber-500' : 'bg-amber-50 text-amber-600') :
+                          req.status === 'aprovado' ? (isDarkMode ? 'bg-emerald-900/30 text-emerald-500' : 'bg-emerald-50 text-emerald-600') :
+                          (isDarkMode ? 'bg-rose-900/30 text-rose-500' : 'bg-rose-50 text-rose-600')
+                        }`}>
+                          {req.status === 'pendente' && <Clock size={10} />}
+                          {req.status === 'aprovado' && <CheckCircle2 size={10} />}
+                          {req.status === 'rejeitado' && <XCircle size={10} />}
+                          {req.status}
+                        </span>
+                      </div>
+                      <p className={`text-xs font-bold leading-relaxed ${isDarkMode ? 'text-slate-300' : 'text-slate-700'}`}>{req.description}</p>
+                      {(req.original_slot || req.proposed_slot) && (
+                        <div className={`mt-3 grid grid-cols-2 gap-2 p-3 rounded-xl border text-[10px] font-bold uppercase tracking-widest ${isDarkMode ? 'bg-slate-950/50 border-slate-800' : 'bg-slate-50 border-slate-100'}`}>
+                          <div className={`flex flex-col gap-1 pr-2 border-r ${isDarkMode ? 'border-slate-800' : 'border-slate-200'}`}>
+                            <span className={isDarkMode ? 'text-slate-500' : 'text-slate-400'}>Original</span>
+                            <span className={isDarkMode ? 'text-slate-300' : 'text-slate-600'}>
+                              {(() => {
+                                try {
+                                  let parsed = req.original_slot;
+                                  if (typeof parsed === 'string' && parsed.startsWith('{')) parsed = JSON.parse(parsed);
+                                  if (typeof parsed === 'string' && parsed.startsWith('"')) parsed = JSON.parse(parsed);
+                                  if (typeof parsed === 'string' && parsed.startsWith('{')) parsed = JSON.parse(parsed);
+                                  if (typeof parsed === 'object' && parsed !== null) return `VAGA:\n${parsed.day} às ${parsed.time}`;
+                                  return String(req.original_slot).replace(/["{}]/g, '');
+                                } catch(e) { return String(req.original_slot); }
+                              })()}
+                            </span>
+                          </div>
+                          <div className={`flex flex-col gap-1 pl-1`}>
+                            <span className={isDarkMode ? 'text-slate-500' : 'text-slate-400'}>Proposta</span>
+                             <span className={isDarkMode ? 'text-indigo-400' : 'text-indigo-600'}>
+                              {(() => {
+                                try {
+                                  let parsed = req.proposed_slot;
+                                  if (typeof parsed === 'string' && parsed.startsWith('{')) parsed = JSON.parse(parsed);
+                                  if (typeof parsed === 'string' && parsed.startsWith('"')) parsed = JSON.parse(parsed);
+                                  if (typeof parsed === 'string' && parsed.startsWith('{')) parsed = JSON.parse(parsed);
+                                  if (typeof parsed === 'object' && parsed !== null) return `${parsed.subject || parsed.classType || 'Mudança'} - ${parsed.day} às ${parsed.time}`;
+                                  return String(req.proposed_slot).replace(/["{}]/g, '');
+                                } catch(e) { return String(req.proposed_slot); }
+                              })()}
+                            </span>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                    {req.admin_feedback && (
+                      <div className={`max-w-[200px] p-3 rounded-lg border text-[10px] animate-in fade-in slide-in-from-right-2 ${isDarkMode ? 'bg-indigo-900/20 border-indigo-800/50 text-indigo-300' : 'bg-indigo-50 border-indigo-100 text-indigo-800'}`}>
+                        <div className="flex items-center gap-1.5 mb-1 opacity-70">
+                          <AlertCircle size={12} />
+                          <span className="font-black uppercase tracking-widest">Feedback DAPE</span>
+                        </div>
+                        <p className="font-bold leading-relaxed">{req.admin_feedback}</p>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* MODAL DE NOVA SOLICITAÇÃO */}
+      {isModalOpen && (
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className={`w-full max-w-lg rounded-3xl shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200 ${isDarkMode ? 'bg-slate-900 border border-slate-700' : 'bg-white'}`}>
+            <div className={`px-6 py-5 border-b flex items-center justify-between ${isDarkMode ? 'border-slate-800 bg-slate-800/30' : 'border-slate-100 bg-slate-50'}`}>
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-2xl bg-indigo-600 flex items-center justify-center text-white shadow-lg rotate-3">
+                  <Send size={18} />
+                </div>
+                <div>
+                  <h3 className={`text-base font-black uppercase tracking-tight ${isDarkMode ? 'text-white' : 'text-slate-900'}`}>Nova Solicitação</h3>
+                  <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Preencha os detalhes da mudança</p>
+                </div>
+              </div>
+              <button 
+                onClick={() => setIsModalOpen(false)}
+                className={`p-2 rounded-xl transition-colors ${isDarkMode ? 'hover:bg-slate-700 text-slate-400' : 'hover:bg-slate-200 text-slate-500'}`}
+              >
+                <XCircle size={20} />
+              </button>
+            </div>
+
+            <form onSubmit={handleSubmit} className="p-6 space-y-4">
+              <div className="space-y-1.5">
+                <label className="text-[10px] font-black uppercase tracking-widest text-slate-500 ml-1">Descrição do Pedido</label>
+                <textarea 
+                  required
+                  placeholder="Explique o motivo da solicitação e os detalhes da mudança..."
+                  className={`w-full min-h-[100px] p-4 rounded-2xl border text-sm font-medium focus:ring-2 focus:ring-indigo-500 transition-all outline-none resize-none ${isDarkMode ? 'bg-slate-950 border-slate-700 text-white placeholder-slate-600' : 'bg-slate-50 border-slate-200 text-slate-900 placeholder-slate-400'}`}
+                  value={newRequest.description}
+                  onChange={e => setNewRequest({...newRequest, description: e.target.value})}
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-1.5">
+                  <label className="text-[10px] font-black uppercase tracking-widest text-slate-500 ml-1">Horário Original (Selecione o slot atual)</label>
+                  <select 
+                    required
+                    className={`w-full p-3.5 rounded-xl border text-xs font-bold focus:ring-2 focus:ring-indigo-500 transition-all outline-none ${isDarkMode ? 'bg-slate-950 border-slate-700 text-white' : 'bg-white border-slate-200 text-slate-900'}`}
+                    value={newRequest.original_slot}
+                    onChange={e => setNewRequest({...newRequest, original_slot: e.target.value})}
+                  >
+                     <option value="">Selecione a aula atual</option>
+                     {weekData.map(r => (
+                        <option key={r.id} value={`${r.day} ${r.time} - ${r.className} (${r.subject})`}>
+                           {r.day} {r.time} | Turma: {r.className} | {r.subject}
+                        </option>
+                     ))}
+                  </select>
+                </div>
+                <div className="space-y-1.5 flex flex-col gap-2">
+                  <label className="text-[10px] font-black uppercase tracking-widest text-slate-500 ml-1">Horário Proposto</label>
+                  <div className="flex gap-2">
+                     <select required className={`w-1/2 p-2.5 rounded-xl border text-xs font-bold outline-none ${isDarkMode ? 'bg-slate-950 border-slate-700 text-white' : 'bg-white border-slate-200 text-slate-900'}`}
+                       value={newRequest.proposed_day} onChange={e => setNewRequest({...newRequest, proposed_day: e.target.value})}
+                     >
+                       <option value="">Selecione o Dia</option>
+                       {activeDays?.map(d => <option key={d} value={d}>{d}</option>)}
+                     </select>
+                     <select required className={`w-1/2 p-2.5 rounded-xl border text-xs font-bold outline-none ${isDarkMode ? 'bg-slate-950 border-slate-700 text-white' : 'bg-white border-slate-200 text-slate-900'}`}
+                       value={newRequest.proposed_time} onChange={e => setNewRequest({...newRequest, proposed_time: e.target.value})}
+                     >
+                       <option value="">Selecione a Hora</option>
+                       {classTimes?.map(t => <option key={t.timeStr} value={t.timeStr}>{t.timeStr} ({t.shift})</option>)}
+                     </select>
+                  </div>
+                  <select required className={`w-full p-2.5 rounded-xl border text-xs font-bold outline-none mt-1 ${isDarkMode ? 'bg-slate-950 border-slate-700 text-white' : 'bg-white border-slate-200 text-slate-900'}`}
+                    value={newRequest.proposed_type} onChange={e => setNewRequest({...newRequest, proposed_type: e.target.value})}
+                  >
+                    {['Regular', 'Recuperação', 'Exame', 'Atendimento'].map(t => <option key={t} value={t}>{t}</option>)}
+                  </select>
+                </div>
+              </div>
+
+              <div className={`p-4 rounded-2xl border flex items-start gap-3 mt-2 ${isDarkMode ? 'bg-amber-900/10 border-amber-800/30 text-amber-500' : 'bg-amber-50 border-amber-100 text-amber-700'}`}>
+                <AlertCircle size={16} className="shrink-0 mt-0.5" />
+                <p className="text-[10px] font-bold leading-relaxed uppercase tracking-wide">
+                  Sua solicitação será analisada pela coordenação. Você receberá o feedback diretamente nesta seção.
+                </p>
+              </div>
+
+              <div className="pt-4 flex gap-3">
+                <button 
+                  type="button"
+                  onClick={() => setIsModalOpen(false)}
+                  className={`flex-1 py-4 rounded-2xl text-[11px] font-black uppercase tracking-widest transition-all ${isDarkMode ? 'bg-slate-800 text-slate-400 hover:bg-slate-700' : 'bg-slate-100 text-slate-500 hover:bg-slate-200'}`}
+                >
+                  Cancelar
+                </button>
+                <button 
+                  type="submit"
+                  disabled={loading}
+                  className={`flex-1 py-4 rounded-2xl text-[11px] font-black uppercase tracking-widest transition-all shadow-xl shadow-indigo-500/20 active:scale-95 flex items-center justify-center gap-2 ${loading ? 'bg-slate-400 cursor-not-allowed text-white' : 'bg-indigo-600 hover:bg-indigo-700 text-white'}`}
+                >
+                  {loading ? <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : <Send size={14} />}
+                  Enviar Solicitação
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
