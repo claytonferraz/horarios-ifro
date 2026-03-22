@@ -913,7 +913,7 @@ export function PortalView({
                              </button>
                            </div>
                          </div>
-                         <div className="p-4 lg:p-6 space-y-6">
+                         <div className="p-4 lg:p-6 grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-4 gap-4">
                            {(() => {
                               const bimsUI = (bimesters && bimesters.length > 0) ? bimesters.map((b, i) => {
                                 const fmtData = (iso) => iso ? iso.split('-').reverse().slice(0,2).join('/') : '';
@@ -924,8 +924,22 @@ export function PortalView({
                                 if (academicWeeks) {
                                   academicWeeks.forEach(w => {
                                     const wStart = new Date(w.start_date + 'T12:00:00');
-                                    if (wStart >= bStart && wStart <= bEnd) {
-                                      diasLetivos += (w.school_days || 0);
+                                    const wEnd = new Date(w.end_date + 'T12:00:00');
+                                    if (wStart <= bEnd && wEnd >= bStart) {
+                                      const overlapStart = new Date(Math.max(wStart.getTime(), bStart.getTime()));
+                                      const overlapEnd = new Date(Math.min(wEnd.getTime(), bEnd.getTime()));
+                                      let overlapDays = 0;
+                                      for (let d = new Date(overlapStart); d <= overlapEnd; d.setDate(d.getDate() + 1)) {
+                                          if (d.getDay() !== 0) overlapDays++; // Excluindo Domingo
+                                      }
+                                      
+                                      if (wStart >= bStart && wEnd <= bEnd && w.school_days > 0) {
+                                          diasLetivos += w.school_days;
+                                      } else if (w.school_days > 0) {
+                                          diasLetivos += Math.min(overlapDays, w.school_days);
+                                      } else {
+                                          diasLetivos += overlapDays; // Fallback se o DB não tiver os dias letivos preenchidos para a semana
+                                      }
                                     }
                                   });
                                 }
@@ -948,32 +962,25 @@ export function PortalView({
                               while (bimsUI.length < 4) bimsUI.push({ b: bimsUI.length + 1, name: `${bimsUI.length + 1}º Bimestre`, start: "-", diasLetivos: 0 });
                               
                               return bimsUI.slice(0,4).map(bim => (
-                                <div key={bim.b} className={`rounded-xl border shadow-sm print:break-inside-avoid ${isDarkMode ? 'bg-slate-800/40 border-slate-700' : 'bg-slate-50 border-slate-200'}`}>
-                                  <div className={`p-4 border-b flex items-center justify-between ${isDarkMode ? 'border-slate-700' : 'border-slate-200'}`}>
+                                <div key={bim.b} className={`rounded-xl border shadow-sm print:break-inside-avoid flex flex-col ${isDarkMode ? 'bg-slate-800/40 border-slate-700' : 'bg-slate-50 border-slate-200'}`}>
+                                  <div className={`p-4 border-b flex flex-col gap-3 ${isDarkMode ? 'border-slate-700' : 'border-slate-200'}`}>
                                     <div>
                                       <h4 className={`font-black text-sm uppercase tracking-wider ${isDarkMode ? 'text-indigo-400' : 'text-indigo-700'}`}>{bim.name}</h4>
                                       <p className="text-[10px] uppercase tracking-widest mt-1 opacity-70">
-                                        Início do Bimestre: <b className="text-emerald-500 mr-2">{bim.start}</b> | Total de Dias Letivos: <b className="text-emerald-500">{bim.diasLetivos}</b>
+                                        Início: <b className="text-emerald-500 mr-2">{bim.start}</b> | 
+                                        Dias Letivos: <b className="text-emerald-500">{bim.diasLetivos}</b>
                                       </p>
                                     </div>
-                                    <div className={`text-white px-3 py-1.5 rounded-lg text-[10px] uppercase font-bold tracking-widest shadow-sm flex flex-col items-center justify-center ${isDarkMode ? 'bg-indigo-600' : 'bg-indigo-600'}`}>
-                                      <span className="text-sm">{(bimestresData[bim.b] || []).length}</span>
+                                    <div className={`text-white px-3 py-1.5 rounded-lg text-[10px] uppercase font-bold tracking-widest shadow-sm flex items-center justify-between ${isDarkMode ? 'bg-indigo-600' : 'bg-indigo-600'}`}>
                                       <span className="text-[8px] opacity-80">Aulas Contabilizadas</span>
+                                      <span className="text-sm">{String((bimestresData[bim.b] || []).length).padStart(2, '0')}</span>
                                     </div>
                                   </div>
                                   
-                                  <div className="p-2 md:p-4 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2">
+                                  <div className="p-2 md:p-3 flex flex-col gap-1 flex-1">
                                     {(bimestresData[bim.b] && bimestresData[bim.b].length > 0) ? bimestresData[bim.b].map(r => (
-                                        <div key={r.id} className={`flex items-center gap-3 p-2 rounded-lg border-l-4 transition-all hover:-translate-y-0.5 ${isDarkMode ? 'bg-slate-800 border-indigo-500 text-slate-300' : 'bg-white border-indigo-500 text-slate-700 shadow-sm'}`}>
-                                          <div className={`font-black w-10 text-center text-xs ${isDarkMode ? 'text-indigo-400' : 'text-indigo-600'}`}>{r.date}</div>
-                                          <div className="h-4 w-px bg-slate-500/20"></div>
-                                          <div className={`font-bold text-[9px] px-2 py-1 rounded tracking-[0.2em] ${isDarkMode ? 'bg-slate-700 text-slate-300' : 'bg-slate-100 text-slate-600'}`}>
-                                            {r.time.replace(' - ', ' ')}
-                                          </div>
-                                          <div className="h-4 w-px bg-slate-500/20"></div>
-                                          <div className="font-semibold text-[10px] flex-1 uppercase tracking-tighter truncate" title={r.subject}>
-                                            {r.subject} {r.className && <span className="opacity-50 inline-block ml-1">({r.className})</span>}
-                                          </div>
+                                        <div key={r.id} className={`text-[10px] font-semibold py-1 border-b border-slate-500/10 last:border-0 hover:bg-slate-500/5 px-1 rounded transition-colors ${isDarkMode ? 'text-slate-300' : 'text-slate-700'}`}>
+                                           {r.date} - {r.time.replace(' - ', ' ')} - <span className="uppercase">{r.subject}</span> {r.className && <span className="opacity-60 ml-1">({r.className})</span>}
                                         </div>
                                     )) : (
                                         <div className="col-span-full text-center py-8 opacity-40 flex flex-col items-center justify-center gap-2 select-none no-print">

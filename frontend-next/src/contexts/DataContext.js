@@ -40,7 +40,7 @@ export function DataProvider({ children }) {
               id: d.id,
               course: d.courseName || d.courseId,
               className: d.className || d.classId,
-              day: d.dayOfWeek,
+              day: !isNaN(d.dayOfWeek) ? ['Domingo', 'Segunda-feira', 'Terça-feira', 'Quarta-feira', 'Quinta-feira', 'Sexta-feira', 'Sábado'][parseInt(d.dayOfWeek)] : d.dayOfWeek,
               time: d.slotId,
               teacher: String(d.teacherId || ''),
               subject: d.subjectName || d.disciplineId,
