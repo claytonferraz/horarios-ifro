@@ -46,6 +46,7 @@ export function PortalView({
   const [editorModal, setEditorModal] = useState(null);
   const [showOnlyMyClasses, setShowOnlyMyClasses] = useState(true);
   const [padraoFilterTeacher, setPadraoFilterTeacher] = useState('Todos');
+  const [selectedColleague, setSelectedColleague] = useState('');
   const [pendingRequests, setPendingRequests] = useState([]);
   
   // New Requests Logic as requested
@@ -618,8 +619,8 @@ export function PortalView({
                   
                   {appMode === 'professor' && (
                     <>
-                      <button onClick={() => { setViewMode('professor'); if(['servidor', 'admin', 'gestao'].includes(userRole) && typeof setSelectedTeacher === 'function') setSelectedTeacher(siape); }} 
-                              className={"flex flex-1 sm:flex-none min-w-[130px] items-center justify-center gap-2 px-4 py-3 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all " + (viewMode === 'professor' ? 'bg-indigo-600 text-white shadow-lg ring-2 ring-indigo-400/50' : (isDarkMode ? 'bg-slate-800 text-slate-300 hover:text-white hover:bg-slate-700' : 'bg-white text-slate-600 border border-slate-200 hover:text-slate-900'))}>
+                      <button onClick={() => { setViewMode('professor'); if(['servidor', 'admin', 'gestao'].includes(userRole) && typeof setSelectedTeacher === 'function') setSelectedTeacher(siape); setSelectedColleague(''); }} 
+                              className={"flex flex-1 sm:flex-none min-w-[130px] items-center justify-center gap-2 px-4 py-3 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all " + (viewMode === 'professor' && !selectedColleague ? 'bg-indigo-600 text-white shadow-lg ring-2 ring-indigo-400/50' : (isDarkMode ? 'bg-slate-800 text-slate-300 hover:text-white hover:bg-slate-700' : 'bg-white text-slate-600 border border-slate-200 hover:text-slate-900'))}>
                         <UserCircle size={14} /> Meus Horários
                       </button>
 
@@ -693,8 +694,9 @@ export function PortalView({
                       </div>
                     </>
                   )}
-                  {(viewMode === 'professor' && appMode === 'aluno') || viewMode === 'outro_professor' ? (
+                  {((viewMode === 'professor' && appMode === 'aluno') || viewMode === 'outro_professor') && (
                     <div className="space-y-1 col-span-full md:col-span-2">
+                       {/* Mantido funcional para aluno ou modo legado que precise */}
                       <label className="text-[9px] font-black tracking-[0.2em] text-slate-400 uppercase ml-1">
                         Buscar Professor
                       </label>
@@ -709,7 +711,23 @@ export function PortalView({
                         colorClass={isDarkMode ? "bg-indigo-900/30 border-indigo-800/50 text-indigo-200 shadow-sm" : "bg-indigo-50 border-indigo-100 text-indigo-900 shadow-sm"} 
                       />
                     </div>
-                  ) : null}
+                  )}
+
+                  {appMode === 'professor' && viewMode === 'professor' && (
+                    <div className="space-y-1 col-span-full md:col-span-2">
+                      <label className="text-[9px] font-black tracking-[0.2em] text-slate-400 uppercase ml-1">Ver Grade de um Colega</label>
+                      <SearchableSelect
+                        isDarkMode={isDarkMode}
+                        options={(globalTeachersList || globalTeachers || [])
+                          .filter(t => t && (t.siape || t.id) && String(t.siape || t.id) !== String(siape))
+                          .map(t => ({value: String(t.siape || t.id), label: t.nome_exibicao || t.nome_completo || t.name || 'Sem Nome'}))
+                          .sort((a,b) => String(a.label).localeCompare(String(b.label)))}
+                        value={selectedColleague}
+                        onChange={setSelectedColleague}
+                        colorClass={isDarkMode ? "bg-slate-800 border-slate-700 text-slate-200 shadow-sm" : "bg-white border-slate-200 text-slate-700 shadow-sm"}
+                      />
+                    </div>
+                  )}
                   {viewMode === 'total' && (
                     <>
                       <div className="space-y-1"><label className="text-[9px] font-black tracking-[0.2em] text-slate-400 uppercase ml-1">Ano Letivo</label>
@@ -1158,8 +1176,9 @@ export function PortalView({
                   )}
 
                   {/* GRADE DE HORÁRIO DO PROFESSOR (Separada por Curso) */}
-                  {(viewMode === 'professor' || viewMode === 'outro_professor') && selectedTeacher && (
+                  {viewMode === 'professor' && selectedTeacher && (
                       <TeacherGrid 
+                        selectedColleague={selectedColleague}
                         mappedSchedules={mappedSchedules}
                         isDarkMode={isDarkMode}
                         scheduleMode={scheduleMode}

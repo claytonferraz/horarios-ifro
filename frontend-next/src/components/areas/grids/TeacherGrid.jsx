@@ -11,6 +11,7 @@ export const TeacherGrid = React.memo(
     viewMode,
     userRole,
     selectedTeacher,
+    selectedColleague,
     globalTeachers,
     safeDays,
     safeTimes,
@@ -31,18 +32,15 @@ export const TeacherGrid = React.memo(
     activeDays,
     classTimes,
   }) => {
-    const baseProfRecords = mappedSchedules.filter(
-      (r) =>
-        r.teacherId &&
-        String(r.teacherId).split(",").includes(String(selectedTeacher)),
-    );
-    const profClasses = new Set(baseProfRecords.map((r) => r.className));
-    let profRecords = [...baseProfRecords];
-
+    const activeTeacher = selectedColleague || selectedTeacher;
+    // 1. Descobre as turmas onde o professor leciona
+    const directRecords = mappedSchedules.filter(r => r.teacherId && String(r.teacherId).split(',').includes(String(activeTeacher)));
+    const profClasses = new Set(directRecords.map(r => r.className));
+    // 2. Puxa TODA a grade dessas turmas para dar o contexto
+    let profRecords = mappedSchedules.filter(r => profClasses.has(r.className));
+    // 3. Adiciona vagas se o toggle estiver ativo
     if (showVacantInMyClasses) {
-      const vagas = mappedSchedules.filter(
-        (r) => isTeacherPending(r.teacher) && profClasses.has(r.className),
-      );
+      const vagas = mappedSchedules.filter(r => (!r.teacherId || r.teacherId === '-' || r.teacherId === 'A Definir') && profClasses.has(r.className));
       profRecords = [...profRecords, ...vagas];
     }
 
@@ -66,26 +64,6 @@ export const TeacherGrid = React.memo(
       <div className="flex flex-col xl:flex-row gap-6 items-start animate-in zoom-in-95 duration-500">
         {/* Lado Principal: Grade */}
         <div className={`w-full space-y-6`}>
-          {profCourses.length === 0 ? (
-            <div
-              className={`rounded-2xl border p-12 text-center shadow-sm no-print ${isDarkMode ? "bg-slate-800 border-slate-700" : "bg-white border-slate-200"}`}
-            >
-              <UserCircle
-                size={40}
-                className={`mx-auto mb-3 ${isDarkMode ? "text-slate-600" : "text-slate-300"}`}
-              />
-              <h3
-                className={`text-lg font-black uppercase tracking-widest ${isDarkMode ? "text-slate-200" : "text-slate-700"}`}
-              >
-                Sem Aulas
-              </h3>
-              <p
-                className={`text-sm font-medium mt-1 max-w-md mx-auto ${isDarkMode ? "text-slate-400" : "text-slate-500"}`}
-              >
-                O professor não possui aulas na semana selecionada.
-              </p>
-            </div>
-          ) : (
             <div className="flex flex-col gap-4 w-full">
               {/* O CABEÇALHO GLOBAL DO PROFESSOR */}
               <div
@@ -138,22 +116,28 @@ export const TeacherGrid = React.memo(
                 </div>
               </div>
 
-              {/* ABAS DOS CURSOS */}
-              {profCourses.length > 1 && (
-                <div className="flex flex-wrap gap-2 mb-2 no-print animate-in fade-in slide-in-from-top-2">
-                  {["Todos", ...profCourses].map((c) => (
-                    <button
-                      key={c}
-                      onClick={() => setActiveCourseTab(c)}
-                      className={`px-4 py-2.5 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all shadow-sm ${activeCourseTab === c ? (scheduleMode === "padrao" ? "bg-blue-600 text-white ring-2 ring-blue-500/50 scale-[1.02] z-10" : scheduleMode === "previa" ? "bg-violet-600 text-white ring-2 ring-violet-500/50 scale-[1.02] z-10" : "bg-indigo-600 text-white ring-2 ring-indigo-500/50 scale-[1.02] z-10") : isDarkMode ? "bg-slate-800 text-slate-400 hover:text-white hover:bg-slate-700" : "bg-white text-slate-500 border border-slate-200 hover:text-slate-800"}`}
-                    >
-                      {c === "Todos" ? "Todos os Cursos" : c}
-                    </button>
-                  ))}
+              {profCourses.length === 0 ? (
+                <div className="p-12 text-center opacity-50 font-black tracking-widest uppercase text-sm">
+                  Este professor não possui aulas alocadas nesta semana.
                 </div>
-              )}
+              ) : (
+                <>
+                  {/* ABAS DOS CURSOS */}
+                  {profCourses.length > 1 && (
+                    <div className="flex flex-wrap gap-2 mb-2 no-print animate-in fade-in slide-in-from-top-2">
+                      {["Todos", ...profCourses].map((c) => (
+                        <button
+                          key={c}
+                          onClick={() => setActiveCourseTab(c)}
+                          className={`px-4 py-2.5 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all shadow-sm ${activeCourseTab === c ? (scheduleMode === "padrao" ? "bg-blue-600 text-white ring-2 ring-blue-500/50 scale-[1.02] z-10" : scheduleMode === "previa" ? "bg-violet-600 text-white ring-2 ring-violet-500/50 scale-[1.02] z-10" : "bg-indigo-600 text-white ring-2 ring-indigo-500/50 scale-[1.02] z-10") : isDarkMode ? "bg-slate-800 text-slate-400 hover:text-white hover:bg-slate-700" : "bg-white text-slate-500 border border-slate-200 hover:text-slate-800"}`}
+                        >
+                          {c === "Todos" ? "Todos os Cursos" : c}
+                        </button>
+                      ))}
+                    </div>
+                  )}
 
-              {(() => {
+                  {(() => {
                 const coursesToRender =
                   activeCourseTab === "Todos"
                     ? profCourses
@@ -342,16 +326,24 @@ export const TeacherGrid = React.memo(
                                                           isVaga &&
                                                           isSlotLocked &&
                                                           isSlotLocked(r);
+                                                        const isActive = r.teacherId && String(r.teacherId).split(',').includes(String(activeTeacher));
+                                                        const isVagaReal = !r.teacherId || r.teacherId === 'A Definir' || r.teacherId === '-';
+                                                        
+                                                        let cardStyle = "print-clean-card p-2 rounded-xl border shadow-sm flex flex-col justify-center min-h-[76px] transition-all relative ";
+                                                        if (isVagaReal) {
+                                                           cardStyle += isDarkMode ? 'bg-red-900/30 border-red-800/50 cursor-pointer hover:scale-[1.02]' : 'bg-red-50 border-red-300 cursor-pointer hover:scale-[1.02]';
+                                                        } else if (isActive) {
+                                                           cardStyle += getColorHash(r.subject, isDarkMode) + " ring-2 ring-indigo-500 shadow-md cursor-pointer hover:scale-[1.02] z-10";
+                                                        } else {
+                                                           cardStyle += isDarkMode ? 'bg-slate-800/30 border-slate-700/50 opacity-40 grayscale pointer-events-none' : 'bg-slate-100 border-slate-200 opacity-40 grayscale pointer-events-none';
+                                                        }
+
                                                         return (
                                                           <div
-                                                            key={
-                                                              r.id
-                                                                ? `prof-rec-${r.id}-${idx}`
-                                                                : `prof-rec-idx-${idx}`
-                                                            }
+                                                            key={r.id ? `prof-rec-${r.id}-${idx}` : `prof-rec-idx-${idx}`}
+                                                            className={cardStyle}
                                                             onClick={() => {
-                                                              if (appMode === "professor") {
-                                                                // Bloqueio de Segurança: Professor comum só pode solicitar troca/vaga se ele leciona na turma clicada.
+                                                              if (appMode === "professor" && (isActive || isVagaReal)) {
                                                                 if (userRole !== "admin" && userRole !== "gestao") {
                                                                   if (!profClasses.has(r.className)) {
                                                                      alert("Você só pode solicitar trocas ou assumir vagas em turmas onde você já leciona ao menos uma disciplina.");
@@ -359,7 +351,7 @@ export const TeacherGrid = React.memo(
                                                                   }
                                                                 }
 
-                                                                if (isVaga) {
+                                                                if (isVagaReal) {
                                                                   if (isLocked) {
                                                                     alert("Esta vaga já está sendo analisada pela direção.");
                                                                     return;
@@ -367,7 +359,7 @@ export const TeacherGrid = React.memo(
                                                                   if (typeof setVacantRequestModal === "function") {
                                                                     setVacantRequestModal(r);
                                                                   }
-                                                                } else if (typeof setExchangeTarget === "function") {
+                                                                } else if (isActive && typeof setExchangeTarget === "function") {
                                                                   setExchangeTarget({
                                                                     targetClass: r.className,
                                                                     targetCourse: r.course,
@@ -376,68 +368,19 @@ export const TeacherGrid = React.memo(
                                                                 }
                                                               }
                                                             }}
-                                                            className={`print-clean-card p-2 rounded-xl border shadow-sm flex flex-col justify-center min-h-[76px] transition-all relative ${isLocked ? (isDarkMode ? "bg-slate-800/80 border-slate-700 opacity-60 cursor-not-allowed" : "bg-slate-200 border-slate-300 opacity-60 cursor-not-allowed") : isVaga ? (isDarkMode ? "bg-red-900/30 border-red-800/50 hover:scale-[1.02] cursor-pointer" : "bg-red-50 border-red-300 hover:scale-[1.02] cursor-pointer") : `${getColorHash(r.className, isDarkMode)} hover:scale-[1.02] cursor-pointer`} ${hasClash && isVaga && !isLocked ? " ring-2 ring-amber-500 animate-pulse" : ""}`}
                                                           >
-                                                            {isVaga ? (
+                                                            {isVagaReal ? (
                                                               <React.Fragment>
-                                                                <div className="absolute -top-2.5 left-1/2 -translate-x-1/2 w-max z-10">
-                                                                  <span
-                                                                    className={`text-[9px] font-black uppercase tracking-widest text-white px-2 py-0.5 rounded shadow-sm ${isLocked ? "bg-slate-500" : isDarkMode ? "bg-red-600 shadow-red-900" : "bg-red-600 shadow-red-200"}`}
-                                                                  >
-                                                                    {isLocked
-                                                                      ? "EM ANÁLISE"
-                                                                      : "AULA VAGA"}
-                                                                  </span>
-                                                                </div>
-                                                                <p
-                                                                  className={`subject font-black text-xs leading-snug text-center mt-1 ${isLocked ? "text-slate-400" : isDarkMode ? "text-red-100" : "text-red-950"}`}
-                                                                >
-                                                                  {r.subject ||
-                                                                    "Pendente"}
-                                                                </p>
-                                                                <span
-                                                                  className={`details text-[10px] font-black tracking-widest px-1.5 py-0.5 rounded mt-1.5 w-fit uppercase mx-auto ${isLocked ? "bg-slate-700/50 text-slate-300" : isDarkMode ? "bg-red-900/80 text-red-100" : "bg-red-200 text-red-950"}`}
-                                                                >
-                                                                  {r.className}{" "}
-                                                                  {r.room
-                                                                    ? "- " +
-                                                                      r.room
-                                                                    : ""}
-                                                                </span>
+                                                                <div className="absolute -top-2.5 left-1/2 -translate-x-1/2 w-max z-10"><span className={"text-[9px] font-black uppercase tracking-widest text-white px-2 py-0.5 rounded shadow-sm " + (isDarkMode ? 'bg-red-600' : 'bg-red-500')}>{isLocked ? "EM ANÁLISE" : "AULA VAGA"}</span></div>
+                                                                <p className={"subject font-black text-xs leading-snug text-center mt-1 " + (isDarkMode ? 'text-red-100' : 'text-red-900')}>{r.subject || "Pendente"}</p>
+                                                                <span className={"details text-[10px] font-black tracking-widest px-1.5 py-0.5 rounded mt-1.5 w-fit uppercase mx-auto " + (isDarkMode ? 'bg-red-900/80 text-red-100' : 'bg-red-200 text-red-950')}>{r.className} {r.room ? "- " + r.room : ''}</span>
                                                               </React.Fragment>
                                                             ) : (
                                                               <React.Fragment>
-                                                                <p className="subject font-black text-xs sm:text-sm leading-snug text-center drop-shadow-sm">
-                                                                  {r.subject}{" "}
-                                                                  {r.isSubstituted &&
-                                                                    r.originalSubject && (
-                                                                      <span className="block text-[8px] sm:text-[9px] opacity-80 mt-1 uppercase">
-                                                                        Era:{" "}
-                                                                        {
-                                                                          r.originalSubject
-                                                                        }
-                                                                      </span>
-                                                                    )}
-                                                                </p>
-                                                                <span
-                                                                  className={`details text-[10px] sm:text-xs font-black tracking-widest px-2 py-1 rounded mt-1.5 w-fit uppercase mx-auto shadow-sm ${isDarkMode ? "bg-white/25 text-white" : "bg-black/10 text-slate-900"}`}
-                                                                >
-                                                                  {r.className}{" "}
-                                                                  {r.room
-                                                                    ? "- " +
-                                                                      r.room
-                                                                    : ""}
+                                                                <p className={"subject font-black text-xs sm:text-sm leading-snug text-center drop-shadow-sm " + (!isActive ? "text-slate-500" : "")}>{r.subject}</p>
+                                                                <span className={"details text-[10px] sm:text-xs font-black tracking-widest px-2 py-1 rounded mt-1.5 w-fit uppercase mx-auto shadow-sm " + (isActive ? (isDarkMode ? 'bg-white/25 text-white' : 'bg-black/10 text-slate-900') : (isDarkMode ? 'bg-slate-700 text-slate-400' : 'bg-slate-200 text-slate-500'))}>
+                                                                  {!isActive ? resolveTeacherName(r.teacherId, globalTeachers).split(' ')[0] : (r.room || 'Sem Sala')}
                                                                 </span>
-                                                                {r.isSubstituted && (
-                                                                  <div className="absolute top-0 right-0 z-10 pointer-events-none print:hidden">
-                                                                    <span
-                                                                      title="Assumida no lugar de uma Vaga"
-                                                                      className="text-[6px] font-black uppercase tracking-wide text-white px-1.5 py-0.5 rounded-bl-[8px] bg-indigo-600 border-l border-b border-indigo-700 block animate-pulse shadow-sm shadow-indigo-900/30"
-                                                                    >
-                                                                      Substituição
-                                                                    </span>
-                                                                  </div>
-                                                                )}
                                                               </React.Fragment>
                                                             )}
                                                           </div>
@@ -593,9 +536,10 @@ export const TeacherGrid = React.memo(
                     </div>
                   );
                 });
-              })()}
+                  })()}
+                </>
+              )}
             </div>
-          )}
         </div>
 
         {/* Widget flutuante movido globalmente para PortalView.jsx para acompanhar fluxo em todas as abas */}

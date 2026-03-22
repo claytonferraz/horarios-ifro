@@ -48,14 +48,12 @@ export const CourseGrid = React.memo(
     const [activeCourseTab, setActiveCourseTab] = useState("Todos");
     const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
 
-    const activeTeacherFilter = padraoFilterTeacher && padraoFilterTeacher !== "Todos" ? padraoFilterTeacher : (showOnlyMyClasses ? siape : null);
+    const activeTeacherFilter = showOnlyMyClasses ? siape : (padraoFilterTeacher && padraoFilterTeacher !== "Todos" ? padraoFilterTeacher : null);
 
     const availableCourses = useMemo(() => {
       let schedulesToConsider = mappedSchedules;
       if (activeTeacherFilter) {
-          schedulesToConsider = mappedSchedules.filter(r => 
-             r.teacherId && String(r.teacherId).split(',').includes(String(activeTeacherFilter))
-          );
+          return ["Todas as Turmas do Professor"];
       }
       return [...new Set(schedulesToConsider.map((r) => r.course))]
         .filter(Boolean)
@@ -155,7 +153,10 @@ export const CourseGrid = React.memo(
                                 })),
                               ]}
                               value={padraoFilterTeacher}
-                              onChange={setPadraoFilterTeacher}
+                              onChange={(val) => {
+                                setPadraoFilterTeacher(val);
+                                if (val !== "Todos" && setShowOnlyMyClasses) setShowOnlyMyClasses(false);
+                              }}
                               colorClass="bg-white/90 border-transparent text-slate-800 shadow-sm text-[10px]"
                               placeholder="Buscar por colega..."
                             />
@@ -166,9 +167,10 @@ export const CourseGrid = React.memo(
                           <input
                             type="checkbox"
                             checked={showOnlyMyClasses}
-                            onChange={(e) =>
-                              setShowOnlyMyClasses(e.target.checked)
-                            }
+                            onChange={(e) => {
+                              setShowOnlyMyClasses(e.target.checked);
+                              if (e.target.checked && setPadraoFilterTeacher) setPadraoFilterTeacher("Todos");
+                            }}
                             className="accent-indigo-500 w-3.5 h-3.5"
                           />
                           Apenas as Minhas
@@ -200,8 +202,16 @@ export const CourseGrid = React.memo(
 
                   {coursesToRender.map((course) => {
                     const courseClassesGlobais = mappedSchedules
-                      .filter((r) => r.course === course)
+                      .filter((r) => {
+                         if (activeTeacherFilter) {
+                             if (!r.teacherId || !String(r.teacherId).split(',').includes(String(activeTeacherFilter))) return false;
+                             return true;
+                         }
+                         if (r.course !== course) return false;
+                         return true;
+                      })
                       .map((r) => r.className);
+                      
                     let courseClasses = [
                       ...new Set(courseClassesGlobais),
                     ].sort();
@@ -210,9 +220,9 @@ export const CourseGrid = React.memo(
                         activeCourseClasses.includes(c),
                       );
                     }
-                    const courseRecords = mappedSchedules.filter(
-                      (r) => r.course === course,
-                    );
+                    const courseRecords = activeTeacherFilter 
+                       ? mappedSchedules
+                       : mappedSchedules.filter((r) => r.course === course);
 
                     return (
                       <React.Fragment key={`grid-${course}`}>
@@ -536,6 +546,8 @@ export const CourseGrid = React.memo(
                                                                       isTeacherPending(
                                                                         r.teacher,
                                                                       );
+                                                                    const isActiveTeacherInCard = activeTeacherFilter ? (r.teacherId && String(r.teacherId).split(',').includes(String(activeTeacherFilter))) : true;
+                                                                    
                                                                     return (
                                                                       <Draggable
                                                                         key={String(
@@ -557,7 +569,7 @@ export const CourseGrid = React.memo(
                                                                             ].includes(
                                                                               userRole,
                                                                             )
-                                                                          )
+                                                                          ) || !isActiveTeacherInCard
                                                                         }
                                                                       >
                                                                         {(
@@ -570,7 +582,7 @@ export const CourseGrid = React.memo(
                                                                             }
                                                                             {...prov2.draggableProps}
                                                                             {...prov2.dragHandleProps}
-                                                                            className={`print-clean-card p-1.5 print:p-1 rounded-xl print:rounded-none border-b-[3px] print:border-b-[1px] print:border-slate-400 shadow-sm print:shadow-none flex flex-col justify-center min-h-[46px] print:min-h-0 transition-all mb-1 print:mb-0 last:mb-0 hover:scale-[1.02] relative overflow-visible ${snap2.isDragging ? "shadow-xl scale-105 z-50" : ""} ${isPending ? (isDarkMode ? "bg-red-900/30 border-red-800/50 text-red-300" : "bg-red-50 border-red-300 text-red-800") : getColorHash(r.subject, isDarkMode)}`}
+                                                                            className={`print-clean-card p-1.5 print:p-1 rounded-xl print:rounded-none border-b-[3px] print:border-b-[1px] print:border-slate-400 shadow-sm print:shadow-none flex flex-col justify-center min-h-[46px] print:min-h-0 transition-all mb-1 print:mb-0 last:mb-0 relative overflow-visible ${snap2.isDragging ? "shadow-xl scale-105 z-50 hover:scale-105" : "hover:scale-[1.02]"} ${!isActiveTeacherInCard ? (isDarkMode ? "bg-slate-800/30 border-slate-700/50 opacity-40 grayscale pointer-events-none" : "bg-slate-100 border-slate-200 opacity-40 grayscale pointer-events-none") : isPending ? (isDarkMode ? "bg-red-900/30 border-red-800/50 text-red-300" : "bg-red-50 border-red-300 text-red-800") : getColorHash(r.subject, isDarkMode)}`}
                                                                           >
                                                                             {r.isSubstituted && (
                                                                               <div className="absolute -top-1.5 -right-1 z-10 print:hidden shadow-sm pointer-events-none">
@@ -866,10 +878,11 @@ export const CourseGrid = React.memo(
                                                                 isTeacherPending(
                                                                   r.teacher,
                                                                 );
+                                                              const isActiveTeacherInCard = activeTeacherFilter ? (r.teacherId && String(r.teacherId).split(',').includes(String(activeTeacherFilter))) : true;
                                                               return (
                                                                 <div
                                                                   key={`mob-rec-${r.id}`}
-                                                                  className={`p-2.5 flex items-center justify-between gap-2 rounded-lg border shadow-sm ${isPending ? (isDarkMode ? "bg-red-900/30 border-red-800/50 text-red-300" : "bg-red-50 border-red-200 text-red-800") : getColorHash(r.subject, isDarkMode)}`}
+                                                                  className={`p-2.5 flex items-center justify-between gap-2 rounded-lg border shadow-sm ${!isActiveTeacherInCard ? (isDarkMode ? "bg-slate-800/20 border-slate-700/50 opacity-40 grayscale" : "bg-slate-100 border-slate-200 opacity-40 grayscale") : isPending ? (isDarkMode ? "bg-red-900/30 border-red-800/50 text-red-300" : "bg-red-50 border-red-200 text-red-800") : getColorHash(r.subject, isDarkMode)}`}
                                                                 >
                                                                   <div className="flex items-center gap-1.5 flex-1 max-w-[calc(100%-60px)]">
                                                                     <span className="font-bold text-[10px] leading-tight break-words pr-1">
