@@ -68,13 +68,27 @@ export function HomeApp({ appMode }) {
   };
 
   const executePrint = () => {
+    let weekStr = scheduleState.selectedWeek;
+    if (academicWeeks && scheduleState.selectedWeek && scheduleState.scheduleMode !== 'padrao') {
+        const w = academicWeeks.find(week => String(week.id) === String(scheduleState.selectedWeek));
+        if (w) {
+            const fmtDate = (d) => {
+                if (!d) return '';
+                const parts = d.split('T')[0].split('-');
+                return parts.length === 3 ? parts[2] + '/' + parts[1] : d;
+            };
+            weekStr = String(w.name).replace(/semana\s*/i, 'SEMANA ') + ' (' + fmtDate(w.start_date) + ' a ' + fmtDate(w.end_date) + ')';
+        }
+    }
+  
     handlePrint({
+      appMode: appMode,
       scheduleMode: scheduleState.scheduleMode,
       viewMode: scheduleState.viewMode,
       selectedClass: scheduleState.selectedClass,
       selectedDay: scheduleState.selectedDay,
       selectedTeacher: scheduleState.selectedTeacher,
-      selectedWeek: scheduleState.selectedWeek
+      selectedWeek: weekStr
     });
   };
 

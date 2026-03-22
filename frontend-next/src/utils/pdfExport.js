@@ -1,4 +1,5 @@
 export const handlePrint = ({
+  appMode,
   scheduleMode,
   viewMode,
   selectedClass,
@@ -18,8 +19,18 @@ export const handlePrint = ({
   }
 
   const labelType = scheduleMode === 'padrao' ? 'HORÁRIO PADRÃO' : scheduleMode === 'previa' ? 'PRÉVIA DA PRÓXIMA SEMANA' : 'HORÁRIO CONSOLIDADO';
-  const printTitle = viewMode === 'total' ? 'Diário de Classe Detalhado' : viewMode === 'sem_professor' ? 'Relatório de Aulas Vagas' : viewMode === 'curso' ? `Horário dos Cursos` : viewMode === 'turma' ? `Horário da Turma: ${selectedClass}` : viewMode === 'hoje' ? `Horário do Dia (${selectedDay}): ${selectedClass}` : `Horário do Professor: ${selectedTeacher}`;
-  const printSubtitle = (viewMode === 'total' || viewMode === 'sem_professor') ? `Documento Oficial` : scheduleMode === 'padrao' ? `BASE DE REFERÊNCIA` : `[${labelType}] - ${selectedWeek}`;
+  
+  let printTitle = '';
+  if (appMode === 'aluno') {
+    printTitle = viewMode === 'professor' ? `Horário do Professor: ${selectedTeacher}` : `Horário da Turma: ${selectedClass}`;
+  } else if (appMode === 'professor') {
+    printTitle = viewMode === 'professor' ? `Horário do Professor: ${selectedTeacher}` : '';
+  } else {
+    printTitle = viewMode === 'total' ? 'Diário de Classe Detalhado' : viewMode === 'sem_professor' ? 'Relatório de Aulas Vagas' : viewMode === 'curso' ? `Horário dos Cursos` : viewMode === 'turma' ? `Horário da Turma: ${selectedClass}` : viewMode === 'hoje' ? `Horário do Dia (${selectedDay}): ${selectedClass}` : `Horário do Professor: ${selectedTeacher}`;
+  }
+
+  const printSubtitle = (viewMode === 'total' || viewMode === 'sem_professor') ? `Documento Oficial` : scheduleMode === 'padrao' ? `BASE DE REFERÊNCIA` : `${labelType} - ${selectedWeek}`;
+
 
   const isMatrixView = viewMode !== 'total' && viewMode !== 'hoje';
   const bodyForceCSS = isMatrixView ? `height: 98vh; overflow: hidden; box-sizing: border-box; zoom: 0.95;` : ``;
@@ -53,6 +64,7 @@ export const handlePrint = ({
           
           .doc-header { text-align: center; margin-bottom: 10px; border-bottom: 2px solid #000; padding-bottom: 5px; }
           .doc-header h2 { font-size: 16px; text-transform: uppercase; margin: 0 0 3px 0; letter-spacing: 1px; }
+          .doc-header h2:empty { display: none; margin: 0; }
           .doc-header p { font-size: 11px; font-weight: bold; color: #444; margin: 0; }
 
           .no-print, button, select, input { display: none !important; }

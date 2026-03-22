@@ -181,50 +181,53 @@ export function PortalView({
     return timeA.localeCompare(timeB);
   });
   const getFormattedDayLabel = (dayName) => {
-    if (scheduleMode === 'padrao') return dayName;
-    if (!selectedWeek || typeof selectedWeek !== 'string' || !selectedWeek.includes(' a ')) return dayName;
-    const [startStr] = selectedWeek.split(' a ');
-    if (!startStr || !startStr.includes('/')) return dayName;
+    if (scheduleMode === 'padrao') return dayName.split('-')[0].toUpperCase();
+    if (!selectedWeek || !academicWeeks) return dayName.split('-')[0].toUpperCase();
+    const wObj = academicWeeks.find(w => String(w.id) === String(selectedWeek));
+    if (!wObj || !wObj.start_date) return dayName.split('-')[0].toUpperCase();
     
-    const [d, m] = startStr.split('/');
-    if (!d || !m) return dayName;
+    const parts = wObj.start_date.split('-');
+    if (parts.length !== 3) return dayName.split('-')[0].toUpperCase();
     
-    const baseDate = new Date(new Date().getFullYear(), parseInt(m) - 1, parseInt(d), 12, 0, 0);
-    const dayIndexInWeek = MAP_DAYS.indexOf(dayName) - 1;
-    if (dayIndexInWeek < 0) return dayName;
+    const baseDate = new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]), 12, 0, 0);
+    const baseDayIndex = baseDate.getDay(); 
     
+    const targetDayIndex = parseInt(Object.keys(MAP_DAYS).find(k => MAP_DAYS[k] === dayName));
+    if (isNaN(targetDayIndex)) return dayName.split('-')[0].toUpperCase();
+    
+    const diff = targetDayIndex - baseDayIndex; 
     const targetDate = new Date(baseDate);
-    targetDate.setDate(targetDate.getDate() + dayIndexInWeek);
+    targetDate.setDate(targetDate.getDate() + diff);
     
-    const dayFormatted = String(targetDate.getDate()).padStart(2, '0');
-    const monthFormatted = String(targetDate.getMonth() + 1).padStart(2, '0');
-    return `${dayFormatted}/${monthFormatted} - ${dayName.split('-')[0]}`;
+    const dayFmt = String(targetDate.getDate()).padStart(2, '0');
+    const monthFmt = String(targetDate.getMonth() + 1).padStart(2, '0');
+    return `${dayName.split('-')[0].toUpperCase()} ${dayFmt}/${monthFmt}`;
   };
 
   const [mobileSelectedClasses, setMobileSelectedClasses] = React.useState({});
 
   React.useEffect(() => {
-    if (viewMode === 'hoje' && scheduleMode !== 'padrao' && selectedWeek) {
-      const [startStr] = selectedWeek.split(' a ');
-      if (startStr && startStr.includes('/')) {
-        const [d, m] = startStr.split('/');
-        const weekStart = new Date(new Date().getFullYear(), parseInt(m) - 1, parseInt(d), 12, 0, 0);
-        // Remove times to compare accurate day difference
-        weekStart.setHours(0,0,0,0);
-        const today = new Date();
-        today.setHours(0,0,0,0);
-        const diffInTime = Math.floor((today.getTime() - weekStart.getTime()) / (1000 * 3600 * 24));
-        
-        if (diffInTime < 0 || diffInTime > 6) {
-          if (safeDays.includes('Segunda-feira')) {
-            setSelectedDay('Segunda-feira');
-          } else if (safeDays.length > 0) {
-            setSelectedDay(safeDays[0]);
-          }
-        }
+    if (viewMode === 'hoje' && scheduleMode !== 'padrao' && selectedWeek && academicWeeks) {
+      const wObj = academicWeeks.find(w => String(w.id) === String(selectedWeek));
+      if (wObj && wObj.start_date) {
+         const parts = wObj.start_date.split('-');
+         if (parts.length === 3) {
+            const weekStart = new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]), 0, 0, 0);
+            const today = new Date();
+            today.setHours(0,0,0,0);
+            const diffInTime = Math.floor((today.getTime() - weekStart.getTime()) / (1000 * 3600 * 24));
+            
+            if (diffInTime < 0 || diffInTime > 6) {
+              if (safeDays.includes('Segunda-feira')) {
+                setSelectedDay('Segunda-feira');
+              } else if (safeDays.length > 0) {
+                setSelectedDay(safeDays[0]);
+              }
+            }
+         }
       }
     }
-  }, [selectedWeek, viewMode, scheduleMode]);
+  }, [selectedWeek, viewMode, scheduleMode, academicWeeks]);
 
   const estatisticasProfessor = React.useMemo(() => {
     if (!schedules || !Array.isArray(schedules)) return { totalAulasOficiais: 0, semanasComRegistro: 0 };
@@ -747,7 +750,11 @@ export function PortalView({
                       <div className="p-4 md:p-6 space-y-3">
                          {(() => {
                             let currentShift = '';
-                            return safeTimes.map((timeObj, index) => {
+                            const getEntityRecords = () => appMode === 'aluno' ? mappedSchedules.filter(r => r.className === selectedClass) : mappedSchedules.filter(r => r.teacherId && r.teacherId.includes(String(siape)));
+                            const eShifts = new Set(getEntityRecords().map(r => safeTimes.find(tObj => tObj.timeStr === r.time)?.shift).filter(Boolean));
+                            const activeSafeTimes = safeTimes.filter(t => eShifts.has(t.shift));
+                            if (activeSafeTimes.length === 0) return <div className="text-[10px] font-bold uppercase tracking-widest text-center py-8 text-slate-400">Não Letivo</div>;
+                            return activeSafeTimes.map((timeObj, index) => {
                                const time = timeObj.timeStr;
                                const shift = timeObj.shift;
                                const isNewShift = shift !== currentShift;
@@ -992,15 +999,15 @@ export function PortalView({
                                   <Printer size={14} /> Imprimir Horário do Curso
                                 </button>
                               </div>
-                              <div className="hidden print:block font-black text-[14px] uppercase mb-2 border-b-[3px] border-black pb-2 tracking-widest mt-4">
-                                {course} <span className="float-right font-medium text-[10px] bg-black text-white px-2 py-1 rounded-sm">{scheduleMode === 'padrao' ? 'HORÁRIO PADRÃO' : (dynamicWeeksList.find(w => w.value === selectedWeek)?.label || selectedWeek)}</span>
+                              <div className="hidden print:block font-black text-[14px] uppercase mb-2 border-b-[3px] border-black pb-2 tracking-widest mt-4 text-black">
+                                {course} <span className="float-right font-medium text-[10px] bg-black text-white px-2 py-1 rounded-sm">{scheduleMode === 'padrao' ? 'HORÁRIO PADRÃO' : `HORÁRIO ${scheduleMode.toUpperCase()} - ${(weekLabel || selectedWeek).replace('SEM ', 'SEMANA ')}`}</span>
                               </div>
                               <div className="hidden md:block overflow-x-auto print:overflow-visible">
                                 <table className="w-full min-w-[800px] border-collapse relative text-xs print:w-full print:min-w-0">
                                   <thead>
                                     <tr className={`border-b text-[9px] font-black uppercase tracking-widest text-slate-400 ${isDarkMode ? 'bg-slate-900 border-slate-700' : 'bg-slate-50 border-slate-200'}`}>
                                       <th className={`sticky left-0 z-30 py-3 px-2 border-r-[3px] w-10 min-w-[40px] text-center shadow-sm ${isDarkMode ? 'bg-slate-900 border-slate-700' : 'bg-slate-100 border-slate-300'}`}>Dia</th>
-                                      <th className={`sticky left-[40px] z-20 py-3 px-3 border-r-[3px] w-28 min-w-[112px] text-center shadow-sm ${isDarkMode ? 'bg-slate-900 border-slate-700' : 'bg-slate-100 border-slate-300'}`}>Horário<br/><span className="text-[8px] font-normal opacity-70 normal-case">{selectedWeek}</span></th>
+                                      <th className={`sticky left-[40px] z-20 py-3 px-3 border-r-[3px] w-28 min-w-[112px] text-center shadow-sm ${isDarkMode ? 'bg-slate-900 border-slate-700' : 'bg-slate-100 border-slate-300'}`}>Horários</th>
                                       {courseClasses.map(cls => (
                                         <th key={cls} className={`py-3 px-4 border-r-[3px] last:border-r-0 text-center ${isDarkMode ? 'border-slate-700 text-slate-200' : 'border-slate-300 text-slate-800'}`}>{cls}</th>
                                       ))}
@@ -1009,28 +1016,22 @@ export function PortalView({
                                   <tbody className={`divide-y ${isDarkMode ? 'divide-slate-800' : 'divide-slate-100'}`}>
                                     {safeDays.map((day, dayIndex) => {
                                       const dayRecords = courseRecords.filter(r => r.day === day);
-                                      const dayShifts = new Set(dayRecords.map(r => safeTimes.find(t => t.timeStr === r.time)?.shift).filter(Boolean));
-                                      const displayShiftsDay = new Set();
-                                      if (dayShifts.has('Matutino')) displayShiftsDay.add('Matutino');
-                                      if (dayShifts.has('Vespertino')) displayShiftsDay.add('Vespertino');
-                                      if (dayShifts.has('Noturno')) displayShiftsDay.add('Noturno');
-                                      
-                                      const activeTimes = safeTimes.filter(t => displayShiftsDay.has(t.shift));
-                                      const hasClassesToday = dayRecords.length > 0;
+                                      const activeTimes = safeTimes.filter(timeObj => courseRecords.some(r => r.day === day && r.time === (timeObj.timeStr || timeObj)));
+                                      const hasClassesToday = activeTimes.length > 0;
 
                                       if (!hasClassesToday || activeTimes.length === 0) {
                                         return (
                                           <React.Fragment key={`day-block-${day}-empty`}>
-                                            <tr className="group transition-colors print:hidden">
+                                            <tr className="group transition-colors">
                                               <td className={`sticky left-0 z-20 border-r-[3px] align-middle text-center ${isDarkMode ? 'bg-slate-900 border-slate-700 shadow-[2px_0_5px_rgba(0,0,0,0.2)]' : 'bg-slate-50 border-slate-300 shadow-[2px_0_5px_rgba(0,0,0,0.02)]'}`}>
-                                                <div className="flex items-center justify-center h-full w-full min-h-[80px] p-2">
-                                                  <span className="text-[9px] font-black uppercase tracking-widest text-slate-500" style={{ transform: 'rotate(-90deg)', display: 'inline-block', whiteSpace: 'nowrap' }}>
-                                                    {day.split('-')[0]}
+                                                <div className="flex items-center justify-center h-full w-full min-h-[120px] p-2">
+                                                  <span className="text-[9px] font-black uppercase tracking-widest text-slate-500" style={{ writingMode: 'vertical-rl', transform: 'rotate(180deg)' }}>
+                                                    {getFormattedDayLabel(day)}
                                                   </span>
                                                 </div>
                                               </td>
                                               <td colSpan={courseClasses.length + 1} className={`py-4 text-center font-bold text-xs uppercase tracking-widest ${isDarkMode ? 'text-slate-500 bg-slate-800/20' : 'text-slate-400 bg-slate-50/50'}`}>
-                                                Sem Aulas
+                                                NÃO LETIVO
                                               </td>
                                             </tr>
                                             {dayIndex < safeDays.length - 1 && (
@@ -1073,9 +1074,9 @@ export function PortalView({
                                                         rowSpan={spanSize} 
                                                         className={`sticky left-0 z-20 border-r-[3px] align-middle text-center bg-white ${isDarkMode ? '!bg-slate-900 border-slate-700 shadow-[2px_0_5px_rgba(0,0,0,0.2)]' : '!bg-slate-50 border-slate-300 shadow-[2px_0_5px_rgba(0,0,0,0.02)]'}`}
                                                       >
-                                                        <div className="flex items-center justify-center h-full w-full min-h-[80px]">
-                                                          <span className="text-[9px] font-black uppercase tracking-widest text-slate-500" style={{ transform: 'rotate(-90deg)', display: 'inline-block', whiteSpace: 'nowrap' }}>
-                                                            {day.split('-')[0]}
+                                                        <div className="flex items-center justify-center h-full w-full min-h-[120px]">
+                                                          <span className="text-[9px] font-black uppercase tracking-widest text-slate-500" style={{ writingMode: 'vertical-rl', transform: 'rotate(180deg)' }}>
+                                                            {getFormattedDayLabel(day)}
                                                           </span>
                                                         </div>
                                                       </td>
@@ -1089,9 +1090,9 @@ export function PortalView({
                                                       rowSpan={spanSize} 
                                                       className={`sticky left-0 z-20 border-r-[3px] align-middle text-center bg-white ${isDarkMode ? '!bg-slate-900 border-slate-700 shadow-[2px_0_5px_rgba(0,0,0,0.2)]' : '!bg-slate-50 border-slate-300 shadow-[2px_0_5px_rgba(0,0,0,0.02)]'}`}
                                                     >
-                                                      <div className="flex items-center justify-center h-full w-full min-h-[80px]">
-                                                        <span className="text-[9px] font-black uppercase tracking-widest text-slate-500" style={{ transform: 'rotate(-90deg)', display: 'inline-block', whiteSpace: 'nowrap' }}>
-                                                          {day.split('-')[0]}
+                                                      <div className="flex items-center justify-center h-full w-full min-h-[120px]">
+                                                        <span className="text-[9px] font-black uppercase tracking-widest text-slate-500" style={{ writingMode: 'vertical-rl', transform: 'rotate(180deg)' }}>
+                                                          {getFormattedDayLabel(day)}
                                                         </span>
                                                       </div>
                                                     </td>
@@ -1401,12 +1402,15 @@ export function PortalView({
                                 </div>
                               </div>
 
-                              <div className="hidden md:block overflow-x-auto">
-                                <table className="w-full min-w-[600px] border-collapse relative text-xs">
+                              <div className="hidden print:block font-black text-[14px] uppercase border-b-[3px] border-black pb-2 tracking-widest mt-4 mb-4 text-black">
+                                PROFESSOR: {resolveTeacherName(selectedTeacher, globalTeachers)} <span className="float-right font-medium text-[10px] bg-black text-white px-2 py-1 rounded-sm">{scheduleMode === 'padrao' ? 'HORÁRIO PADRÃO' : `HORÁRIO ${scheduleMode.toUpperCase()} - ${(weekLabel || selectedWeek).replace('SEM ', 'SEMANA ')}`}</span>
+                              </div>
+                              <div className="hidden md:block overflow-x-auto print:overflow-visible">
+                                <table className="w-full min-w-[600px] border-collapse relative text-xs print:w-full print:min-w-0">
                                   <thead>
                                     <tr className={`border-b text-[9px] font-black uppercase tracking-widest text-slate-400 ${isDarkMode ? 'bg-slate-900 border-slate-700' : 'bg-slate-50 border-slate-200'}`}>
                                       <th className={`sticky left-0 z-30 py-3 px-2 border-r-[3px] w-10 min-w-[40px] text-center shadow-sm ${isDarkMode ? 'bg-slate-900 border-slate-700' : 'bg-slate-100 border-slate-300'}`}>Dia</th>
-                                      <th className={`sticky left-[40px] z-20 py-3 px-3 border-r-[3px] w-28 min-w-[112px] text-center shadow-sm ${isDarkMode ? 'bg-slate-900 border-slate-700' : 'bg-slate-100 border-slate-300'}`}>Horário<br/><span className="text-[8px] font-normal opacity-70 normal-case">{selectedWeek}</span></th>
+                                      <th className={`sticky left-[40px] z-20 py-3 px-3 border-r-[3px] w-28 min-w-[112px] text-center shadow-sm ${isDarkMode ? 'bg-slate-900 border-slate-700' : 'bg-slate-100 border-slate-300'}`}>Horários</th>
                                       {courseClasses.map(cls => (
                                         <th key={`head-${cls}`} className={`py-3 px-4 border-r-[3px] last:border-r-0 text-center ${isDarkMode ? 'border-slate-700 text-slate-200' : 'border-slate-300 text-slate-800'}`}>{cls}</th>
                                       ))}
@@ -1415,6 +1419,30 @@ export function PortalView({
                                   <tbody className={`divide-y ${isDarkMode ? 'divide-slate-800' : 'divide-slate-100'}`}>
                                     {courseDays.map((day, dayIndex) => {
                                       const activeTimes = safeTimes.filter(timeObj => courseRecords.some(r => r.day === day && r.time === (timeObj.timeStr || timeObj)));
+
+                                      if (activeTimes.length === 0) {
+                                        return (
+                                          <React.Fragment key={`prof-day-block-${day}-empty`}>
+                                            <tr className="group transition-colors">
+                                              <td className={`sticky left-0 z-20 border-r-[3px] align-middle text-center ${isDarkMode ? 'bg-slate-900 border-slate-700 shadow-[2px_0_5px_rgba(0,0,0,0.2)]' : 'bg-slate-50 border-slate-300 shadow-[2px_0_5px_rgba(0,0,0,0.02)]'}`}>
+                                                <div className="flex items-center justify-center h-full w-full min-h-[120px] p-2">
+                                                  <span className="text-[9px] font-black uppercase tracking-widest text-slate-500" style={{ writingMode: 'vertical-rl', transform: 'rotate(180deg)' }}>
+                                                    {getFormattedDayLabel(day)}
+                                                  </span>
+                                                </div>
+                                              </td>
+                                              <td colSpan={courseClasses.length + 1} className={`py-4 text-center font-bold text-xs uppercase tracking-widest ${isDarkMode ? 'text-slate-500 bg-slate-800/20' : 'text-slate-400 bg-slate-50/50'}`}>
+                                                NÃO LETIVO
+                                              </td>
+                                            </tr>
+                                            {dayIndex < courseDays.length - 1 && (
+                                              <tr className={`border-y-[4px] print:hidden ${isDarkMode ? 'bg-slate-700/40 border-slate-700' : 'bg-slate-300/40 border-slate-300'}`}>
+                                                <td colSpan={courseClasses.length + 2} className="h-0 p-0"></td>
+                                              </tr>
+                                            )}
+                                          </React.Fragment>
+                                        );
+                                      }
 
                                       return (
                                         <React.Fragment key={`prof-day-block-${day}`}>
@@ -1432,9 +1460,9 @@ export function PortalView({
                                                       rowSpan={activeTimes.length + (hasLunch ? 1 : 0)}
                                                       className={`sticky left-0 z-20 border-r-[3px] align-middle text-center ${isDarkMode ? 'bg-slate-900 border-slate-700 shadow-[2px_0_5px_rgba(0,0,0,0.2)]' : 'bg-slate-50 border-slate-300 shadow-[2px_0_5px_rgba(0,0,0,0.02)]'}`}
                                                     >
-                                                      <div className="flex items-center justify-center h-full w-full min-h-[80px]">
-                                                        <span className="text-[9px] font-black uppercase tracking-widest text-slate-500" style={{ transform: 'rotate(-90deg)', display: 'inline-block', whiteSpace: 'nowrap' }}>
-                                                          {day.split('-')[0]}
+                                                      <div className="flex items-center justify-center h-full w-full min-h-[120px]">
+                                                        <span className="text-[9px] font-black uppercase tracking-widest text-slate-500" style={{ writingMode: 'vertical-rl', transform: 'rotate(180deg)' }}>
+                                                          {getFormattedDayLabel(day)}
                                                         </span>
                                                       </div>
                                                     </td>
@@ -1505,7 +1533,7 @@ export function PortalView({
                                                 </tr>
                                                 {isLunch && (
                                                   <tr className={`print-interval text-[8px] font-black uppercase tracking-[0.4em] border-y-[3px] ${isDarkMode ? 'bg-slate-800/60 text-slate-500 border-slate-700' : 'bg-slate-100/60 text-slate-400 border-slate-300'}`}>
-                                                    <td colSpan={courseClasses.length + 2} className="py-2 text-center shadow-inner">Intervalo / Almoço</td>
+                                                    <td colSpan={courseClasses.length + 1} className="py-2 text-center shadow-inner">Intervalo / Almoço</td>
                                                   </tr>
                                                 )}
                                               </React.Fragment>
@@ -1530,7 +1558,8 @@ export function PortalView({
                                   const dayRecords = courseRecords.filter(r => r.day === day);
                                   if (dayRecords.length === 0) return null;
                                   
-                                  const activeTimes = safeTimes.filter(t => dayRecords.some(r => r.time === (t.timeStr || t)));
+                                  const dailyShifts = new Set(courseRecords.map(r => safeTimes.find(t => t.timeStr === r.time)?.shift).filter(Boolean));
+                                  const activeTimes = safeTimes.filter(timeObj => dailyShifts.has(timeObj.shift));
                                   
                                   return (
                                     <div key={`mob-prof-${course}-${day}`} className={`rounded-xl border overflow-hidden shadow-sm animate-in fade-in ${isDarkMode ? 'border-slate-700 bg-slate-800/30' : 'border-slate-200 bg-white'}`}>
@@ -1635,12 +1664,15 @@ export function PortalView({
                         </button>
                       </div>
                       
-                      <div className="hidden md:block overflow-x-auto">
-                        <table className="w-full min-w-[750px] border-collapse relative text-xs">
+                      <div className="hidden print:block font-black text-[14px] uppercase border-b-[3px] border-black pb-2 tracking-widest mt-4 mb-4 text-black">
+                        TURMA: {selectedClass} <span className="float-right font-medium text-[10px] bg-black text-white px-2 py-1 rounded-sm">{scheduleMode === 'padrao' ? 'HORÁRIO PADRÃO' : `HORÁRIO ${scheduleMode.toUpperCase()} - ${(weekLabel || selectedWeek).replace('SEM ', 'SEMANA ')}`}</span>
+                      </div>
+                      <div className="hidden md:block overflow-x-auto print:overflow-visible">
+                        <table className="w-full min-w-[750px] border-collapse relative text-xs print:w-full print:min-w-0">
                           <thead>
                             <tr className={`border-b text-[9px] font-black uppercase tracking-widest text-slate-400 ${isDarkMode ? 'bg-slate-900 border-slate-700' : 'bg-slate-50 border-slate-200'}`}>
-                              <th className={`sticky left-0 z-20 py-3 px-4 border-r-[3px] w-28 text-center ${isDarkMode ? 'bg-slate-900 border-slate-700 shadow-[2px_0_5px_rgba(0,0,0,0.2)]' : 'bg-slate-100 border-slate-300 shadow-[2px_0_5px_rgba(0,0,0,0.02)]'}`}>Horário<br/><span className="text-[8px] font-normal opacity-70 normal-case">{selectedWeek}</span></th>
-                              {safeDays.map(day => (<th key={day} className={`py-3 px-4 border-r-[3px] last:border-r-0 text-center ${isDarkMode ? 'border-slate-700' : 'border-slate-300'}`}>{day.split('-')[0]}</th>))}
+                              <th className={`sticky left-0 z-20 py-3 px-4 border-r-[3px] w-28 text-center ${isDarkMode ? 'bg-slate-900 border-slate-700 shadow-[2px_0_5px_rgba(0,0,0,0.2)]' : 'bg-slate-100 border-slate-300 shadow-[2px_0_5px_rgba(0,0,0,0.02)]'}`}>Horários</th>
+                              {safeDays.map(day => (<th key={day} className={`py-3 px-4 border-r-[3px] last:border-r-0 text-center ${isDarkMode ? 'border-slate-700' : 'border-slate-300'}`}>{getFormattedDayLabel(day)}</th>))}
                             </tr>
                           </thead>
                           <tbody className={`divide-y ${isDarkMode ? 'divide-slate-800' : 'divide-slate-100'}`}>
@@ -1655,6 +1687,9 @@ export function PortalView({
                               const entityTimes = safeTimes.filter(t => displayShifts.has(t.shift));
 
                               let currentShift = '';
+                              if (entityTimes.length === 0) {
+                                return <tr><td colSpan={safeDays.length + 1} className="py-8 text-center text-slate-400 font-bold uppercase tracking-widest text-xs">- Não Letivo -</td></tr>;
+                              }
                                 return (
                                   <DragDropContext onDragEnd={onDragEnd}>
                                     {entityTimes.map((timeObj, index) => {
@@ -1732,24 +1767,42 @@ export function PortalView({
                                                           );
                                                         })()}
                                                       </div>
-                                                    ) : (
-                                                      <div className={`w-full h-full min-h-[60px] flex flex-col items-center justify-center p-2 rounded-lg border border-dashed opacity-70 transition-colors ${isDarkMode ? 'bg-slate-800/40 border-slate-600' : 'bg-slate-100 border-slate-300'}`}>
-                                                          <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">Aula Vaga</span>
-                                                          
-                                                          {userRole === 'professor' && scheduleMode !== 'padrao' && (
-                                                              <button
-                                                                  onClick={() => {
-                                                                      if(window.confirm(`Deseja solicitar à coordenação para assumir esta Aula Vaga na ${MAP_DAYS[diaIndex]} às ${time}?`)) {
-                                                                          alert('Solicitação registrada! A coordenação analisará seu pedido para assumir este horário.');
-                                                                      }
-                                                                  }}
-                                                                  className="mt-2 px-3 py-1.5 bg-emerald-100 hover:bg-emerald-200 text-emerald-700 text-[9px] font-black uppercase tracking-widest rounded-md shadow-sm transition-all active:scale-95 flex items-center gap-1"
-                                                              >
-                                                                  <CheckCircle size={10} /> Assumir
-                                                              </button>
-                                                          )}
-                                                      </div>
-                                                    )}
+                                                    ) : (() => {
+                                                        const dayHasClasses = turmaRecords.some(r => r.day === day);
+                                                        const shiftHasClasses = turmaRecords.some(r => r.day === day && safeTimes.find(t => t.timeStr === r.time)?.shift === shift);
+                                                        
+                                                        if (!dayHasClasses) {
+                                                            const isMidLabel = time.includes('08:50') || time.includes('15:00') || time.includes('20:40') || index === 2 || (entityTimes.length === 1 && index === 0);
+                                                            return (
+                                                                <div className="w-full h-full min-h-[60px] flex items-center justify-center opacity-60">
+                                                                    {isMidLabel && <span className="text-[10px] font-bold uppercase tracking-widest text-slate-400 print:text-black">Não Letivo</span>}
+                                                                </div>
+                                                            );
+                                                        }
+                                                        
+                                                        if (!shiftHasClasses) {
+                                                            return <div className="w-full h-full min-h-[60px]"></div>;
+                                                        }
+
+                                                        return (
+                                                          <div className={`w-full h-full min-h-[60px] flex flex-col items-center justify-center p-2 rounded-lg border border-dashed opacity-70 transition-colors ${isDarkMode ? 'bg-slate-800/40 border-slate-600' : 'bg-slate-100 border-slate-300'}`}>
+                                                              <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">Aula Vaga</span>
+                                                              
+                                                              {userRole === 'professor' && scheduleMode !== 'padrao' && (
+                                                                  <button
+                                                                      onClick={() => {
+                                                                          if(window.confirm(`Deseja solicitar à coordenação para assumir esta Aula Vaga na ${MAP_DAYS[diaIndex]} às ${time}?`)) {
+                                                                              alert('Solicitação registrada! A coordenação analisará seu pedido para assumir este horário.');
+                                                                          }
+                                                                      }}
+                                                                      className="mt-2 px-3 py-1.5 bg-emerald-100 hover:bg-emerald-200 text-emerald-700 text-[9px] font-black uppercase tracking-widest rounded-md shadow-sm transition-all active:scale-95 flex items-center gap-1 no-print"
+                                                                  >
+                                                                      <CheckCircle size={10} /> Assumir
+                                                                  </button>
+                                                              )}
+                                                          </div>
+                                                        );
+                                                    })()}
                                                     {provided.placeholder}
                                                   </td>
                                                 )}
@@ -1883,12 +1936,15 @@ export function PortalView({
                                 </button>
                               </div>
 
-                              <div className="hidden md:block overflow-x-auto">
-                                <table className="w-full min-w-[600px] border-collapse relative text-xs">
+                              <div className="hidden print:block font-black text-[14px] uppercase border-b-[3px] border-black pb-2 tracking-widest mt-4 mb-4 text-black">
+                                AULAS VAGAS <span className="float-right font-medium text-[10px] bg-black text-white px-2 py-1 rounded-sm">{scheduleMode === 'padrao' ? 'HORÁRIO PADRÃO' : `HORÁRIO ${scheduleMode.toUpperCase()} - ${(weekLabel || selectedWeek).replace('SEM ', 'SEMANA ')}`}</span>
+                              </div>
+                              <div className="hidden md:block overflow-x-auto print:overflow-visible">
+                                <table className="w-full min-w-[600px] border-collapse relative text-xs print:w-full print:min-w-0">
                                   <thead>
                                     <tr className={`border-b text-[9px] font-black uppercase tracking-widest text-slate-400 ${isDarkMode ? 'bg-slate-900 border-slate-700' : 'bg-slate-50 border-slate-200'}`}>
                                       <th className={`sticky left-0 z-30 py-3 px-2 border-r-[3px] w-10 min-w-[40px] text-center shadow-sm ${isDarkMode ? 'bg-slate-900 border-slate-700' : 'bg-slate-100 border-slate-300'}`}>Dia</th>
-                                      <th className={`sticky left-[40px] z-20 py-3 px-3 border-r-[3px] w-28 min-w-[112px] text-center shadow-sm ${isDarkMode ? 'bg-slate-900 border-slate-700' : 'bg-slate-100 border-slate-300'}`}>Horário<br/><span className="text-[8px] font-normal opacity-70 normal-case">{selectedWeek}</span></th>
+                                      <th className={`sticky left-[40px] z-20 py-3 px-3 border-r-[3px] w-28 min-w-[112px] text-center shadow-sm ${isDarkMode ? 'bg-slate-900 border-slate-700' : 'bg-slate-100 border-slate-300'}`}>Horários</th>
                                       {courseClasses.map(cls => (
                                         <th key={cls} className={`py-3 px-4 border-r-[3px] last:border-r-0 text-center ${isDarkMode ? 'border-slate-700 text-slate-200' : 'border-slate-300 text-slate-800'}`}>{cls}</th>
                                       ))}
@@ -1897,6 +1953,30 @@ export function PortalView({
                                   <tbody className={`divide-y ${isDarkMode ? 'divide-slate-800' : 'divide-slate-100'}`}>
                                     {courseDays.map((day, dayIndex) => {
                                       const activeTimes = safeTimes.filter(timeObj => courseRecords.some(r => r.day === day && r.time === (timeObj.timeStr || timeObj)));
+
+                                      if (activeTimes.length === 0) {
+                                        return (
+                                          <React.Fragment key={`day-block-${day}-empty`}>
+                                            <tr className="group transition-colors">
+                                              <td className={`sticky left-0 z-20 border-r-[3px] align-middle text-center ${isDarkMode ? 'bg-slate-900 border-slate-700 shadow-[2px_0_5px_rgba(0,0,0,0.2)]' : 'bg-slate-50 border-slate-300 shadow-[2px_0_5px_rgba(0,0,0,0.02)]'}`}>
+                                                <div className="flex items-center justify-center h-full w-full min-h-[120px] p-2">
+                                                  <span className="text-[9px] font-black uppercase tracking-widest text-slate-500" style={{ writingMode: 'vertical-rl', transform: 'rotate(180deg)' }}>
+                                                    {getFormattedDayLabel(day)}
+                                                  </span>
+                                                </div>
+                                              </td>
+                                              <td colSpan={courseClasses.length + 1} className={`py-4 text-center font-bold text-xs uppercase tracking-widest ${isDarkMode ? 'text-slate-500 bg-slate-800/20' : 'text-slate-400 bg-slate-50/50'}`}>
+                                                NÃO LETIVO
+                                              </td>
+                                            </tr>
+                                            {dayIndex < courseDays.length - 1 && (
+                                              <tr className={`border-y-[4px] print:hidden ${isDarkMode ? 'bg-slate-700/40 border-slate-700' : 'bg-slate-300/40 border-slate-300'}`}>
+                                                <td colSpan={courseClasses.length + 2} className="h-0 p-0"></td>
+                                              </tr>
+                                            )}
+                                          </React.Fragment>
+                                        );
+                                      }
 
                                       return (
                                         <React.Fragment key={`day-block-${day}`}>
@@ -1914,9 +1994,9 @@ export function PortalView({
                                                       rowSpan={activeTimes.length + (hasLunch ? 1 : 0)}
                                                       className={`sticky left-0 z-20 border-r-[3px] align-middle text-center ${isDarkMode ? 'bg-slate-900 border-slate-700 shadow-[2px_0_5px_rgba(0,0,0,0.2)]' : 'bg-slate-50 border-slate-300 shadow-[2px_0_5px_rgba(0,0,0,0.02)]'}`}
                                                     >
-                                                      <div className="flex items-center justify-center h-full w-full min-h-[80px]">
-                                                        <span className="text-[9px] font-black uppercase tracking-widest text-slate-500" style={{ transform: 'rotate(-90deg)', display: 'inline-block', whiteSpace: 'nowrap' }}>
-                                                          {day.split('-')[0]}
+                                                      <div className="flex items-center justify-center h-full w-full min-h-[120px]">
+                                                        <span className="text-[9px] font-black uppercase tracking-widest text-slate-500" style={{ writingMode: 'vertical-rl', transform: 'rotate(180deg)' }}>
+                                                          {getFormattedDayLabel(day)}
                                                         </span>
                                                       </div>
                                                     </td>
