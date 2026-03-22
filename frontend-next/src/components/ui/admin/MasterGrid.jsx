@@ -206,6 +206,39 @@ export function MasterGrid({ isDarkMode, ...props }) {
     });
   };
 
+  const handleTypeChange = (e) => {
+     const newType = e.target.value;
+     setSelectedType(newType);
+
+     const s = new Set();
+     if (schedules && Array.isArray(schedules)) {
+         schedules.forEach(sch => {
+            if (sch.type === newType && String(sch.academic_year) === String(selectedConfigYear)) {
+               if (selectedCourses.length === 0 || selectedCourses.includes(String(sch.courseId))) {
+                   if (sch.week_id) s.add(String(sch.week_id));
+               }
+            }
+         });
+     }
+
+     if (newType === 'padrao') {
+         if (s.size > 0) {
+             const maxV = Math.max(1, ...Array.from(s).filter(v => typeof v === 'string' && v.startsWith('V')).map(v => parseInt(v.replace('V', '')) || 1));
+             setSelectedWeek(`V${maxV}`);
+         } else {
+             setSelectedWeek('');
+         }
+     } else {
+         if (s.size > 0) {
+             const available = Array.from(s);
+             const found = academicWeeks?.find(w => String(w.academic_year) === String(selectedConfigYear) && available.includes(String(w.id)));
+             setSelectedWeek(found ? String(found.id) : available[0]);
+         } else {
+             setSelectedWeek('');
+         }
+     }
+  };
+
   // Carrega os currículos e turmas direto da fonte
   useEffect(() => {
     async function loadAdminData() {
@@ -768,11 +801,11 @@ export function MasterGrid({ isDarkMode, ...props }) {
   }, [grade, schedules, horariosExibidos]);
 
   const weeksWithData = useMemo(() => {
-     if (!schedules || !Array.isArray(schedules) || selectedCourses.length === 0) return new Set();
+     if (!schedules || !Array.isArray(schedules)) return new Set();
      const s = new Set();
      schedules.forEach(sch => {
         if (sch.type === selectedType && String(sch.academic_year) === String(selectedConfigYear)) {
-           if (selectedCourses.includes(String(sch.courseId))) {
+           if (selectedCourses.length === 0 || selectedCourses.includes(String(sch.courseId))) {
                if (sch.week_id) s.add(String(sch.week_id));
            }
         }
@@ -893,26 +926,9 @@ export function MasterGrid({ isDarkMode, ...props }) {
 
           <div className="h-6 w-px bg-slate-300 dark:bg-slate-600 mx-1 hidden sm:block"></div>
 
-          <select value={shiftFilter} onChange={e => setShiftFilter(e.target.value)} className={`px-4 py-2.5 rounded-lg border shadow-sm outline-none cursor-pointer text-xs font-bold uppercase tracking-wider text-teal-600 dark:text-teal-400 ${isDarkMode ? 'bg-slate-800 border-slate-600' : 'bg-white border-slate-200'}`}>
-            <option value="todos">Todos os Turnos</option>
-            <option value="diurno">Diurno (Mat/Vesp)</option>
-            <option value="noturno">Noturno</option>
-          </select>
 
-          {globalTeachersList?.length > 0 && (
-            <div className="w-56">
-               <SearchableSelect 
-                  isDarkMode={isDarkMode} 
-                  options={globalTeachersList.map(t => ({value: t.id || t.siape, label: t.nome_exibicao || t.nome_completo || t.name}))} 
-                  value={teacherFilter} 
-                  onChange={setTeacherFilter} 
-                  placeholder="Filtrar Professor"
-                  colorClass={`px-4 py-2.5 rounded-lg border shadow-sm outline-none cursor-pointer text-xs font-bold uppercase tracking-wider text-sky-600 dark:text-sky-400 ${isDarkMode ? 'bg-slate-800 border-slate-600' : 'bg-white border-slate-200'}`}
-               />
-            </div>
-          )}
 
-          <select value={selectedType} onChange={e => setSelectedType(e.target.value)} className={`px-4 py-2.5 rounded-lg border shadow-sm outline-none cursor-pointer text-xs font-bold uppercase tracking-wider text-indigo-600 dark:text-indigo-400 ${isDarkMode ? 'bg-slate-800 border-slate-600' : 'bg-white border-slate-200'}`}>
+          <select value={selectedType} onChange={handleTypeChange} className={`px-4 py-2.5 rounded-lg border shadow-sm outline-none cursor-pointer text-xs font-bold uppercase tracking-wider text-indigo-600 dark:text-indigo-400 ${isDarkMode ? 'bg-slate-800 border-slate-600' : 'bg-white border-slate-200'}`}>
               <option value="padrao">Padrão Anual (Base)</option>
               <option value="previa">Prévia Semanal</option>
               <option value="atual">Horário Atual</option>
@@ -971,6 +987,11 @@ export function MasterGrid({ isDarkMode, ...props }) {
                  </>
              )}
            </div>
+           <select value={shiftFilter} onChange={e => setShiftFilter(e.target.value)} className={`px-4 py-2.5 rounded-lg border shadow-sm outline-none cursor-pointer text-xs font-bold uppercase tracking-wider text-teal-600 dark:text-teal-400 ${isDarkMode ? 'bg-slate-800 border-slate-600' : 'bg-white border-slate-200'}`}>
+              <option value="todos">Todos os Turnos</option>
+              <option value="diurno">Diurno (Mat/Vesp)</option>
+              <option value="noturno">Noturno</option>
+           </select>
         </div>
       </div>
 

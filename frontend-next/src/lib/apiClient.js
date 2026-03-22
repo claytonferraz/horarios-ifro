@@ -385,7 +385,7 @@ export const apiClient = {
   },
 
   async submitRequest(data) {
-    const res = await fetch(`${API_URL}/professor/request`, {
+    const res = await fetch(`${API_URL}/requests`, {
       method: 'POST',
       headers: getHeaders(),
       body: JSON.stringify(data)

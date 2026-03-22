@@ -520,6 +520,32 @@ export function PortalView({
      }
    }, [dynamicWeeksList, selectedWeek, setSelectedWeek]);
 
+   // Regra de Negócio: Auto-avançar para a Prévia no Final de Semana se não houver aulas
+   React.useEffect(() => {
+       if (scheduleMode === 'atual' && dynamicWeeksList.length > 0 && selectedWeek && horariosFiltrados) {
+           const now = new Date();
+           const isWeekend = now.getDay() === 6 || now.getDay() === 0;
+
+           if (isWeekend) {
+               let myNextClasses = [];
+               
+               if (appMode === 'professor' && siape) {
+                   myNextClasses = horariosFiltrados.filter(s => s.teacherId && String(s.teacherId).split(',').includes(String(siape)));
+               } else if (appMode === 'aluno' && selectedClass) {
+                   myNextClasses = horariosFiltrados.filter(s => String(s.classId) === String(selectedClass));
+               } else {
+                   myNextClasses = horariosFiltrados;
+               }
+
+               const hasWeekendClasses = myNextClasses.some(s => s.dayOfWeek && (s.dayOfWeek.includes('Sábado') || s.dayOfWeek.includes('Domingo')));
+               
+               if (!hasWeekendClasses && typeof setScheduleMode === 'function') {
+                   setScheduleMode('previa');
+               }
+           }
+       }
+   }, [scheduleMode, dynamicWeeksList, selectedWeek, horariosFiltrados, appMode, siape, selectedClass, setScheduleMode]);
+
    React.useEffect(() => {
      if (!selectedClass && filteredClassesList.length > 0 && typeof setSelectedClass === 'function') {
          setSelectedClass(filteredClassesList[0]);

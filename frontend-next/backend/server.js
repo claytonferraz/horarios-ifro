@@ -514,6 +514,7 @@ const bulkScheduleSchema = z.object({
 
 app.post('/api/schedules/bulk-course', verifyToken, (req, res) => {
   try {
+    const now = new Date().toISOString();
     const { courseIds, courseId, type, weekId, academicYear, schedules } = bulkScheduleSchema.parse(req.body);
     const coursesToClear = (courseIds && courseIds.length > 0) ? courseIds : (courseId ? [courseId] : []);
     if (coursesToClear.length === 0) return res.status(400).json({ error: "Nenhum curso especificado para gravação." });
@@ -1242,18 +1243,67 @@ app.get('/api/requests', (req, res) => {
 
 app.post('/api/requests', (req, res) => {
   try {
-    const { action, requester_id, substituteId, targetClass, originalRecord, returnWeekId, reason, obs } = req.body;
-    // Regra: Vaga vai direto para a gestão. Troca vai para o colega aceitar primeiro.
-    const status = action === 'troca' ? 'aguardando_colega' : 'pronto_para_homologacao';
+    const data = req.body;
+    let action = data.action; 
+    let requester = data.requester_id || data.siape;
+    let targetClass = data.targetClass;
+    let returnWeekId = data.returnWeekId || data.week_id;
+    let reason = data.reason || data.description;
+    let obs = data.obs || (data.proposed_slot ? JSON.stringify(data.proposed_slot) : '');
+    
+    let originalDay = '', originalTime = '', subject = '';
 
-    db.run(
-      'INSERT INTO exchange_requests (action_type, requester_id, substitute_id, target_class, original_day, original_time, subject, return_week, reason, obs, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-      [action, requester_id || '', substituteId || '', targetClass, originalRecord?.day || '', originalRecord?.time || '', originalRecord?.subject || '', returnWeekId || '', reason, obs || '', status],
-      function(err) {
-        if (err) return res.status(500).json({ error: err.message });
-        res.json({ success: true, id: this.lastID });
-      }
-    );
+    // Extracao Modal 1: VacantRequestModal
+    if (!action && data.proposed_slot && data.proposed_slot.classType === 'Substituição') {
+        action = 'vaga';
+        targetClass = data.proposed_slot.className;
+        originalDay = data.proposed_slot.day;
+        originalTime = data.proposed_slot.time;
+        subject = data.proposed_slot.subject;
+    }
+    // Extracao Modal 2: TeacherExchangeModal
+    else if (action === 'vaga' && data.proposedSlot) {
+        originalDay = data.proposedSlot.day;
+        originalTime = data.proposedSlot.time;
+        subject = data.proposedSlot.subject;
+    } 
+    // Trocas Regulares
+    else if (action === 'troca') {
+        originalDay = data.originalRecord?.day || '';
+        originalTime = data.originalRecord?.time || '';
+        subject = data.originalRecord?.subject || '';
+    }
+
+    if (action === 'vaga') {
+        // Substituicao Automática da Vaga (Auto-Homologação)
+        let type = returnWeekId ? 'previa' : 'padrao';
+
+        const updateQ = `UPDATE schedules SET teacherId = ?, disciplineId = ? WHERE classId = ? AND dayOfWeek = ? AND slotId = ? AND type = ? AND (week_id = ? OR (? IS NULL AND (week_id IS NULL OR week_id = '')))`;
+        db.run(updateQ, [requester, subject, targetClass, originalDay, originalTime, type, returnWeekId || null, returnWeekId || null], function(err) {
+           if (err) return res.status(500).json({ error: err.message });
+           
+           db.run('INSERT INTO exchange_requests (action_type, requester_id, target_class, original_day, original_time, subject, return_week, reason, obs, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+             [action, requester, targetClass, originalDay, originalTime, subject, returnWeekId || '', reason || '', obs || '', 'aprovada'],
+             function(err2) {
+               if (err2) return res.status(500).json({ error: err2.message });
+               io.emit('schedule_updated');
+               res.json({ success: true, id: this.lastID, automatic: true });
+             }
+           );
+        });
+
+    } else {
+        const status = 'aguardando_colega'; 
+
+        db.run(
+          'INSERT INTO exchange_requests (action_type, requester_id, substitute_id, target_class, original_day, original_time, subject, return_week, reason, obs, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+          [action, requester, data.substituteId || '', targetClass, originalDay, originalTime, subject, returnWeekId || '', reason || '', obs || '', status],
+          function(err) {
+            if (err) return res.status(500).json({ error: err.message });
+            res.json({ success: true, id: this.lastID });
+          }
+        );
+    }
   } catch(e) { res.status(500).json({error: e.message}); }
 });
 

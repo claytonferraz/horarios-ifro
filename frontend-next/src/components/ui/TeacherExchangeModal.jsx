@@ -61,7 +61,12 @@ export function TeacherExchangeModal({
         originalRecord: originalRecord,
         returnWeekId: selectedWeek,
         reason: `Proposta de Troca / Ocupação de Vaga gerada pelo Portal. Tipo de Aula preterida: ${classType}`,
-        obs: proposalInfo
+        obs: proposalInfo,
+        proposedSlot: {
+           day: selectedSlot.day,
+           time: selectedSlot.time,
+           subject: originalRecord.subject
+        }
       };
 
       if (typeof onSubmit === 'function') {
