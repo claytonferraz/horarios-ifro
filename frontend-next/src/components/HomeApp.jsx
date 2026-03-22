@@ -149,7 +149,7 @@ export function HomeApp({ appMode }) {
 
         {appMode === 'admin' && isUnlocked && userRole === 'admin' && (
             <>
-                <div className="mb-6 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 no-print">
+                <div className="mb-6 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 no-print print:hidden">
                     <div className="flex items-center gap-4">
                         <div className={`p-3 rounded-xl text-white shadow-md transition-all bg-slate-800 rotate-3`}>
                             <Settings size={24}/>
@@ -193,7 +193,7 @@ export function HomeApp({ appMode }) {
 
         {appMode === 'aluno' && (
             <>
-                <div className="mb-6 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 no-print">
+                <div className="mb-6 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 no-print print:hidden">
                     <div className="flex items-center gap-4">
                         <div className={`p-3 rounded-xl text-white shadow-md transition-all bg-emerald-600`}>
                             <GraduationCap size={24}/>
@@ -220,7 +220,7 @@ export function HomeApp({ appMode }) {
 
         {appMode === 'professor' && (
             <>
-                <div className="mb-6 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 no-print">
+                <div className="mb-6 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 no-print print:hidden">
                     <div className="flex items-center gap-4">
                         <div className={`p-3 rounded-xl text-white shadow-md transition-all bg-indigo-600`}>
                             <UserCheck size={24}/>

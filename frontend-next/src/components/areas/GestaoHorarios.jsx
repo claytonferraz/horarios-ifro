@@ -43,10 +43,12 @@ export function GestaoHorarios({
   return (
     <div className="space-y-4 animate-in slide-in-from-top-4 duration-500">
         
-        <AdminStatsPanel adminStats={adminStats} isDarkMode={isDarkMode} />
+        <div className="print:hidden">
+            <AdminStatsPanel adminStats={adminStats} isDarkMode={isDarkMode} />
+        </div>
 
         {/* BARRA DE NAVEGAÇÃO INTERNA ADMIN (REFINADA) */}
-        <div className={`flex flex-wrap items-center gap-2 p-1.5 rounded-xl shadow-inner w-full mb-4 ${isDarkMode ? 'bg-slate-900' : 'bg-slate-100'}`}>
+        <div className={`flex flex-wrap items-center gap-2 p-1.5 rounded-xl shadow-inner w-full mb-4 print:hidden ${isDarkMode ? 'bg-slate-900' : 'bg-slate-100'}`}>
           
           {/* DESTAQUES (MASTER GRID & SOLICITAÇÕES) */}
           {['admin','gestao'].includes(userRole) && (

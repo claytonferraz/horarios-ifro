@@ -144,7 +144,7 @@ export function FloatingRequestsWidget({ isDarkMode, userRole, appMode }) {
   };
 
   return (
-    <div className="fixed bottom-6 right-6 z-[9999] flex flex-col items-end">
+    <div className="fixed bottom-6 right-6 z-[9999] flex flex-col items-end print:hidden">
       {/* CHAT WINDOW */}
       <div className={`transition-all transform origin-bottom-right duration-300 ${isOpen ? 'scale-100 opacity-100 translate-y-0 mb-4' : 'scale-75 opacity-0 translate-y-10 pointer-events-none absolute bottom-full'}`}>
         <div className={`w-[360px] sm:w-[400px] h-[500px] max-h-[70vh] rounded-2xl shadow-2xl flex flex-col border overflow-hidden ${isDarkMode ? 'bg-slate-900 border-slate-700' : 'bg-white border-slate-200'}`}>

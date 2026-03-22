@@ -523,7 +523,7 @@ export function PortalView({
           <div className="space-y-4 animate-in fade-in duration-700">
             
             {/* ABAS E FILTROS */}
-            <div className={`rounded-2xl shadow-sm border p-4 space-y-4 no-print ${isDarkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'}`}>
+            <div className={`rounded-2xl shadow-sm border p-4 space-y-4 no-print print:hidden ${isDarkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'}`}>
               
               {/* Nível 1: Tipos de Visão (Adaptável por Perfil) */}
               <div className={`flex items-center justify-between border-b pb-3 ${isDarkMode ? 'border-slate-700' : 'border-slate-100'}`}>
@@ -1162,7 +1162,12 @@ export function PortalView({
           <TeacherRequestsSection 
             requests={typeof pendingRequests !== 'undefined' ? pendingRequests : []} 
             onCancel={typeof handleCancelRequest === 'function' ? handleCancelRequest : () => {}} 
-            isDarkMode={isDarkMode} 
+            isDarkMode={isDarkMode}
+            siape={siape}
+            selectedWeek={selectedWeek}
+            activeDays={activeDays}
+            classTimes={classTimes}
+            weekData={recordsForWeek ? recordsForWeek.filter(r => String(r.teacherId).includes(String(siape))) : []}
           />
         </div>
       )}

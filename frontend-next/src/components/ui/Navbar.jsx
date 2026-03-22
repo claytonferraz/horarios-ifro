@@ -33,7 +33,7 @@ export function Navbar() {
 
   return (
     <header
-      className={`border-b sticky top-0 z-50 transition-colors shadow-sm ${
+      className={`border-b sticky top-0 z-50 transition-colors shadow-sm print:hidden ${
         isDarkMode ? "bg-slate-900 border-slate-800" : "bg-white border-slate-200"
       }`}
     >

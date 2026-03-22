@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { MessageSquare, Send, AlertCircle, CheckCircle2, Clock, XCircle } from 'lucide-react';
+import { MessageSquare, Send, AlertCircle, CheckCircle2, Clock, XCircle, Printer } from 'lucide-react';
 import { apiClient } from '@/lib/apiClient';
 
 export function TeacherRequestsSection({ isDarkMode, siape, selectedWeek, weekData, activeDays, classTimes }) {
@@ -43,9 +43,16 @@ export function TeacherRequestsSection({ isDarkMode, siape, selectedWeek, weekDa
   };
 
   return (
-    <div className="mt-8 mb-12 animate-in slide-in-from-bottom-4 no-print">
-      <div className={`rounded-2xl shadow-lg border overflow-hidden ${isDarkMode ? 'bg-slate-900 border-slate-700' : 'bg-white border-slate-200'}`}>
-        <div className={`px-6 py-4 flex items-center justify-between border-b ${isDarkMode ? 'border-slate-800 bg-slate-800/50' : 'border-slate-100 bg-slate-50'}`}>
+    <div className="mt-8 mb-12 animate-in slide-in-from-bottom-4 print:mt-0 print:mb-0 print:block">
+      {/* Header específico para impressão (só aparece em modo print) */}
+      <div className="hidden print:block mb-8 border-b-2 border-slate-800 pb-4">
+         <h1 className="text-2xl font-black uppercase tracking-widest text-slate-900">Relatório de Solicitações</h1>
+         <p className="text-sm font-bold text-slate-500 uppercase tracking-widest">Portal do Servidor - SIAPE: {siape}</p>
+         <p className="text-xs font-medium text-slate-400 mt-1">Gerado em: {new Date().toLocaleDateString('pt-BR')} às {new Date().toLocaleTimeString('pt-BR')}</p>
+      </div>
+
+      <div className={`rounded-2xl shadow-lg border overflow-hidden transition-all print:shadow-none print:border-none print:bg-transparent ${isDarkMode ? 'bg-slate-900 border-slate-700' : 'bg-white border-slate-200'}`}>
+        <div className={`px-6 py-4 flex flex-col sm:flex-row items-center justify-between border-b print:hidden gap-4 ${isDarkMode ? 'border-slate-800 bg-slate-800/50' : 'border-slate-100 bg-slate-50'}`}>
           <div className="flex items-center gap-3">
             <div className={`p-2 rounded-lg ${isDarkMode ? 'bg-indigo-900/50 text-indigo-400' : 'bg-indigo-50 text-indigo-600'}`}>
               <MessageSquare size={20} />
@@ -55,31 +62,39 @@ export function TeacherRequestsSection({ isDarkMode, siape, selectedWeek, weekDa
               <p className={`text-[10px] font-bold opacity-60 uppercase tracking-widest ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>Coordenação DAPE</p>
             </div>
           </div>
-          <button 
-            onClick={() => setIsModalOpen(true)}
-            className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all shadow-md active:scale-95 flex items-center gap-2 ${isDarkMode ? 'bg-indigo-600 hover:bg-indigo-500 text-white' : 'bg-indigo-600 hover:bg-indigo-700 text-white'}`}
-          >
-            <Send size={14} /> Nova Solicitação
-          </button>
+          <div className="flex items-center gap-3 w-full sm:w-auto">
+            <button 
+              onClick={() => window.print()}
+              className={`flex-1 sm:flex-none px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all shadow-sm active:scale-95 flex items-center justify-center gap-2 ${isDarkMode ? 'bg-slate-800 hover:bg-slate-700 text-slate-300' : 'bg-white border border-slate-200 hover:bg-slate-50 text-slate-600'}`}
+            >
+              <Printer size={14} /> Imprimir
+            </button>
+            <button 
+              onClick={() => setIsModalOpen(true)}
+              className={`flex-1 sm:flex-none px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all shadow-md active:scale-95 flex items-center justify-center gap-2 ${isDarkMode ? 'bg-indigo-600 hover:bg-indigo-500 text-white' : 'bg-indigo-600 hover:bg-indigo-700 text-white'}`}
+            >
+              <Send size={14} /> Nova Solicitação
+            </button>
+          </div>
         </div>
 
         <div className="p-4">
           {requests.length === 0 ? (
-            <div className={`p-10 text-center rounded-xl border-2 border-dashed ${isDarkMode ? 'border-slate-800 text-slate-600' : 'border-slate-100 text-slate-400'}`}>
-              <MessageSquare size={32} className="mx-auto mb-2 opacity-20" />
-              <p className="text-[10px] font-black uppercase tracking-[0.2em]">Nenhuma solicitação enviada</p>
+            <div className={`p-10 text-center rounded-xl border-2 border-dashed print:border-none print:text-black ${isDarkMode ? 'border-slate-800 text-slate-600' : 'border-slate-100 text-slate-400'}`}>
+              <MessageSquare size={32} className="mx-auto mb-2 opacity-20 print:hidden" />
+              <p className="text-[10px] font-black uppercase tracking-[0.2em] print:text-sm">Nenhuma solicitação enviada até o momento</p>
             </div>
           ) : (
-            <div className="space-y-3">
+            <div className="space-y-3 print:space-y-6">
               {requests.map(req => (
-                <div key={req.id} className={`p-4 rounded-xl border transition-all ${isDarkMode ? 'bg-slate-800 border-slate-700 hover:bg-slate-800/70' : 'bg-white border-slate-100 hover:border-slate-200 hover:shadow-sm'}`}>
-                  <div className="flex items-start justify-between gap-4">
-                    <div className="flex-1">
-                      <div className="flex items-center gap-2 mb-2">
-                        <span className={`text-[9px] font-black px-2 py-0.5 rounded-full uppercase tracking-widest ${isDarkMode ? 'bg-slate-900 text-slate-400' : 'bg-slate-100 text-slate-500'}`}>
-                          Semana: {req.week_id}
+                <div key={req.id} className={`p-4 rounded-xl border transition-all print:border-b-2 print:border-t-0 print:border-x-0 print:border-slate-200 print:rounded-none print:p-2 print:bg-transparent print:shadow-none break-inside-avoid ${isDarkMode ? 'bg-slate-800 border-slate-700 hover:bg-slate-800/70' : 'bg-white border-slate-100 hover:border-slate-200 hover:shadow-sm'}`}>
+                  <div className="flex flex-col items-start justify-between gap-4 print:flex-row print:flex-nowrap print:gap-6 print:items-stretch">
+                    <div className="flex-1 w-full print:flex-1 print:w-auto">
+                      <div className="flex flex-wrap items-center gap-2 mb-2 print:flex-nowrap">
+                        <span className={`text-[9px] font-black px-2 py-0.5 rounded-full uppercase tracking-widest print:bg-transparent print:text-slate-800 print:border print:border-slate-300 print:px-1 ${isDarkMode ? 'bg-slate-900 text-slate-400' : 'bg-slate-100 text-slate-500'}`}>
+                          Semana/Versão: {req.week_id}
                         </span>
-                        <span className={`text-[8px] font-black px-2 py-0.5 rounded-full uppercase tracking-widest flex items-center gap-1 ${
+                        <span className={`text-[8px] font-black px-2 py-0.5 rounded-full uppercase tracking-widest flex items-center gap-1 print:bg-transparent print:border print:border-slate-300 print:text-black print:px-1 ${
                           req.status === 'pendente' ? (isDarkMode ? 'bg-amber-900/30 text-amber-500' : 'bg-amber-50 text-amber-600') :
                           req.status === 'aprovado' ? (isDarkMode ? 'bg-emerald-900/30 text-emerald-500' : 'bg-emerald-50 text-emerald-600') :
                           (isDarkMode ? 'bg-rose-900/30 text-rose-500' : 'bg-rose-50 text-rose-600')
@@ -90,10 +105,11 @@ export function TeacherRequestsSection({ isDarkMode, siape, selectedWeek, weekDa
                           {req.status}
                         </span>
                       </div>
-                      <p className={`text-xs font-bold leading-relaxed ${isDarkMode ? 'text-slate-300' : 'text-slate-700'}`}>{req.description}</p>
+                      <p className={`text-xs font-bold leading-relaxed mb-1 print:text-sm print:text-black ${isDarkMode ? 'text-slate-300' : 'text-slate-700'}`}>{req.description}</p>
+                      
                       {(req.original_slot || req.proposed_slot) && (
-                        <div className={`mt-3 grid grid-cols-2 gap-2 p-3 rounded-xl border text-[10px] font-bold uppercase tracking-widest ${isDarkMode ? 'bg-slate-950/50 border-slate-800' : 'bg-slate-50 border-slate-100'}`}>
-                          <div className={`flex flex-col gap-1 pr-2 border-r ${isDarkMode ? 'border-slate-800' : 'border-slate-200'}`}>
+                        <div className={`mt-3 grid grid-cols-1 sm:grid-cols-2 gap-2 p-3 rounded-xl border text-[10px] font-bold uppercase tracking-widest print:grid-cols-2 print:bg-transparent print:border-slate-200 print:rounded-none print:p-0 print:border-0 print:text-[11px] print:text-black ${isDarkMode ? 'bg-slate-950/50 border-slate-800' : 'bg-slate-50 border-slate-100'}`}>
+                          <div className={`flex flex-col gap-1 pb-2 border-b sm:border-b-0 sm:pr-2 sm:border-r print:border-r print:border-slate-300 print:pr-4 print:pb-0 print:border-b-0 ${isDarkMode ? 'border-slate-800' : 'border-slate-200'}`}>
                             <span className={isDarkMode ? 'text-slate-500' : 'text-slate-400'}>Original</span>
                             <span className={isDarkMode ? 'text-slate-300' : 'text-slate-600'}>
                               {(() => {
@@ -126,13 +142,14 @@ export function TeacherRequestsSection({ isDarkMode, siape, selectedWeek, weekDa
                         </div>
                       )}
                     </div>
+                    
                     {req.admin_feedback && (
-                      <div className={`max-w-[200px] p-3 rounded-lg border text-[10px] animate-in fade-in slide-in-from-right-2 ${isDarkMode ? 'bg-indigo-900/20 border-indigo-800/50 text-indigo-300' : 'bg-indigo-50 border-indigo-100 text-indigo-800'}`}>
-                        <div className="flex items-center gap-1.5 mb-1 opacity-70">
+                      <div className={`w-full sm:max-w-[200px] print:w-[35%] print:max-w-[300px] p-3 rounded-lg border text-[10px] mt-3 sm:mt-0 print:mt-0 animate-in fade-in slide-in-from-right-2 print:border-dashed print:border-slate-400 print:bg-slate-50/50 print:text-black print:p-3 ${isDarkMode ? 'bg-indigo-900/20 border-indigo-800/50 text-indigo-300' : 'bg-indigo-50 border-indigo-100 text-indigo-800'}`}>
+                        <div className="flex items-center gap-1.5 mb-1 opacity-70 print:opacity-100">
                           <AlertCircle size={12} />
-                          <span className="font-black uppercase tracking-widest">Feedback DAPE</span>
+                          <span className="font-black uppercase tracking-widest print:text-xs">Feedback DAPE</span>
                         </div>
-                        <p className="font-bold leading-relaxed">{req.admin_feedback}</p>
+                        <p className="font-bold leading-relaxed print:text-sm">{req.admin_feedback}</p>
                       </div>
                     )}
                   </div>
