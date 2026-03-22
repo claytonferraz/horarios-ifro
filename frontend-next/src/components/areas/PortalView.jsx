@@ -276,17 +276,23 @@ export function PortalView({
        return horariosFiltrados.map(s => {
            const classObj = dbClasses.find(c => String(c.id) === String(s.classId));
            const courseObj = dbCourses.find(c => String(c.id) === String(s.courseId));
-           const discName = matrixDisciplinesMap[s.disciplineId] || disciplinesMeta?.[s.disciplineId]?.name || subjectHoursMeta?.[s.disciplineId]?.name || 'Disciplina Desconhecida';
+           // Use local dictionary mapping, then backend JOINed name, then raw string just passing through
+           const discName = matrixDisciplinesMap[s.disciplineId] || disciplinesMeta?.[s.disciplineId]?.name || subjectHoursMeta?.[s.disciplineId]?.name || s.subjectName || (s.disciplineId && s.disciplineId.length > 20 ? 'Disciplina Desconhecida' : s.disciplineId) || 'Disciplina Desconhecida';
+           
+           let extraRecs = {};
+           try { if(s.records) extraRecs = JSON.parse(s.records); } catch(e){}
+
            return {
                id: s.id,
-               course: courseObj ? courseObj.course : s.courseId,
-               className: classObj ? classObj.name : s.classId,
+               course: courseObj ? courseObj.course : (s.courseName || s.courseId),
+               className: classObj ? classObj.name : (s.className || s.classId),
                day: MAP_DAYS[s.dayOfWeek],
                time: s.slotId,
                subject: discName,
                teacher: s.teacherId ? String(s.teacherId).split(',').map(id => resolveTeacherName(id, globalTeachers)).join(',') : 'A Definir',
                teacherId: s.teacherId || '',
                room: s.room || '',
+               ...extraRecs,
                raw: s
            };
        });
@@ -740,12 +746,19 @@ export function PortalView({
                                           {records.length > 0 ? records.map(r => {
                                              const isPending = isTeacherPending(r.teacher);
                                              return (
-                                                <div key={r.id} className={`p-3 rounded-lg border flex flex-col sm:flex-row justify-between sm:items-center gap-2 shadow-sm ${isPending ? (isDarkMode ? 'bg-red-900/30 border-red-800/50 text-red-300' : 'bg-red-50 border-red-200 text-red-800') : getColorHash(r.subject, isDarkMode)}`}>
-                                                   <div>
-                                                      <p className={`font-black text-sm leading-tight ${isDarkMode ? 'text-white' : 'text-slate-800'}`}>{r.subject}</p>
-                                                      <p className={`text-[10px] font-bold uppercase tracking-wider mt-0.5 ${isPending ? (isDarkMode ? 'text-red-400' : 'text-red-600') : 'opacity-80'}`}>{isPending ? 'Sem Professor' : resolveTeacherName(r.teacher, globalTeachers)}</p>
+                                                <div key={r.id} className={`p-3 rounded-lg border flex flex-col sm:flex-row justify-between sm:items-center gap-2 shadow-sm relative overflow-hidden ${isPending ? (isDarkMode ? 'bg-red-900/30 border-red-800/50 text-red-300' : 'bg-red-50 border-red-200 text-red-800') : getColorHash(r.subject, isDarkMode)}`}>
+                                                   {r.isSubstituted && (
+                                                      <div className="absolute top-0 right-0 z-10 pointer-events-none print:hidden">
+                                                          <span title="Assumida no lugar de uma Vaga" className="text-[7px] font-black uppercase tracking-wide text-white px-2 py-0.5 rounded-bl-[8px] bg-indigo-600 border-l border-b border-indigo-700 block animate-pulse shadow-sm shadow-indigo-900/30">Substituição</span>
+                                                      </div>
+                                                   )}
+                                                   <div className="pt-2 sm:pt-0">
+                                                      <p className={`font-black text-sm leading-tight ${isDarkMode ? 'text-white' : 'text-slate-900'}`}>
+                                                        {r.subject} {r.isSubstituted && r.originalSubject && <span className="block text-[8px] sm:text-[9.5px] opacity-80 mt-1 uppercase">Era: {r.originalSubject}</span>}
+                                                      </p>
+                                                      <p className={`text-[10px] font-bold uppercase tracking-wider mt-1.5 ${isPending ? (isDarkMode ? 'text-red-400' : 'text-red-600') : 'opacity-80'}`}>{isPending ? 'Sem Professor' : resolveTeacherName(r.teacher, globalTeachers)}</p>
                                                    </div>
-                                                   {r.room && <span className={`text-[9px] font-black uppercase tracking-widest px-2 py-1 rounded-md self-start sm:self-auto shrink-0 ${isDarkMode ? 'bg-white/10' : 'bg-black/5'}`}>{r.room}</span>}
+                                                   {r.room && <span className={`text-[9px] font-black uppercase tracking-widest px-2 py-1 rounded-md self-start sm:self-auto shrink-0 mt-2 sm:mt-0 shadow-sm ${isDarkMode ? 'bg-white/20' : 'bg-black/10'}`}>{r.room}</span>}
                                                 </div>
                                              )
                                           }) : <div className={`text-[10px] font-bold uppercase tracking-widest py-1.5 px-1 ${isDarkMode ? 'text-slate-500' : 'text-slate-400'}`}>- Horário Vago -</div>}
@@ -1667,7 +1680,15 @@ export function PortalView({
                                                                     </div>
                                                                   )}
                                                                   {isPending && <span className={`text-[7px] font-black uppercase tracking-widest px-1.5 py-0.5 rounded w-fit mx-auto mb-0.5 ${isDarkMode ? 'text-red-400 bg-red-900/50' : 'text-red-600 bg-red-100'}`}>SEM PROFESSOR</span>}
-                                                                  <p className="subject font-bold text-[10px] leading-tight mb-0.5 text-center">{disciplineName}</p>
+                                                                  {aulaNesteSlot.isSubstituted && (
+                                                                     <div className="absolute top-0 right-0 z-10 pointer-events-none print:hidden">
+                                                                         <span title="Assumida no lugar de uma Vaga" className="text-[6px] font-black uppercase tracking-wide text-white px-1.5 py-0.5 rounded-bl-[8px] bg-indigo-600 border-l border-b border-indigo-700 block animate-pulse shadow-sm shadow-indigo-900/30">Substituição</span>
+                                                                     </div>
+                                                                  )}
+                                                                  <p className="subject font-bold text-[10px] leading-tight mb-0.5 text-center">
+                                                                     {disciplineName}
+                                                                     {aulaNesteSlot.isSubstituted && aulaNesteSlot.originalSubject && <span className="block text-[8px] sm:text-[9.5px] opacity-80 mt-1 uppercase">Era: {aulaNesteSlot.originalSubject}</span>}
+                                                                  </p>
                                                                   <p className="details text-[8px] font-bold opacity-80 flex items-center justify-center gap-1 uppercase truncate">
                                                                     {teacherName}
                                                                   </p>

@@ -893,6 +893,18 @@ export function MasterGrid({ isDarkMode, ...props }) {
           ) : (
             <table className="w-full text-left border-collapse min-w-[800px]">
               <thead className={`sticky top-0 z-40 shadow-sm ${isDarkMode ? 'bg-slate-800' : 'bg-white'}`}>
+                {dashboardAlerts.list.length > 0 && (
+                   <tr className="shadow-sm">
+                     <td colSpan={turmasDoCurso.filter(t => !hiddenClasses.includes(t.id)).length + 1} className={`w-full p-1.5 border-b-2 text-center text-xs font-bold text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-950/80`}>
+                        <div className="flex bg-transparent rounded border-none w-full max-w-full overflow-x-auto gap-4 py-1 pb-1 scrollbar-hide snap-x items-center justify-start px-2">
+                           <span className="shrink-0 font-black uppercase text-[10px] tracking-widest flex items-center gap-1"><AlertTriangle size={12}/> {dashboardAlerts.list.length} Choque(s) na Grade:</span>
+                           {dashboardAlerts.list.map((msg, i) => (
+                             <span key={i} className="whitespace-nowrap shrink-0 snap-center bg-red-100 dark:bg-red-900/60 text-[10px] px-3 py-1 rounded-full border border-red-200 dark:border-red-800/80 shadow-sm">{msg}</span>
+                           ))}
+                        </div>
+                     </td>
+                   </tr>
+                )}
                 <tr>
                   <th className={`py-2 px-2 w-20 sticky left-0 top-0 z-50 ${isDarkMode ? 'bg-slate-800' : 'bg-white'}`}></th>
                   {turmasDoCurso.filter(t => !hiddenClasses.includes(t.id)).map(turma => (
@@ -1013,15 +1025,12 @@ export function MasterGrid({ isDarkMode, ...props }) {
                                         <span title="Aula assumida via Vaga" className="text-[5px] font-black uppercase tracking-widest text-white px-1.5 py-[2px] rounded border border-indigo-400 bg-indigo-600 block shadow-sm shadow-indigo-900/40">Substituição</span>
                                      </div>
                                   )}
-                                  <div className="font-bold text-[9.5px] print:text-[8px] leading-[1.1] mb-0.5 mt-0.5 text-center px-0.5 min-h-[22px] flex flex-col items-center justify-center">
-                                      <span>{aulaNesteSlot.disciplina}</span>
-                                      {aulaNesteSlot.isSubstituted && aulaNesteSlot.originalSubject && <span className="text-[7px] opacity-80 uppercase mt-0.5">Era: {aulaNesteSlot.originalSubject}</span>}
+                                  <div className="flex flex-col flex-1 shrink-0 mt-3.5 mb-1" title={`${aulaNesteSlot.disciplina} - ${aulaNesteSlot.className}`}>
+                                     <span className="text-[10px] font-black uppercase tracking-widest leading-none">{aulaNesteSlot.disciplina}</span>
+                                     {aulaNesteSlot.isSubstituted && aulaNesteSlot.originalSubject && <span className="text-[7.5px] opacity-90 uppercase mt-0.5 leading-tight text-white bg-indigo-900/60 border border-indigo-400/30 rounded px-1 py-[1px] w-fit shadow-sm">Era: {aulaNesteSlot.originalSubject}</span>}
+                                     <span className="text-[7.5px] opacity-75 font-bold tracking-widest truncate mt-1">{aulaNesteSlot.className}</span>
                                   </div>
-                                  <div className="flex flex-col w-[85%] leading-none" title={`${aulaNesteSlot.disciplina} - ${aulaNesteSlot.className}`}>
-                                    <span className="text-[10px] font-black uppercase tracking-widest truncate">{aulaNesteSlot.disciplina}</span>
-                                    <span className="text-[7px] opacity-75 font-bold tracking-widest truncate mt-0.5">{aulaNesteSlot.className}</span>
-                                  </div>
-                                  <div className="flex justify-between items-center mt-auto pt-1 gap-1 overflow-hidden" title={temAlertaProf ? profMsgText : "Professor e Local"}>
+                                  <div className="flex justify-between items-center mt-auto pt-1 gap-1" title={temAlertaProf ? profMsgText : "Professor e Local"}>
                                     <div className={`flex items-center gap-1 overflow-hidden flex-1 ${temAlertaProf ? 'text-red-500 dark:text-red-400 bg-red-500/10 px-0.5 rounded border border-red-500/20' : 'text-slate-500 dark:text-slate-300'}`}>
                                        {temAlertaProf && <AlertTriangle size={8} className="shrink-0" />}
                                        <span className="truncate text-[9px] font-bold" title={aulaNesteSlot.professores?.join(' + ')}>
@@ -1193,22 +1202,6 @@ export function MasterGrid({ isDarkMode, ...props }) {
             </button>
          </div>
          <div className="flex-1 overflow-y-auto p-5 pb-20 space-y-6">
-            
-            {dashboardAlerts.list.length > 0 && (
-               <div className={`p-4 rounded-xl border flex flex-col gap-3 shadow-sm ${isDarkMode ? 'bg-red-950/20 border-red-900/50' : 'bg-white border-red-200'}`}>
-                  <h3 className={`text-[12px] font-black uppercase tracking-widest flex items-center gap-2 ${isDarkMode ? 'text-red-400' : 'text-red-600'}`}>
-                     <AlertTriangle size={16} /> Choques na Grade ({dashboardAlerts.list.length})
-                  </h3>
-                  <div className="flex-1 border-t border-red-500/20"></div>
-                  <ul className="flex flex-col gap-2 mt-1">
-                     {dashboardAlerts.list.map((msg, i) => (
-                       <li key={i} className={`text-[11px] font-bold flex items-start gap-2 p-2 rounded-lg ${isDarkMode ? 'bg-red-900/20 text-red-300/80' : 'bg-red-50 text-red-800/80'}`}>
-                          <span className="mt-0.5 pointer-events-none">•</span> <span>{msg}</span>
-                       </li>
-                     ))}
-                  </ul>
-               </div>
-            )}
 
             {filteredRequests.length > 0 && (
                <div className={`p-4 rounded-xl border flex flex-col gap-3 shadow-sm ${isDarkMode ? 'bg-indigo-950/20 border-indigo-900/50' : 'bg-white border-indigo-200'}`}>
