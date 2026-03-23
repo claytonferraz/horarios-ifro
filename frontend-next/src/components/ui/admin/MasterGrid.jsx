@@ -1249,7 +1249,7 @@ export function MasterGrid({ isDarkMode, ...props }) {
                           const profMsgText = alertasObj.profAlertMsg?.length > 0 ? alertasObj.profAlertMsg.join('\n') : 'Conflito de Professor.';
                           const temAlertaSala = alertasObj.salaAlert;
                           
-                          const isVaga = !aulaNesteSlot?.professores || aulaNesteSlot.professores.length === 0 || aulaNesteSlot.professores.some(p => !p || p === 'A Definir' || p === '-');
+                          const isVaga = !aulaNesteSlot?.professores || aulaNesteSlot.professores.length === 0 || aulaNesteSlot.professores.some(p => !p || p === 'A Definir' || p === '-' || p === 'SEM PROFESSOR');
                           
                           return (
                             <td 
@@ -1263,13 +1263,13 @@ export function MasterGrid({ isDarkMode, ...props }) {
                                   draggable
                                   onDragStart={(e) => handleDragStart(e, aulaNesteSlot, slotKey)}
                                   onDragEnd={handleDragEnd}
-                                  className={`group/card w-[95%] sm:w-[90%] mx-auto min-h-[56px] rounded flex flex-col justify-between p-2 cursor-grab transition-all shadow-sm overflow-hidden relative ${isVaga ? 'border-[2px] border-rose-500 shadow-[0_0_10px_rgba(244,63,94,0.4)] ring-2 ring-rose-500/50 hover:ring-rose-400' : 'border hover:ring-2 ring-emerald-500'}`}
-                                  style={isVaga ? { backgroundColor: isDarkMode ? 'rgba(225,29,72,0.15)' : 'rgba(255,228,230,0.8)', color: isDarkMode ? '#fecdd3' : '#881337', borderColor: '#e11d48' } : getCardStyle(aulaNesteSlot.courseId, aulaNesteSlot.classId, aulaNesteSlot.disciplina, isDarkMode)}
+                                  className={`group/card w-[95%] sm:w-[90%] mx-auto min-h-[56px] rounded flex flex-col justify-between p-2 cursor-grab transition-all shadow-sm overflow-hidden relative border hover:ring-2 ring-emerald-500`}
+                                  style={getCardStyle(aulaNesteSlot.courseId, aulaNesteSlot.classId, aulaNesteSlot.disciplina, isDarkMode)}
                                 >
                                   {isVaga && (
-                                    <div className="absolute top-0 right-0 left-0 bg-rose-600 text-white text-[7px] font-black uppercase text-center py-[1px] shadow-sm tracking-[0.2em] animate-pulse">
-                                      ⚠ Aula Vaga
-                                    </div>
+                                     <div className="absolute top-0 left-0 z-10 print:hidden shadow-sm pointer-events-none">
+                                        <span title="Aula Vaga (Sem Docente)" className="text-[5px] font-black uppercase tracking-widest text-white px-1.5 py-[2px] rounded-br-md border-b border-r border-rose-500/50 bg-rose-600 block shadow-sm shadow-rose-900/40 relative z-10">AULA VAGA</span>
+                                     </div>
                                   )}
                                   <button onClick={(e) => { e.preventDefault(); e.stopPropagation(); setGrade(prev => { const n = {...prev}; delete n[slotKey]; return n; }); }} className="absolute top-0 right-0 bg-rose-500 hover:bg-rose-600 text-white font-bold p-1 rounded-bl-md z-20 opacity-0 group-hover/card:opacity-100 cursor-pointer transition-opacity shadow-sm" title="Remover Aula do Horário" >
                                     <X size={8} strokeWidth={4} />
@@ -1279,13 +1279,13 @@ export function MasterGrid({ isDarkMode, ...props }) {
                                      {Object.values(grade).filter(g => String(g.classId) === String(aulaNesteSlot.classId) && String(g.id) === String(aulaNesteSlot.id)).length}/{aulaNesteSlot.numAulas || 1}
                                   </span>
                                   {aulaNesteSlot.isDisponibilizada && (
-                                     <div className="absolute top-0 right-0 z-10 print:hidden shadow-sm pointer-events-none">
-                                        <span title="Aula Disponibilizada pelo Titular" className="text-[5px] font-black uppercase tracking-widest text-white px-1.5 py-[2px] rounded-bl-md border-b border-l border-amber-500/50 bg-amber-600 block shadow-sm shadow-amber-900/40 relative z-10">Oferecida</span>
+                                     <div className="absolute top-0 left-0 z-10 print:hidden shadow-sm pointer-events-none">
+                                        <span title="Aula Disponibilizada pelo Titular" className="text-[5px] font-black uppercase tracking-widest text-white px-1.5 py-[2px] rounded-br-md border-b border-r border-amber-500/50 bg-amber-600 block shadow-sm shadow-amber-900/40 relative z-10">Oferecida</span>
                                      </div>
                                   )}
                                   {aulaNesteSlot.isSubstituted && !aulaNesteSlot.isDisponibilizada && (
-                                     <div className="absolute top-0 right-0 z-10 print:hidden shadow-sm pointer-events-none">
-                                        <span title="Aula assumida via Vaga" className="text-[5px] font-black uppercase tracking-widest text-white px-1.5 py-[2px] rounded-bl-md border-b border-l border-indigo-500/50 bg-indigo-600 block shadow-sm shadow-indigo-900/40 relative z-10">Substituição</span>
+                                     <div className="absolute top-0 left-0 z-10 print:hidden shadow-sm pointer-events-none">
+                                        <span title="Aula assumida via Vaga" className="text-[5px] font-black uppercase tracking-widest text-white px-1.5 py-[2px] rounded-br-md border-b border-r border-indigo-500/50 bg-indigo-600 block shadow-sm shadow-indigo-900/40 relative z-10">Substituição</span>
                                      </div>
                                   )}
                                   <div className={`flex flex-col flex-1 shrink-0 ${isVaga ? 'mt-4 mb-1' : 'mt-3.5 mb-1'}`} title={`${aulaNesteSlot.disciplina} - ${aulaNesteSlot.className}`}>
@@ -1629,7 +1629,14 @@ function SaveMatrixModal({ isDarkMode, grade, selectedCourses, courses, saveOpti
   const executarSalvamentoNoBackend = async () => {
     const payload = Object.entries(grade).map(([key, aula]) => {
       const [classId, dayOfWeek, slotId] = key.split('|');
-      return { courseId: aula.courseId, classId, dayOfWeek, slotId, teacherId: aula.teacherIds ? aula.teacherIds.join(',') : 'A Definir', disciplineId: aula.disciplineId || aula.id, room: aula.sala };
+      return { 
+        courseId: aula.courseId, classId, dayOfWeek, slotId, 
+        teacherId: aula.teacherIds ? aula.teacherIds.join(',') : 'A Definir', 
+        disciplineId: aula.disciplineId || aula.id, room: aula.sala,
+        isSubstituted: aula.isSubstituted || false,
+        originalSubject: aula.originalSubject || null,
+        isDisponibilizada: aula.isDisponibilizada || false
+      };
     });
 
     if (saveOptions.type !== 'padrao') {
@@ -1640,7 +1647,8 @@ function SaveMatrixModal({ isDarkMode, grade, selectedCourses, courses, saveOpti
             if (!exists) {
                 payload.push({
                     courseId: pSlot.courseId, classId: pSlot.classId, dayOfWeek: pSlot.dayOfWeek,
-                    slotId: pSlot.slotId, teacherId: 'A Definir', disciplineId: pSlot.disciplineId, room: pSlot.room
+                    slotId: pSlot.slotId, teacherId: 'A Definir', disciplineId: pSlot.disciplineId, room: pSlot.room,
+                    isSubstituted: false, originalSubject: null, isDisponibilizada: false
                 });
             }
         });

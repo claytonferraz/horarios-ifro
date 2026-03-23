@@ -126,19 +126,19 @@ export function TeacherRequestsSection({ isDarkMode, siape, selectedWeek, weekDa
                               const targetWeekId = req.week_id || req.return_week;
                               const wDt = typeof targetWeekId === 'string' && targetWeekId === 'padrao' ? null : academicWeeks?.find(w => String(w.id) === String(targetWeekId));
                               return targetWeekId === 'padrao' ? 'Grade Matriz Oficial (Padrão)' : 
-                                     wDt ? `Semana da prévia ou horário atual: Semana ${wDt.name} de ${wDt.start_date.split('-').reverse().join('/')} a ${wDt.end_date.split('-').reverse().join('/')}` : 
+                                     wDt ? `Semana da prévia ou horário atual: ${wDt.name} de ${wDt.start_date.split('-').reverse().join('/')} a ${wDt.end_date.split('-').reverse().join('/')}` : 
                                      `Semana Isolada / Especial (${targetWeekId})`;
                           })()}
                         </span>
                         <span className={`text-[8px] font-black px-2 py-0.5 rounded-full uppercase tracking-widest flex items-center gap-1 print:bg-transparent print:border print:border-slate-300 print:text-black print:px-1 ${
-                          (req.status === 'pendente' || req.status === 'aguardando_colega') ? (isDarkMode ? 'bg-amber-900/30 text-amber-500' : 'bg-amber-50 text-amber-600') :
-                          req.status === 'pronto_para_homologacao' ? (isDarkMode ? 'bg-blue-900/30 text-blue-500' : 'bg-blue-50 text-blue-600') :
-                          (req.status === 'aprovado' || req.status === 'approved') ? (isDarkMode ? 'bg-emerald-900/30 text-emerald-500' : 'bg-emerald-50 text-emerald-600') :
-                          (isDarkMode ? 'bg-rose-900/30 text-rose-500' : 'bg-rose-50 text-rose-600')
+                          (req.status === 'pendente' || req.status === 'pending' || req.status === 'pronto_para_homologacao' || req.status === 'aguardando_colega') ? (isDarkMode ? 'bg-amber-900/30 text-amber-500' : 'bg-amber-50 text-amber-600') :
+                          (req.status === 'aprovado' || req.status === 'aprovada' || req.status === 'resolvida' || req.status === 'approved') ? (req.obs === 'Homologado Automaticamente' ? (isDarkMode ? 'bg-blue-900/30 text-blue-400' : 'bg-blue-50 text-blue-600') : (isDarkMode ? 'bg-emerald-900/30 text-emerald-500' : 'bg-emerald-50 text-emerald-600')) :
+                          (req.status === 'rejeitado' || req.status === 'rejeitada') ? (isDarkMode ? 'bg-rose-900/30 text-rose-500' : 'bg-rose-50 text-rose-600') :
+                          (isDarkMode ? 'bg-indigo-900/30 text-indigo-400' : 'bg-indigo-50 text-indigo-600')
                         }`}>
                           {(req.status === 'pendente' || req.status === 'aguardando_colega' || req.status === 'pronto_para_homologacao') && <Clock size={10} />}
-                          {(req.status === 'aprovado' || req.status === 'aprovada' || req.status === 'approved') && <CheckCircle2 size={10} />}
-                          {req.status === 'rejeitado' && <XCircle size={10} />}
+                          {(req.status === 'aprovado' || req.status === 'aprovada' || req.status === 'Resolvida' || req.status === 'approved') && <CheckCircle2 size={10} />}
+                          {(req.status === 'rejeitado' || req.status === 'rejeitada') && <XCircle size={10} />}
                           {req.status === 'aguardando_colega' ? 'Aguardando Colega' : req.status === 'pronto_para_homologacao' ? 'Pronto p/ Homologação' : (req.status === 'aprovada' || req.status === 'aprovado') && req.obs === 'Homologado Automaticamente' ? 'Homologado Automaticamente' : req.status}
                         </span>
                       </div>

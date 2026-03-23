@@ -353,20 +353,22 @@ export const TeacherGrid = React.memo(
                                                               }
                                                             }}
                                                           >
-                                                            {isVagaReal ? (
-                                                              <React.Fragment>
-                                                                <div className="absolute -top-2.5 left-1/2 -translate-x-1/2 w-max z-10"><span className={"text-[9px] font-black uppercase tracking-widest text-white px-2 py-0.5 rounded shadow-sm " + (isDarkMode ? 'bg-red-600' : 'bg-red-500')}>{isLocked ? "EM ANÁLISE" : "AULA VAGA"}</span></div>
-                                                                <p className={"subject font-black text-xs leading-snug text-center mt-1 " + (isDarkMode ? 'text-red-100' : 'text-red-900')}>{r.subject || "Pendente"}</p>
-                                                                <span className={"details text-[10px] font-black tracking-widest px-1.5 py-0.5 rounded mt-1.5 w-fit uppercase mx-auto " + (isDarkMode ? 'bg-red-900/80 text-red-100' : 'bg-red-200 text-red-950')}>{r.className} {r.room ? "- " + r.room : ''}</span>
-                                                              </React.Fragment>
-                                                            ) : (
-                                                              <React.Fragment>
-                                                                <p className={"subject font-black text-xs sm:text-sm leading-snug text-center drop-shadow-sm " + (!isActive ? "text-slate-500" : "")}>{r.subject}</p>
-                                                                <span className={"details text-[10px] sm:text-xs font-black tracking-widest px-2 py-1 rounded mt-1.5 w-fit uppercase mx-auto shadow-sm " + (isActive ? (isDarkMode ? 'bg-white/25 text-white' : 'bg-black/10 text-slate-900') : (isDarkMode ? 'bg-slate-700 text-slate-400' : 'bg-slate-200 text-slate-500'))}>
-                                                                  {!isActive ? resolveTeacherName(r.teacherId, globalTeachers).split(' ')[0] : (r.room || 'Sem Sala')}
-                                                                </span>
-                                                              </React.Fragment>
+                                                            {isVagaReal && (
+                                                                <div className="absolute top-0 left-0 z-10 pointer-events-none print:hidden">
+                                                                   <span className="text-[6px] font-black uppercase tracking-wide text-white px-1.5 py-0.5 rounded-br-[8px] bg-rose-600 border-r border-b border-rose-700 block animate-pulse shadow-sm shadow-rose-900/30">{isLocked ? "EM ANÁLISE" : "AULA VAGA"}</span>
+                                                                </div>
                                                             )}
+                                                            {r.isSubstituted && !isVagaReal && (
+                                                                <div className="absolute top-0 left-0 z-10 pointer-events-none print:hidden">
+                                                                   <span title="Assumida no lugar de uma Vaga" className="text-[6px] font-black uppercase tracking-wide text-white px-1.5 py-0.5 rounded-br-[8px] bg-indigo-600 border-r border-b border-indigo-700 block shadow-sm shadow-indigo-900/30">Substituição</span>
+                                                                </div>
+                                                            )}
+                                                            <React.Fragment>
+                                                              <p className={"subject font-black text-xs sm:text-sm leading-snug text-center drop-shadow-sm mt-1 " + (!isActive ? "text-slate-500" : "")}>{r.subject || "Pendente"}</p>
+                                                              <span className={"details text-[10px] sm:text-xs font-black tracking-widest px-2 py-1 rounded mt-1 w-fit uppercase mx-auto shadow-sm " + (isActive ? (isDarkMode ? 'bg-white/25 text-white' : 'bg-black/10 text-slate-900') : (isDarkMode ? 'bg-slate-700 text-slate-400' : 'bg-slate-200 text-slate-500'))}>
+                                                                {!isActive ? resolveTeacherName(r.teacherId, globalTeachers).split(' ')[0] : (r.className || 'Sem Turma') + (r.room ? ' - ' + r.room : '')}
+                                                              </span>
+                                                            </React.Fragment>
                                                           </div>
                                                         );
                                                       },

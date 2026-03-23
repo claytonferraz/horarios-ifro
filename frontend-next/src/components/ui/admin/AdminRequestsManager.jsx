@@ -49,7 +49,7 @@ export function AdminRequestsManager({ isDarkMode }) {
     if (!wData) return { id: wId, label: `Semana Especial (${wId})` };
     const startStr = wData.start_date ? wData.start_date.split('-').reverse().join('/') : '?';
     const endStr = wData.end_date ? wData.end_date.split('-').reverse().join('/') : '?';
-    return { id: wId, label: `Semana ${wData.name} (${startStr} a ${endStr})` };
+    return { id: wId, label: `${wData.name} (${startStr} a ${endStr})` };
   });
 
   // Aplicar filtros
@@ -196,7 +196,7 @@ function RequestCard({ req, isDarkMode, loadingId, handleUpdate, globalTeachers,
   const targetWeekId = req.week_id || req.return_week;
   const weekData = typeof targetWeekId === 'string' && targetWeekId === 'padrao' ? null : academicWeeks?.find(w => String(w.id) === String(targetWeekId));
   const scheduleTypeName = targetWeekId === 'padrao' ? 'Grade Matriz Oficial (Padrão)' : 
-                           weekData ? `Semana da prévia ou horário atual: Semana ${weekData.name} de ${weekData.start_date.split('-').reverse().join('/')} a ${weekData.end_date.split('-').reverse().join('/')}` : 
+                           weekData ? `Semana da prévia ou horário atual: ${weekData.name} de ${weekData.start_date.split('-').reverse().join('/')} a ${weekData.end_date.split('-').reverse().join('/')}` : 
                            `Semana Isolada / Especial (${targetWeekId})`;
 
   return (
@@ -215,8 +215,9 @@ function RequestCard({ req, isDarkMode, loadingId, handleUpdate, globalTeachers,
             </div>
             <span className={`text-[8px] font-black px-2 py-0.5 rounded-full uppercase tracking-widest print:bg-transparent print:text-slate-800 print:border print:border-slate-300 print:px-1 ${
               (req.status === 'pendente' || req.status === 'pending' || req.status === 'pronto_para_homologacao' || req.status === 'aguardando_colega') ? (isDarkMode ? 'bg-amber-900/30 text-amber-500' : 'bg-amber-50 text-amber-600') :
-              (req.status === 'aprovado' || req.status === 'aprovada') ? (req.obs === 'Homologado Automaticamente' ? (isDarkMode ? 'bg-blue-900/30 text-blue-400' : 'bg-blue-50 text-blue-600') : (isDarkMode ? 'bg-emerald-900/30 text-emerald-500' : 'bg-emerald-50 text-emerald-600')) :
-              (isDarkMode ? 'bg-rose-900/30 text-rose-500' : 'bg-rose-50 text-rose-600')
+              (req.status === 'aprovado' || req.status === 'aprovada' || req.status === 'resolvida') ? (req.obs === 'Homologado Automaticamente' ? (isDarkMode ? 'bg-blue-900/30 text-blue-400' : 'bg-blue-50 text-blue-600') : (isDarkMode ? 'bg-emerald-900/30 text-emerald-500' : 'bg-emerald-50 text-emerald-600')) :
+              (req.status === 'rejeitado' || req.status === 'rejeitada') ? (isDarkMode ? 'bg-rose-900/30 text-rose-500' : 'bg-rose-50 text-rose-600') :
+              (isDarkMode ? 'bg-indigo-900/30 text-indigo-400' : 'bg-indigo-50 text-indigo-600')
             }`}>
               {req.status === 'pending' ? 'pendente' : req.status === 'pronto_para_homologacao' ? 'Pronto p/ Homologação' : req.status === 'aguardando_colega' ? 'Aguard. Colega (Pode Forçar)' : (req.status === 'aprovada' || req.status === 'aprovado') && req.obs === 'Homologado Automaticamente' ? 'Homologado Automaticamente' : req.status}
             </span>
@@ -224,7 +225,7 @@ function RequestCard({ req, isDarkMode, loadingId, handleUpdate, globalTeachers,
 
           <div className={`p-4 rounded-xl text-xs font-medium leading-relaxed print:bg-transparent print:p-0 print:text-sm print:text-black ${isDarkMode ? 'bg-slate-800 text-slate-300' : 'bg-slate-50 text-slate-700'}`}>
              <p className="font-bold uppercase text-[9px] text-slate-500 mb-1 tracking-widest print:text-xs">Pedido:</p>
-             {req.description}
+             {req.reason || req.description}
           </div>
 
           {(req.original_slot || req.proposed_slot) && (
@@ -298,8 +299,8 @@ function RequestCard({ req, isDarkMode, loadingId, handleUpdate, globalTeachers,
                   </button>
                </div>
            ) : (
-               <div className={`flex items-center justify-center py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all border print:hidden ${req.status === 'aprovado' ? (isDarkMode ? 'bg-emerald-900/20 border-emerald-900/50 text-emerald-500' : 'bg-emerald-50 border-emerald-200 text-emerald-700') : (isDarkMode ? 'bg-rose-900/20 border-rose-900/50 text-rose-500' : 'bg-rose-50 border-rose-200 text-rose-700')}`}>
-                  {req.status === 'aprovado' ? <CheckCircle2 size={14} className="mr-2" /> : <XCircle size={14} className="mr-2" />}
+               <div className={`flex items-center justify-center py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all border print:hidden ${(req.status === 'aprovado' || req.status === 'aprovada' || req.status === 'resolvida') ? (isDarkMode ? 'bg-emerald-900/20 border-emerald-900/50 text-emerald-500' : 'bg-emerald-50 border-emerald-200 text-emerald-700') : (isDarkMode ? 'bg-rose-900/20 border-rose-900/50 text-rose-500' : 'bg-rose-50 border-rose-200 text-rose-700')}`}>
+                  {(req.status === 'aprovado' || req.status === 'aprovada' || req.status === 'resolvida') ? <CheckCircle2 size={14} className="mr-2" /> : <XCircle size={14} className="mr-2" />}
                   Solicitação Resolvida
                </div>
            )}

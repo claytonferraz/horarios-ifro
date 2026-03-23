@@ -149,10 +149,14 @@ export const ClassGrid = React.memo(({
                                                        <GripVertical size={10} />
                                                     </div>
                                                   )}
-                                                  {isPending && <span className={`text-[7px] font-black uppercase tracking-widest px-1.5 py-0.5 rounded w-fit mx-auto mb-0.5 ${isDarkMode ? 'text-red-400 bg-red-900/50' : 'text-red-600 bg-red-100'}`}>SEM PROFESSOR</span>}
-                                                  {aulaNesteSlot.isSubstituted && (
-                                                     <div className="absolute top-0 right-0 z-10 pointer-events-none print:hidden">
-                                                         <span title="Assumida no lugar de uma Vaga" className="text-[6px] font-black uppercase tracking-wide text-white px-1.5 py-0.5 rounded-bl-[8px] bg-indigo-600 border-l border-b border-indigo-700 block animate-pulse shadow-sm shadow-indigo-900/30">Substituição</span>
+                                                  {isPending && (
+                                                     <div className="absolute top-0 left-0 z-10 pointer-events-none print:hidden">
+                                                         <span className="text-[6px] font-black uppercase tracking-wide text-white px-1.5 py-0.5 rounded-br-[8px] bg-rose-600 border-r border-b border-rose-700 block animate-pulse shadow-sm shadow-rose-900/30">AULA VAGA</span>
+                                                     </div>
+                                                  )}
+                                                  {aulaNesteSlot.isSubstituted && !isPending && (
+                                                     <div className="absolute top-0 left-0 z-10 pointer-events-none print:hidden">
+                                                         <span title="Assumida no lugar de uma Vaga" className="text-[6px] font-black uppercase tracking-wide text-white px-1.5 py-0.5 rounded-br-[8px] bg-indigo-600 border-r border-b border-indigo-700 block animate-pulse shadow-sm shadow-indigo-900/30">Substituição</span>
                                                      </div>
                                                   )}
                                                   <p className="subject font-bold text-[10px] leading-tight mb-0.5 text-center">
@@ -188,7 +192,7 @@ export const ClassGrid = React.memo(({
 
                                         return (
                                           <div className={`w-full h-full min-h-[60px] flex flex-col items-center justify-center p-2 rounded-lg border border-dashed opacity-70 transition-colors ${isDarkMode ? 'bg-slate-800/40 border-slate-600' : 'bg-slate-100 border-slate-300'}`}>
-                                              <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">Aula Vaga</span>
+                                              <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">Tempo Livre</span>
                                               
                                               {userRole === 'professor' && scheduleMode !== 'padrao' && (
                                                   <button

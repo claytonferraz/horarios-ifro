@@ -514,7 +514,10 @@ const bulkScheduleSchema = z.object({
     slotId: z.union([z.string(), z.number()]).transform(String),
     teacherId: z.union([z.string(), z.number()]).transform(String),
     disciplineId: z.union([z.string(), z.number()]).transform(String).optional().nullable(),
-    room: z.union([z.string(), z.number()]).transform(String).optional().nullable()
+    room: z.union([z.string(), z.number()]).transform(String).optional().nullable(),
+    isSubstituted: z.boolean().optional(),
+    originalSubject: z.string().optional().nullable(),
+    isDisponibilizada: z.boolean().optional()
   }))
 });
 
@@ -605,11 +608,19 @@ app.post('/api/schedules/bulk-course', verifyToken, (req, res) => {
               db.run(`DELETE FROM schedules WHERE courseId IN (${placeholders}) AND type = ? AND (academic_year = ? OR academic_year IS NULL) AND (week_id IS NULL OR week_id = '')`, [...coursesToClear, type, academicYear || '']);
           }
 
-          const stmt = db.prepare("INSERT INTO schedules (id, courseId, academic_year, classId, dayOfWeek, slotId, teacherId, disciplineId, room, type, week_id, updatedAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
+          const stmt = db.prepare("INSERT INTO schedules (id, courseId, academic_year, classId, dayOfWeek, slotId, teacherId, disciplineId, room, type, week_id, updatedAt, records) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
           for (const slot of schedules) {
             const id = `s_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
             const targetCourse = slot.courseId || coursesToClear[0];
-            stmt.run([id, targetCourse, academicYear || null, slot.classId, slot.dayOfWeek, slot.slotId, slot.teacherId, slot.disciplineId || null, slot.room || null, type, weekId || null, now]);
+            let recordsJSON = null;
+            if (type !== 'padrao' && type !== 'oficial' && (slot.isSubstituted || slot.isDisponibilizada)) {
+               recordsJSON = JSON.stringify({
+                  isSubstituted: slot.isSubstituted || false,
+                  originalSubject: slot.originalSubject || null,
+                  isDisponibilizada: slot.isDisponibilizada || false
+               });
+            }
+            stmt.run([id, targetCourse, academicYear || null, slot.classId, slot.dayOfWeek, slot.slotId, slot.teacherId, slot.disciplineId || null, slot.room || null, type, weekId || null, now, recordsJSON]);
           }
           
           stmt.finalize();
@@ -1304,42 +1315,38 @@ app.post('/api/requests', (req, res) => {
         db.run(updateQ, [requester, disciplineIdToUpdate, newRecordsFragment, classIdToUpdate, dayOfWeekToUpdate, originalTime, returnWeekId || null, returnWeekId || null], function(err) {
            if (err) return res.status(500).json({ error: err.message });
            
-           const finalReason = `O professor(a) ${teacherNameDesc.replace('SIApE: ', '')} solicitou aula vaga de ${originalSubjectName} para sua disciplina de ${subject}.`;
-           const finalObs = `Homologado Automaticamente`;
-           const finalFeedback = `Aprovado pelo sistema automaticamente em: ${new Date().toLocaleString('pt-BR')}`;
-           
-           db.run('INSERT INTO exchange_requests (action_type, requester_id, target_class, original_day, original_time, subject, return_week, reason, obs, status, admin_feedback) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-             [action, requester, targetClass, originalDay, originalTime, subject, returnWeekId || '', finalReason, finalObs, 'aprovada', finalFeedback],
-             function(err2) {
-               if (err2) return res.status(500).json({ error: err2.message });
-               
-               const insertedId = this.lastID;
-               
-               const finalizeVaga = (weekText) => {
-                 const now = new Date().toISOString();
-                 const notifyMsg = `Professor(a) ${teacherNameDesc}: assumiu aula vaga de (${originalSubjectName}) com a disciplina (${subject}) na turma ${targetClass} em ${originalDay} às ${originalTime}${weekText} (Auto-Homologada).`;
-                 db.run("INSERT INTO notifications (type, target, title, message, createdAt) VALUES ('SYSTEM', 'ALL_ADMIN', 'Substituição Automática', ?, ?)", [notifyMsg, now], function(){});
-                 
-                 io.emit('schedule_updated');
-                 res.json({ success: true, id: insertedId, automatic: true });
-               };
+        const executeInsert = (weekText) => {
+            const notifyMsg = `Professor(a) ${teacherNameDesc.replace('SIApE: ', '')}: assumiu aula vaga de (${originalSubjectName}) com a disciplina (${subject}) na turma ${targetClass} em ${originalDay} às ${originalTime} ${weekText} (Auto-Homologada).`;
+            const finalReason = notifyMsg;
+            const finalObs = `Homologado Automaticamente`;
+            const finalFeedback = `Aprovado pelo sistema automaticamente em: ${new Date().toLocaleString('pt-BR')}`;
+            
+            db.run('INSERT INTO exchange_requests (action_type, requester_id, target_class, original_day, original_time, subject, return_week, reason, obs, status, admin_feedback) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+              [action, requester, targetClass, originalDay, originalTime, subject, returnWeekId || '', finalReason, finalObs, 'aprovada', finalFeedback],
+              function(err2) {
+                if (err2) return res.status(500).json({ error: err2.message });
+                const insertedId = this.lastID;
+                const now = new Date().toISOString();
+                db.run("INSERT INTO notifications (type, target, title, message, createdAt) VALUES ('SYSTEM', 'ALL_ADMIN', 'Substituição Automática', ?, ?)", [notifyMsg, now], function(){});
+                io.emit('schedule_updated');
+                res.json({ success: true, id: insertedId, automatic: true });
+              }
+            );
+        };
 
-               if (returnWeekId && returnWeekId !== 'padrao') {
-                 db.get("SELECT name, start_date, end_date FROM academic_weeks WHERE id = ?", [returnWeekId], (err3, row) => {
-                   if (!err3 && row && row.start_date && row.end_date) {
-                     const pS = row.start_date.split('-');
-                     const pE = row.end_date.split('-');
-                     const dStr = ` (Semana: ${pS[2]}/${pS[1]} a ${pE[2]}/${pE[1]})`;
-                     finalizeVaga(dStr);
-                   } else {
-                     finalizeVaga('');
-                   }
-                 });
-               } else {
-                 finalizeVaga(' (Matriz Padrão)');
-               }
-             }
-           );
+        if (returnWeekId && returnWeekId !== 'padrao') {
+            db.get("SELECT name, start_date, end_date FROM academic_weeks WHERE id = ?", [returnWeekId], (err3, row) => {
+              if (!err3 && row && row.start_date && row.end_date) {
+                const pS = row.start_date.split('-');
+                const pE = row.end_date.split('-');
+                executeInsert(`(Semana: ${pS[2]}/${pS[1]} a ${pE[2]}/${pE[1]})`);
+              } else {
+                executeInsert('');
+              }
+            });
+        } else {
+            executeInsert('(Matriz Padrão)');
+        }
         });
 
     } else if (action === 'oferta_vaga') {
