@@ -1311,11 +1311,11 @@ app.post('/api/requests', (req, res) => {
            if (err) return res.status(500).json({ error: err.message });
            
            const executeInsert = (weekText) => {
-               const notifyMsg = `Professor(a) SIApE: ${requester} assumiu aula vaga de (${originalSubjectName}) com a disciplina (${proposedSubject}) na turma ${targetClass} em ${proposedDay} às ${proposedTime} ${weekText} (Auto-Homologada).`;
+               const notifyMsg = 'Auto-ocupação de Vaga Registrada no Sistema.';
                const finalFeedback = `Aprovado pelo sistema automaticamente em: ${new Date().toLocaleString('pt-BR')}`;
                
-               db.run('INSERT INTO exchange_requests (action_type, requester_id, target_class, original_day, original_time, subject, return_week, reason, obs, status, admin_feedback) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-                 [action, requester, targetClass, originalDay, originalTime, subject, returnWeekId || '', notifyMsg, obs, 'aprovada', finalFeedback],
+               db.run('INSERT INTO exchange_requests (action_type, requester_id, target_class, original_day, original_time, subject, return_week, reason, obs, status, admin_feedback, original_slot, proposed_slot) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+                 [action, requester, targetClass, originalDay, originalTime, subject, returnWeekId || '', notifyMsg, obs, 'aprovada', finalFeedback, JSON.stringify(data.original_slot || {}), JSON.stringify(data.proposed_slot || {})],
                  function(err2) {
                    if (err2) return res.status(500).json({ error: err2.message });
                    const insertedId = this.lastID;
@@ -1358,8 +1358,8 @@ app.post('/api/requests', (req, res) => {
         });
 
         Promise.all(promises).then(() => {
-            db.run('INSERT INTO exchange_requests (action_type, requester_id, substitute_id, target_class, original_day, original_time, subject, return_week, reason, obs, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-                [action, requester, (slotsObj.targetSubject === 'ALL' ? '' : slotsObj.targetSubject), targetClass, slotsObj.day, slotsObj.time, 'Aulas Agrupadas', returnWeekId || '', reason || '', obs || '', 'pendente'],
+            db.run('INSERT INTO exchange_requests (action_type, requester_id, substitute_id, target_class, original_day, original_time, subject, return_week, reason, obs, status, original_slot, proposed_slot) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+                [action, requester, (slotsObj.targetSubject === 'ALL' ? '' : slotsObj.targetSubject), targetClass, slotsObj.day, slotsObj.time, 'Aulas Agrupadas', returnWeekId || '', reason || '', obs || '', 'pendente', JSON.stringify(data.original_slot || {}), JSON.stringify(data.proposed_slot || {})],
                 function(err) {
                     if (err) return res.status(500).json({ error: err.message });
                     const insertedId = this.lastID;
