@@ -2,13 +2,14 @@ import React, { useState } from 'react';
 import { 
   ChevronDown, Clock, Printer, CheckCircle, Check, Eye, BookOpen, FileText, Users,
   MessageSquare, Send, CheckCircle2, XCircle, AlertCircle, GripVertical,
-  Calendar, UserCircle, Layers, AlertTriangle, BarChart3, ListTodo, CalendarDays, Settings, Bell, Sun
+  Calendar, UserCircle, Layers, AlertTriangle, BarChart3, ListTodo, CalendarDays, Settings, Bell, Sun, RefreshCcw
 } from 'lucide-react';
 import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd';
 import { SearchableSelect } from '../ui/SearchableSelect';
 import { InlineInput } from '../ui/InlineInput';
 import { ScheduleEditorModal } from '../ui/admin/ScheduleEditorModal';
 import { TeacherExchangeModal } from '../ui/TeacherExchangeModal';
+import { TeacherOfferModal } from '../ui/TeacherOfferModal';
 import { ScheduleNotifications } from '../ui/admin/ScheduleNotifications';
 import { MAP_DAYS, getColorHash, isTeacherPending, resolveTeacherName } from '@/lib/dates';
 import { useData } from '@/contexts/DataContext';
@@ -113,6 +114,7 @@ export function PortalView({
 
   const [draggingRecord, setDraggingRecord] = useState(null);
   const [exchangeTarget, setExchangeTarget] = useState(null);
+  const [exchangeAction, setExchangeAction] = useState(null);
 
   const isSlotLocked = React.useCallback((r) => {
       return pendingRequests.some(req => {
@@ -721,21 +723,7 @@ export function PortalView({
                     </div>
                   )}
 
-                  {appMode === 'professor' && viewMode === 'professor' && (
-                    <div className="space-y-1 col-span-full md:col-span-2">
-                      <label className="text-[9px] font-black tracking-[0.2em] text-slate-400 uppercase ml-1">Ver Grade de um Colega</label>
-                      <SearchableSelect
-                        isDarkMode={isDarkMode}
-                        options={(globalTeachersList || globalTeachers || [])
-                          .filter(t => t && (t.siape || t.id) && String(t.siape || t.id) !== String(siape))
-                          .map(t => ({value: String(t.siape || t.id), label: t.nome_exibicao || t.nome_completo || t.name || 'Sem Nome'}))
-                          .sort((a,b) => String(a.label).localeCompare(String(b.label)))}
-                        value={selectedColleague}
-                        onChange={setSelectedColleague}
-                        colorClass={isDarkMode ? "bg-slate-800 border-slate-700 text-slate-200 shadow-sm" : "bg-white border-slate-200 text-slate-700 shadow-sm"}
-                      />
-                    </div>
-                  )}
+
                   {viewMode === 'total' && (
                     <>
                       <div className="space-y-1"><label className="text-[9px] font-black tracking-[0.2em] text-slate-400 uppercase ml-1">Ano Letivo</label>
@@ -1374,11 +1362,38 @@ export function PortalView({
         </div>
       )}
 
-      {exchangeTarget && (
-        <TeacherExchangeModal 
+      {exchangeTarget && !exchangeAction && (
+        <div className="fixed inset-0 z-[200] flex justify-center items-center bg-slate-900/60 backdrop-blur-sm p-4 animate-in fade-in duration-200">
+           <div className={`w-full max-w-sm rounded-2xl shadow-xl border flex flex-col ${isDarkMode ? 'bg-slate-900 border-slate-700' : 'bg-white border-slate-200'}`}>
+              <div className={`p-4 border-b flex items-center justify-between ${isDarkMode ? 'bg-slate-800' : 'bg-slate-50'}`}>
+                 <h3 className="font-black uppercase tracking-widest text-sm text-indigo-500">Ação da Aula</h3>
+                 <button onClick={() => { setExchangeTarget(null); setExchangeAction(null); }} className="p-2 rounded-lg text-slate-400 hover:text-slate-200"><X size={16}/></button>
+              </div>
+              <div className="p-6 space-y-4">
+                 <button onClick={() => setExchangeAction('swap')} className="w-full flex items-center gap-3 p-4 border rounded-xl bg-indigo-50/50 hover:bg-indigo-100 hover:border-indigo-400 !text-indigo-900 transition-all text-left">
+                    <span className="p-2 bg-indigo-500 text-white rounded-lg"><RefreshCcw size={20} /></span>
+                    <div>
+                      <span className="font-black text-sm uppercase block tracking-widest">Trocar com Colega</span>
+                      <span className="text-[10px] opacity-80 font-bold block">Assumir aula de outro professor em troca</span>
+                    </div>
+                 </button>
+                 <button onClick={() => setExchangeAction('offer')} className="w-full flex items-center gap-3 p-4 border rounded-xl bg-rose-50/50 hover:bg-rose-100 hover:border-rose-400 !text-rose-900 transition-all text-left">
+                    <span className="p-2 bg-rose-500 text-white rounded-lg"><HandHeart size={20} /></span>
+                    <div>
+                      <span className="font-black text-sm uppercase block tracking-widest">Disponibilizar (Vaga)</span>
+                      <span className="text-[10px] opacity-80 font-bold block">Gera ausência (livre ou específica)</span>
+                    </div>
+                 </button>
+              </div>
+           </div>
+        </div>
+      )}
+
+      {exchangeTarget && exchangeAction === 'offer' && (
+        <TeacherOfferModal 
           isOpen={true} 
           isDarkMode={isDarkMode}
-          onClose={() => setExchangeTarget(null)}
+          onClose={() => { setExchangeTarget(null); setExchangeAction(null); }}
           originalRecord={exchangeTarget.originalRecord}
           targetClass={exchangeTarget.targetClass}
           targetCourse={exchangeTarget.targetCourse}
@@ -1392,6 +1407,31 @@ export function PortalView({
             apiClient.submitRequest({ ...payload, requester_id: selectedTeacher }).then(() => {
               alert('Solicitação enviada!');
               fetchRequests();
+              setExchangeTarget(null); setExchangeAction(null);
+            }).catch(e => alert(e.message));
+          }}
+        />
+      )}
+
+      {exchangeTarget && exchangeAction === 'swap' && (
+        <TeacherExchangeModal 
+          isOpen={true} 
+          isDarkMode={isDarkMode}
+          onClose={() => { setExchangeTarget(null); setExchangeAction(null); }}
+          originalRecord={exchangeTarget.originalRecord}
+          targetClass={exchangeTarget.targetClass}
+          targetCourse={exchangeTarget.targetCourse}
+          classRecords={recordsForWeek.filter(r => r.className === exchangeTarget.targetClass)}
+          safeDays={safeDays}
+          safeTimes={safeTimes}
+          globalTeachers={globalTeachersList}
+          apiClient={apiClient}
+          selectedWeek={selectedWeek}
+          onSubmit={(payload) => {
+            apiClient.submitRequest(payload).then(() => {
+              alert('Solicitação enviada e está aguardando aceite!');
+              fetchRequests();
+              setExchangeTarget(null); setExchangeAction(null);
             }).catch(e => alert(e.message));
           }}
         />

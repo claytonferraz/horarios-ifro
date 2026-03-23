@@ -43,7 +43,7 @@ export function AdminRequestsManager({ isDarkMode }) {
     return { siape, name: globalTeachers?.find(t => t.siape === siape)?.nome_exibicao || siape };
   }).sort((a, b) => String(a.name).localeCompare(String(b.name)));
 
-  const uniqueWeeks = [...new Set(requests.map(r => String(r.week_id)))].sort((a,b)=> a.localeCompare(b)).map(wId => {
+  const uniqueWeeks = [...new Set(requests.map(r => String(r.week_id || r.return_week)))].filter(x => x && x !== 'undefined' && x !== 'null').sort((a,b)=> a.localeCompare(b)).map(wId => {
     if (wId === 'padrao') return { id: wId, label: 'Grade Matriz Oficial (Padrão)' };
     const wData = academicWeeks?.find(w => String(w.id) === wId);
     if (!wData) return { id: wId, label: `Semana Especial (${wId})` };
@@ -55,10 +55,17 @@ export function AdminRequestsManager({ isDarkMode }) {
   // Aplicar filtros
   const filteredRequests = requests.filter(req => {
     if (filterTeacher && req.requester_id !== filterTeacher) return false;
-    if (filterWeek && String(req.week_id) !== filterWeek) return false;
+    if (filterWeek && String(req.week_id || req.return_week) !== filterWeek) return false;
     if (filterStatus) {
-       const mappedStatus = req.status === 'pending' ? 'pendente' : req.status;
-       if (mappedStatus !== filterStatus) return false;
+       const mappedStatus = req.status === 'pending' ? 'pendente' : req.status === 'aprovada' ? 'aprovado' : req.status;
+       
+       if (filterStatus === 'automatica') {
+           if (req.obs !== 'Homologado Automaticamente') return false;
+       } else if (filterStatus === 'aprovado') {
+           if (mappedStatus !== 'aprovado' || req.obs === 'Homologado Automaticamente') return false;
+       } else {
+           if (mappedStatus !== filterStatus) return false;
+       }
     }
     return true;
   });
@@ -116,7 +123,10 @@ export function AdminRequestsManager({ isDarkMode }) {
                  >
                    <option value="">Qualquer Status</option>
                    <option value="pendente">Pendente</option>
-                   <option value="aprovado">Aprovado</option>
+                   <option value="pronto_para_homologacao">Pronto p/ Homologação</option>
+                   <option value="aguardando_colega">Aguardando Colega</option>
+                   <option value="aprovado">Aprovado (Manual)</option>
+                   <option value="automatica">Homologada Automaticamente</option>
                    <option value="rejeitado">Rejeitado</option>
                  </select>
                </div>
@@ -183,10 +193,11 @@ function RequestCard({ req, isDarkMode, loadingId, handleUpdate, globalTeachers,
   const teacherName = globalTeachers?.find(t => t.siape === req.requester_id)?.nome_exibicao || req.requester_id || 'Desconhecido';
   const [feedback, setFeedback] = React.useState(req.admin_feedback || '');
 
-  const weekData = typeof req.week_id === 'string' && req.week_id === 'padrao' ? null : academicWeeks?.find(w => String(w.id) === String(req.week_id));
-  const scheduleTypeName = req.week_id === 'padrao' ? 'Grade Matriz Oficial (Padrão)' : 
-                           weekData ? `Semana Letiva ${weekData.name} - ${weekData.start_date.split('-').reverse().join('/')}` : 
-                           `Semana Isolada / Especial (${req.week_id})`;
+  const targetWeekId = req.week_id || req.return_week;
+  const weekData = typeof targetWeekId === 'string' && targetWeekId === 'padrao' ? null : academicWeeks?.find(w => String(w.id) === String(targetWeekId));
+  const scheduleTypeName = targetWeekId === 'padrao' ? 'Grade Matriz Oficial (Padrão)' : 
+                           weekData ? `Semana da prévia ou horário atual: Semana ${weekData.name} de ${weekData.start_date.split('-').reverse().join('/')} a ${weekData.end_date.split('-').reverse().join('/')}` : 
+                           `Semana Isolada / Especial (${targetWeekId})`;
 
   return (
     <div className={`p-5 rounded-2xl border transition-all print:border-b-2 print:border-t-0 print:border-x-0 print:border-slate-300 print:rounded-none print:p-2 print:bg-transparent print:shadow-none break-inside-avoid ${isDarkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200 shadow-sm'}`}>
@@ -203,11 +214,11 @@ function RequestCard({ req, isDarkMode, loadingId, handleUpdate, globalTeachers,
               </div>
             </div>
             <span className={`text-[8px] font-black px-2 py-0.5 rounded-full uppercase tracking-widest print:bg-transparent print:text-slate-800 print:border print:border-slate-300 print:px-1 ${
-              (req.status === 'pendente' || req.status === 'pending' || req.status === 'pronto_para_homologacao') ? (isDarkMode ? 'bg-amber-900/30 text-amber-500' : 'bg-amber-50 text-amber-600') :
-              req.status === 'aprovado' ? (isDarkMode ? 'bg-emerald-900/30 text-emerald-500' : 'bg-emerald-50 text-emerald-600') :
+              (req.status === 'pendente' || req.status === 'pending' || req.status === 'pronto_para_homologacao' || req.status === 'aguardando_colega') ? (isDarkMode ? 'bg-amber-900/30 text-amber-500' : 'bg-amber-50 text-amber-600') :
+              (req.status === 'aprovado' || req.status === 'aprovada') ? (req.obs === 'Homologado Automaticamente' ? (isDarkMode ? 'bg-blue-900/30 text-blue-400' : 'bg-blue-50 text-blue-600') : (isDarkMode ? 'bg-emerald-900/30 text-emerald-500' : 'bg-emerald-50 text-emerald-600')) :
               (isDarkMode ? 'bg-rose-900/30 text-rose-500' : 'bg-rose-50 text-rose-600')
             }`}>
-              {req.status === 'pending' ? 'pendente' : req.status === 'pronto_para_homologacao' ? 'Pronto p/ Homologação' : req.status}
+              {req.status === 'pending' ? 'pendente' : req.status === 'pronto_para_homologacao' ? 'Pronto p/ Homologação' : req.status === 'aguardando_colega' ? 'Aguard. Colega (Pode Forçar)' : (req.status === 'aprovada' || req.status === 'aprovado') && req.obs === 'Homologado Automaticamente' ? 'Homologado Automaticamente' : req.status}
             </span>
           </div>
 
@@ -262,14 +273,14 @@ function RequestCard({ req, isDarkMode, loadingId, handleUpdate, globalTeachers,
               <label className="text-[9px] font-black uppercase text-slate-500 tracking-widest print:opacity-100 print:text-black">Ação / Resposta</label>
               <textarea 
                 placeholder="Feedback para o professor..."
-                className={`w-full min-h-[80px] p-3 rounded-xl border text-[11px] font-bold outline-none resize-none transition-all print:border-dashed print:border-slate-400 print:bg-slate-50/50 print:text-black print:min-h-0 print:h-auto ${req.status !== 'pendente' && req.status !== 'pending' && req.status !== 'pronto_para_homologacao' ? 'opacity-50 print:opacity-100 cursor-not-allowed pointer-events-none' : ''} ${isDarkMode ? 'bg-slate-950 border-slate-700 text-white focus:border-indigo-500' : 'bg-white border-slate-200 text-slate-900 focus:border-indigo-600'}`}
+                className={`w-full min-h-[80px] p-3 rounded-xl border text-[11px] font-bold outline-none resize-none transition-all print:border-dashed print:border-slate-400 print:bg-slate-50/50 print:text-black print:min-h-0 print:h-auto ${req.status !== 'pendente' && req.status !== 'pending' && req.status !== 'pronto_para_homologacao' && req.status !== 'aguardando_colega' ? 'opacity-50 print:opacity-100 cursor-not-allowed pointer-events-none' : ''} ${isDarkMode ? 'bg-slate-950 border-slate-700 text-white focus:border-indigo-500' : 'bg-white border-slate-200 text-slate-900 focus:border-indigo-600'}`}
                 value={feedback}
                 onChange={e => setFeedback(e.target.value)}
-                readOnly={req.status !== 'pendente' && req.status !== 'pending' && req.status !== 'pronto_para_homologacao'}
+                readOnly={req.status !== 'pendente' && req.status !== 'pending' && req.status !== 'pronto_para_homologacao' && req.status !== 'aguardando_colega'}
               />
            </div>
            
-           {(req.status === 'pendente' || req.status === 'pending' || req.status === 'pronto_para_homologacao') ? (
+           {(req.status === 'pendente' || req.status === 'pending' || req.status === 'pronto_para_homologacao' || req.status === 'aguardando_colega') ? (
                <div className="grid grid-cols-2 gap-2 print:hidden">
                   <button 
                     disabled={loadingId === req.id}

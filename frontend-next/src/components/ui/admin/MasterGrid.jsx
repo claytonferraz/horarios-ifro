@@ -56,8 +56,9 @@ const formatWeekLabel = (w) => {
 };
 
 export function MasterGrid({ isDarkMode, ...props }) {
-  const { globalTeachers: globalTeachersList, activeDays, classTimes, academicWeeks, selectedConfigYear, setSelectedConfigYear, academicYearsMeta } = useData();
-  
+  const { globalTeachers: globalTeachersList, activeDays, classTimes, academicWeeks, selectedConfigYear, setSelectedConfigYear, academicYearsMeta, exchangeRequests } = useData();
+
+
   const [selectedCourses, setSelectedCourses] = useState([]);
   const [isCoursesOpen, setIsCoursesOpen] = useState(false);
   const [hiddenClasses, setHiddenClasses] = useState([]);
@@ -82,6 +83,19 @@ export function MasterGrid({ isDarkMode, ...props }) {
   const [teacherFilter, setTeacherFilter] = useState('');
   const [refreshTrigger, setRefreshTrigger] = useState(0);
   const [draggedItem, setDraggedItem] = useState(null);
+
+  const [ofertasModal, setOfertasModal] = useState([]);
+  
+  useEffect(() => {
+     if (selectedWeek && exchangeRequests) {
+         const pendentes = exchangeRequests.filter(req => req.status === 'pendente' && req.action_type === 'oferta_vaga' && String(req.return_week) === String(selectedWeek));
+         if (pendentes.length > 0) {
+             setOfertasModal(pendentes);
+         } else {
+             setOfertasModal([]);
+         }
+     }
+  }, [selectedWeek, exchangeRequests]);
 
   const [pendingDrop, setPendingDrop] = useState(null); // Modal DND 
   const [dropAlert, setDropAlert] = useState(null); // Alerta Simples
@@ -111,7 +125,7 @@ export function MasterGrid({ isDarkMode, ...props }) {
   const [pendingRequests, setPendingRequests] = useState([]);
   const [isRequestsWidgetOpen, setIsRequestsWidgetOpen] = useState(false);
   const [isWidgetMenuOpen, setIsWidgetMenuOpen] = useState(false);
-
+  
   React.useEffect(() => {
     apiClient.getRequests().then(data => setPendingRequests(data.filter(r => r.status === 'pronto_para_homologacao'))).catch(console.error);
   }, []);
@@ -400,6 +414,7 @@ export function MasterGrid({ isDarkMode, ...props }) {
              
              let flagIsSubstituted = false;
              let flagOriginalSubject = null;
+             let flagIsDisponibilizada = false;
              if (schedule.records) {
                  try {
                      const recs = JSON.parse(schedule.records);
@@ -407,11 +422,17 @@ export function MasterGrid({ isDarkMode, ...props }) {
                          flagIsSubstituted = true;
                          flagOriginalSubject = recs.originalSubject || null;
                      }
+                     if (recs.isDisponibilizada) {
+                         flagIsDisponibilizada = true;
+                     }
                      if (Array.isArray(recs)) {
                          const found = recs.find(r => String(r.day) === String(schedule.dayOfWeek) && String(r.time) === String(schedule.slotId));
                          if (found?.isSubstituted) {
                              flagIsSubstituted = true;
                              flagOriginalSubject = found?.originalSubject || null;
+                         }
+                         if (found?.isDisponibilizada) {
+                             flagIsDisponibilizada = true;
                          }
                      }
                  } catch(e) {}
@@ -424,7 +445,8 @@ export function MasterGrid({ isDarkMode, ...props }) {
                  professores: dbTeacherIds ? dbTeacherIds.map(id => resolveTeacherName(id, globalTeachersList)) : refCard.professores,
                  teacherChanged: teacherChanged,
                  isSubstituted: flagIsSubstituted,
-                 originalSubject: flagOriginalSubject
+                 originalSubject: flagOriginalSubject,
+                 isDisponibilizada: flagIsDisponibilizada
              };
              aulasAlocadasIds.push(String(refCard.id));
         }
@@ -834,6 +856,39 @@ export function MasterGrid({ isDarkMode, ...props }) {
   return (
     <div className={`flex flex-col gap-4 animate-in fade-in duration-300 ${isDarkMode ? 'text-slate-200' : 'text-slate-800'}`}>
       
+      {ofertasModal.length > 0 && (
+          <div className="fixed inset-0 z-[200] flex justify-center items-center bg-slate-900/80 backdrop-blur-md p-4 animate-in fade-in duration-200">
+             <div className={`w-full max-w-lg rounded-2xl shadow-xl border overflow-hidden flex flex-col ${isDarkMode ? 'bg-slate-900 border-rose-500/30' : 'bg-white border-rose-200'}`}>
+                <div className={`p-6 border-b flex items-center justify-between ${isDarkMode ? 'bg-rose-900/20 border-rose-500/30' : 'bg-rose-50 border-rose-200'}`}>
+                   <div className="flex items-center gap-3 text-rose-500">
+                      <AlertCircle size={24} />
+                      <h3 className="font-black uppercase tracking-widest text-sm">Avisos de Aulas Disponíveis</h3>
+                   </div>
+                   <button onClick={() => setOfertasModal([])} className={`p-2 rounded-lg transition-colors ${isDarkMode ? 'hover:bg-slate-800 text-slate-400' : 'hover:bg-slate-100 text-slate-500'}`}><X size={20}/></button>
+                </div>
+                <div className="p-6 space-y-4 max-h-[60vh] overflow-y-auto">
+                   <p className={`text-xs font-bold ${isDarkMode ? 'text-slate-300' : 'text-slate-600'}`}>
+                      Detectamos que professores disponibilizaram suas aulas na semana atualmente selecionada.
+                   </p>
+                   {ofertasModal.map(req => (
+                      <div key={req.id} className={`p-4 rounded-xl border flex flex-col gap-1 ${isDarkMode ? 'bg-slate-800/50 border-slate-700' : 'bg-slate-50 border-slate-200'}`}>
+                         <div className="flex items-center justify-between">
+                            <span className="font-black text-xs uppercase tracking-widest text-indigo-500">{req.subject}</span>
+                            <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest bg-slate-200 dark:bg-slate-700 px-2 py-0.5 rounded outline outline-1 outline-current">{req.target_class}</span>
+                         </div>
+                         <span className="text-[10px] uppercase font-bold tracking-widest text-rose-500">Prof: {resolveTeacherName(req.requester_id, globalTeachersList)}</span>
+                         <span className="text-[10px] italic opacity-80 mt-1">{req.reason} | {req.obs}</span>
+                      </div>
+                   ))}
+                </div>
+                <div className={`p-4 border-t text-center ${isDarkMode ? 'bg-slate-800 border-slate-700' : 'bg-slate-50 border-slate-200'}`}>
+                   <p className="text-[10px] font-bold text-rose-500 uppercase tracking-widest mb-3 leading-tight">As marcações destas vagas (e avisos de "Oferecida") já aparecem visualmente no Mastergrid.<br/>Para aprová-las definitivamente para aceite dos professores, use a aba "Solicitações".</p>
+                   <button onClick={() => setOfertasModal([])} className="px-6 py-2 bg-rose-600 hover:bg-rose-700 text-white rounded-lg text-xs font-black uppercase tracking-widest transition-all w-full">ESTOU CIENTE</button>
+                </div>
+             </div>
+          </div>
+      )}
+
       {/* CABEÇALHO */}
       {/* CABEÇALHO ORGANIZADO EM DUAS LINHAS */}
       <div className={`p-5 rounded-xl border shadow-sm flex flex-col gap-5 transition-colors ${isDarkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'}`}>
@@ -1223,14 +1278,20 @@ export function MasterGrid({ isDarkMode, ...props }) {
                                   <span className="absolute top-0 right-0 bg-slate-200 dark:bg-slate-600 text-slate-500 dark:text-slate-300 font-bold px-1 rounded-bl-md text-[7px] group-hover/card:opacity-0 transition-opacity" title={`Qtd Total desta Aula no Horário da Turma`}>
                                      {Object.values(grade).filter(g => String(g.classId) === String(aulaNesteSlot.classId) && String(g.id) === String(aulaNesteSlot.id)).length}/{aulaNesteSlot.numAulas || 1}
                                   </span>
-                                  {aulaNesteSlot.isSubstituted && (
+                                  {aulaNesteSlot.isDisponibilizada && (
+                                     <div className="absolute top-0 right-0 z-10 print:hidden shadow-sm pointer-events-none">
+                                        <span title="Aula Disponibilizada pelo Titular" className="text-[5px] font-black uppercase tracking-widest text-white px-1.5 py-[2px] rounded-bl-md border-b border-l border-amber-500/50 bg-amber-600 block shadow-sm shadow-amber-900/40 relative z-10">Oferecida</span>
+                                     </div>
+                                  )}
+                                  {aulaNesteSlot.isSubstituted && !aulaNesteSlot.isDisponibilizada && (
                                      <div className="absolute top-0 right-0 z-10 print:hidden shadow-sm pointer-events-none">
                                         <span title="Aula assumida via Vaga" className="text-[5px] font-black uppercase tracking-widest text-white px-1.5 py-[2px] rounded-bl-md border-b border-l border-indigo-500/50 bg-indigo-600 block shadow-sm shadow-indigo-900/40 relative z-10">Substituição</span>
                                      </div>
                                   )}
                                   <div className={`flex flex-col flex-1 shrink-0 ${isVaga ? 'mt-4 mb-1' : 'mt-3.5 mb-1'}`} title={`${aulaNesteSlot.disciplina} - ${aulaNesteSlot.className}`}>
                                      <span className="text-[10px] font-black uppercase tracking-widest leading-none drop-shadow-sm">{aulaNesteSlot.disciplina}</span>
-                                     {aulaNesteSlot.isSubstituted && aulaNesteSlot.originalSubject && <span className="text-[7.5px] opacity-90 uppercase mt-0.5 leading-tight text-white bg-indigo-900/60 border border-indigo-400/30 rounded px-1 py-[1px] w-fit shadow-sm">Era: {aulaNesteSlot.originalSubject}</span>}
+                                     {aulaNesteSlot.isSubstituted && aulaNesteSlot.originalSubject && !aulaNesteSlot.isDisponibilizada && <span className="text-[7.5px] opacity-90 uppercase mt-0.5 leading-tight text-white bg-indigo-900/60 border border-indigo-400/30 rounded px-1 py-[1px] w-fit shadow-sm">Era: {aulaNesteSlot.originalSubject}</span>}
+                                     {aulaNesteSlot.isDisponibilizada && aulaNesteSlot.originalSubject && <span className="text-[7.5px] opacity-90 uppercase mt-0.5 leading-tight text-white bg-amber-900/60 border border-amber-400/30 rounded px-1 py-[1px] w-fit shadow-sm">Disp: {aulaNesteSlot.originalSubject}</span>}
                                      <span className="text-[7.5px] opacity-90 font-bold tracking-widest truncate mt-1 break-words">{aulaNesteSlot.className}</span>
                                   </div>
                                   <div className="flex justify-between items-center mt-auto pt-1 gap-1" title={temAlertaProf ? profMsgText : "Professor e Local"}>

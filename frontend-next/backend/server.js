@@ -131,8 +131,13 @@ db.serialize(() => {
     reason TEXT,
     obs TEXT,
     status TEXT DEFAULT 'pendente',
+    admin_feedback TEXT,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP
   )`);
+
+  db.run("ALTER TABLE exchange_requests ADD COLUMN admin_feedback TEXT", (err) => {
+      // Ignora erro se a coluna já existir
+  });
 
   db.run(`CREATE TABLE IF NOT EXISTS config (
     id TEXT PRIMARY KEY, -- config_2026
@@ -267,7 +272,7 @@ app.get('/api/status', (req, res) => {
 // ==========================================
 app.get('/api/notifications', (req, res) => {
   const { siape, userRole } = req.query;
-  const limit = 20;
+  const limit = 10;
 
   let targets = ["ALL"]; // Sempre buscar eventos pra todo mundo
   if (userRole === 'aluno') {
@@ -1299,8 +1304,12 @@ app.post('/api/requests', (req, res) => {
         db.run(updateQ, [requester, disciplineIdToUpdate, newRecordsFragment, classIdToUpdate, dayOfWeekToUpdate, originalTime, returnWeekId || null, returnWeekId || null], function(err) {
            if (err) return res.status(500).json({ error: err.message });
            
-           db.run('INSERT INTO exchange_requests (action_type, requester_id, target_class, original_day, original_time, subject, return_week, reason, obs, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-             [action, requester, targetClass, originalDay, originalTime, subject, returnWeekId || '', reason || '', obs || '', 'aprovada'],
+           const finalReason = `O professor(a) ${teacherNameDesc.replace('SIApE: ', '')} solicitou aula vaga de ${originalSubjectName} para sua disciplina de ${subject}.`;
+           const finalObs = `Homologado Automaticamente`;
+           const finalFeedback = `Aprovado pelo sistema automaticamente em: ${new Date().toLocaleString('pt-BR')}`;
+           
+           db.run('INSERT INTO exchange_requests (action_type, requester_id, target_class, original_day, original_time, subject, return_week, reason, obs, status, admin_feedback) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+             [action, requester, targetClass, originalDay, originalTime, subject, returnWeekId || '', finalReason, finalObs, 'aprovada', finalFeedback],
              function(err2) {
                if (err2) return res.status(500).json({ error: err2.message });
                
@@ -1331,6 +1340,36 @@ app.post('/api/requests', (req, res) => {
                }
              }
            );
+        });
+
+    } else if (action === 'oferta_vaga') {
+        const slotsObj = data.proposed_slot || data.proposedSlot || {};
+        const targets = slotsObj.slots || [];
+        const REVERSE_MAP_DAYS = { 'Segunda-feira': 1, 'Terça-feira': 2, 'Quarta-feira': 3, 'Quinta-feira': 4, 'Sexta-feira': 5, 'Sábado': 6 };
+        const dayNum = REVERSE_MAP_DAYS[slotsObj.day] || slotsObj.day;
+        const cid = slotsObj.classId || targetClass;
+
+        const promises = targets.map((s) => {
+           return new Promise((resolve) => {
+               const uQ = `UPDATE schedules SET teacherId = 'A Definir', records = json_patch(COALESCE(records, '{}'), ?) WHERE classId = ? AND dayOfWeek = ? AND slotId = ? AND ( (week_id = ? AND type IN ('previa', 'atual', 'oficial')) OR (? IS NULL AND type = 'padrao' AND (week_id IS NULL OR week_id = '')) )`;
+               const meta = JSON.stringify({ isSubstituted: true, originalSubject: (s.subject || subject), isDisponibilizada: true, offeredTo: slotsObj.targetSubject });
+               db.run(uQ, [meta, cid, dayNum, s.time, returnWeekId || null, returnWeekId || null], () => resolve());
+           });
+        });
+
+        Promise.all(promises).then(() => {
+            db.run('INSERT INTO exchange_requests (action_type, requester_id, substitute_id, target_class, original_day, original_time, subject, return_week, reason, obs, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+                [action, requester, (slotsObj.targetSubject === 'ALL' ? '' : slotsObj.targetSubject), targetClass, slotsObj.day, slotsObj.time, 'Aulas Agrupadas', returnWeekId || '', reason || '', obs || '', 'pendente'],
+                function(err) {
+                    if (err) return res.status(500).json({ error: err.message });
+                    const insertedId = this.lastID;
+                    const now = new Date().toISOString();
+                    const nMsg = `Professor(a) SIApE: ${requester} disponibilizou aula(s) vaga(s) na turma ${targetClass} em ${slotsObj.day} (${slotsObj.time}). Alvo: ${slotsObj.targetSubject}`;
+                    db.run("INSERT INTO notifications (type, target, title, message, createdAt) VALUES ('SYSTEM', 'ALL_ADMIN', 'Aula(s) Disponibilizada(s)', ?, ?)", [nMsg, now], function(){});
+                    io.emit('schedule_updated');
+                    res.json({ success: true, id: insertedId, automatic: true });
+                }
+            );
         });
 
     } else {

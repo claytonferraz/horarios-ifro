@@ -1,8 +1,10 @@
 import React, { useState } from 'react';
 import { MessageSquare, Send, AlertCircle, CheckCircle2, Clock, XCircle, Printer } from 'lucide-react';
 import { apiClient } from '@/lib/apiClient';
+import { useData } from '@/contexts/DataContext';
 
 export function TeacherRequestsSection({ isDarkMode, siape, selectedWeek, weekData, activeDays, classTimes, onCancel, isFloating }) {
+  const { academicWeeks } = useData();
   const [requests, setRequests] = useState([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isFloatingOpen, setIsFloatingOpen] = useState(false);
@@ -120,7 +122,13 @@ export function TeacherRequestsSection({ isDarkMode, siape, selectedWeek, weekDa
                     <div className="flex-1 w-full print:flex-1 print:w-auto">
                       <div className="flex flex-wrap items-center gap-2 mb-2 print:flex-nowrap">
                         <span className={`text-[9px] font-black px-2 py-0.5 rounded-full uppercase tracking-widest print:bg-transparent print:text-slate-800 print:border print:border-slate-300 print:px-1 ${isDarkMode ? 'bg-slate-900 text-slate-400' : 'bg-slate-100 text-slate-500'}`}>
-                          Semana/Versão: {req.week_id}
+                          {(() => {
+                              const targetWeekId = req.week_id || req.return_week;
+                              const wDt = typeof targetWeekId === 'string' && targetWeekId === 'padrao' ? null : academicWeeks?.find(w => String(w.id) === String(targetWeekId));
+                              return targetWeekId === 'padrao' ? 'Grade Matriz Oficial (Padrão)' : 
+                                     wDt ? `Semana da prévia ou horário atual: Semana ${wDt.name} de ${wDt.start_date.split('-').reverse().join('/')} a ${wDt.end_date.split('-').reverse().join('/')}` : 
+                                     `Semana Isolada / Especial (${targetWeekId})`;
+                          })()}
                         </span>
                         <span className={`text-[8px] font-black px-2 py-0.5 rounded-full uppercase tracking-widest flex items-center gap-1 print:bg-transparent print:border print:border-slate-300 print:text-black print:px-1 ${
                           (req.status === 'pendente' || req.status === 'aguardando_colega') ? (isDarkMode ? 'bg-amber-900/30 text-amber-500' : 'bg-amber-50 text-amber-600') :
@@ -129,12 +137,12 @@ export function TeacherRequestsSection({ isDarkMode, siape, selectedWeek, weekDa
                           (isDarkMode ? 'bg-rose-900/30 text-rose-500' : 'bg-rose-50 text-rose-600')
                         }`}>
                           {(req.status === 'pendente' || req.status === 'aguardando_colega' || req.status === 'pronto_para_homologacao') && <Clock size={10} />}
-                          {(req.status === 'aprovado' || req.status === 'approved') && <CheckCircle2 size={10} />}
+                          {(req.status === 'aprovado' || req.status === 'aprovada' || req.status === 'approved') && <CheckCircle2 size={10} />}
                           {req.status === 'rejeitado' && <XCircle size={10} />}
-                          {req.status === 'aguardando_colega' ? 'Aguardando Colega' : req.status === 'pronto_para_homologacao' ? 'Pronto p/ Homologação' : req.status}
+                          {req.status === 'aguardando_colega' ? 'Aguardando Colega' : req.status === 'pronto_para_homologacao' ? 'Pronto p/ Homologação' : (req.status === 'aprovada' || req.status === 'aprovado') && req.obs === 'Homologado Automaticamente' ? 'Homologado Automaticamente' : req.status}
                         </span>
                       </div>
-                      <p className={`text-xs font-bold leading-relaxed mb-1 print:text-sm print:text-black ${isDarkMode ? 'text-slate-300' : 'text-slate-700'}`}>{req.description}</p>
+                      <p className={`text-xs font-bold leading-relaxed mb-1 print:text-sm print:text-black ${isDarkMode ? 'text-slate-300' : 'text-slate-700'}`}>{req.reason || req.description}</p>
                       
                       {(req.original_slot || req.proposed_slot) && (
                         <div className={`mt-3 grid grid-cols-1 sm:grid-cols-2 gap-2 p-3 rounded-xl border text-[10px] font-bold uppercase tracking-widest print:grid-cols-2 print:bg-transparent print:border-slate-200 print:rounded-none print:p-0 print:border-0 print:text-[11px] print:text-black ${isDarkMode ? 'bg-slate-950/50 border-slate-800' : 'bg-slate-50 border-slate-100'}`}>
