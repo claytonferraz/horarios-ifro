@@ -21,7 +21,7 @@ function getColorHash(str, isDark) {
 
 export function TeacherExchangeModal({
   isOpen, onClose, isDarkMode, 
-  originalRecord, targetClass, classRecords = [], 
+  originalRecord, targetRecord, targetClass, classRecords = [], 
   safeDays = [], safeTimes = [], globalTeachers = [],
   apiClient, selectedWeek, onSubmit
 }) {
@@ -29,6 +29,17 @@ export function TeacherExchangeModal({
   const [classType, setClassType] = useState('Regular');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
+
+  React.useEffect(() => {
+    if (targetRecord && isOpen) {
+       setSelectedSlot({
+         day: targetRecord.day,
+         time: targetRecord.time,
+         isEmpty: false, // Since they clicked an existing record in CourseGrid
+         existingRecord: targetRecord
+       });
+    }
+  }, [targetRecord, isOpen]);
 
   if (!isOpen || !originalRecord) return null;
 
@@ -56,32 +67,28 @@ export function TeacherExchangeModal({
 
       const payload = {
         action: selectedSlot.isEmpty ? 'vaga' : 'troca',
-        substituteId: selectedSlot.isEmpty ? null : selectedSlot.existingRecord.teacher,
+        requester_id: originalRecord.teacher,
+        substitute_id: selectedSlot.isEmpty ? null : selectedSlot.existingRecord.teacher,
         targetClass: targetClass,
-        originalRecord: originalRecord,
-        returnWeekId: selectedWeek,
+        week_id: selectedWeek,
         reason: `Proposta de Troca / Ocupação de Vaga gerada pelo Portal. Tipo de Aula preterida: ${classType}`,
         obs: proposalInfo,
-        proposedSlot: {
+        original_slot: originalRecord,
+        proposed_slot: {
            day: selectedSlot.day,
            time: selectedSlot.time,
-           subject: originalRecord.subject
+           subject: selectedSlot.existingRecord?.subject || originalRecord.subject,
+           teacherId: selectedSlot.isEmpty ? null : selectedSlot.existingRecord.teacher,
+           classId: selectedSlot.existingRecord?.classId || targetClass,
+           course: selectedSlot.existingRecord?.course || originalRecord.course,
+           originalSubject: originalRecord.subject
         }
       };
 
       if (typeof onSubmit === 'function') {
         await onSubmit(payload);
       } else {
-        await apiClient.submitRequest({
-          siape: originalRecord.teacher,
-          week_id: selectedWeek,
-          description: payload.reason,
-          original_slot: `${originalRecord.day} - ${originalRecord.time} - ${targetClass} (${originalRecord.subject})`,
-          proposed_day: selectedSlot.day,
-          proposed_time: selectedSlot.time,
-          proposed_type: classType,
-          proposed_details: proposalInfo
-        });
+        await apiClient.submitRequest(payload);
         alert('Solicitação enviada com sucesso ao DAPE!');
       }
       onClose();

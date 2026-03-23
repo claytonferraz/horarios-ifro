@@ -132,12 +132,14 @@ db.serialize(() => {
     obs TEXT,
     status TEXT DEFAULT 'pendente',
     admin_feedback TEXT,
+    system_message TEXT,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP
   )`);
 
-  db.run("ALTER TABLE exchange_requests ADD COLUMN admin_feedback TEXT", (err) => {
-      // Ignora erro se a coluna já existir
-  });
+  db.run("ALTER TABLE exchange_requests ADD COLUMN admin_feedback TEXT", (err) => {});
+  db.run("ALTER TABLE exchange_requests ADD COLUMN system_message TEXT", (err) => {});
+  db.run("ALTER TABLE exchange_requests ADD COLUMN original_slot TEXT", (err) => {});
+  db.run("ALTER TABLE exchange_requests ADD COLUMN proposed_slot TEXT", (err) => {});
 
   db.run(`CREATE TABLE IF NOT EXISTS config (
     id TEXT PRIMARY KEY, -- config_2026
@@ -1254,8 +1256,9 @@ app.get('/api/requests', (req, res) => {
     let query = 'SELECT * FROM exchange_requests ORDER BY created_at DESC';
     let params = [];
     if (req.query.siape) {
-        query = 'SELECT * FROM exchange_requests WHERE requester_id = ? OR substitute_id = ? ORDER BY created_at DESC';
-        params = [req.query.siape, req.query.siape];
+        query = 'SELECT * FROM exchange_requests WHERE requester_id LIKE ? OR substitute_id LIKE ? ORDER BY id DESC';
+        const likeSiape = `%${req.query.siape}%`;
+        params = [likeSiape, likeSiape];
     }
     db.all(query, params, (err, rows) => {
       if (err) return res.status(500).json({ error: err.message });
@@ -1268,89 +1271,79 @@ app.post('/api/requests', (req, res) => {
   try {
     const data = req.body;
     let action = data.action; 
+
+    // O fallback de ação protege o endpoint
+    if (!['vaga', 'troca', 'oferta_vaga'].includes(action)) {
+        return res.status(400).json({ error: "Ação não especificada ou inválida." });
+    }
+
     let requester = data.requester_id || data.siape;
-    let targetClass = data.targetClass;
+    let targetClass = data.targetClass || data.original_slot?.className || '';
     let returnWeekId = data.returnWeekId || data.week_id;
     let reason = data.reason || data.description;
-    let obs = data.obs || (data.proposed_slot ? JSON.stringify(data.proposed_slot) : '');
-    let originalDay = '', originalTime = '', subject = '';
-    
-    let classIdToUpdate = targetClass;
-    let disciplineIdToUpdate = subject;
-    let originalSubjectName = 'A Definir';
-    let teacherNameDesc = `SIApE: ${requester}`;
+    let substituteId = data.substitute_id || '';
 
-    // Extracao Modal 1: VacantRequestModal
-    if (!action && data.proposed_slot && data.proposed_slot.classType === 'Substituição') {
-        action = 'vaga';
-        targetClass = data.proposed_slot.className;
-        classIdToUpdate = data.proposed_slot.classId || targetClass;
-        originalDay = data.proposed_slot.day;
-        originalTime = data.proposed_slot.time;
-        subject = data.proposed_slot.subject;
-        disciplineIdToUpdate = data.proposed_slot.disciplineId || subject;
-        originalSubjectName = data.proposed_slot.originalSubject || 'A Definir';
-        if (data.proposed_slot.teacherName) teacherNameDesc = data.proposed_slot.teacherName;
-    }
-    // Extracao Modal 2: TeacherExchangeModal
-    else if (action === 'vaga' && data.proposedSlot) {
-        originalDay = data.proposedSlot.day;
-        originalTime = data.proposedSlot.time;
-        subject = data.proposedSlot.subject;
-    } 
-    // Trocas Regulares
-    else if (action === 'troca') {
-        originalDay = data.originalRecord?.day || '';
-        originalTime = data.originalRecord?.time || '';
-        subject = data.originalRecord?.subject || '';
-    }
+    let originalDay = data.original_slot?.day || '';
+    let originalTime = data.original_slot?.time || '';
+    let subject = data.original_slot?.subject || '';
+
+    // Empacotamos toda a clareza da permuta na coluna OBS para facilitar o Motor de Troco
+    const corePayload = JSON.stringify({ 
+         original: data.original_slot, 
+         proposed: data.proposed_slot 
+    });
+    let obs = data.obs ? `${data.obs} | [SYSTEM_DATA]: ${corePayload}` : corePayload;
 
     if (action === 'vaga') {
-        // Substituicao Automática da Vaga (Auto-Homologação)
+        const proposedDay = data.proposed_slot?.day || originalDay;
+        const proposedTime = data.proposed_slot?.time || originalTime;
+        const proposedSubject = data.proposed_slot?.subject || subject;
+        const classIdToUpdate = data.proposed_slot?.classId || targetClass;
+        const originalSubjectName = data.proposed_slot?.originalSubject || subject;
+
         const REVERSE_MAP_DAYS = { 'Segunda-feira': 1, 'Terça-feira': 2, 'Quarta-feira': 3, 'Quinta-feira': 4, 'Sexta-feira': 5, 'Sábado': 6 };
-        const dayOfWeekToUpdate = REVERSE_MAP_DAYS[originalDay] || originalDay;
+        const dayOfWeekToUpdate = REVERSE_MAP_DAYS[proposedDay] || proposedDay;
 
         const updateQ = `UPDATE schedules SET teacherId = ?, disciplineId = ?, records = json_patch(COALESCE(records, '{}'), ?) WHERE classId = ? AND dayOfWeek = ? AND slotId = ? AND ( (week_id = ? AND type IN ('previa', 'atual', 'oficial')) OR (? IS NULL AND type = 'padrao' AND (week_id IS NULL OR week_id = '')) )`;
         const newRecordsFragment = JSON.stringify({ isSubstituted: true, originalSubject: originalSubjectName });
-        db.run(updateQ, [requester, disciplineIdToUpdate, newRecordsFragment, classIdToUpdate, dayOfWeekToUpdate, originalTime, returnWeekId || null, returnWeekId || null], function(err) {
+
+        db.run(updateQ, [requester, proposedSubject, newRecordsFragment, classIdToUpdate, dayOfWeekToUpdate, proposedTime, returnWeekId || null, returnWeekId || null], function(err) {
            if (err) return res.status(500).json({ error: err.message });
            
-        const executeInsert = (weekText) => {
-            const notifyMsg = `Professor(a) ${teacherNameDesc.replace('SIApE: ', '')}: assumiu aula vaga de (${originalSubjectName}) com a disciplina (${subject}) na turma ${targetClass} em ${originalDay} às ${originalTime} ${weekText} (Auto-Homologada).`;
-            const finalReason = notifyMsg;
-            const finalObs = `Homologado Automaticamente`;
-            const finalFeedback = `Aprovado pelo sistema automaticamente em: ${new Date().toLocaleString('pt-BR')}`;
-            
-            db.run('INSERT INTO exchange_requests (action_type, requester_id, target_class, original_day, original_time, subject, return_week, reason, obs, status, admin_feedback) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-              [action, requester, targetClass, originalDay, originalTime, subject, returnWeekId || '', finalReason, finalObs, 'aprovada', finalFeedback],
-              function(err2) {
-                if (err2) return res.status(500).json({ error: err2.message });
-                const insertedId = this.lastID;
-                const now = new Date().toISOString();
-                db.run("INSERT INTO notifications (type, target, title, message, createdAt) VALUES ('SYSTEM', 'ALL_ADMIN', 'Substituição Automática', ?, ?)", [notifyMsg, now], function(){});
-                io.emit('schedule_updated');
-                res.json({ success: true, id: insertedId, automatic: true });
-              }
-            );
-        };
+           const executeInsert = (weekText) => {
+               const notifyMsg = `Professor(a) SIApE: ${requester} assumiu aula vaga de (${originalSubjectName}) com a disciplina (${proposedSubject}) na turma ${targetClass} em ${proposedDay} às ${proposedTime} ${weekText} (Auto-Homologada).`;
+               const finalFeedback = `Aprovado pelo sistema automaticamente em: ${new Date().toLocaleString('pt-BR')}`;
+               
+               db.run('INSERT INTO exchange_requests (action_type, requester_id, target_class, original_day, original_time, subject, return_week, reason, obs, status, admin_feedback) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+                 [action, requester, targetClass, originalDay, originalTime, subject, returnWeekId || '', notifyMsg, obs, 'aprovada', finalFeedback],
+                 function(err2) {
+                   if (err2) return res.status(500).json({ error: err2.message });
+                   const insertedId = this.lastID;
+                   const now = new Date().toISOString();
+                   db.run("INSERT INTO notifications (type, target, title, message, createdAt) VALUES ('SYSTEM', 'ALL_ADMIN', 'Substituição Automática', ?, ?)", [notifyMsg, now], function(){});
+                   io.emit('schedule_updated');
+                   res.json({ success: true, id: insertedId, automatic: true });
+                 }
+               );
+           };
 
-        if (returnWeekId && returnWeekId !== 'padrao') {
-            db.get("SELECT name, start_date, end_date FROM academic_weeks WHERE id = ?", [returnWeekId], (err3, row) => {
-              if (!err3 && row && row.start_date && row.end_date) {
-                const pS = row.start_date.split('-');
-                const pE = row.end_date.split('-');
-                executeInsert(`(Semana: ${pS[2]}/${pS[1]} a ${pE[2]}/${pE[1]})`);
-              } else {
-                executeInsert('');
-              }
-            });
-        } else {
-            executeInsert('(Matriz Padrão)');
-        }
+           if (returnWeekId && returnWeekId !== 'padrao') {
+               db.get("SELECT name, start_date, end_date FROM academic_weeks WHERE id = ?", [returnWeekId], (err3, row) => {
+                 if (!err3 && row && row.start_date && row.end_date) {
+                   const pS = row.start_date.split('-');
+                   const pE = row.end_date.split('-');
+                   executeInsert(`(Semana: ${pS[2]}/${pS[1]} a ${pE[2]}/${pE[1]})`);
+                 } else {
+                   executeInsert('');
+                 }
+               });
+           } else {
+               executeInsert('(Matriz Padrão)');
+           }
         });
 
     } else if (action === 'oferta_vaga') {
-        const slotsObj = data.proposed_slot || data.proposedSlot || {};
+        const slotsObj = data.proposed_slot || {};
         const targets = slotsObj.slots || [];
         const REVERSE_MAP_DAYS = { 'Segunda-feira': 1, 'Terça-feira': 2, 'Quarta-feira': 3, 'Quinta-feira': 4, 'Sexta-feira': 5, 'Sábado': 6 };
         const dayNum = REVERSE_MAP_DAYS[slotsObj.day] || slotsObj.day;
@@ -1379,12 +1372,15 @@ app.post('/api/requests', (req, res) => {
             );
         });
 
-    } else {
-        const status = 'aguardando_colega'; 
+    } else if (action === 'troca' || !action) {
+        // Se action_type estiver estritamente vazio (modal antigo/incompleto), forçamos 'troca_aberta' ou assumimos o fluxo base para evitar nulls
+        const finalAction = action || 'vaga';
+        const status = finalAction === 'troca' ? 'aguardando_colega' : 'pendente'; 
 
         db.run(
-          'INSERT INTO exchange_requests (action_type, requester_id, substitute_id, target_class, original_day, original_time, subject, return_week, reason, obs, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-          [action, requester, data.substituteId || '', targetClass, originalDay, originalTime, subject, returnWeekId || '', reason || '', obs || '', status],
+          // Na tabela, usaremos a query com "obs" espelhando o formato stricto.
+          'INSERT INTO exchange_requests (action_type, requester_id, substitute_id, target_class, original_day, original_time, subject, return_week, reason, obs, status, original_slot, proposed_slot) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+          [finalAction, requester, substituteId || '', targetClass, originalDay, originalTime, subject, returnWeekId || '', reason || '', obs, status, JSON.stringify(data.original_slot || {}), JSON.stringify(data.proposed_slot || {})],
           function(err) {
             if (err) return res.status(500).json({ error: err.message });
             res.json({ success: true, id: this.lastID });
@@ -1396,17 +1392,108 @@ app.post('/api/requests', (req, res) => {
 
 app.put('/api/requests/:id/status', (req, res) => {
   try {
-    const { status, admin_feedback } = req.body;
-    db.run('UPDATE exchange_requests SET status = ?, admin_feedback = COALESCE(?, admin_feedback) WHERE id = ?', [status, admin_feedback || null, req.params.id], function(err) {
+    const { status, admin_feedback, system_message } = req.body;
+    db.run('UPDATE exchange_requests SET status = ?, admin_feedback = COALESCE(?, admin_feedback), system_message = COALESCE(?, system_message) WHERE id = ?', [status, admin_feedback || null, system_message || null, req.params.id], function(err) {
       if (err) return res.status(500).json({ error: err.message });
       
+      const now = new Date().toISOString();
+
       if (status === 'pronto_para_homologacao') {
-        const now = new Date().toISOString();
         db.run("INSERT INTO notifications (type, target, title, message, createdAt) VALUES ('SYSTEM', 'ALL_ADMIN', 'Permuta Aceita pelo Colega', 'Um pedido de mudança acaba de receber o aceite do professor substituto. Aguardando sua homologação.', ?)", [now], function(){});
         io.emit('schedule_updated');
-      }
+        res.json({ success: true });
 
-      res.json({ success: true });
+      } else if (status === 'rejeitado') {
+         db.get("SELECT requester_id FROM exchange_requests WHERE id = ?", [req.params.id], (err2, row) => {
+            if (!err2 && row && row.requester_id) {
+               db.run("INSERT INTO notifications (type, target, title, message, createdAt) VALUES ('SYSTEM', ?, 'Permuta Recusada', 'O seu colega não aceitou a proposta de troca de aula(s).', ?)", [row.requester_id, now], function(){
+                 io.emit('schedule_updated');
+               });
+            }
+         });
+         res.json({ success: true });
+
+      } else if (status === 'aprovada' || status === 'aprovado') {
+         // MOTOR DE TROCA (SWAP ENGINE) V2 - Execução Homologada
+         db.get("SELECT * FROM exchange_requests WHERE id = ?", [req.params.id], (err3, row) => {
+             if (!err3 && row && row.action_type === 'troca') {
+                 try {
+                     let sysMatch = row.obs.indexOf('[SYSTEM_DATA]:');
+                     let payloadData = null;
+                     if (sysMatch > -1) {
+                          payloadData = JSON.parse(row.obs.substring(sysMatch + 14).trim());
+                     } else {
+                          payloadData = JSON.parse(row.obs);
+                     }
+                     
+                     const orig = payloadData.original;
+                     const prop = payloadData.proposed;
+                     
+                     const REVERSE_MAP_DAYS = { 'Segunda-feira': 1, 'Terça-feira': 2, 'Quarta-feira': 3, 'Quinta-feira': 4, 'Sexta-feira': 5, 'Sábado': 6 };
+                     const origDay = REVERSE_MAP_DAYS[orig.day] || orig.day;
+                     const propDay = REVERSE_MAP_DAYS[prop.day] || prop.day;
+                     
+                     const weekIdFilter = row.return_week || null;
+
+                     const origTargetClass = orig.classId || orig.className || row.target_class;
+                     const propTargetClass = prop.classId || prop.className || row.target_class;
+
+                     console.log("\n[SWAP_ENGINE] ==============================================");
+                     console.log("[SWAP_ENGINE] INICIANDO HOMOLOGAÇÃO / SWAP CRUZADO IDREQ:", req.params.id);
+                     console.log(`[SWAP_ENGINE] NÓ ORIGEM  -> SIApE (A): ${row.requester_id} entregando ${orig.subject} [${orig.day} ${orig.time}] - T: ${origTargetClass}`);
+                     console.log(`[SWAP_ENGINE] NÓ OBJETIVO-> SIApE (B): ${row.substitute_id} recebendo ${prop.subject} [${prop.day} ${prop.time}] - T: ${propTargetClass}`);
+
+                     db.serialize(() => {
+                         console.log("[SWAP_ENGINE] > BEGIN TRANSACTION");
+                         db.run("BEGIN TRANSACTION;");
+
+                         // AULA 1 (A passa para B) -> Update Original Node
+                         const updateOrig = `UPDATE schedules SET teacherId = ?, disciplineId = ?, records = json_patch(COALESCE(records, '{}'), ?) WHERE classId = ? AND dayOfWeek = ? AND slotId = ? AND ( (week_id = ? AND type IN ('previa', 'atual', 'oficial')) OR (? IS NULL AND type = 'padrao' AND (week_id IS NULL OR week_id = '')) )`;
+                         const patchOrig = JSON.stringify({ isSubstituted: true, isPermuted: true, originalSubject: (orig.originalSubject || orig.subject) });
+                         
+                         db.run(updateOrig, [row.substitute_id, prop.subject, patchOrig, origTargetClass, origDay, orig.time, weekIdFilter, weekIdFilter]);
+                         console.log(`[SWAP_ENGINE] > UPDATE 1 (A->B) DISPARADO (Patch: ${patchOrig})`);
+
+                         // AULA 2 (B passa para A) -> Update Proposed Node
+                         const updateProp = `UPDATE schedules SET teacherId = ?, disciplineId = ?, records = json_patch(COALESCE(records, '{}'), ?) WHERE classId = ? AND dayOfWeek = ? AND slotId = ? AND ( (week_id = ? AND type IN ('previa', 'atual', 'oficial')) OR (? IS NULL AND type = 'padrao' AND (week_id IS NULL OR week_id = '')) )`;
+                         const patchProp = JSON.stringify({ isSubstituted: true, isPermuted: true, originalSubject: (prop.originalSubject || prop.subject) });
+                         
+                         db.run(updateProp, [row.requester_id, orig.subject, patchProp, propTargetClass, propDay, prop.time, weekIdFilter, weekIdFilter]);
+                         console.log(`[SWAP_ENGINE] > UPDATE 2 (B->A) DISPARADO (Patch: ${patchProp})`);
+
+                         db.run("COMMIT;", (commitErr) => {
+                             if (commitErr) {
+                                 console.error("[SWAP_ENGINE] [ERRO CRÍTICO] Falha no COMMIT:", commitErr);
+                                 db.run("ROLLBACK;");
+                                 res.status(500).json({ error: "Erro na integridade da Transação" });
+                             } else {
+                                 console.log("[SWAP_ENGINE] > COMMIT REALIZADO COM SUCESSO. GRADE MUTADA DE FORMA SEGURA.");
+                                 console.log("[SWAP_ENGINE] ==============================================\n");
+                                 
+                                 const notifyTitle = 'Sua Permuta de Aulas foi Efetivada na Grade';
+                                 const notifyMsg = `A troca envolvendo suas aulas de ${orig.subject} (${orig.day}) e ${prop.subject} (${prop.day}) acaba de ser homologada oficialmente.`;
+                                 db.run("INSERT INTO notifications (type, target, title, message, createdAt) VALUES ('SYSTEM', ?, ?, ?, ?)", [row.requester_id, notifyTitle, notifyMsg, now], function(){});
+                                 db.run("INSERT INTO notifications (type, target, title, message, createdAt) VALUES ('SYSTEM', ?, ?, ?, ?)", [row.substitute_id, notifyTitle, notifyMsg, now], function(){});
+
+                                 io.emit('schedule_updated'); 
+                                 res.json({ success: true, homologacaoStatus: 'EXECUTADA' });
+                             }
+                         });
+                     });
+
+                 } catch(jsonErr) {
+                     console.warn("[SWAP_ENGINE] Falha ao parsear JSON payload. Requisição Legada. Pulando motor.", jsonErr);
+                     io.emit('schedule_updated');
+                     res.json({ success: true, homologacaoStatus: 'MANUAL_LEGADO' });
+                 }
+             } else {
+                 io.emit('schedule_updated');
+                 res.json({ success: true });
+             }
+         });
+      } else {
+         res.json({ success: true });
+      }
     });
   } catch(e) { res.status(500).json({error: e.message}); }
 });

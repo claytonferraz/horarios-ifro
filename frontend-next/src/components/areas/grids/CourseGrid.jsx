@@ -24,6 +24,7 @@ export const CourseGrid = React.memo(
     intervals,
     dynamicWeeksList,
     selectedWeek,
+    checkPendingSwapRequest,
     weekLabel,
     draggingRecord,
     checkConflict,
@@ -546,6 +547,7 @@ export const CourseGrid = React.memo(
                                                                       isTeacherPending(
                                                                         r.teacher,
                                                                       );
+                                                                    const hasPendingSwap = typeof checkPendingSwapRequest === 'function' && checkPendingSwapRequest(r);
                                                                     const isActiveTeacherInCard = activeTeacherFilter ? (r.teacherId && String(r.teacherId).split(',').includes(String(activeTeacherFilter))) : true;
                                                                     
                                                                     return (
@@ -577,38 +579,64 @@ export const CourseGrid = React.memo(
                                                                           snap2,
                                                                         ) => (
                                                                           <div
-                                                                            ref={
-                                                                              prov2.innerRef
-                                                                            }
+                                                                            ref={prov2.innerRef}
                                                                             {...prov2.draggableProps}
                                                                             {...prov2.dragHandleProps}
-                                                                            className={`print-clean-card p-1.5 print:p-1 rounded-xl print:rounded-none border-b-[3px] print:border-b-[1px] print:border-slate-400 shadow-sm print:shadow-none flex flex-col justify-center min-h-[46px] print:min-h-0 transition-all mb-1 print:mb-0 last:mb-0 relative overflow-visible ${snap2.isDragging ? "shadow-xl scale-105 z-50 hover:scale-105" : "hover:scale-[1.02]"} ${!isActiveTeacherInCard ? (isDarkMode ? "bg-slate-800/30 border-slate-700/50 opacity-40 grayscale pointer-events-none" : "bg-slate-100 border-slate-200 opacity-40 grayscale pointer-events-none") : isPending ? (isDarkMode ? "bg-red-900/30 border-red-800/50 text-red-300" : "bg-red-50 border-red-300 text-red-800") : getColorHash(r.subject, isDarkMode)}`}
+                                                                            onClick={(e) => {
+                                                                               if (userRole === "professor" && onReverseSwapClick) {
+                                                                                   if (hasPendingSwap) {
+                                                                                      e.stopPropagation();
+                                                                                      alert("Esta aula já possui uma permuta em andamento.");
+                                                                                      return;
+                                                                                   }
+                                                                                   e.stopPropagation();
+                                                                                   onReverseSwapClick(r);
+                                                                               }
+                                                                            }}
+                                                                            className={`print-clean-card p-1.5 print:p-1 rounded-xl print:rounded-none border-b-[3px] print:border-b-[1px] print:border-slate-400 shadow-sm print:shadow-none flex flex-col justify-center min-h-[46px] print:min-h-0 transition-all mb-1 print:mb-0 last:mb-0 relative overflow-visible ${snap2.isDragging ? "shadow-xl scale-105 z-50 hover:scale-105" : "hover:scale-[1.02] cursor-pointer"} ${hasPendingSwap ? (isDarkMode ? "bg-amber-900/30 border-amber-800/50 hover:bg-amber-900/40 text-amber-200" : "bg-amber-100 hover:bg-amber-200 border-amber-400 text-amber-900") : !isActiveTeacherInCard ? (isDarkMode ? "bg-slate-800/30 border-slate-700/50 opacity-60 grayscale hover:opacity-100 hover:grayscale-0" : "bg-slate-100 border-slate-200 opacity-60 grayscale hover:opacity-100 hover:grayscale-0") : isPending ? (isDarkMode ? "bg-red-900/30 border-red-800/50 text-red-300" : "bg-red-50 border-red-300 text-red-800") : getColorHash(r.subject, isDarkMode)}`}
                                                                           >
-                                                                            {r.isSubstituted && (
+                                                                            {hasPendingSwap && !isPending && (
+                                                                               <div className="absolute -top-1.5 -left-1 z-10 print:hidden shadow-sm pointer-events-none">
+                                                                                 <span
+                                                                                   title="Há uma solicitação de troca envolvendo esta aula"
+                                                                                   className="text-[5px] font-black uppercase tracking-widest text-amber-900 px-1.5 py-[2px] rounded border border-amber-400 bg-amber-400 block animate-pulse shadow-sm"
+                                                                                 >
+                                                                                   SOLICITADO
+                                                                                 </span>
+                                                                               </div>
+                                                                            )}
+                                                                            {r.isPermuted && (
+                                                                              <div className="absolute -top-1.5 -right-1 z-10 print:hidden shadow-sm pointer-events-none delay-100">
+                                                                                <span
+                                                                                  title="Aula permutada por Acordo"
+                                                                                  className="text-[5px] font-black uppercase tracking-widest text-[#FFFBEB] px-1.5 py-[2px] rounded border border-amber-500 bg-amber-600 block shadow-sm shadow-amber-900/40"
+                                                                                >
+                                                                                  PERMUTADA
+                                                                                </span>
+                                                                              </div>
+                                                                            )}
+                                                                            {r.isSubstituted && !r.isPermuted && !hasPendingSwap && (
                                                                               <div className="absolute -top-1.5 -right-1 z-10 print:hidden shadow-sm pointer-events-none">
                                                                                 <span
                                                                                   title="Aula assumida de Vaga via Troca"
-                                                                                  className="text-[5px] font-black uppercase tracking-widest text-white px-1.5 py-[2px] rounded border border-indigo-400 bg-indigo-600 block animate-pulse shadow-sm shadow-indigo-900/40"
+                                                                                  className="text-[5px] font-black uppercase tracking-widest text-white px-1.5 py-[2px] rounded border border-indigo-400 bg-indigo-600 block shadow-sm shadow-indigo-900/40"
                                                                                 >
                                                                                   Substituição
                                                                                 </span>
                                                                               </div>
                                                                             )}
                                                                             <p
-                                                                              className={`subject font-bold text-[10px] print:text-[8.5px] leading-tight print:leading-[1.1] mb-1 print:mb-0.5 text-center ${isDarkMode ? "text-slate-200" : "text-slate-800"}`}
+                                                                              className={`subject font-bold text-[10px] print:text-[8.5px] leading-tight print:leading-[1.1] mb-1 print:mb-0.5 text-center flex flex-col items-center gap-0.5 ${isDarkMode ? "text-slate-200" : "text-slate-800"}`}
                                                                             >
-                                                                              {
-                                                                                r.subject
-                                                                              }{" "}
-                                                                              {r.isSubstituted &&
-                                                                                r.originalSubject && (
+                                                                              <span>{r.subject}</span>
+                                                                              {r.isPermuted && !isPending && (
+                                                                                <span className={`px-1.5 py-0.5 rounded text-[7px] uppercase tracking-widest font-black ${isDarkMode ? "bg-amber-900/40 text-amber-400 border border-amber-800/50" : "bg-amber-100 text-amber-700 border border-amber-300"}`}>PERMUTA</span>
+                                                                              )}
+                                                                              {r.isSubstituted && !r.isPermuted && r.originalSubject && (
                                                                                   <span className="block text-[8px] sm:text-[9px] opacity-80 mt-1 uppercase">
-                                                                                    Era:{" "}
-                                                                                    {
-                                                                                      r.originalSubject
-                                                                                    }
+                                                                                    Era: {r.originalSubject}
                                                                                   </span>
-                                                                                )}
+                                                                              )}
                                                                             </p>
                                                                             <p
                                                                               className={`text-[8.5px] print:text-[7.5px] font-medium leading-none text-center opacity-90 ${isPending ? (isDarkMode ? "text-red-400 font-bold" : "text-red-600 font-bold") : ""}`}

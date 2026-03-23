@@ -10,6 +10,7 @@ export function TeacherRequestsSection({ isDarkMode, siape, selectedWeek, weekDa
   const [isFloatingOpen, setIsFloatingOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [newRequest, setNewRequest] = useState({ description: '', original_slot: '', proposed_day: '', proposed_time: '', proposed_type: 'Regular' });
+  const [rejectionTarget, setRejectionTarget] = useState(null);
 
   const loadRequests = async () => {
     try {
@@ -146,52 +147,95 @@ export function TeacherRequestsSection({ isDarkMode, siape, selectedWeek, weekDa
                       
                       {(req.original_slot || req.proposed_slot) && (
                         <div className={`mt-3 grid grid-cols-1 sm:grid-cols-2 gap-2 p-3 rounded-xl border text-[10px] font-bold uppercase tracking-widest print:grid-cols-2 print:bg-transparent print:border-slate-200 print:rounded-none print:p-0 print:border-0 print:text-[11px] print:text-black ${isDarkMode ? 'bg-slate-950/50 border-slate-800' : 'bg-slate-50 border-slate-100'}`}>
-                          <div className={`flex flex-col gap-1 pb-2 border-b sm:border-b-0 sm:pr-2 sm:border-r print:border-r print:border-slate-300 print:pr-4 print:pb-0 print:border-b-0 ${isDarkMode ? 'border-slate-800' : 'border-slate-200'}`}>
-                            <span className={isDarkMode ? 'text-slate-500' : 'text-slate-400'}>Original</span>
-                            <span className={isDarkMode ? 'text-slate-300' : 'text-slate-600'}>
-                              {(() => {
-                                try {
-                                  let parsed = req.original_slot;
-                                  if (typeof parsed === 'string' && parsed.startsWith('{')) parsed = JSON.parse(parsed);
-                                  if (typeof parsed === 'string' && parsed.startsWith('"')) parsed = JSON.parse(parsed);
-                                  if (typeof parsed === 'string' && parsed.startsWith('{')) parsed = JSON.parse(parsed);
-                                  if (typeof parsed === 'object' && parsed !== null) return `VAGA:\n${parsed.day} às ${parsed.time}`;
-                                  return String(req.original_slot).replace(/["{}]/g, '');
-                                } catch(e) { return String(req.original_slot); }
-                              })()}
-                            </span>
-                          </div>
-                          <div className={`flex flex-col gap-1 pl-1`}>
-                            <span className={isDarkMode ? 'text-slate-500' : 'text-slate-400'}>Proposta</span>
-                             <span className={isDarkMode ? 'text-indigo-400' : 'text-indigo-600'}>
-                              {(() => {
-                                try {
-                                  let parsed = req.proposed_slot;
-                                  if (typeof parsed === 'string' && parsed.startsWith('{')) parsed = JSON.parse(parsed);
-                                  if (typeof parsed === 'string' && parsed.startsWith('"')) parsed = JSON.parse(parsed);
-                                  if (typeof parsed === 'string' && parsed.startsWith('{')) parsed = JSON.parse(parsed);
-                                  if (typeof parsed === 'object' && parsed !== null) return `${parsed.subject || parsed.classType || 'Mudança'} - ${parsed.day} às ${parsed.time}`;
-                                  return String(req.proposed_slot).replace(/["{}]/g, '');
-                                } catch(e) { return String(req.proposed_slot); }
-                              })()}
-                            </span>
-                          </div>
+                          {(() => {
+                             const isReceivedByMe = String(req.substitute_id || '').includes(String(siape));
+                             const isSentByMe = String(req.requester_id || '') === String(siape);
+
+                             let pO = req.original_slot; try { if (typeof pO === 'string') pO = JSON.parse(pO); if (typeof pO === 'string') pO = JSON.parse(pO); if (typeof pO === 'string') pO = JSON.parse(pO); } catch(e){}
+                             let pP = req.proposed_slot; try { if (typeof pP === 'string') pP = JSON.parse(pP); if (typeof pP === 'string') pP = JSON.parse(pP); if (typeof pP === 'string') pP = JSON.parse(pP); } catch(e){}
+                             
+                             const origStr = typeof pO === 'object' && pO !== null ? `${pO.subject || pO.classType || 'VAGA'} - ${pO.day} às ${pO.time}` : String(pO).replace(/["{}]/g, '');
+                             const propStr = typeof pP === 'object' && pP !== null ? `${pP.subject || pP.classType || 'Mudança'} - ${pP.day} às ${pP.time}` : String(pP).replace(/["{}]/g, '');
+                             
+                             let leftLabel = "Original / Ofertada";
+                             let leftVal = origStr;
+                             let rightLabel = "Proposta / Solicitada";
+                             let rightVal = propStr;
+
+                             if (req.action_type === 'troca' && isReceivedByMe && !isSentByMe) {
+                                // Sou o colega recebendo o pedido. A Aula solicitada (minha) é prop = pP. A Aula ofertada (dele) é orig = pO.
+                                leftLabel = "SUA AULA SOLICITADA";
+                                leftVal = propStr;
+                                rightLabel = "NOVO HORÁRIO PARA TROCA";
+                                rightVal = origStr;
+                             } else if (req.action_type === 'troca' && isSentByMe) {
+                                leftLabel = "SUA AULA OFERTADA";
+                                leftVal = origStr;
+                                rightLabel = "AULA ALVO SOLICITADA";
+                                rightVal = propStr;
+                             }
+
+                             return (
+                                <>
+                                  <div className={`flex flex-col gap-1 pb-2 border-b sm:border-b-0 sm:pr-2 sm:border-r print:border-r print:border-slate-300 print:pr-4 print:pb-0 print:border-b-0 ${isDarkMode ? 'border-slate-800' : 'border-slate-200'}`}>
+                                    <span className={isDarkMode ? 'text-slate-500' : 'text-slate-400'}>{leftLabel}</span>
+                                    <span className={isDarkMode ? 'text-slate-300' : 'text-slate-600'}>{leftVal}</span>
+                                  </div>
+                                  <div className={`flex flex-col gap-1 pl-1`}>
+                                    <span className={isDarkMode ? 'text-slate-500' : 'text-slate-400'}>{rightLabel}</span>
+                                    <span className={isDarkMode ? 'text-indigo-400' : 'text-indigo-600'}>{rightVal}</span>
+                                  </div>
+                                </>
+                             );
+                          })()}
                         </div>
                       )}
                     </div>
 
-                    {req.status === 'aguardando_colega' && String(req.substitute_id) === String(siape) && (
+                    {req.status === 'aguardando_colega' && String(req.substitute_id || '').includes(String(siape)) && (
                       <div className="mt-3 flex justify-end print:hidden">
                         <button onClick={() => {
-                          apiClient.updateRequestStatus(req.id, 'rejeitado').then(() => {
-                            alert('Permuta Rejeitada! O colega solicitante será notificado.');
-                            loadRequests();
-                            if (typeof onCancel === 'function') onCancel();
-                          });
+                          let origName = "Aula Original"; let origTime = "";
+                          let propName = "Aula Proposta"; let propTime = "";
+                          try {
+                             let pO = req.original_slot; if (typeof pO === 'string') pO = JSON.parse(pO);
+                             if (typeof pO === 'string') pO = JSON.parse(pO);
+                             if (typeof pO === 'string') pO = JSON.parse(pO);
+                             origName = pO.subject || pO.classType || "Aula Original";
+                             origTime = `${pO.day} às ${pO.time}`;
+                          } catch(e) {}
+                          try {
+                             let pP = req.proposed_slot; if (typeof pP === 'string') pP = JSON.parse(pP);
+                             if (typeof pP === 'string') pP = JSON.parse(pP);
+                             if (typeof pP === 'string') pP = JSON.parse(pP);
+                             propName = pP.subject || pP.classType || "Aula Proposta";
+                             propTime = `${pP.day} às ${pP.time}`;
+                          } catch(e) {}
+                          setRejectionTarget(req);
                         }} className="px-4 py-2 text-[10px] font-black uppercase tracking-widest rounded-lg bg-rose-100 hover:bg-rose-200 text-rose-700 shadow-sm border border-rose-200 transition-all mr-2">Recusar</button>
+
                         
                         <button onClick={() => {
-                          apiClient.updateRequestStatus(req.id, 'pronto_para_homologacao').then(() => {
+                          let origName = "Aula Original"; let origTime = "";
+                          let propName = "Aula Proposta"; let propTime = "";
+                          try {
+                             let pO = req.original_slot; if (typeof pO === 'string') pO = JSON.parse(pO);
+                             if (typeof pO === 'string') pO = JSON.parse(pO);
+                             if (typeof pO === 'string') pO = JSON.parse(pO);
+                             origName = pO.subject || pO.classType || "Aula Original";
+                             origTime = `${pO.day} às ${pO.time}`;
+                          } catch(e) {}
+                          try {
+                             let pP = req.proposed_slot; if (typeof pP === 'string') pP = JSON.parse(pP);
+                             if (typeof pP === 'string') pP = JSON.parse(pP);
+                             if (typeof pP === 'string') pP = JSON.parse(pP);
+                             propName = pP.subject || pP.classType || "Aula Proposta";
+                             propTime = `${pP.day} às ${pP.time}`;
+                          } catch(e) {}
+
+                          const acceptMsg = `O colega aceitou permutar a ${propName} (${propTime}) pela sua ${origName} (${origTime}). Aguardando Homologação da Gestão.`;
+
+                          apiClient.updateRequestStatus(req.id, 'pronto_para_homologacao', '', acceptMsg).then(() => {
                             alert('Permuta Aceita! A coordenação foi notificada para homologar.');
                             loadRequests();
                             if (typeof onCancel === 'function') onCancel();
@@ -318,6 +362,38 @@ export function TeacherRequestsSection({ isDarkMode, siape, selectedWeek, weekDa
               </div>
             </form>
           </div>
+        </div>
+      )}
+
+      {rejectionTarget && (
+        <div className="fixed inset-0 z-[9999] flex justify-center items-center bg-slate-900/60 backdrop-blur-sm p-4 animate-in fade-in duration-200 print:hidden text-left" onClick={(e) => e.stopPropagation()}>
+           <div className={`w-full max-w-sm rounded-2xl shadow-xl flex flex-col overflow-hidden ${isDarkMode ? 'bg-slate-900 border border-slate-700' : 'bg-white border border-slate-200'}`}>
+              <div className={`p-4 border-b flex items-center justify-between ${isDarkMode ? 'bg-slate-800' : 'bg-slate-50'}`}>
+                 <h3 className="font-black uppercase tracking-widest text-[11px] text-rose-500 flex items-center gap-2"><XCircle size={14}/> Recusar Permuta</h3>
+              </div>
+              <div className="p-4 flex flex-col gap-3">
+                 <label className={`text-[10px] font-black uppercase tracking-widest opacity-70 ${isDarkMode ? 'text-slate-300' : 'text-slate-600'}`}>Justificativa:</label>
+                 <textarea id="rejectionReasonText" rows={3} placeholder="Escreva o motivo para informar o colega..." className={`w-full p-3 rounded-xl border text-xs outline-none focus:ring-2 focus:ring-rose-500/50 resize-none ${isDarkMode ? 'bg-slate-950 border-slate-700 text-white placeholder-slate-600' : 'bg-white border-slate-200 text-slate-800 placeholder-slate-400'}`}></textarea>
+                 
+                 <div className="flex gap-2 justify-end mt-2">
+                   <button onClick={() => setRejectionTarget(null)} className={`px-4 py-2 font-black uppercase tracking-widest text-[10px] rounded-lg transition-all ${isDarkMode ? 'hover:bg-slate-800 text-slate-400' : 'hover:bg-slate-100 text-slate-500'}`}>Cancelar</button>
+                   <button onClick={() => {
+                      const msg = document.getElementById('rejectionReasonText').value.trim();
+                      if(!msg) return alert('É necessário justificar a recusa.');
+                      const currentReq = rejectionTarget;
+                      const rejectMsg = `Permuta Rejeitada pelo colega. Justificativa: ${msg || 'Sem justificativa.'}`;
+                      apiClient.updateRequestStatus(currentReq.id, 'rejeitado', msg || '', rejectMsg).then(() => {
+                        setRejectionTarget(null);
+                        loadRequests();
+                        if (typeof window !== 'undefined') {
+                            const event = new CustomEvent('showCustomToast', { detail: { message: 'Aviso de recusa enviado ao colega.', type: 'error' } });
+                            window.dispatchEvent(event);
+                        }
+                      }).catch((e) => alert("Erro ao rejeitar: " + e.message));
+                   }} className="px-5 py-2 font-black uppercase tracking-widest text-[10px] rounded-xl bg-rose-600 hover:bg-rose-500 text-white shadow-md active:scale-95 transition-all">Confirmar Recusa</button>
+                 </div>
+              </div>
+           </div>
         </div>
       )}
     </div>

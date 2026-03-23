@@ -1283,7 +1283,12 @@ export function MasterGrid({ isDarkMode, ...props }) {
                                         <span title="Aula Disponibilizada pelo Titular" className="text-[5px] font-black uppercase tracking-widest text-white px-1.5 py-[2px] rounded-br-md border-b border-r border-amber-500/50 bg-amber-600 block shadow-sm shadow-amber-900/40 relative z-10">Oferecida</span>
                                      </div>
                                   )}
-                                  {aulaNesteSlot.isSubstituted && !aulaNesteSlot.isDisponibilizada && (
+                                  {aulaNesteSlot.isPermuted && (
+                                     <div className="absolute top-0 left-0 z-10 print:hidden shadow-sm pointer-events-none">
+                                        <span title="Aula permutada por Acordo" className="text-[5px] font-black uppercase tracking-widest text-[#FFFBEB] px-1.5 py-[2px] rounded-br-md border-b border-r border-amber-500/50 bg-amber-600 block shadow-sm shadow-amber-900/40 relative z-10">PERMUTADA</span>
+                                     </div>
+                                  )}
+                                  {aulaNesteSlot.isSubstituted && !aulaNesteSlot.isDisponibilizada && !aulaNesteSlot.isPermuted && (
                                      <div className="absolute top-0 left-0 z-10 print:hidden shadow-sm pointer-events-none">
                                         <span title="Aula assumida via Vaga" className="text-[5px] font-black uppercase tracking-widest text-white px-1.5 py-[2px] rounded-br-md border-b border-r border-indigo-500/50 bg-indigo-600 block shadow-sm shadow-indigo-900/40 relative z-10">Substituição</span>
                                      </div>

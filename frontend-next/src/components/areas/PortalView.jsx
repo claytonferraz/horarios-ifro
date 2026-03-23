@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
+import { io } from 'socket.io-client';
 import { 
   ChevronDown, Clock, Printer, CheckCircle, Check, Eye, BookOpen, FileText, Users,
   MessageSquare, Send, CheckCircle2, XCircle, AlertCircle, GripVertical,
-  Calendar, UserCircle, Layers, AlertTriangle, BarChart3, ListTodo, CalendarDays, Settings, Bell, Sun, RefreshCcw
+  Calendar, UserCircle, Layers, AlertTriangle, BarChart3, ListTodo, CalendarDays, Settings, Bell, Sun, RefreshCcw, HandHeart, X
 } from 'lucide-react';
 import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd';
 import { SearchableSelect } from '../ui/SearchableSelect';
@@ -73,6 +74,7 @@ export function PortalView({
   const [showVacantInMyClasses, setShowVacantInMyClasses] = useState(false);
   const [vacantRequestModal, setVacantRequestModal] = useState(null);
   const [alertModal, setAlertModal] = useState(null);
+  const [confirmReverseSwapPayload, setConfirmReverseSwapPayload] = useState(null);
 
   React.useEffect(() => {
     if (appMode === 'aluno') {
@@ -102,7 +104,7 @@ export function PortalView({
     if (selectedWeek) {
       apiClient.fetchRequests().then(reqs => {
         if (reqs) {
-          setPendingRequests(reqs.filter(r => (r.status === 'pendente' || r.status === 'pending') && r.week_id === selectedWeek));
+          setPendingRequests(reqs.filter(r => (r.status === 'pendente' || r.status === 'pending' || r.status === 'aguardando_colega' || r.status === 'pronto_para_homologacao') && r.week_id === selectedWeek));
         }
       }).catch(e => console.error("Error fetching requests for alerts", e));
     }
@@ -110,20 +112,60 @@ export function PortalView({
 
   React.useEffect(() => {
     loadPendingRequests();
+    const socket = io(process.env.NEXT_PUBLIC_SOCKET_URL || 'http://localhost:3012');
+    socket.on('schedule_updated', () => loadPendingRequests());
+    return () => socket.disconnect();
   }, [loadPendingRequests, scheduleMode]);
 
   const [draggingRecord, setDraggingRecord] = useState(null);
   const [exchangeTarget, setExchangeTarget] = useState(null);
   const [exchangeAction, setExchangeAction] = useState(null);
+  const [pendingReverseTarget, setPendingReverseTarget] = useState(null);
 
-  const isSlotLocked = React.useCallback((r) => {
+  const padraoExchangeRecords = React.useMemo(() => {
+    if (!exchangeTarget || !exchangeTarget.targetClass || !schedules) return [];
+    return schedules
+      .filter(s => s.type === 'padrao' && String(s.classId) === String(exchangeTarget.targetClass) && String(s.academic_year) === String(selectedConfigYear))
+      .map(s => {
+         let recs = {};
+         if (typeof s.records === 'string') { try { recs = JSON.parse(s.records); } catch(e){} }
+         else recs = s.records || {};
+         return {
+            id: s.id,
+            day: typeof s.dayOfWeek === 'number' ? MAP_DAYS[s.dayOfWeek-1] : (s.day_of_week || s.dayOfWeek),
+            time: s.slotId || s.time,
+            subject: s.disciplineId,
+            teacher: s.teacherId || '-',
+            className: s.classId || s.className,
+            course: s.courseName || s.className?.split('-')[0] || '',
+            room: recs.room || ''
+         };
+      });
+  }, [exchangeTarget, schedules, selectedConfigYear]);
+
+  const profClassesMemo = React.useMemo(() => {
+     if (appMode !== 'professor' || !schedules) return new Set();
+     const sf = selectedTeacher || siape;
+     return new Set(schedules.filter(s => s.teacherId && String(s.teacherId).split(',').includes(String(sf))).map(s => s.className || s.classId));
+  }, [appMode, selectedTeacher, siape, schedules]);
+
+  const isSlotInvolvedInPendingRequest = React.useCallback((r) => {
       return pendingRequests.some(req => {
           try {
               let prop = req.proposed_slot;
               if (typeof prop === 'string' && prop.startsWith('{')) prop = JSON.parse(prop);
               if (typeof prop === 'string' && prop.startsWith('"')) prop = JSON.parse(prop);
               if (typeof prop === 'string' && prop.startsWith('{')) prop = JSON.parse(prop);
-              return String(prop.day) === String(r.day) && String(prop.time) === String(r.time) && String(prop.className) === String(r.className);
+              
+              let orig = req.original_slot;
+              if (typeof orig === 'string' && orig.startsWith('{')) orig = JSON.parse(orig);
+              if (typeof orig === 'string' && orig.startsWith('"')) orig = JSON.parse(orig);
+              if (typeof orig === 'string' && orig.startsWith('{')) orig = JSON.parse(orig);
+
+              const isProp = prop && String(prop.day) === String(r.day) && String(prop.time) === String(r.time) && String(prop.className || prop.classId) === String(r.className || r.classId);
+              const isOrig = orig && String(orig.day) === String(r.day) && String(orig.time) === String(r.time) && String(orig.className || orig.classId) === String(r.className || r.classId);
+              
+              return isProp || isOrig;
           } catch(e) { return false; }
       });
   }, [pendingRequests]);
@@ -1141,31 +1183,41 @@ export function PortalView({
                             userRole={userRole}
                             globalTeachers={globalTeachers}
                             activeCourseClasses={filteredCourseClasses}
-                          safeDays={safeDays}
-                          safeTimes={safeTimes}
-                          intervals={intervals}
-                          dynamicWeeksList={dynamicWeeksList}
-                          selectedWeek={selectedWeek}
-                          weekLabel={weekLabel}
-                          draggingRecord={draggingRecord}
-                          checkConflict={checkConflict}
-                          setEditorModal={setEditorModal}
-                          handlePrint={handlePrint}
-                          getColorHash={getColorHash}
-                          resolveTeacherName={resolveTeacherName}
-                          isTeacherPending={isTeacherPending}
-                          onDragStart={onDragStart}
-                          onDragEnd={onDragEnd}
-                          subjectHoursMeta={subjectHoursMeta}
-                          activeData={activeData}
-                          getFormattedDayLabel={getFormattedDayLabel}
-                          appMode={appMode}
-                          showOnlyMyClasses={showOnlyMyClasses}
-                          setShowOnlyMyClasses={setShowOnlyMyClasses}
-                          padraoFilterTeacher={padraoFilterTeacher}
-                          setPadraoFilterTeacher={setPadraoFilterTeacher}
-                          siape={siape}
-                        />
+                            safeDays={safeDays}
+                            safeTimes={safeTimes}
+                            intervals={intervals}
+                            dynamicWeeksList={dynamicWeeksList}
+                            selectedWeek={selectedWeek}
+                            weekLabel={weekLabel}
+                            draggingRecord={draggingRecord}
+                            checkConflict={checkConflict}
+                            setEditorModal={setEditorModal}
+                            handlePrint={handlePrint}
+                            getColorHash={getColorHash}
+                            resolveTeacherName={resolveTeacherName}
+                            isTeacherPending={isTeacherPending}
+                            onDragStart={onDragStart}
+                            onDragEnd={onDragEnd}
+                            subjectHoursMeta={subjectHoursMeta}
+                            activeData={activeData}
+                            getFormattedDayLabel={getFormattedDayLabel}
+                            appMode={appMode}
+                            showOnlyMyClasses={showOnlyMyClasses}
+                            setShowOnlyMyClasses={setShowOnlyMyClasses}
+                            padraoFilterTeacher={padraoFilterTeacher}
+                            setPadraoFilterTeacher={setPadraoFilterTeacher}
+                            checkPendingSwapRequest={isSlotInvolvedInPendingRequest}
+                            siape={selectedTeacher || siape}
+                            onReverseSwapClick={(rec) => {
+                               if (String(rec.teacher) !== String(selectedTeacher || siape)) {
+                                 if (userRole !== 'admin' && userRole !== 'gestao' && !profClassesMemo.has(rec.className)) {
+                                    alert('Você só pode interagir com grades e turmas nas quais você já leciona ao menos uma disciplina.');
+                                    return;
+                                 }
+                                 setPendingReverseTarget(rec);
+                               }
+                            }}
+                          />
                         </div>
                       </DragDropContext>
                     </div>
@@ -1193,9 +1245,18 @@ export function PortalView({
                         handlePrint={handlePrint}
                         resolveTeacherName={resolveTeacherName}
                         isTeacherPending={isTeacherPending}
-                        isSlotLocked={isSlotLocked}
+                        checkPendingSwapRequest={isSlotInvolvedInPendingRequest}
                         setVacantRequestModal={setVacantRequestModal}
                         setExchangeTarget={setExchangeTarget}
+                        onReverseSwapClick={(rec) => {
+                           if (String(rec.teacher) !== String(selectedTeacher || siape)) {
+                             if (userRole !== 'admin' && userRole !== 'gestao' && !profClassesMemo.has(rec.className)) {
+                                alert('Você só pode interagir com grades e turmas nas quais você já leciona ao menos uma disciplina.');
+                                return;
+                             }
+                             setPendingReverseTarget(rec);
+                           }
+                        }}
                         getColorHash={getColorHash}
                         getFormattedDayLabel={getFormattedDayLabel}
                         recordsForWeek={recordsForWeek}
@@ -1229,7 +1290,17 @@ export function PortalView({
                       onDragEnd={onDragEnd}
                       setEditorModal={setEditorModal}
                       setExchangeTarget={setExchangeTarget}
+                      checkPendingSwapRequest={isSlotInvolvedInPendingRequest}
                       siape={siape}
+                      onReverseSwapClick={(rec) => {
+                         if (String(rec.teacher) !== String(selectedTeacher || siape)) {
+                           if (userRole !== 'admin' && userRole !== 'gestao' && !profClassesMemo.has(rec.className)) {
+                              alert('Você só pode interagir com grades e turmas nas quais você já leciona ao menos uma disciplina.');
+                              return;
+                           }
+                           setPendingReverseTarget(rec);
+                         }
+                      }}
                     />
                   )}
 
@@ -1397,7 +1468,7 @@ export function PortalView({
           originalRecord={exchangeTarget.originalRecord}
           targetClass={exchangeTarget.targetClass}
           targetCourse={exchangeTarget.targetCourse}
-          classRecords={recordsForWeek.filter(r => r.className === exchangeTarget.targetClass)}
+          classRecords={padraoExchangeRecords}
           safeDays={safeDays}
           safeTimes={safeTimes}
           globalTeachers={globalTeachersList}
@@ -1419,9 +1490,10 @@ export function PortalView({
           isDarkMode={isDarkMode}
           onClose={() => { setExchangeTarget(null); setExchangeAction(null); }}
           originalRecord={exchangeTarget.originalRecord}
+          targetRecord={exchangeTarget.targetRecord}
           targetClass={exchangeTarget.targetClass}
           targetCourse={exchangeTarget.targetCourse}
-          classRecords={recordsForWeek.filter(r => r.className === exchangeTarget.targetClass)}
+          classRecords={padraoExchangeRecords}
           safeDays={safeDays}
           safeTimes={safeTimes}
           globalTeachers={globalTeachersList}
@@ -1435,6 +1507,86 @@ export function PortalView({
             }).catch(e => alert(e.message));
           }}
         />
+      )}
+
+      {pendingReverseTarget && (
+        <div className="fixed inset-0 z-[200] flex justify-center items-center bg-slate-900/60 backdrop-blur-sm p-4 animate-in fade-in duration-200">
+           <div className={`w-full max-w-lg rounded-2xl shadow-xl border flex flex-col ${isDarkMode ? 'bg-slate-900 border-slate-700' : 'bg-white border-slate-200'}`}>
+              <div className={`p-4 border-b flex items-center justify-between ${isDarkMode ? 'bg-slate-800' : 'bg-slate-50'}`}>
+                 <h3 className="font-black uppercase tracking-widest text-sm text-indigo-500">Escolha a Aula para Oferecer</h3>
+                 <button onClick={() => setPendingReverseTarget(null)} className="p-2 rounded-lg text-slate-400 hover:text-slate-200"><X size={16}/></button>
+              </div>
+              <div className="p-6 space-y-4">
+                 <div className={`p-3 rounded-lg border ${isDarkMode ? 'bg-indigo-900/20 border-indigo-800/50' : 'bg-indigo-50 border-indigo-200'} text-xs`}>
+                    <p className="font-black uppercase tracking-widest opacity-80 mb-1">AULA ALVO (Colega)</p>
+                    <p className="font-bold">{pendingReverseTarget.subject} - Turma {pendingReverseTarget.className}</p>
+                    <p className="opacity-80">{pendingReverseTarget.day} às {pendingReverseTarget.time}</p>
+                 </div>
+                 <div>
+                    <label className="block text-[10px] font-black uppercase text-slate-500 mb-2">Qual aula SUA deseja dar em troca?</label>
+                    <select id="reverseSlotSelect" className={`w-full p-3 rounded-xl border text-sm font-bold outline-none ${isDarkMode ? 'bg-slate-950 border-slate-700' : 'bg-white border-slate-200'}`}>
+                       <option value="">Selecione uma de suas aulas...</option>
+                       {mappedSchedules.filter(r => {
+                          const isMyClass = r.teacherId && String(r.teacherId).split(',').includes(String(selectedTeacher || siape));
+                          if (!isMyClass) return false;
+                          
+                          const rTurma = String(r.className || r.classId).toLowerCase().trim();
+                          const targetTurma = String(pendingReverseTarget.className || pendingReverseTarget.classId).toLowerCase().trim();
+                          if (rTurma !== targetTurma) return false;
+                          
+                          if (typeof isSlotInvolvedInPendingRequest === 'function' && isSlotInvolvedInPendingRequest(r)) return false;
+                          
+                          return true;
+                       }).map(r => (
+                          <option key={r.id} value={r.id}>{r.subject} ({r.className}) - {r.day} {r.time}</option>
+                       ))}
+                    </select>
+                 </div>
+                 <div className="flex justify-end gap-3 mt-4">
+                    <button onClick={() => setPendingReverseTarget(null)} className="px-4 py-2 font-bold text-xs">Cancelar</button>
+                    <button 
+                       onClick={() => {
+                          const val = document.getElementById('reverseSlotSelect').value;
+                          if (!val) return alert('Selecione uma aula!');
+                          const selectedClasses = mappedSchedules.filter(r => String(r.id) === String(val));
+                          if (selectedClasses.length === 0) return;
+                          
+                          const originalRecord = selectedClasses[0];
+                          const targetRecord = pendingReverseTarget;
+
+                          const confirmMsg = `Deseja realmente solicitar a troca da sua aula de ${originalRecord.subject} (${originalRecord.day} às ${originalRecord.time}) pela aula de ${targetRecord.subject} (${targetRecord.day} às ${targetRecord.time})?`;
+
+                          const payload = {
+                             action: 'troca',
+                             requester_id: originalRecord.teacherId ? String(originalRecord.teacherId).split(',')[0] : (selectedTeacher || siape),
+                             substitute_id: targetRecord.teacherId ? String(targetRecord.teacherId).split(',')[0] : targetRecord.teacher,
+                             targetClass: targetRecord.className || targetRecord.classId,
+                             week_id: selectedWeek,
+                             reason: `Proposta Direta - Solicitação via Grade`,
+                             obs: `Troca Direta de ${originalRecord.subject} por ${targetRecord.subject}`,
+                             original_slot: { ...originalRecord, classId: originalRecord.classId || originalRecord.className },
+                             proposed_slot: {
+                                day: targetRecord.day,
+                                time: targetRecord.time,
+                                subject: targetRecord.subject,
+                                teacherId: targetRecord.teacherId || targetRecord.teacher,
+                                classId: targetRecord.classId || targetRecord.className,
+                                course: targetRecord.course || originalRecord.course,
+                                originalSubject: originalRecord.subject
+                             }
+                          };
+
+                          setConfirmReverseSwapPayload({ message: confirmMsg, payload });
+                          setPendingReverseTarget(null);
+                       }}
+                       className="px-6 py-2 bg-indigo-600 hover:bg-indigo-500 text-white font-black uppercase tracking-widest rounded-xl text-xs shadow-md transition-all active:scale-95"
+                    >
+                       Continuar Solicitação
+                    </button>
+                 </div>
+              </div>
+           </div>
+        </div>
       )}
 
       {/* MODAL GLOBAL ESTILIZADO PARA FEEDBACKS (Ex: Sessão expirada, Sucesso) */}
@@ -1458,6 +1610,33 @@ export function PortalView({
         </div>
       )}
 
+      {confirmReverseSwapPayload && (
+        <div className="fixed inset-0 z-[99999] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in zoom-in-95 duration-200">
+           <div className={`w-full max-w-sm rounded-3xl shadow-2xl flex flex-col items-center text-center p-6 ${isDarkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'} border`}>
+              <div className="w-16 h-16 rounded-full flex items-center justify-center mb-4 bg-indigo-100 text-indigo-600 shadow-sm border border-indigo-200">
+                 <CheckCircle size={32} />
+              </div>
+              <h3 className={`text-lg font-black mb-2 uppercase tracking-widest ${isDarkMode ? 'text-white' : 'text-slate-900'}`}>Confirmação</h3>
+              <p className={`text-xs mb-6 px-2 leading-relaxed font-semibold ${isDarkMode ? 'text-slate-300' : 'text-slate-600'}`}>{confirmReverseSwapPayload.message}</p>
+              
+              <div className="flex gap-3 w-full">
+                 <button onClick={() => setConfirmReverseSwapPayload(null)} className={`flex-1 py-3 rounded-xl font-bold uppercase tracking-widest text-[10px] transition-all shadow-sm ${isDarkMode ? 'bg-slate-700 text-slate-300 hover:bg-slate-600 border border-slate-600' : 'bg-slate-100 text-slate-500 hover:bg-slate-200 border border-slate-300'}`}>
+                    Rever
+                 </button>
+                 <button onClick={() => {
+                    apiClient.submitRequest(confirmReverseSwapPayload.payload).then(() => {
+                       setAlertModal({ title: 'Sucesso!', message: 'Solicitação de troca enviada ao colega com sucesso!', type: 'success' });
+                       if (typeof fetchRequests === 'function') fetchRequests();
+                       if (typeof loadPendingRequests === 'function') loadPendingRequests();
+                       setConfirmReverseSwapPayload(null);
+                    }).catch(e => setAlertModal({ title: 'Ops!', message: e.message || 'Erro ao comunicar com o servidor.', type: 'error' }));
+                 }} className={`flex-1 py-3 rounded-xl font-black uppercase tracking-widest text-[10px] text-white transition-all shadow-md active:scale-95 bg-indigo-600 hover:bg-indigo-500`}>
+                    Sim, Enviar
+                 </button>
+              </div>
+           </div>
+        </div>
+      )}
     </>
   );
 }

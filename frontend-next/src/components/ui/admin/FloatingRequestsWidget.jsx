@@ -122,7 +122,7 @@ export function FloatingRequestsWidget({ isDarkMode, userRole, appMode, controll
   // Mixed timeline Feed
   const feed = [
     ...notifications.map(n => ({...n, isNotif: true, time: new Date(n.createdAt).getTime()})),
-    ...resolvedRequests.map(r => ({...r, isReq: true, time: new Date(r.createdAt).getTime()}))
+    ...resolvedRequests.map(r => ({...r, isReq: true, time: new Date(r.created_at || r.createdAt).getTime()}))
   ].sort((a,b) => b.time - a.time).slice(0, 20);
 
 
@@ -236,13 +236,36 @@ export function FloatingRequestsWidget({ isDarkMode, userRole, appMode, controll
 }
 
 function ChatItem({ req, isDarkMode, loadingId, handleUpdate, globalTeachers }) {
-  const teacherName = resolveTeacherName(req.siape, globalTeachers) || req.siape;
+  const [isRejecting, setIsRejecting] = useState(false);
+  const teacherSiape = req.requester_id || req.siape;
+  const teacherName = resolveTeacherName(teacherSiape, globalTeachers) || teacherSiape;
   const isPending = req.status === 'pendente' || req.status === 'pending' || req.status === 'pronto_para_homologacao';
   
-  let desc = req.description;
+  let descUI = <p className={isDarkMode ? 'text-slate-200' : 'text-slate-800'}>{req.description || req.reason}</p>;
   try {
-    const p = JSON.parse(req.proposed_slot);
-    desc = `Aula de ${p.subject} (${p.className}) solicitada para ${p.day} às ${p.time}.`;
+    let pO = req.original_slot;
+    let pP = req.proposed_slot;
+    if (typeof pO === 'string') { pO = JSON.parse(pO); if (typeof pO === 'string') pO = JSON.parse(pO); }
+    if (typeof pP === 'string') { pP = JSON.parse(pP); if (typeof pP === 'string') pP = JSON.parse(pP); }
+    
+    if (pO && pP && req.action_type === 'troca') {
+       descUI = (
+         <div className="flex flex-col gap-2">
+           <div className={`p-2 rounded border text-[10px] uppercase font-bold tracking-widest leading-tight ${isDarkMode ? 'bg-slate-900 border-slate-700 text-slate-300' : 'bg-slate-100 border-slate-200 text-slate-600'}`}>
+              <span className="opacity-50 block mb-1 text-[8px]">AULA ALVO SOLICITADA</span>
+              <span className="text-indigo-500 block">{pP.subject || pP.classType} - {pP.className || pP.classId}</span>
+              <span className="opacity-80 text-[8px]">{pP.day} às {pP.time} <span title="Colega Solicitado" className='underline'>{resolveTeacherName(req.substitute_id, globalTeachers)?.split(' ')[0]}</span></span>
+           </div>
+           <div className={`p-2 rounded border text-[10px] uppercase font-bold tracking-widest leading-tight ${isDarkMode ? 'bg-slate-900 border-slate-700 text-slate-300' : 'bg-slate-100 border-slate-200 text-slate-600'}`}>
+              <span className="opacity-50 block mb-1 text-[8px]">HORÁRIO CEDIDO P/ TROCA</span>
+              <span className="text-rose-500 block">{pO.subject || pO.classType} - {pO.className || pO.classId}</span>
+              <span className="opacity-80 text-[8px]">{pO.day} às {pO.time} <span title="Solicitante" className='underline'>{resolveTeacherName(req.requester_id, globalTeachers)?.split(' ')[0]}</span></span>
+           </div>
+         </div>
+       );
+    } else if (pP) {
+       descUI = <p className={`leading-relaxed ${isDarkMode ? 'text-slate-200' : 'text-slate-800'}`}>{`Mudança / Vaga: ${pP.subject} (${pP.className}) para ${pP.day} às ${pP.time}.`}</p>;
+    }
   } catch(e) {}
 
   return (
@@ -255,7 +278,7 @@ function ChatItem({ req, isDarkMode, loadingId, handleUpdate, globalTeachers }) 
         </div>
         
         <div className="flex-1 flex flex-col justify-center gap-2">
-           <p className={isDarkMode ? 'text-slate-200' : 'text-slate-800'}>{desc}</p>
+           {descUI}
            
            {req.admin_feedback && !isPending && (
              <div className={`p-2 rounded-lg text-xs italic ${isDarkMode ? 'bg-black/20 text-slate-400' : 'bg-black/5 text-slate-600'}`}>
@@ -263,7 +286,7 @@ function ChatItem({ req, isDarkMode, loadingId, handleUpdate, globalTeachers }) 
              </div>
            )}
 
-           {isPending && (
+           {isPending && !isRejecting && (
              <div className="flex flex-col sm:flex-row gap-2 mt-1">
                <button 
                  onClick={() => handleUpdate(req.id, 'aprovado', 'Aprovado')}
@@ -273,7 +296,7 @@ function ChatItem({ req, isDarkMode, loadingId, handleUpdate, globalTeachers }) 
                  {loadingId === req.id ? <Loader2 size={12} className="animate-spin" /> : <CheckCircle2 size={12} />} Aprovar
                </button>
                <button 
-                 onClick={() => handleUpdate(req.id, 'rejeitado', 'Inviável no momento')}
+                 onClick={() => setIsRejecting(true)}
                  disabled={loadingId === req.id}
                  className="flex-1 py-1.5 px-3 bg-rose-600 hover:bg-rose-500 text-white rounded-lg text-[9px] font-black uppercase tracking-widest flex justify-center items-center gap-1 transition-all"
                >
@@ -281,11 +304,28 @@ function ChatItem({ req, isDarkMode, loadingId, handleUpdate, globalTeachers }) 
                </button>
              </div>
            )}
+
+           {isPending && isRejecting && (
+               <div className={`mt-2 p-3 rounded-xl border ${isDarkMode ? 'bg-slate-950 border-slate-700' : 'bg-white border-slate-200'} shadow-sm flex flex-col gap-2`}>
+                   <label className={`text-[9px] font-black uppercase tracking-widest ${isDarkMode ? 'text-rose-400' : 'text-rose-600'}`}>Motivo da Recusa:</label>
+                   <textarea id={`rejectReason-${req.id}`} rows={2} placeholder="Justifique a recusa..." className={`w-full p-2 text-xs rounded border outline-none resize-none ${isDarkMode ? 'bg-slate-900 border-slate-700 text-white' : 'bg-slate-50 border-slate-300 text-slate-800'}`}></textarea>
+                   <div className="flex gap-2 justify-end mt-1">
+                      <button onClick={() => setIsRejecting(false)} className={`px-3 py-1 text-[9px] font-black uppercase tracking-widest rounded transition-all ${isDarkMode ? 'hover:bg-slate-800 text-slate-400' : 'hover:bg-slate-100 text-slate-500'}`}>Cancelar</button>
+                      <button onClick={() => {
+                          const val = document.getElementById(`rejectReason-${req.id}`).value.trim();
+                          if (!val) return alert("Por favor, digite o motivo da recusa.");
+                          handleUpdate(req.id, 'rejeitado', val).then(() => setIsRejecting(false));
+                      }} className="px-3 py-1 bg-rose-600 hover:bg-rose-500 text-white rounded text-[9px] text-white font-black uppercase tracking-widest transition-all">
+                        {loadingId === req.id ? <Loader2 size={10} className="animate-spin inline" /> : 'Confirmar'}
+                      </button>
+                   </div>
+               </div>
+           )}
         </div>
       </div>
       
       <span className="text-[8px] font-black uppercase tracking-widest opacity-40 mt-1 ml-2">
-        {new Date(req.createdAt).toLocaleString([], {day: '2-digit', month: '2-digit', hour: '2-digit', minute:'2-digit'})}
+        {new Date(req.created_at || req.createdAt).toLocaleString([], {day: '2-digit', month: '2-digit', hour: '2-digit', minute:'2-digit'})}
       </span>
     </div>
   );

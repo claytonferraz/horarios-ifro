@@ -26,7 +26,9 @@ export const ClassGrid = React.memo(({
   onDragEnd,
   setEditorModal,
   setExchangeTarget,
-  siape
+  checkPendingSwapRequest,
+  siape,
+  onReverseSwapClick
 }) => {
   return (
     <div className="space-y-4">
@@ -135,15 +137,29 @@ export const ClassGrid = React.memo(({
                                                       return;
                                                     }
                                                     if (appMode === 'professor') {
-                                                      if (typeof setExchangeTarget === 'function') {
-                                                        setExchangeTarget({ targetClass: selectedClass, targetCourse: aulaNesteSlot.course || '', originalRecord: aulaNesteSlot });
+                                                      if (typeof checkPendingSwapRequest === 'function' && checkPendingSwapRequest(aulaNesteSlot)) {
+                                                         alert("Esta aula já possui uma permuta em andamento. Ela ficará bloqueada até sua recusa ou homologação.");
+                                                         return;
+                                                      }
+                                                      const isActiveTeacherInCard = typeof siape !== 'undefined' && aulaNesteSlot.teacherId ? String(aulaNesteSlot.teacherId).split(',').includes(String(siape)) : true;
+                                                      if (isActiveTeacherInCard) {
+                                                          if (typeof setExchangeTarget === 'function') {
+                                                            setExchangeTarget({ targetClass: selectedClass, targetCourse: aulaNesteSlot.course || '', originalRecord: aulaNesteSlot });
+                                                          }
+                                                      } else if (typeof onReverseSwapClick === 'function') {
+                                                          onReverseSwapClick(aulaNesteSlot);
                                                       }
                                                     } else if (appMode !== 'aluno') {
                                                       setEditorModal({ cls: selectedClass, day, time, tObj: timeObj });
                                                     }
                                                   }}
-                                                  className={`print-clean-card p-2 rounded-xl border shadow-sm flex flex-col justify-center min-h-[60px] transition-all relative ${drgSnapshot.isDragging ? 'z-50 scale-105 shadow-2xl rotate-2' : 'hover:scale-[1.02] hover:shadow-md active:scale-95'} ${isPending ? (isDarkMode ? 'bg-red-900/30 border-red-800/50 text-red-300' : 'bg-red-50 border-red-300 text-red-800') : hasConflict ? (isDarkMode ? 'bg-rose-950/80 border-rose-500/80 text-rose-200 shadow-[0_0_10px_rgba(225,29,72,0.4)]' : 'bg-rose-100 border-rose-500 text-rose-900 shadow-[0_0_10px_rgba(225,29,72,0.3)]') : getColorHash(disciplineName, isDarkMode)}`}
+                                                  className={`print-clean-card p-2 rounded-xl border shadow-sm flex flex-col justify-center min-h-[60px] transition-all relative ${drgSnapshot.isDragging ? 'z-50 scale-105 shadow-2xl rotate-2' : 'hover:scale-[1.02] hover:shadow-md active:scale-95'} ${typeof checkPendingSwapRequest === 'function' && checkPendingSwapRequest(aulaNesteSlot) ? (isDarkMode ? 'bg-amber-900/30 border-amber-800/50 hover:bg-amber-900/40 text-amber-200 shadow-[0_0_10px_rgba(251,191,36,0.2)]' : 'bg-amber-100 hover:bg-amber-200 border-amber-400 text-amber-900 shadow-[0_0_10px_rgba(251,191,36,0.2)]') : isPending ? (isDarkMode ? 'bg-red-900/30 border-red-800/50 text-red-300' : 'bg-red-50 border-red-300 text-red-800') : hasConflict ? (isDarkMode ? 'bg-rose-950/80 border-rose-500/80 text-rose-200 shadow-[0_0_10px_rgba(225,29,72,0.4)]' : 'bg-rose-100 border-rose-500 text-rose-900 shadow-[0_0_10px_rgba(225,29,72,0.3)]') : getColorHash(disciplineName, isDarkMode)}`}
                                                 >
+                                                  {typeof checkPendingSwapRequest === 'function' && checkPendingSwapRequest(aulaNesteSlot) && !isPending && (
+                                                     <div className="absolute top-0 right-0 z-10 pointer-events-none print:hidden">
+                                                        <span className="text-[5px] font-black uppercase tracking-widest text-amber-900 px-[5px] py-[3px] rounded-bl-[8px] rounded-tr-[10px] bg-amber-400 border-l border-b border-amber-500 block animate-pulse shadow-[0_2px_4px_rgba(251,191,36,0.3)]">SOLICITADO</span>
+                                                     </div>
+                                                  )}
                                                   {appMode !== 'aluno' && (
                                                     <div className="absolute top-1 right-1 opacity-20 group-hover:opacity-100">
                                                        <GripVertical size={10} />
@@ -154,14 +170,22 @@ export const ClassGrid = React.memo(({
                                                          <span className="text-[6px] font-black uppercase tracking-wide text-white px-1.5 py-0.5 rounded-br-[8px] bg-rose-600 border-r border-b border-rose-700 block animate-pulse shadow-sm shadow-rose-900/30">AULA VAGA</span>
                                                      </div>
                                                   )}
-                                                  {aulaNesteSlot.isSubstituted && !isPending && (
+                                                  {aulaNesteSlot.isPermuted && !isPending && (
+                                                     <div className="absolute top-0 left-0 z-10 pointer-events-none print:hidden">
+                                                         <span title="Aula permutada por Acordo" className="text-[6px] font-black uppercase tracking-wide text-[#FFFBEB] px-1.5 py-0.5 rounded-br-[8px] bg-amber-600 border-r border-b border-amber-700 block shadow-sm shadow-amber-900/30">PERMUTADA</span>
+                                                     </div>
+                                                  )}
+                                                  {aulaNesteSlot.isSubstituted && !aulaNesteSlot.isPermuted && !isPending && (
                                                      <div className="absolute top-0 left-0 z-10 pointer-events-none print:hidden">
                                                          <span title="Assumida no lugar de uma Vaga" className="text-[6px] font-black uppercase tracking-wide text-white px-1.5 py-0.5 rounded-br-[8px] bg-indigo-600 border-r border-b border-indigo-700 block animate-pulse shadow-sm shadow-indigo-900/30">Substituição</span>
                                                      </div>
                                                   )}
-                                                  <p className="subject font-bold text-[10px] leading-tight mb-0.5 text-center">
-                                                     {disciplineName}
-                                                     {aulaNesteSlot.isSubstituted && aulaNesteSlot.originalSubject && <span className="block text-[8px] sm:text-[9.5px] opacity-80 mt-1 uppercase">Era: {aulaNesteSlot.originalSubject}</span>}
+                                                  <p className="subject font-bold text-[10px] leading-tight mb-0.5 text-center flex flex-col items-center gap-0.5">
+                                                     <span>{disciplineName}</span>
+                                                     {aulaNesteSlot.isPermuted && !isPending && (
+                                                        <span className={`px-1.5 py-0.5 rounded text-[8px] uppercase tracking-widest font-black ${isDarkMode ? 'bg-amber-900/40 text-amber-400 border border-amber-800/50' : 'bg-amber-100 text-amber-700 border border-amber-300'}`}>PERMUTA</span>
+                                                     )}
+                                                     {aulaNesteSlot.isSubstituted && !aulaNesteSlot.isPermuted && aulaNesteSlot.originalSubject && <span className="block text-[8px] sm:text-[9.5px] opacity-80 mt-1 uppercase">Era: {aulaNesteSlot.originalSubject}</span>}
                                                   </p>
                                                   <p className="details text-[8px] font-bold opacity-80 flex items-center justify-center gap-1 uppercase truncate">
                                                     {teacherName}

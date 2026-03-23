@@ -23,9 +23,10 @@ export const TeacherGrid = React.memo(
     handlePrint,
     resolveTeacherName,
     isTeacherPending,
-    isSlotLocked,
+    checkPendingSwapRequest,
     setVacantRequestModal,
     setExchangeTarget,
+    onReverseSwapClick,
     getColorHash,
     getFormattedDayLabel,
     recordsForWeek,
@@ -308,18 +309,21 @@ export const TeacherGrid = React.memo(
                                                           1;
                                                         const isLocked =
                                                           isVaga &&
-                                                          isSlotLocked &&
-                                                          isSlotLocked(r);
+                                                          checkPendingSwapRequest &&
+                                                          checkPendingSwapRequest(r);
+                                                        const hasPendingSwap = checkPendingSwapRequest && checkPendingSwapRequest(r);
                                                         const isActive = r.teacherId && String(r.teacherId).split(',').includes(String(activeTeacher));
                                                         const isVagaReal = appMode !== 'aluno' && (!r.teacherId || r.teacherId === 'A Definir' || r.teacherId === '-');
                                                         
                                                         let cardStyle = "print-clean-card p-2 rounded-xl border shadow-sm flex flex-col justify-center min-h-[76px] transition-all relative ";
                                                         if (isVagaReal) {
                                                            cardStyle += isDarkMode ? 'bg-red-900/30 border-red-800/50 cursor-pointer hover:scale-[1.02]' : 'bg-red-50 border-red-300 cursor-pointer hover:scale-[1.02]';
+                                                        } else if (hasPendingSwap) {
+                                                           cardStyle += isDarkMode ? 'bg-amber-900/30 border-amber-800/50 cursor-pointer hover:scale-[1.02] text-amber-200 shadow-[0_0_10px_rgba(251,191,36,0.2)]' : 'bg-amber-100 border-amber-400 text-amber-900 cursor-pointer hover:scale-[1.02] shadow-[0_0_10px_rgba(251,191,36,0.2)]';
                                                         } else if (isActive) {
                                                            cardStyle += getColorHash(r.subject, isDarkMode) + " ring-2 ring-indigo-500 shadow-md cursor-pointer hover:scale-[1.02] z-10";
                                                         } else {
-                                                           cardStyle += isDarkMode ? 'bg-slate-800/30 border-slate-700/50 opacity-40 grayscale pointer-events-none' : 'bg-slate-100 border-slate-200 opacity-40 grayscale pointer-events-none';
+                                                           cardStyle += isDarkMode ? 'bg-slate-800/30 border-slate-700/50 opacity-40 grayscale hover:grayscale-0 hover:opacity-100 cursor-pointer' : 'bg-slate-100 border-slate-200 opacity-40 grayscale hover:grayscale-0 hover:opacity-100 cursor-pointer';
                                                         }
 
                                                         return (
@@ -327,28 +331,40 @@ export const TeacherGrid = React.memo(
                                                             key={r.id ? `prof-rec-${r.id}-${idx}` : `prof-rec-idx-${idx}`}
                                                             className={cardStyle}
                                                             onClick={() => {
-                                                              if (appMode === "professor" && (isActive || isVagaReal)) {
-                                                                if (userRole !== "admin" && userRole !== "gestao") {
-                                                                  if (!profClasses.has(r.className)) {
-                                                                     alert("Você só pode solicitar trocas ou assumir vagas em turmas onde você já leciona ao menos uma disciplina.");
-                                                                     return;
-                                                                  }
+                                                              if (appMode === "professor") {
+                                                                if (hasPendingSwap) {
+                                                                   alert("Esta aula já possui uma permuta em andamento. Ela ficará bloqueada até sua recusa ou homologação.");
+                                                                   return;
                                                                 }
+                                                                
+                                                                if (!isActive && !isVagaReal && typeof onReverseSwapClick === 'function') {
+                                                                  onReverseSwapClick(r);
+                                                                  return;
+                                                                }
+                                                                
+                                                                if (isActive || isVagaReal) {
+                                                                  if (userRole !== "admin" && userRole !== "gestao") {
+                                                                    if (!profClasses.has(r.className)) {
+                                                                       alert("Você só pode solicitar trocas ou assumir vagas em turmas onde você já leciona ao menos uma disciplina.");
+                                                                       return;
+                                                                    }
+                                                                  }
 
-                                                                if (isVagaReal) {
-                                                                  if (isLocked) {
-                                                                    alert("Esta vaga já está sendo analisada pela direção.");
-                                                                    return;
+                                                                  if (isVagaReal) {
+                                                                    if (isLocked) {
+                                                                      alert("Esta vaga já está sendo analisada pela direção.");
+                                                                      return;
+                                                                    }
+                                                                    if (typeof setVacantRequestModal === "function") {
+                                                                      setVacantRequestModal(r);
+                                                                    }
+                                                                  } else if (isActive && typeof setExchangeTarget === "function") {
+                                                                    setExchangeTarget({
+                                                                      targetClass: r.className,
+                                                                      targetCourse: r.course,
+                                                                      originalRecord: r,
+                                                                    });
                                                                   }
-                                                                  if (typeof setVacantRequestModal === "function") {
-                                                                    setVacantRequestModal(r);
-                                                                  }
-                                                                } else if (isActive && typeof setExchangeTarget === "function") {
-                                                                  setExchangeTarget({
-                                                                    targetClass: r.className,
-                                                                    targetCourse: r.course,
-                                                                    originalRecord: r,
-                                                                  });
                                                                 }
                                                               }
                                                             }}
@@ -358,7 +374,17 @@ export const TeacherGrid = React.memo(
                                                                    <span className="text-[6px] font-black uppercase tracking-wide text-white px-1.5 py-0.5 rounded-br-[8px] bg-rose-600 border-r border-b border-rose-700 block animate-pulse shadow-sm shadow-rose-900/30">{isLocked ? "EM ANÁLISE" : "AULA VAGA"}</span>
                                                                 </div>
                                                             )}
-                                                            {r.isSubstituted && !isVagaReal && (
+                                                            {!isVagaReal && hasPendingSwap && (
+                                                                <div className="absolute top-0 right-0 z-10 pointer-events-none print:hidden">
+                                                                   <span className="text-[5px] font-black uppercase tracking-widest text-amber-900 px-1.5 py-[3px] rounded-bl-[8px] bg-amber-400 border-l border-b border-amber-500 block animate-pulse shadow-[0_2px_4px_rgba(251,191,36,0.3)]">SOLICITADO</span>
+                                                                </div>
+                                                            )}
+                                                            {r.isPermuted && !isVagaReal && (
+                                                                <div className="absolute top-0 left-0 z-10 pointer-events-none print:hidden">
+                                                                   <span title="Aula permutada por Acordo" className="text-[6px] font-black uppercase tracking-wide text-[#FFFBEB] px-1.5 py-0.5 rounded-br-[8px] bg-amber-600 border-r border-b border-amber-700 block shadow-sm shadow-amber-900/30">PERMUTADA</span>
+                                                                </div>
+                                                            )}
+                                                            {r.isSubstituted && !r.isPermuted && !isVagaReal && (
                                                                 <div className="absolute top-0 left-0 z-10 pointer-events-none print:hidden">
                                                                    <span title="Assumida no lugar de uma Vaga" className="text-[6px] font-black uppercase tracking-wide text-white px-1.5 py-0.5 rounded-br-[8px] bg-indigo-600 border-r border-b border-indigo-700 block shadow-sm shadow-indigo-900/30">Substituição</span>
                                                                 </div>

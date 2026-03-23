@@ -397,11 +397,11 @@ export const apiClient = {
     return await res.json();
   },
 
-  async updateRequestStatus(id, status, admin_feedback = '') {
-    const res = await fetch(`${API_URL}/requests/${id}`, {
+  async updateRequestStatus(id, status, admin_feedback = '', system_message = '') {
+    const res = await fetch(`${API_URL}/requests/${id}/status`, {
       method: 'PUT',
       headers: getHeaders(),
-      body: JSON.stringify({ status, admin_feedback })
+      body: JSON.stringify({ status, admin_feedback, system_message })
     });
     if (!res.ok) throw new Error('Falha ao atualizar solicitação');
     return await res.json();
