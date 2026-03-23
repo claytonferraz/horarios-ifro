@@ -239,7 +239,12 @@ function RequestCard({ req, isDarkMode, loadingId, handleUpdate, globalTeachers,
                         if (typeof parsed === 'string' && parsed.startsWith('{')) parsed = JSON.parse(parsed);
                         if (typeof parsed === 'string' && parsed.startsWith('"')) parsed = JSON.parse(parsed);
                         if (typeof parsed === 'string' && parsed.startsWith('{')) parsed = JSON.parse(parsed);
-                        if (typeof parsed === 'object' && parsed !== null) return `VAGA na turma ${parsed.day} às ${parsed.time}`;
+                        if (typeof parsed === 'object' && parsed !== null) {
+                           const prefix = parsed.subject || parsed.classType || `VAGA na turma ${parsed.className || ''}`;
+                           const hasTurmaStr = prefix.toLowerCase().includes('turma') || prefix.toLowerCase().includes(String(parsed.className).toLowerCase());
+                           const classInfo = (parsed.className && !hasTurmaStr) ? ` (${parsed.className})` : '';
+                           return `${prefix}${classInfo} ${parsed.day ? parsed.day + ' às ' + parsed.time : ''}`.trim();
+                        }
                         return String(req.original_slot).replace(/["{}]/g, '');
                       } catch(e) { return String(req.original_slot); }
                     })()}
@@ -254,7 +259,12 @@ function RequestCard({ req, isDarkMode, loadingId, handleUpdate, globalTeachers,
                         if (typeof parsed === 'string' && parsed.startsWith('{')) parsed = JSON.parse(parsed);
                         if (typeof parsed === 'string' && parsed.startsWith('"')) parsed = JSON.parse(parsed);
                         if (typeof parsed === 'string' && parsed.startsWith('{')) parsed = JSON.parse(parsed);
-                        if (typeof parsed === 'object' && parsed !== null) return `${parsed.subject || parsed.classType || 'Mudança'} (${parsed.className || 'Mesma turma'}) ${parsed.day} às ${parsed.time}`;
+                        if (typeof parsed === 'object' && parsed !== null) {
+                           const prefix = parsed.classType || parsed.subject || 'Mudança';
+                           const hasTurmaStr = prefix.toLowerCase().includes('turma') || (parsed.className && prefix.toLowerCase().includes(String(parsed.className).toLowerCase()));
+                           const classInfo = hasTurmaStr ? '' : ` (${parsed.className || 'Mesma turma'})`;
+                           return `${prefix}${classInfo} ${parsed.day ? parsed.day + ' às ' + parsed.time : ''}`.trim();
+                        }
                         return String(req.proposed_slot).replace(/["{}]/g, '');
                       } catch(e) { return String(req.proposed_slot); }
                     })()}
