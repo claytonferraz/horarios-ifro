@@ -1224,8 +1224,8 @@ export function MasterGrid({ isDarkMode, ...props }) {
                                      {Object.values(grade).filter(g => String(g.classId) === String(aulaNesteSlot.classId) && String(g.id) === String(aulaNesteSlot.id)).length}/{aulaNesteSlot.numAulas || 1}
                                   </span>
                                   {aulaNesteSlot.isSubstituted && (
-                                     <div className="absolute -top-1.5 -right-1 z-10 print:hidden shadow-sm pointer-events-none">
-                                        <span title="Aula assumida via Vaga" className="text-[5px] font-black uppercase tracking-widest text-white px-1.5 py-[2px] rounded border border-indigo-400 bg-indigo-600 block shadow-sm shadow-indigo-900/40">Substituição</span>
+                                     <div className="absolute top-0 right-0 z-10 print:hidden shadow-sm pointer-events-none">
+                                        <span title="Aula assumida via Vaga" className="text-[5px] font-black uppercase tracking-widest text-white px-1.5 py-[2px] rounded-bl-md border-b border-l border-indigo-500/50 bg-indigo-600 block shadow-sm shadow-indigo-900/40 relative z-10">Substituição</span>
                                      </div>
                                   )}
                                   <div className={`flex flex-col flex-1 shrink-0 ${isVaga ? 'mt-4 mb-1' : 'mt-3.5 mb-1'}`} title={`${aulaNesteSlot.disciplina} - ${aulaNesteSlot.className}`}>
