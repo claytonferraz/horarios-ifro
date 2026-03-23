@@ -36,10 +36,8 @@ export const TeacherGrid = React.memo(
     const activeTeacher = selectedColleague || selectedTeacher;
     // 1. Descobre as turmas onde o professor leciona
     const directRecords = mappedSchedules.filter(r => r.teacherId && String(r.teacherId).split(',').includes(String(activeTeacher)));
-    const profClasses = new Set(directRecords.map(r => r.className));
-    // 2. Puxa TODA a grade dessas turmas para dar o contexto
-    let profRecords = mappedSchedules.filter(r => profClasses.has(r.className));
-    // 3. (Removido: Adicionar vagas se toggle estiver ativo)
+    // Exibe apenas as aulas reais do professor
+    let profRecords = directRecords;
 
     const profCourses = [...new Set(profRecords.map((r) => r.course))].sort(
       (a, b) => String(a).localeCompare(String(b)),
