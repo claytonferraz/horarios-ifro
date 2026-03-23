@@ -11,6 +11,7 @@ export function TeacherRequestsSection({ isDarkMode, siape, selectedWeek, weekDa
   const [loading, setLoading] = useState(false);
   const [newRequest, setNewRequest] = useState({ description: '', original_slot: '', proposed_day: '', proposed_time: '', proposed_type: 'Regular' });
   const [rejectionTarget, setRejectionTarget] = useState(null);
+  const [alertModal, setAlertModal] = useState(null);
 
   const loadRequests = async () => {
     try {
@@ -236,9 +237,10 @@ export function TeacherRequestsSection({ isDarkMode, siape, selectedWeek, weekDa
                           const acceptMsg = `O colega aceitou permutar a ${propName} (${propTime}) pela sua ${origName} (${origTime}). Aguardando Homologação da Gestão.`;
 
                           apiClient.updateRequestStatus(req.id, 'pronto_para_homologacao', '', acceptMsg).then(() => {
-                            alert('Permuta Aceita! A coordenação foi notificada para homologar.');
-                            loadRequests();
-                            if (typeof onCancel === 'function') onCancel();
+                            setAlertModal({ title: 'Permuta Aceita!', message: 'A coordenação foi notificada para homologar.', type: 'success', onClose: () => {
+                              loadRequests();
+                              if (typeof onCancel === 'function') onCancel();
+                            }});
                           });
                         }} className="px-4 py-2 text-[10px] font-black uppercase tracking-widest rounded-lg bg-emerald-600 text-white shadow-md hover:bg-emerald-500">Aceitar Permuta</button>
                       </div>
@@ -385,15 +387,36 @@ export function TeacherRequestsSection({ isDarkMode, siape, selectedWeek, weekDa
                       apiClient.updateRequestStatus(currentReq.id, 'rejeitado', msg || '', rejectMsg).then(() => {
                         setRejectionTarget(null);
                         loadRequests();
-                        if (typeof window !== 'undefined') {
-                            const event = new CustomEvent('showCustomToast', { detail: { message: 'Aviso de recusa enviado ao colega.', type: 'error' } });
-                            window.dispatchEvent(event);
-                        }
-                      }).catch((e) => alert("Erro ao rejeitar: " + e.message));
+                        setAlertModal({ title: 'Aviso', message: 'Aviso de recusa enviado ao colega.', type: 'alert' });
+                      }).catch((e) => setAlertModal({ title: 'Erro', message: "Erro ao rejeitar: " + e.message, type: 'error' }));
                    }} className="px-5 py-2 font-black uppercase tracking-widest text-[10px] rounded-xl bg-rose-600 hover:bg-rose-500 text-white shadow-md active:scale-95 transition-all">Confirmar Recusa</button>
                  </div>
               </div>
            </div>
+        </div>
+      )}
+
+      {/* MODAL GLOBAL ESTILIZADO PARA FEEDBACKS (Ex: Sucesso) */}
+      {alertModal && (
+        <div className="fixed inset-0 z-[99999] flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm animate-in fade-in zoom-in-95 duration-200">
+          <div className={`w-full max-w-sm p-6 rounded-3xl shadow-2xl flex flex-col items-center text-center ${isDarkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'} border`}>
+            {alertModal.type === 'error' && <AlertCircle size={48} className={`mb-4 ${isDarkMode ? 'text-rose-400' : 'text-rose-500'}`} />}
+            {alertModal.type === 'success' && <CheckCircle2 size={48} className={`mb-4 ${isDarkMode ? 'text-emerald-400' : 'text-emerald-500'}`} />}
+            {alertModal.type === 'alert' && <AlertCircle size={48} className={`mb-4 ${isDarkMode ? 'text-amber-400' : 'text-amber-500'}`} />}
+            
+            <h3 className={`text-lg font-black mb-2 uppercase tracking-widest ${isDarkMode ? 'text-white' : 'text-slate-900'}`}>{alertModal.title}</h3>
+            <p className={`text-sm mb-6 ${isDarkMode ? 'text-slate-300' : 'text-slate-600'}`}>{alertModal.message}</p>
+            
+            <button 
+              onClick={() => {
+                setAlertModal(null);
+                if (alertModal.onClose) alertModal.onClose();
+              }}
+              className={`w-full py-3 rounded-xl font-bold uppercase tracking-widest text-xs transition-all active:scale-95 ${alertModal.type === 'error' ? 'bg-rose-500 hover:bg-rose-600 text-white shadow-[0_0_15px_rgba(244,63,94,0.4)]' : alertModal.type === 'success' ? 'bg-emerald-500 hover:bg-emerald-600 text-white shadow-[0_0_15px_rgba(16,185,129,0.4)]' : 'bg-amber-500 hover:bg-amber-600 text-white shadow-[0_0_15px_rgba(245,158,11,0.4)]'}`}
+            >
+              Entendido
+            </button>
+          </div>
         </div>
       )}
     </div>

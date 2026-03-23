@@ -1270,7 +1270,7 @@ app.get('/api/requests', (req, res) => {
 app.post('/api/requests', (req, res) => {
   try {
     const data = req.body;
-    let action = data.action; 
+    let action = data.action || 'vaga';
 
     // O fallback de ação protege o endpoint
     if (!['vaga', 'troca', 'oferta_vaga'].includes(action)) {

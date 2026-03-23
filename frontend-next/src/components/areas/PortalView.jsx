@@ -1411,11 +1411,12 @@ export function PortalView({
                 const requesterName = matchedTeacher?.nome_exibicao || matchedTeacher?.nome_completo || selectedTeacher || siape;
 
                 apiClient.submitRequest({
+                  action: 'vaga',
                   siape: selectedTeacher || siape,
                   week_id: selectedWeek,
-                  description: 'Solicitação para assumir aula vaga na turma ' + vacantRequestModal.className + ' - Disciplina: ' + subjName,
-                  original_slot: JSON.stringify({ day: vacantRequestModal.day, time: vacantRequestModal.time, type: 'VAGA' }),
-                  proposed_slot: { day: vacantRequestModal.day, time: vacantRequestModal.time, className: vacantRequestModal.className, classId: vacantRequestModal.classId, subject: subjName, disciplineId: discId, originalSubject: vacantRequestModal.subject, classType: 'Substituição', teacherName: requesterName }
+                  description: 'Proposta Direta - Solicitação via Grade',
+                  original_slot: JSON.stringify({ day: vacantRequestModal.day, time: vacantRequestModal.time, classType: `AULA VAGA na turma ${vacantRequestModal.className}` }),
+                  proposed_slot: { day: vacantRequestModal.day, time: vacantRequestModal.time, className: vacantRequestModal.className, classId: vacantRequestModal.classId, subject: subjName, disciplineId: discId, originalSubject: vacantRequestModal.subject, classType: `${subjName} (Mesma turma)`, teacherName: requesterName }
                 }).then(() => {
                   setAlertModal({ title: 'Tudo Certo!', message: 'Sua solicitação foi enviada com sucesso à coordenação.', type: 'success' });
                   setVacantRequestModal(null);
