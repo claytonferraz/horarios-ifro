@@ -11,6 +11,7 @@ import { InlineInput } from '../ui/InlineInput';
 import { ScheduleEditorModal } from '../ui/admin/ScheduleEditorModal';
 import { TeacherExchangeModal } from '../ui/TeacherExchangeModal';
 import { TeacherOfferModal } from '../ui/TeacherOfferModal';
+import { TeacherDirectModal } from '../ui/TeacherDirectModal';
 import { ScheduleNotifications } from '../ui/admin/ScheduleNotifications';
 import { MAP_DAYS, getColorHash, isTeacherPending, resolveTeacherName } from '@/lib/dates';
 import { useData } from '@/contexts/DataContext';
@@ -47,6 +48,7 @@ export function PortalView({
   }, [schedules, selectedConfigYear, scheduleMode, selectedWeek]);
   const [editorModal, setEditorModal] = useState(null);
   const [showOnlyMyClasses, setShowOnlyMyClasses] = useState(true);
+  const [showEmptySlots, setShowEmptySlots] = useState(false);
   const [padraoFilterTeacher, setPadraoFilterTeacher] = useState('Todos');
   const [selectedColleague, setSelectedColleague] = useState('');
   const [pendingRequests, setPendingRequests] = useState([]);
@@ -73,6 +75,7 @@ export function PortalView({
 
   const [showVacantInMyClasses, setShowVacantInMyClasses] = useState(false);
   const [vacantRequestModal, setVacantRequestModal] = useState(null);
+  const [teacherDirectModal, setTeacherDirectModal] = useState(null);
   const [alertModal, setAlertModal] = useState(null);
   const [confirmReverseSwapPayload, setConfirmReverseSwapPayload] = useState(null);
 
@@ -987,6 +990,11 @@ export function PortalView({
                                                           <span title="Assumida no lugar de uma Vaga" className="text-[7px] font-black uppercase tracking-wide text-white px-2 py-0.5 rounded-bl-[8px] bg-indigo-600 border-l border-b border-indigo-700 block animate-pulse shadow-sm shadow-indigo-900/30">Substituição</span>
                                                       </div>
                                                    )}
+                                                   {r.classType && r.classType !== 'Regular' && (
+                                                      <div className="absolute bottom-0 right-0 z-10 pointer-events-none print:hidden">
+                                                          <span className="text-[7px] font-black uppercase tracking-wide text-white px-2 py-0.5 rounded-tl-[8px] bg-emerald-600 border-l border-t border-emerald-700 block shadow-sm shadow-emerald-900/30">{r.classType}</span>
+                                                      </div>
+                                                   )}
                                                    <div className="pt-2 sm:pt-0">
                                                       <p className={`font-black text-sm leading-tight ${isDarkMode ? 'text-white' : 'text-slate-900'}`}>
                                                         {r.subject} {r.isSubstituted && r.originalSubject && <span className="block text-[8px] sm:text-[9.5px] opacity-80 mt-1 uppercase">Era: {r.originalSubject}</span>}
@@ -1235,8 +1243,23 @@ export function PortalView({
 
                   {/* GRADE DE HORÁRIO DO PROFESSOR (Separada por Curso) */}
                   {viewMode === 'professor' && selectedTeacher && (
+                    <div className="flex flex-col gap-4">
+                      {appMode === 'professor' && (
+                        <div className={`p-3 rounded-xl border flex items-center justify-end sm:justify-start ${isDarkMode ? 'bg-slate-800 border-slate-700' : 'bg-slate-50 border-slate-200'}`}>
+                           <label className="flex items-center gap-3 cursor-pointer group">
+                               <div className={`w-8 h-4 rounded-full relative transition-colors ${showEmptySlots ? 'bg-indigo-500' : 'bg-slate-300 dark:bg-slate-600'}`}>
+                                 <div className={`absolute top-0.5 w-3 h-3 rounded-full bg-white transition-all ${showEmptySlots ? 'left-4.5 translate-x-[14px]' : 'left-0.5'}`} />
+                               </div>
+                               <span className={`text-[9px] font-black uppercase tracking-widest transition-colors ${showEmptySlots ? (isDarkMode ? 'text-indigo-400' : 'text-indigo-600') : (isDarkMode ? 'text-slate-400 group-hover:text-slate-300' : 'text-slate-500 group-hover:text-slate-700')}`}>Mostrar horários livres na semana</span>
+                               <input type="checkbox" checked={showEmptySlots} onChange={e => setShowEmptySlots(e.target.checked)} className="peer sr-only" />
+                           </label>
+                        </div>
+                      )}
+                      
                       <TeacherGrid 
                         selectedColleague={selectedColleague}
+                        showEmptySlots={showEmptySlots}
+                        onEmptySlotClick={setTeacherDirectModal}
                         mappedSchedules={mappedSchedules}
                         isDarkMode={isDarkMode}
                         scheduleMode={scheduleMode}
@@ -1273,6 +1296,7 @@ export function PortalView({
                         activeDays={activeDays}
                         classTimes={classTimes}
                       />
+                    </div>
                   )}
 
                   {/* GRADE DE HORÁRIO GERAL (Turma COMPLETA E HISTORICO) */}
@@ -1367,6 +1391,8 @@ export function PortalView({
             classesData={classesList || []}
             usersList={globalTeachersList || []}
             classTimes={classTimes}
+            userRole={userRole}
+            siape={siape}
          />
       )}
 
@@ -1654,8 +1680,17 @@ export function PortalView({
            </div>
         </div>
       )}
+      <TeacherDirectModal 
+        isOpen={!!teacherDirectModal}
+        slotData={teacherDirectModal}
+        onClose={() => setTeacherDirectModal(null)}
+        onSuccess={() => { refreshData(); setTeacherDirectModal(null); }}
+        siape={selectedColleague || siape}
+        selectedWeek={selectedWeek}
+        isDarkMode={isDarkMode}
+        dbClasses={classesList}
+        scheduleMode={scheduleMode}
+      />
     </>
   );
 }
-
-

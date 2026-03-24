@@ -175,11 +175,16 @@ export const ClassGrid = React.memo(({
                                                          <span title="Aula permutada por Acordo" className="text-[6px] font-black uppercase tracking-wide text-[#FFFBEB] px-1.5 py-0.5 rounded-br-[8px] bg-amber-600 border-r border-b border-amber-700 block shadow-sm shadow-amber-900/30">PERMUTADA</span>
                                                      </div>
                                                   )}
-                                                  {aulaNesteSlot.isSubstituted && !aulaNesteSlot.isPermuted && !isPending && (
-                                                     <div className="absolute top-0 left-0 z-10 pointer-events-none print:hidden">
-                                                         <span title="Assumida no lugar de uma Vaga" className="text-[6px] font-black uppercase tracking-wide text-white px-1.5 py-0.5 rounded-br-[8px] bg-indigo-600 border-r border-b border-indigo-700 block animate-pulse shadow-sm shadow-indigo-900/30">Substituição</span>
-                                                     </div>
-                                                  )}
+                                                   {aulaNesteSlot.isSubstituted && !aulaNesteSlot.isPermuted && !isPending && (
+                                                      <div className="absolute top-0 left-0 z-10 pointer-events-none print:hidden">
+                                                          <span title="Assumida no lugar de uma Vaga" className="text-[6px] font-black uppercase tracking-wide text-white px-1.5 py-0.5 rounded-br-[8px] bg-indigo-600 border-r border-b border-indigo-700 block animate-pulse shadow-sm shadow-indigo-900/30">Substituição</span>
+                                                      </div>
+                                                   )}
+                                                   {aulaNesteSlot.classType && aulaNesteSlot.classType !== 'Regular' && (
+                                                      <div className="absolute bottom-0 right-0 z-10 pointer-events-none print:hidden">
+                                                          <span className="text-[6px] font-black uppercase tracking-wide text-white px-1.5 py-0.5 rounded-tl-[8px] bg-emerald-600 border-l border-t border-emerald-700 block shadow-sm shadow-emerald-900/30">{aulaNesteSlot.classType}</span>
+                                                      </div>
+                                                   )}
                                                   <p className="subject font-bold text-[10px] leading-tight mb-0.5 text-center flex flex-col items-center gap-0.5">
                                                      <span>{disciplineName}</span>
                                                      {aulaNesteSlot.isPermuted && !isPending && (

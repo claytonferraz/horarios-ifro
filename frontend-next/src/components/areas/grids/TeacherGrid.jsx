@@ -27,6 +27,8 @@ export const TeacherGrid = React.memo(
     setVacantRequestModal,
     setExchangeTarget,
     onReverseSwapClick,
+    onEmptySlotClick,
+    showEmptySlots,
     getColorHash,
     getFormattedDayLabel,
     recordsForWeek,
@@ -139,7 +141,7 @@ export const TeacherGrid = React.memo(
                   const courseClasses = [
                     ...new Set(courseRecords.map((r) => r.className)),
                   ].sort();
-                  const courseDays = safeDays.filter((day) =>
+                  const courseDays = showEmptySlots ? safeDays.filter(d => d !== 'Sunday' && d !== 'Saturday') : safeDays.filter((day) =>
                     courseRecords.some((r) => r.day === day),
                   );
 
@@ -187,7 +189,7 @@ export const TeacherGrid = React.memo(
                             className={`divide-y ${isDarkMode ? "divide-slate-800" : "divide-slate-100"}`}
                           >
                             {courseDays.map((day, dayIndex) => {
-                              const activeTimes = safeTimes.filter((timeObj) =>
+                              const activeTimes = showEmptySlots ? safeTimes : safeTimes.filter((timeObj) =>
                                 courseRecords.some(
                                   (r) =>
                                     r.day === day &&
@@ -287,21 +289,43 @@ export const TeacherGrid = React.memo(
                                                   r.time === timeStr &&
                                                   r.className === cls,
                                               );
+                                              const globalRecordsNesteSlot = mappedSchedules.filter(
+                                                (r) =>
+                                                  r.day === day &&
+                                                  r.time === timeStr &&
+                                                  r.className === cls &&
+                                                  r.teacher &&
+                                                  !/A Definir|sem professor|Pendente|-/i.test(r.teacher)
+                                              );
+                                              const isOccupiedByOther = globalRecordsNesteSlot.length > 0;
 
-                                            return (
-                                              <td
-                                                key={`prof-${cls}-${timeStr}`}
-                                                className={`p-1 border align-top relative ${isDarkMode ? "border-slate-700 group-hover:bg-slate-700/30" : "border-slate-200 group-hover:bg-slate-50/50"}`}
-                                              >
-                                                <div className="flex flex-col gap-1 w-full h-full min-h-[76px]">
-                                                  {recordsNesteSlot.length ===
-                                                  0 ? (
-                                                    <div
-                                                      className={`flex items-center justify-center h-full font-black text-[9px] tracking-widest uppercase select-none flex-1 ${isDarkMode ? "opacity-20" : "opacity-5"}`}
-                                                    >
-                                                      -
-                                                    </div>
-                                                  ) : (
+                                              return (
+                                                <td
+                                                  key={`prof-${cls}-${timeStr}`}
+                                                  className={`p-1 border align-top relative ${isDarkMode ? "border-slate-700 group-hover:bg-slate-700/30" : "border-slate-200 group-hover:bg-slate-50/50"}`}
+                                                >
+                                                  <div className="flex flex-col gap-1 w-full h-full min-h-[76px]">
+                                                    {recordsNesteSlot.length ===
+                                                    0 ? (
+                                                      isOccupiedByOther && showEmptySlots && appMode === 'professor' ? (
+                                                          <div className={`flex items-center justify-center h-full min-h-[76px] rounded-xl transition-all select-none ${isDarkMode ? "bg-slate-800/20 text-slate-500 opacity-60" : "bg-slate-100/50 text-slate-400 opacity-60"}`}>
+                                                              <span className="text-[9px] font-black uppercase tracking-widest text-center px-1">(Ocupado)</span>
+                                                          </div>
+                                                      ) : (
+                                                          <div
+                                                            onClick={() => {
+                                                               if (showEmptySlots && appMode === 'professor' && typeof onEmptySlotClick === 'function') {
+                                                                  onEmptySlotClick({ day, time: timeStr, className: cls, course });
+                                                               }
+                                                            }}
+                                                            className={`flex items-center justify-center h-full min-h-[76px] rounded-xl border-[2px] border-dashed transition-all select-none ${showEmptySlots && appMode === 'professor' ? (isDarkMode ? "border-slate-700 hover:border-indigo-500 hover:bg-indigo-900/20 text-slate-600 hover:text-indigo-400 cursor-pointer" : "border-slate-300 hover:border-indigo-400 hover:bg-indigo-50 text-slate-400 hover:text-indigo-600 cursor-pointer shadow-sm") : (isDarkMode ? "opacity-20 border-transparent text-slate-500" : "opacity-10 border-transparent text-slate-500")}`}
+                                                          >
+                                                            {showEmptySlots && appMode === 'professor' ? (
+                                                              <span className="text-[9px] font-black uppercase tracking-widest">+ Lançar</span>
+                                                            ) : "-"}
+                                                          </div>
+                                                      )
+                                                    ) : (
                                                     recordsNesteSlot.map(
                                                       (r, idx) => {
                                                         const isVaga =
@@ -393,6 +417,11 @@ export const TeacherGrid = React.memo(
                                                                    <span title="Assumida no lugar de uma Vaga" className="text-[6px] font-black uppercase tracking-wide text-white px-1.5 py-0.5 rounded-br-[8px] bg-indigo-600 border-r border-b border-indigo-700 block shadow-sm shadow-indigo-900/30">Substituição</span>
                                                                 </div>
                                                             )}
+                                                            {r.classType && r.classType !== 'Regular' && !isVagaReal && (
+                                                                <div className="absolute bottom-0 right-0 z-10 pointer-events-none print:hidden">
+                                                                   <span className="text-[6px] font-black uppercase tracking-wide text-white px-1.5 py-0.5 rounded-tl-[8px] bg-emerald-600 border-l border-t border-emerald-700 block shadow-sm shadow-emerald-900/30">{r.classType}</span>
+                                                                </div>
+                                                            )}
                                                             <React.Fragment>
                                                               <p className={"subject font-black text-xs sm:text-sm leading-snug text-center drop-shadow-sm mt-1 " + (!isActive ? "text-slate-500" : "")}>{r.subject || "Pendente"}</p>
                                                               <span className={"details text-[10px] sm:text-xs font-black tracking-widest px-2 py-1 rounded mt-1 w-fit uppercase mx-auto shadow-sm " + (isActive ? (isDarkMode ? 'bg-white/25 text-white' : 'bg-black/10 text-slate-900') : (isDarkMode ? 'bg-slate-700 text-slate-400' : 'bg-slate-200 text-slate-500'))}>
@@ -448,13 +477,13 @@ export const TeacherGrid = React.memo(
                           const dayRecords = courseRecords.filter(
                             (r) => r.day === day,
                           );
-                          if (dayRecords.length === 0) return null;
+                          if (dayRecords.length === 0 && !showEmptySlots) return null;
 
-                          const dailyShifts = new Set(
+                          const dailyShifts = showEmptySlots ? new Set(safeTimes.map(t => t.shift).filter(Boolean)) : new Set(
                             courseRecords
                               .map(
                                 (r) =>
-                                  safeTimes.find((t) => t.timeStr === r.time)
+                                  safeTimes.find((t) => (t.timeStr || t) === r.time)
                                     ?.shift,
                               )
                               .filter(Boolean),
@@ -496,7 +525,7 @@ export const TeacherGrid = React.memo(
                                         </span>
                                       </div>
                                       <div className="flex-1 space-y-2">
-                                        {records.map((r, rIdx) => {
+                                        {records.length > 0 ? records.map((r, rIdx) => {
                                           const isPending = isTeacherPending(
                                             r.teacher,
                                           );
@@ -512,9 +541,12 @@ export const TeacherGrid = React.memo(
                                                   {r.className}
                                                 </span>
                                                 <span className="font-bold text-[10px] leading-tight truncate">
-                                                  {r.subject}
+                                                  {r.subject} {r.classType && r.classType !== 'Regular' && `(${r.classType})`}
                                                 </span>
                                               </div>
+                                              {r.classType && r.classType !== 'Regular' && (
+                                                <span className="text-[8px] font-black uppercase tracking-widest pl-1 mt-0.5 text-emerald-600 dark:text-emerald-400 block">{r.classType}</span>
+                                              )}
                                               {r.room && (
                                                 <span
                                                   className={`text-[8px] font-black uppercase tracking-widest pl-1 mt-1 opacity-80 block`}
@@ -524,7 +556,19 @@ export const TeacherGrid = React.memo(
                                               )}
                                             </div>
                                           );
-                                        })}
+                                        }) : (
+                                          <div 
+                                             onClick={() => {
+                                               // Aqui o mobile precisaria de qual classe? Se não tem classe específica nesse contexto mobile, vamos usar a primeira do courseClasses
+                                               if (showEmptySlots && appMode === 'professor' && typeof onEmptySlotClick === 'function' && courseClasses.length > 0) {
+                                                  onEmptySlotClick({ day, time, className: courseClasses[0], course });
+                                               }
+                                             }}
+                                             className={`w-full py-2.5 rounded-lg border-[2px] border-dashed text-center flex items-center justify-center transition-all ${showEmptySlots && appMode === 'professor' ? (isDarkMode ? "border-slate-700 bg-slate-800/30 text-indigo-400" : "border-slate-300 bg-slate-50 text-indigo-600 hover:bg-slate-100 cursor-pointer") : (isDarkMode ? "opacity-20 border-transparent text-slate-500" : "opacity-10 border-transparent text-slate-500")}`}
+                                          >
+                                            {showEmptySlots && appMode === 'professor' ? <span className="text-[9px] font-black uppercase tracking-widest">+ Lançar Aula</span> : "-"}
+                                          </div>
+                                        )}
                                       </div>
                                     </div>
                                   );

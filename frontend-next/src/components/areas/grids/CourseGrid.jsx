@@ -527,9 +527,10 @@ export const CourseGrid = React.memo(
                                                                   [
                                                                     "admin",
                                                                     "gestao",
+                                                                    "professor"
                                                                   ].includes(
                                                                     userRole,
-                                                                  )
+                                                                  ) && !["oficial", "consolidado"].includes(scheduleMode)
                                                                 )
                                                                   setEditorModal(
                                                                     {
@@ -540,7 +541,7 @@ export const CourseGrid = React.memo(
                                                                     },
                                                                   );
                                                               }}
-                                                              className={`w-full h-full min-h-[50px] p-0.5 rounded-lg transition-colors ${["admin", "gestao"].includes(userRole) ? "cursor-pointer hover:ring-2 hover:ring-indigo-500 hover:z-30 relative" : ""} ${conflictMsg ? "bg-red-500/20 ring-2 ring-red-500 !bg-red-500/20" : snapshot.isDraggingOver ? (isDarkMode ? "bg-slate-700/50" : "bg-slate-100") : isDarkMode ? "group-hover:bg-slate-700/30 bg-slate-800/20" : "group-hover:bg-slate-50/50 bg-slate-50/20"}`}
+                                                              className={`w-full h-full min-h-[50px] p-0.5 rounded-lg transition-colors ${["admin", "gestao", "professor"].includes(userRole) && !["oficial", "consolidado"].includes(scheduleMode) ? "cursor-pointer hover:ring-2 hover:ring-indigo-500 hover:z-30 relative" : ""} ${conflictMsg ? "bg-red-500/20 ring-2 ring-red-500 !bg-red-500/20" : snapshot.isDraggingOver ? (isDarkMode ? "bg-slate-700/50" : "bg-slate-100") : isDarkMode ? "group-hover:bg-slate-700/30 bg-slate-800/20" : "group-hover:bg-slate-50/50 bg-slate-50/20"}`}
                                                             >
                                                               {conflictMsg &&
                                                                 snapshot.isDraggingOver && (
@@ -636,6 +637,13 @@ export const CourseGrid = React.memo(
                                                                                   className="text-[5px] font-black uppercase tracking-widest text-white px-1.5 py-[2px] rounded border border-indigo-400 bg-indigo-600 block shadow-sm shadow-indigo-900/40"
                                                                                 >
                                                                                   Substituição
+                                                                                </span>
+                                                                              </div>
+                                                                            )}
+                                                                            {r.classType && r.classType !== 'Regular' && (
+                                                                              <div className="absolute -top-1.5 -left-1 z-10 print:hidden shadow-sm pointer-events-none">
+                                                                                <span className="text-[5px] font-black uppercase tracking-widest text-white px-1.5 py-[2px] rounded border border-emerald-400 bg-emerald-600 block shadow-sm shadow-emerald-900/40">
+                                                                                  {r.classType}
                                                                                 </span>
                                                                               </div>
                                                                             )}

@@ -266,7 +266,7 @@ module.exports = function(io) {
   const schedulePayloadSchema = z.object({
     id: z.string().min(1, "ID é obrigatório"),
     week: z.string().min(1, "Semana é obrigatória"),
-    type: z.enum(['oficial', 'previa', 'padrao']),
+    type: z.enum(['oficial', 'previa', 'padrao', 'atual']),
     fileName: z.string().optional(),
     records: z.string().min(2, "Records deve ser uma string JSON válida")
   });
@@ -291,16 +291,12 @@ module.exports = function(io) {
           const slotKey = `${r.day}_${r.time}`;
           if (isSet(r.teacher)) {
             const key = `${r.teacher}_${slotKey}`;
-            if (teacherMap.has(key) && teacherMap.get(key) !== r.id) {
-               throw new Error(`Conflito de Horário: O professor ${r.teacher} já possui aula em ${r.day} às ${r.time}.`);
-            }
+            // Permitindo override no front-end em vez de bloquear na API
             teacherMap.set(key, r.id);
           }
           if (isSet(r.className)) {
             const key = `${r.className}_${slotKey}`;
-            if (classMap.has(key) && classMap.get(key) !== r.id) {
-               throw new Error(`Conflito Acadêmico: A turma ${r.className} já possui aula alocada em ${r.day} às ${r.time}.`);
-            }
+            // Permitir permissividade para resolver conflitos de laboratórios
             classMap.set(key, r.id);
           }
         }

@@ -6,9 +6,10 @@ export function ScheduleEditorModal({
   isOpen, onClose, isDarkMode, 
   scheduleMode, selectedWeek,
   className, day, time, timeObj,
-  courseRecords, weekData, classTimes
+  courseRecords, weekData, classTimes, userRole, siape
 }) {
   const [localRecords, setLocalRecords] = useState([]);
+  const [extraWeek, setExtraWeek] = useState(selectedWeek || '');
   const [inconsistencies, setInconsistencies] = useState([]);
   const [saving, setSaving] = useState(false);
   const [matrixData, setMatrixData] = useState([]);
@@ -110,7 +111,15 @@ export function ScheduleEditorModal({
      const matrix = matrixData.find(m => m.id === currentClassObj.matrixId);
      if (matrix) {
         const serie = matrix.series.find(s => s.id === currentClassObj.serieId);
-        if (serie) availableDisciplines = serie.disciplines;
+        if (serie) {
+           availableDisciplines = serie.disciplines;
+           if (userRole === 'professor') {
+              availableDisciplines = availableDisciplines.filter(d => {
+                 const mappedProfs = currentClassObj.professorAssignments?.[d.id] || [];
+                 return mappedProfs.includes(String(siape));
+              });
+           }
+        }
      }
   }
 
@@ -122,7 +131,11 @@ export function ScheduleEditorModal({
          availableDisciplines.find(d => d.name === val)?.id
        ];
        if (mappedProfs && mappedProfs.length > 0) {
-          setLocalRecords(prev => prev.map(r => r.id === id ? { ...r, teacher: mappedProfs[0] } : r));
+          setLocalRecords(prev => prev.map(r => r.id === id ? { ...r, subject: val, teacher: userRole === 'professor' ? String(siape) : mappedProfs[0] } : r));
+       } else if (userRole === 'professor') {
+          setLocalRecords(prev => prev.map(r => r.id === id ? { ...r, subject: val, teacher: String(siape) } : r));
+       } else {
+          setLocalRecords(prev => prev.map(r => r.id === id ? { ...r, subject: val, teacher: 'A Definir' } : r));
        }
     }
   };
@@ -131,7 +144,7 @@ export function ScheduleEditorModal({
      setLocalRecords(prev => [...prev, {
          id: 'n_' + Date.now(),
          day, time, className, 
-         teacher: '', subject: '',
+         teacher: userRole === 'professor' ? String(siape) : '', subject: '',
          startTime: timeObj?.startTime || '',
          endTime: timeObj?.endTime || '',
          classType: 'Regular'
@@ -154,16 +167,30 @@ export function ScheduleEditorModal({
          }
       }
 
+      if (scheduleMode === 'padrao' && !extraWeek) {
+         alert("Por favor, selecione para qual semana esta modificação se aplica!");
+         setSaving(false);
+         return;
+      }
+
       // Preparando os novos records pra substituir os antigos
       const cleanedLocal = localRecords.filter(r => r.subject && r.teacher);
       const otherRecords = weekData.records.filter(r => !(r.className === className && r.day === day && r.time === time));
       
       const newRecords = [...otherRecords, ...cleanedLocal];
 
-      await apiClient.saveSchedule(weekData.id || selectedWeek, {
-         ...weekData,
+      const targetWeek = scheduleMode === 'padrao' ? extraWeek : (weekData?.week || selectedWeek);
+      const payloadId = weekData?.id || selectedWeek || `s_${Date.now()}`;
+      const targetType = scheduleMode === 'padrao' ? 'previa' : scheduleMode; // Aulas a mais no padrão viram prévia da semana escolhida
+
+      const payload = {
+         id: String(payloadId),
+         week: String(targetWeek),
+         type: targetType,
          records: JSON.stringify(newRecords)
-      });
+      };
+
+      await apiClient.saveSchedule(payloadId, payload);
       // A atualização do front será reativa no próprio componente pai
       onClose(true); // true = refresh needed
     } catch(e) {
@@ -186,6 +213,23 @@ export function ScheduleEditorModal({
           <Clock className="text-indigo-500" /> Editar Grade (Sincronização Ativa)
         </h2>
         <p className="text-xs font-bold opacity-60 mb-6 uppercase tracking-widest">{day} - {time} - TURMA: {className}</p>
+
+        {scheduleMode === 'padrao' && (
+           <div className="mb-6 p-4 rounded-xl border bg-indigo-500/10 border-indigo-500/30">
+              <label className="text-[10px] font-black uppercase tracking-widest opacity-80 block mb-2 text-indigo-400">Para qual Semana é esta aula avulsa?</label>
+              <select 
+                 value={extraWeek}
+                 onChange={e => setExtraWeek(e.target.value)}
+                 className={`w-full p-2.5 rounded-lg border font-bold text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 ${isDarkMode ? 'bg-slate-900 border-slate-700 text-white' : 'bg-white border-slate-300 text-slate-800'}`}
+              >
+                  <option value="">Selecione a semana alvo...</option>
+                  {Array.from({length: 40}, (_, i) => {
+                     const wName = `Semana ${String(i+1).padStart(2, '0')}`;
+                     return <option key={i} value={wName}>{wName}</option>;
+                  })}
+              </select>
+           </div>
+        )}
 
         {inconsistencies.length > 0 && (
           <div className="mb-6 p-4 rounded-xl bg-orange-500/20 border border-orange-500/50 text-orange-400 text-xs">
@@ -212,21 +256,6 @@ export function ScheduleEditorModal({
                          <option key={d.id} value={d.name}>{d.name} ({d.aulas_semanais || 0} aulas/sem)</option>
                       ))}
                       {!availableDisciplines.find(d => d.name === r.subject) && r.subject && <option value={r.subject}>{r.subject} (Avulso)</option>}
-                    </select>
-                  </div>
-                  <div>
-                    <label className="text-[10px] font-black uppercase tracking-widest opacity-60 block mb-1">Professor (Da Base Central)</label>
-                    <select 
-                       value={r.teacher} 
-                       onChange={e => handleUpdate(r.id, 'teacher', e.target.value)} 
-                       className={`w-full p-2.5 rounded-lg border font-bold text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 ${isDarkMode ? 'bg-slate-900 border-slate-700' : 'bg-white border-slate-300'}`}
-                    >
-                      <option value="">Selecione um Professor...</option>
-                      <option value="SEM PROFESSOR">SEM PROFESSOR</option>
-                      <option value="SUBSTITUTO">SUBSTITUTO</option>
-                      {usersList.map(u => (
-                         <option key={u.siape} value={u.siape}>{u.nome_exibicao || u.nome_completo}</option>
-                      ))}
                     </select>
                   </div>
                 </div>

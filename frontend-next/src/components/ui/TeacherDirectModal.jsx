@@ -1,0 +1,330 @@
+import React, { useState, useEffect } from "react";
+import { X, CheckCircle, Search, Calendar, User, Clock, CheckCircle2 } from "lucide-react";
+import { apiClient } from "@/lib/apiClient";
+import { SearchableSelect } from "./SearchableSelect";
+import { useData } from "@/contexts/DataContext";
+
+export function TeacherDirectModal({
+  isOpen,
+  onClose,
+  onSuccess,
+  slotData,
+  siape,
+  selectedWeek,
+  isDarkMode,
+  dbClasses = [],
+  scheduleMode = "atual"
+}) {
+  const [loading, setLoading] = useState(false);
+  const [selectedSubject, setSelectedSubject] = useState("");
+  const [classType, setClassType] = useState("Regular");
+  const [selectedTimes, setSelectedTimes] = useState([]);
+
+  const { classTimes, matrixData, schedules } = useData();
+
+  useEffect(() => {
+    if (isOpen && slotData) {
+      setSelectedSubject("");
+      setClassType("Regular");
+      setSelectedTimes([slotData.time]);
+    }
+  }, [isOpen, slotData]);
+
+  if (!isOpen || !slotData) return null;
+
+  // Usa apenas a turma vinda da célula clicada
+  const selectedClass = slotData.className;
+  const clickedTimeObj = classTimes.find(t => t.timeStr === slotData.time);
+  const currentShift = clickedTimeObj?.shift || "Manhã";
+  const shiftTimes = classTimes.filter(t => t.shift === currentShift);
+
+  // Deriva todas as turmas onde este professor atua, puxando com segurança das matrizes ativas
+  const classObj = dbClasses.find(c => c.name === selectedClass);
+  let availableSubjects = [];
+  
+  if (classObj && matrixData) {
+     const matrix = matrixData.find(m => m.id === classObj.matrixId);
+     if (matrix) {
+         const serie = matrix.series.find(s => s.id === classObj.serieId);
+         if (serie && serie.disciplines) {
+            availableSubjects = serie.disciplines.filter(d => {
+               if (!classObj.professorAssignments) return false;
+               const rawProfs = classObj.professorAssignments[d.id] || classObj.professorAssignments[String(d.id)];
+               if (!rawProfs) return false;
+               const mappedProfs = Array.isArray(rawProfs) ? rawProfs : [rawProfs];
+               return mappedProfs.some(p => String(p) === String(siape) || String(p).includes(String(siape)));
+            });
+         }
+     }
+  }
+
+  // FALLBACK PROTEÇÃO EXTREMA: Se não houver vínculos na classe exata, exibe qualquer disciplina
+  // que o professor lecione em outras turmas. (Evita bloqueio de lançamento)
+  if (availableSubjects.length === 0 && matrixData) {
+      dbClasses.forEach(c => {
+         const matrix = matrixData.find(m => m.id === c.matrixId);
+         const serie = matrix?.series?.find(s => s.id === c.serieId);
+         if (serie && serie.disciplines) {
+             serie.disciplines.forEach(d => {
+                 const rawProfs = c.professorAssignments?.[d.id] || c.professorAssignments?.[String(d.id)];
+                 if (rawProfs) {
+                     const mappedProfs = Array.isArray(rawProfs) ? rawProfs : [rawProfs];
+                     if (mappedProfs.some(p => String(p) === String(siape) || String(p).includes(String(siape)))) {
+                         if (!availableSubjects.find(ex => ex.name === d.name)) {
+                             availableSubjects.push(d);
+                         }
+                     }
+                 }
+             });
+         }
+      });
+  }
+
+  // ÚLTIMO RECURSO INQUEBRÁVEL: Se o banco de matrizes falhou ou não existe professor_assignments na base,
+  // vamos olhar o que ele já dá aula de fato nas grades já cadastradas (histórico real do usuário)
+  if (availableSubjects.length === 0 && schedules && schedules.length > 0) {
+      schedules.forEach(sched => {
+         if (!sched.records) return;
+         try {
+            const recs = JSON.parse(sched.records);
+            recs.forEach(r => {
+               if (r.teacher && (String(r.teacher) === String(siape) || String(r.teacher).includes(String(siape)))) {
+                   if (r.className === selectedClass && r.subject && !availableSubjects.some(ex => ex.name === r.subject)) {
+                       availableSubjects.push({ name: r.subject, id: r.subject });
+                   }
+               }
+            });
+         } catch(e) {}
+      });
+      
+      // E se nem na mesma turma ele tem histórico, pegamos de QUALQUER turma que ele já deu aula (Liberação total)
+      if (availableSubjects.length === 0) {
+          schedules.forEach(sched => {
+             if (!sched.records) return;
+             try {
+                const recs = JSON.parse(sched.records);
+                recs.forEach(r => {
+                   if (r.teacher && (String(r.teacher) === String(siape) || String(r.teacher).includes(String(siape)))) {
+                       if (r.subject && !availableSubjects.some(ex => ex.name === r.subject)) {
+                           availableSubjects.push({ name: r.subject, id: r.subject });
+                       }
+                   }
+                });
+             } catch(e) {}
+          });
+      }
+  }
+
+  const handleSave = async () => {
+    if (!selectedClass || !selectedSubject) {
+      alert("Por favor, preencha a Turma e a Disciplina!");
+      return;
+    }
+    if (selectedTimes.length === 0) {
+      alert("Por favor, selecione pelo menos um horário!");
+      return;
+    }
+
+    try {
+      setLoading(true);
+
+      const targetType = scheduleMode === 'padrao' ? 'previa' : scheduleMode; 
+      const data = await apiClient.fetchAll();
+      const currentSchedules = data.schedules || [];
+      const targetSchedules = currentSchedules.filter(s => s.type === targetType && String(s.week_id) === String(selectedWeek));
+      
+      let isOccupied = false;
+      let existingRecord = null;
+      let currentRecordsArray = [];
+      const scheduleForCurrentWeek = targetSchedules[0];
+
+      if (scheduleForCurrentWeek && scheduleForCurrentWeek.records) {
+         try { currentRecordsArray = JSON.parse(scheduleForCurrentWeek.records); } catch(e) {}
+         existingRecord = currentRecordsArray.find(r => 
+             r.className === selectedClass && 
+             r.day === slotData.day && 
+             selectedTimes.includes(r.time) && 
+             r.teacher && 
+             !/A Definir|sem professor|Pendente|-/i.test(r.teacher)
+         );
+         if (existingRecord) isOccupied = true;
+      }
+
+      if (isOccupied) {
+         alert(`Vaga Recusada: Um colega ocupou esta aula exatamente instantes antes de você atualizar.`);
+         onSuccess();
+         onClose();
+         return;
+      }
+
+      const newRecordsList = selectedTimes.map((selTime, i) => {
+          const timeParts = selTime.split(' - ');
+          const mappedTimeObj = classTimes.find(t => t.timeStr === selTime) || {};
+          return {
+            id: "nd_" + Date.now() + "_" + i,
+            day: slotData.day,
+            time: selTime,
+            startTime: timeParts[0] || mappedTimeObj.startTime || "",
+            endTime: timeParts[1] || mappedTimeObj.endTime || "",
+            className: selectedClass,
+            subject: selectedSubject,
+            teacher: String(siape), // O modal já injeta o SIAPE fixo
+            classType: classType,
+            course: slotData.course || "", 
+          };
+      });
+
+      const cleanedCurrentRecords = currentRecordsArray.filter(r => 
+          !(r.className === selectedClass && r.day === slotData.day && selectedTimes.includes(r.time))
+      );
+      const finalRecords = [...cleanedCurrentRecords, ...newRecordsList];
+      
+      const payloadId = scheduleForCurrentWeek?.id || `s_${Date.now()}`;
+
+      const payload = {
+        id: payloadId,
+        week: String(selectedWeek),
+        type: targetType,
+        records: JSON.stringify(finalRecords)
+      };
+
+      await apiClient.saveSchedule(payloadId, payload);
+      
+      alert("Aula lançada com sucesso!");
+      onSuccess();
+      onClose();
+    } catch (e) {
+      console.error(e);
+      alert("Erro ao lançar a aula. Detalhes: " + e.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+  return (
+    <div className="fixed inset-0 z-[999] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 sm:p-6 animate-in fade-in duration-200">
+      <div 
+         className={`relative w-full max-w-lg rounded-3xl shadow-2xl overflow-hidden animate-in zoom-in-95 duration-300 ${isDarkMode ? 'bg-slate-900 border border-slate-700' : 'bg-white border border-slate-100'}`}
+      >
+        <div className={`px-6 py-4 flex items-center justify-between border-b ${isDarkMode ? 'bg-slate-800 border-slate-700' : 'bg-slate-50 border-slate-100'}`}>
+          <div className="flex items-center gap-3">
+            <div className={`p-2 rounded-xl ${isDarkMode ? 'bg-indigo-900/40 text-indigo-400' : 'bg-indigo-100 text-indigo-600'}`}>
+              <CheckCircle2 size={24} />
+            </div>
+            <div>
+              <h2 className={`font-black tracking-widest uppercase text-base ${isDarkMode ? 'text-slate-100' : 'text-slate-800'}`}>Lançamento Direto</h2>
+              <p className={`text-[10px] font-bold uppercase tracking-widest mt-0.5 ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>Preenchimento de Horário Livre</p>
+            </div>
+          </div>
+          <button onClick={onClose} className={`p-2 rounded-full transition-colors ${isDarkMode ? 'hover:bg-slate-700 text-slate-400' : 'hover:bg-slate-200 text-slate-500'}`}>
+             <X size={20} />
+          </button>
+        </div>
+
+        <div className="p-6 space-y-5">
+           
+           <div className={`p-4 rounded-2xl flex items-center justify-between shadow-inner ${isDarkMode ? 'bg-slate-800 border-slate-700' : 'bg-slate-50 border-slate-100'}`}>
+             <div className="flex items-center gap-3">
+                <Calendar size={18} className={isDarkMode ? 'text-slate-400' : 'text-slate-500'} />
+                <div>
+                   <p className={`text-[10px] font-black uppercase tracking-widest ${isDarkMode ? 'text-slate-500' : 'text-slate-400'}`}>Dia Alvo</p>
+                   <p className={`font-bold mt-0.5 ${isDarkMode ? 'text-slate-200' : 'text-slate-700'}`}>{slotData.day}</p>
+                </div>
+             </div>
+             
+             <div className="w-px h-8 bg-slate-300 dark:bg-slate-600"></div>
+
+             <div className="flex items-start gap-3 w-full sm:w-auto mt-3 sm:mt-0">
+                <Clock size={18} className={`mt-0.5 ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`} />
+                <div className="flex-1 min-w-[200px]">
+                   <p className={`text-[10px] font-black uppercase tracking-widest ${isDarkMode ? 'text-slate-500' : 'text-slate-400'}`}>
+                      Múltiplos Horários ({currentShift})
+                   </p>
+                   <div className="grid grid-cols-2 gap-2 mt-2">
+                       {shiftTimes.map(t => (
+                          <label key={t.timeStr} className={`flex items-center gap-2 p-2 rounded-lg border cursor-pointer transition-all ${selectedTimes.includes(t.timeStr) ? (isDarkMode ? 'bg-indigo-900/40 border-indigo-500 shadow-sm' : 'bg-indigo-50 border-indigo-400 shadow-sm') : (isDarkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200 hover:bg-slate-50')}`}>
+                             <input 
+                               type="checkbox" 
+                               checked={selectedTimes.includes(t.timeStr)} 
+                               onChange={(e) => {
+                                  if (e.target.checked) setSelectedTimes(prev => [...prev, t.timeStr]);
+                                  else setSelectedTimes(prev => prev.filter(time => time !== t.timeStr));
+                               }}
+                               className="w-3.5 h-3.5 text-indigo-600 focus:ring-indigo-500 rounded border-slate-300 transition-all cursor-pointer"
+                             />
+                             <span className={`text-[10px] sm:text-xs font-bold leading-none ${isDarkMode ? 'text-slate-300' : 'text-slate-700'}`}>{t.timeStr}</span>
+                          </label>
+                       ))}
+                   </div>
+                </div>
+             </div>
+           </div>
+
+           <div className="space-y-4">
+              <div>
+                <label className={`block text-[10px] font-black tracking-widest uppercase mb-1.5 ml-1 ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>Turma Alvo</label>
+                <input 
+                  type="text"
+                  readOnly
+                  value={selectedClass}
+                  className={`w-full p-3 font-bold text-sm rounded-xl border focus:outline-none transition-all cursor-not-allowed opacity-90 ${isDarkMode ? 'bg-slate-800 border-slate-700 text-slate-300' : 'bg-slate-100 border-slate-200 text-slate-600'}`}
+                />
+              </div>
+
+              <div>
+                <label className={`block text-[10px] font-black tracking-widest uppercase mb-1.5 ml-1 flex justify-between items-center ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>
+                   Sua Disciplina
+                   {availableSubjects.length === 0 && <span className="text-[8px] text-amber-500 font-bold">(Nenhum vínculo achado)</span>}
+                </label>
+                <select 
+                  className={`w-full p-3 font-bold text-sm rounded-xl border focus:ring-2 focus:outline-none transition-all cursor-pointer ${isDarkMode ? 'bg-slate-800 border-slate-700 text-white focus:ring-indigo-500/50' : 'bg-slate-50 border-slate-200 text-slate-800 focus:ring-indigo-500/20 shadow-sm'}`}
+                  value={selectedSubject}
+                  onChange={(e) => setSelectedSubject(e.target.value)}
+                >
+                   {availableSubjects.length === 0 ? (
+                      <option value="" disabled>-- Base dados incompleta --</option>
+                   ) : (
+                      <option value="" disabled>-- Escolha sua matéria --</option>
+                   )}
+                   {availableSubjects.map(d => <option key={d.name} value={d.name}>{d.name}</option>)}
+                </select>
+                {availableSubjects.length === 0 && (
+                   <p className={`text-[9px] mt-2 px-2 flex justify-between gap-2 leading-tight ${isDarkMode ? 'text-amber-400/80' : 'text-amber-600/80'}`}>
+                      Se a disciplina não carregou, feche e abra o modal novamente ou peça suporte à Gestão para vincular seu SIAPE à matriz.
+                   </p>
+                )}
+              </div>
+
+              <div>
+                <label className={`block text-[10px] font-black tracking-widest uppercase mb-1.5 ml-1 ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>Motivo / Tipo de Aula</label>
+                <div className={`flex flex-wrap gap-2 p-1.5 shadow-inner rounded-xl ${isDarkMode ? 'bg-slate-800' : 'bg-slate-100'}`}>
+                   {['Regular', 'Recuperação', 'Exame Final', 'Atendimento ao aluno'].map(tipo => (
+                      <button 
+                        key={tipo}
+                        onClick={() => setClassType(tipo)}
+                        className={`flex-1 min-w-[100px] py-2 px-3 text-[10px] font-black uppercase tracking-widest rounded-lg transition-all ${classType === tipo ? 'bg-indigo-500 text-white shadow-md ring-2 ring-indigo-500/30' : (isDarkMode ? 'text-slate-400 hover:text-slate-300 hover:bg-slate-700' : 'text-slate-500 hover:text-slate-800 hover:bg-white')}`}
+                      >
+                         {tipo}
+                      </button>
+                   ))}
+                </div>
+              </div>
+           </div>
+
+        </div>
+
+        <div className={`p-5 flex justify-end gap-3 border-t ${isDarkMode ? 'bg-slate-800/50 border-slate-700' : 'bg-slate-50 border-slate-100'}`}>
+           <button onClick={onClose} className={`px-5 py-2.5 rounded-xl font-bold text-xs transition-colors ${isDarkMode ? 'text-slate-400 hover:text-slate-200 hover:bg-slate-800' : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200'}`}>
+             Cancelar
+           </button>
+           <button 
+              onClick={handleSave} 
+              disabled={loading || !selectedSubject || !selectedClass}
+              className={`px-8 py-2.5 rounded-xl font-black text-xs uppercase tracking-widest transition-all shadow-lg flex items-center gap-2 ${(loading || !selectedSubject || !selectedClass) ? 'opacity-50 cursor-not-allowed' : 'hover:scale-105'} ${isDarkMode ? 'bg-indigo-600 text-white shadow-indigo-900/40 hover:bg-indigo-500' : 'bg-indigo-600 text-white shadow-indigo-600/30 hover:bg-indigo-700'}`}
+           >
+             {loading ? 'Processando...' : 'Confirmar e Lançar'}
+           </button>
+        </div>
+      </div>
+    </div>
+  );
+}

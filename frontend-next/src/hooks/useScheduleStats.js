@@ -52,7 +52,11 @@ export function useScheduleStats({
         summary[key].updatedAt = r.updatedAt;
       }
     });
-    const getVal = (s) => { const m = s.match(/(\d{2})\/(\d{2})/); return m ? parseInt(m[2])*100 + parseInt(m[1]) : 9999; };
+    const getVal = (s) => { 
+      if (!s || typeof s !== 'string') return 9999;
+      const m = s.match(/(\d{2})\/(\d{2})/); 
+      return m ? parseInt(m[2])*100 + parseInt(m[1]) : 9999; 
+    };
     return Object.values(summary).sort((a,b) => getVal(a.week) - getVal(b.week));
   }, [rawData, disabledWeeks]);
 

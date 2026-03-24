@@ -417,6 +417,7 @@ export function MasterGrid({ isDarkMode, ...props }) {
              let flagIsPermuted = false;
              let flagOriginalSubject = null;
              let flagIsDisponibilizada = false;
+             let flagClassType = null; // New declaration
              if (schedule.records) {
                  try {
                      const recs = JSON.parse(schedule.records);
@@ -430,6 +431,9 @@ export function MasterGrid({ isDarkMode, ...props }) {
                      if (recs.isDisponibilizada) {
                          flagIsDisponibilizada = true;
                      }
+                     if (recs.classType) { // New logic
+                         flagClassType = recs.classType;
+                     }
                      if (Array.isArray(recs)) {
                          const found = recs.find(r => String(r.day) === String(schedule.dayOfWeek) && String(r.time) === String(schedule.slotId));
                          if (found?.isSubstituted) {
@@ -441,6 +445,9 @@ export function MasterGrid({ isDarkMode, ...props }) {
                          }
                          if (found?.isDisponibilizada) {
                              flagIsDisponibilizada = true;
+                         }
+                         if (found?.classType) { // New logic
+                             flagClassType = found.classType;
                          }
                      }
                  } catch(e) {}
@@ -455,7 +462,8 @@ export function MasterGrid({ isDarkMode, ...props }) {
                  isSubstituted: flagIsSubstituted,
                  isPermuted: flagIsPermuted,
                  originalSubject: flagOriginalSubject,
-                 isDisponibilizada: flagIsDisponibilizada
+                 isDisponibilizada: flagIsDisponibilizada,
+                 classType: flagClassType
              };
              aulasAlocadasIds.push(String(refCard.id));
         }
@@ -1302,6 +1310,11 @@ export function MasterGrid({ isDarkMode, ...props }) {
                                         <span title="Aula assumida via Vaga" className="text-[5px] font-black uppercase tracking-widest text-white px-1.5 py-[2px] rounded-br-md border-b border-r border-indigo-500/50 bg-indigo-600 block shadow-sm shadow-indigo-900/40 relative z-10">Substituição</span>
                                      </div>
                                   )}
+                                  {aulaNesteSlot.classType && aulaNesteSlot.classType !== 'Regular' && (
+                                     <div className="absolute top-0 right-0 z-10 print:hidden shadow-sm pointer-events-none">
+                                        <span className="text-[5px] font-black uppercase tracking-widest text-white px-1.5 py-[2px] rounded-bl-md border-b border-l border-emerald-500/50 bg-emerald-600 block shadow-sm shadow-emerald-900/40 relative z-10">{aulaNesteSlot.classType}</span>
+                                     </div>
+                                  )}
                                   <div className={`flex flex-col flex-1 shrink-0 ${isVaga ? 'mt-4 mb-1' : 'mt-3.5 mb-1'}`} title={`${aulaNesteSlot.disciplina} - ${aulaNesteSlot.className}`}>
                                      <span className="text-[10px] font-black uppercase tracking-widest leading-none drop-shadow-sm">{aulaNesteSlot.disciplina}</span>
                                      {aulaNesteSlot.isSubstituted && aulaNesteSlot.originalSubject && !aulaNesteSlot.isDisponibilizada && <span className="text-[7.5px] opacity-90 uppercase mt-0.5 leading-tight text-white bg-indigo-900/60 border border-indigo-400/30 rounded px-1 py-[1px] w-fit shadow-sm">Era: {aulaNesteSlot.originalSubject}</span>}
@@ -1650,7 +1663,8 @@ function SaveMatrixModal({ isDarkMode, grade, selectedCourses, courses, saveOpti
         isSubstituted: aula.isSubstituted || false,
         isPermuted: aula.isPermuted || false,
         originalSubject: aula.originalSubject || null,
-        isDisponibilizada: aula.isDisponibilizada || false
+        isDisponibilizada: aula.isDisponibilizada || false,
+        classType: aula.classType || null
       };
     });
 
@@ -1663,7 +1677,7 @@ function SaveMatrixModal({ isDarkMode, grade, selectedCourses, courses, saveOpti
                 payload.push({
                     courseId: pSlot.courseId, classId: pSlot.classId, dayOfWeek: pSlot.dayOfWeek,
                     slotId: pSlot.slotId, teacherId: 'A Definir', disciplineId: pSlot.disciplineId, room: pSlot.room,
-                    isSubstituted: false, isPermuted: false, originalSubject: null, isDisponibilizada: false
+                    isSubstituted: false, isPermuted: false, originalSubject: null, isDisponibilizada: false, classType: null
                 });
             }
         });
