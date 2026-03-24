@@ -44,6 +44,7 @@ export const CourseGrid = React.memo(
     padraoFilterTeacher,
     setPadraoFilterTeacher,
     siape,
+    onReverseSwapClick,
   }) => {
     const [mobileSelectedClasses, setMobileSelectedClasses] = useState({});
     const [activeCourseTab, setActiveCourseTab] = useState("Todos");
@@ -583,7 +584,7 @@ export const CourseGrid = React.memo(
                                                                             {...prov2.draggableProps}
                                                                             {...prov2.dragHandleProps}
                                                                             onClick={(e) => {
-                                                                               if (userRole === "professor" && onReverseSwapClick) {
+                                                                               if (appMode === "professor" && onReverseSwapClick) {
                                                                                    if (hasPendingSwap) {
                                                                                       e.stopPropagation();
                                                                                       alert("Esta aula já possui uma permuta em andamento.");
@@ -910,7 +911,18 @@ export const CourseGrid = React.memo(
                                                               return (
                                                                 <div
                                                                   key={`mob-rec-${r.id}`}
-                                                                  className={`p-2.5 flex items-center justify-between gap-2 rounded-lg border shadow-sm ${!isActiveTeacherInCard ? (isDarkMode ? "bg-slate-800/20 border-slate-700/50 opacity-40 grayscale" : "bg-slate-100 border-slate-200 opacity-40 grayscale") : isPending ? (isDarkMode ? "bg-red-900/30 border-red-800/50 text-red-300" : "bg-red-50 border-red-200 text-red-800") : getColorHash(r.subject, isDarkMode)}`}
+                                                                  className={`p-2.5 flex items-center justify-between gap-2 rounded-lg border shadow-sm ${!isActiveTeacherInCard ? (isDarkMode ? "bg-slate-800/20 border-slate-700/50 opacity-40 grayscale hover:grayscale-0 hover:opacity-100 cursor-pointer" : "bg-slate-100 border-slate-200 opacity-40 grayscale hover:opacity-100 hover:grayscale-0 cursor-pointer") : isPending ? (isDarkMode ? "bg-red-900/30 border-red-800/50 text-red-300" : "bg-red-50 border-red-200 text-red-800") : getColorHash(r.subject, isDarkMode)}`}
+                                                                  onClick={(e) => {
+                                                                     if (appMode === "professor" && onReverseSwapClick) {
+                                                                         if (hasPendingSwap) {
+                                                                            e.stopPropagation();
+                                                                            alert("Esta aula já possui uma permuta em andamento.");
+                                                                            return;
+                                                                         }
+                                                                         e.stopPropagation();
+                                                                         onReverseSwapClick(r);
+                                                                     }
+                                                                  }}
                                                                 >
                                                                   <div className="flex items-center gap-1.5 flex-1 max-w-[calc(100%-60px)]">
                                                                     <span className="font-bold text-[10px] leading-tight break-words pr-1">

@@ -317,7 +317,7 @@ export const TeacherGrid = React.memo(
                                                           checkPendingSwapRequest(r);
                                                         const hasPendingSwap = checkPendingSwapRequest && checkPendingSwapRequest(r);
                                                         const isActive = r.teacherId && String(r.teacherId).split(',').includes(String(activeTeacher));
-                                                        const isVagaReal = appMode !== 'aluno' && (!r.teacherId || r.teacherId === 'A Definir' || r.teacherId === '-');
+                                                        const isVagaReal = appMode !== 'aluno' && (!r.teacherId || r.teacherId === 'A Definir' || r.teacherId === '-' || /sem professor/i.test(r.teacher) || r.subject === 'AULA VAGA');
                                                         
                                                         let cardStyle = "print-clean-card p-2 rounded-xl border shadow-sm flex flex-col justify-center min-h-[76px] transition-all relative ";
                                                         if (isVagaReal) {
