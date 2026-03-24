@@ -142,14 +142,25 @@ router.post('/', (req, res) => {
         });
 
     } else if (action === 'lancamento_extra') {
-         db.run(
-           'INSERT INTO exchange_requests (action_type, requester_id, substitute_id, target_class, original_day, original_time, subject, return_week, reason, obs, status, original_slot, proposed_slot) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-           [action, requester, '', targetClass, originalDay, originalTime, subject, returnWeekId || '', reason || '', obs || '', 'pronto_para_homologacao', JSON.stringify(data.original_slot || {}), JSON.stringify(data.proposed_slot || {})],
-           function(err) {
-             if (err) return res.status(500).json({ error: err.message });
-             res.json({ success: true, id: this.lastID });
-           }
-         );
+        // Regra de Negócio: Atendimento ao Aluno não precisa de homologação da Gestão (DAPE).
+        const propClassType = data.proposed_slot?.classType || '';
+        const isAtendimento = propClassType.toLowerCase().includes('atendimento');
+        
+        const initialStatus = isAtendimento ? 'aprovada' : 'pronto_para_homologacao';
+        const finalFeedback = isAtendimento ? 'Auto-homologado pelo sistema (Atendimento ao Aluno)' : null;
+
+        db.run(
+            'INSERT INTO exchange_requests (action_type, requester_id, substitute_id, target_class, original_day, original_time, subject, return_week, reason, obs, status, admin_feedback, original_slot, proposed_slot) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+            [action, requester, '', targetClass, originalDay, originalTime, subject, returnWeekId || '', reason || '', obs || '', initialStatus, finalFeedback, JSON.stringify(data.original_slot || {}), JSON.stringify(data.proposed_slot || {})],
+            function(err) {
+                if (err) return res.status(500).json({ error: err.message });
+                const insertedId = this.lastID;
+                
+                // Se for Atendimento, enviamos um sinal ao Frontend informando 'autoApproved: true'
+                // O frontend cuidará de disparar o PUT /status internamente para acionar o motor de inserção na grade.
+                res.json({ success: true, id: insertedId, autoApproved: isAtendimento });
+            }
+        );
     } else if (action === 'troca' || !action) {
         // Se action_type estiver estritamente vazio (modal antigo/incompleto), forçamos 'troca_aberta' ou assumimos o fluxo base para evitar nulls
         const finalAction = action || 'vaga';
@@ -290,63 +301,74 @@ router.put('/:id/status', verifyToken, (req, res) => {
                  // HOMOLOGAÇÃO DE LANÇAMENTO DE AULA EXTRA
                  try {
                      const propData = JSON.parse(row.proposed_slot || '{}');
-                     const newSlots = propData.slots || [];
-                     const type = propData.type || 'previa'; // Capta 'atual' ou 'previa' do Front
+                     
+                     // Suporta o formato de array (times) ou string única (time/original_time)
+                     let timesToProcess = [];
+                     if (propData.times && Array.isArray(propData.times)) timesToProcess = propData.times;
+                     else if (propData.time) timesToProcess = [propData.time];
+                     else if (row.original_time) timesToProcess = [row.original_time];
+
                      const weekId = row.return_week || null;
+                     const targetType = propData.type || 'previa';
+                     const classType = propData.classType || 'Regular';
+                     const targetSubject = propData.subject || row.subject;
 
-                     console.log(`[EXTRA_ENGINE] HOMOLOGANDO LANÇAMENTO EXTRA PARA SIAPE: ${row.requester_id} (${propData.targetSubject})`);
+                     const REVERSE_MAP_DAYS = { 'Segunda-feira': 1, 'Terça-feira': 2, 'Quarta-feira': 3, 'Quinta-feira': 4, 'Sexta-feira': 5, 'Sábado': 6 };
+                     const dayNum = REVERSE_MAP_DAYS[propData.day || row.original_day] || propData.day || row.original_day;
+                     const targetClassStr = propData.classId || propData.className || row.target_class;
 
-                     db.get("SELECT payload FROM curriculum_data WHERE dataType = 'class' AND json_extract(payload, '$.name') = ?", [propData.className || row.target_class], (cErr, cRow) => {
-                         let realCourseId = null;
-                         let realClassId = null;
-                         let realYear = null;
-                         
-                         if (!cErr && cRow) {
-                             const clsData = JSON.parse(cRow.payload);
-                             realCourseId = clsData.matrixId;
-                             realClassId = clsData.id;
-                             realYear = clsData.academicYear;
+                     console.log(`[EXTRA_ENGINE] HOMOLOGANDO ${classType} PARA SIAPE: ${row.requester_id} na turma ${targetClassStr}`);
+
+                     db.all("SELECT payload FROM curriculum_data WHERE dataType = 'class'", [], (cErr, cRows) => {
+                         const classMapping = {};
+                         if (!cErr && cRows) {
+                             cRows.forEach(r => {
+                                 try {
+                                     const obj = JSON.parse(r.payload);
+                                     if (obj.name) classMapping[obj.name] = obj.id;
+                                 } catch(e){}
+                             });
                          }
+                         const realClassId = classMapping[targetClassStr] || targetClassStr;
 
                          db.serialize(() => {
-                            db.run("BEGIN TRANSACTION;");
-                            const stmt = db.prepare("INSERT OR REPLACE INTO schedules (id, courseId, academic_year, classId, dayOfWeek, slotId, teacherId, disciplineId, room, type, week_id, updatedAt, records) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
-                            
-                            for (const slot of newSlots) {
-                               const sid = slot.id || `s_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
-                               let recordsJSON = null;
-                               if (slot.classType || slot.isSubstituted) {
-                                  recordsJSON = JSON.stringify({ classType: slot.classType || null, isSubstituted: slot.isSubstituted || false });
-                               }
-                               const cId = realCourseId || slot.courseId || row.target_class || 'DESCONHECIDO';
-                               const clId = realClassId || slot.classId || row.target_class || 'DESCONHECIDO';
-                               const aY = realYear || slot.academicYear || null;
-                               const dW = slot.dayOfWeek || propData.day || 'DESCONHECIDO';
-                               const sId = slot.slotId || propData.time || 'DESCONHECIDO';
-                               const tId = slot.teacherId || row.requester_id || 'DESCONHECIDO';
+                             db.run("BEGIN TRANSACTION;");
+                             let hasError = false;
 
-                               stmt.run([sid, cId, aY, clId, dW, sId, tId, slot.disciplineId || null, slot.room || null, type, weekId, now, recordsJSON]);
-                            }
-                            stmt.finalize();
+                             timesToProcess.forEach(timeStr => {
+                                 const patchData = JSON.stringify({ classType: classType, isExtra: true });
+                                 
+                                 // Primeiro tenta fazer o UPDATE de um slot vazio ou já existente na grade prévia
+                                 const updateQ = `UPDATE schedules SET teacherId = ?, disciplineId = ?, records = json_patch(COALESCE(records, '{}'), ?) WHERE classId = ? AND dayOfWeek = ? AND slotId = ? AND ( (week_id = ? AND type IN ('previa', 'atual', 'oficial')) OR (? IS NULL AND type = 'padrao' AND (week_id IS NULL OR week_id = '')) )`;
+                                 
+                                 db.run(updateQ, [row.requester_id, targetSubject, patchData, realClassId, dayNum, timeStr, weekId, weekId], function(upErr) {
+                                     if (upErr) hasError = true;
+                                     // Se o UPDATE afetou 0 linhas, significa que o slot não existe nem na matriz padrão. Forçamos o INSERT.
+                                     if (this.changes === 0 && !upErr) {
+                                         const sid = 's_ext_' + Date.now() + Math.random().toString(36).substring(2,6);
+                                         db.run(`INSERT INTO schedules (id, classId, dayOfWeek, slotId, teacherId, disciplineId, type, week_id, records) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`, 
+                                         [sid, realClassId, dayNum, timeStr, row.requester_id, targetSubject, targetType, weekId, patchData]);
+                                     }
+                                 });
+                             });
 
-                        db.run("COMMIT;", (commitErr) => {
-                           if (commitErr) {
-                               db.run("ROLLBACK;");
-                               res.status(500).json({ error: "Erro na integridade da Transação do Lançamento Extra" });
-                           } else {
-                               const notifyTitle = 'Lançamento Extra Homologado';
-                               const notifyMsg = `Sua solicitação de aula extra (${propData.targetSubject}) em ${propData.day} (${propData.time}) foi aprovada pela Gestão e já está na grade.`;
-                               db.run("INSERT INTO notifications (type, target, title, message, createdAt) VALUES ('SYSTEM', ?, ?, ?, ?)", [row.requester_id, notifyTitle, notifyMsg, now], function(){});
-                               io.emit('schedule_updated');
-                               res.json({ success: true, homologacaoStatus: 'EXECUTADA_EXTRA' });
-                           }
-                        });
+                             db.run("COMMIT;", (commitErr) => {
+                                 if (commitErr || hasError) {
+                                     db.run("ROLLBACK;");
+                                     res.status(500).json({ error: "Erro na integridade da Transação" });
+                                 } else {
+                                     const notifyTitle = 'Lançamento Extra Homologado';
+                                     const notifyMsg = `Sua solicitação para inserir aula de ${classType} (${targetSubject}) foi inserida na grade com sucesso.`;
+                                     const now = new Date().toISOString();
+                                     db.run("INSERT INTO notifications (type, target, title, message, createdAt) VALUES ('SYSTEM', ?, ?, ?, ?)", [row.requester_id, notifyTitle, notifyMsg, now], function(){});
+                                     io.emit('schedule_updated');
+                                     res.json({ success: true, homologacaoStatus: 'EXECUTADA_EXTRA' });
+                                 }
+                             });
+                         });
                      });
-                     }); // end db.get
-
                  } catch(errExtract) {
                      console.error("[EXTRA_ENGINE] Falha Processando JSON da Aula Extra:", errExtract);
-                     io.emit('schedule_updated');
                      res.json({ success: true, homologacaoStatus: 'FALHA_PARSE' });
                  }
              } else {
