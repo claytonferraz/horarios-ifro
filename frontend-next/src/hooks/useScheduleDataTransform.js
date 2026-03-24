@@ -107,7 +107,13 @@ export function useScheduleDataTransform({
     }
 
     if ((appMode === 'professor' || viewMode === 'professor') && (!selectedTeacher || !globalTeachersList.includes(selectedTeacher))) {
-      if (globalTeachersList.length > 0) setSelectedTeacher(globalTeachersList[0]);
+      if (globalTeachersList.length > 0) {
+         if (siape && globalTeachersList.includes(String(siape))) {
+             setSelectedTeacher(String(siape));
+         } else {
+             setSelectedTeacher(globalTeachersList[0]);
+         }
+      }
     }
   }, [appMode, viewMode, globalTeachersList, selectedTeacher, setSelectedTeacher, siape, userRole]);
 
