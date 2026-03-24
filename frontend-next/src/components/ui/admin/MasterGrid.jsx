@@ -413,6 +413,7 @@ export function MasterGrid({ isDarkMode, ...props }) {
              }
              
              let flagIsSubstituted = false;
+             let flagIsPermuted = false;
              let flagOriginalSubject = null;
              let flagIsDisponibilizada = false;
              if (schedule.records) {
@@ -422,6 +423,9 @@ export function MasterGrid({ isDarkMode, ...props }) {
                          flagIsSubstituted = true;
                          flagOriginalSubject = recs.originalSubject || null;
                      }
+                     if (recs.isPermuted) {
+                         flagIsPermuted = true;
+                     }
                      if (recs.isDisponibilizada) {
                          flagIsDisponibilizada = true;
                      }
@@ -430,6 +434,9 @@ export function MasterGrid({ isDarkMode, ...props }) {
                          if (found?.isSubstituted) {
                              flagIsSubstituted = true;
                              flagOriginalSubject = found?.originalSubject || null;
+                         }
+                         if (found?.isPermuted) {
+                             flagIsPermuted = true;
                          }
                          if (found?.isDisponibilizada) {
                              flagIsDisponibilizada = true;
@@ -445,6 +452,7 @@ export function MasterGrid({ isDarkMode, ...props }) {
                  professores: dbTeacherIds ? dbTeacherIds.map(id => resolveTeacherName(id, globalTeachersList)) : refCard.professores,
                  teacherChanged: teacherChanged,
                  isSubstituted: flagIsSubstituted,
+                 isPermuted: flagIsPermuted,
                  originalSubject: flagOriginalSubject,
                  isDisponibilizada: flagIsDisponibilizada
              };
@@ -1639,6 +1647,7 @@ function SaveMatrixModal({ isDarkMode, grade, selectedCourses, courses, saveOpti
         teacherId: aula.teacherIds ? aula.teacherIds.join(',') : 'A Definir', 
         disciplineId: aula.disciplineId || aula.id, room: aula.sala,
         isSubstituted: aula.isSubstituted || false,
+        isPermuted: aula.isPermuted || false,
         originalSubject: aula.originalSubject || null,
         isDisponibilizada: aula.isDisponibilizada || false
       };
@@ -1653,7 +1662,7 @@ function SaveMatrixModal({ isDarkMode, grade, selectedCourses, courses, saveOpti
                 payload.push({
                     courseId: pSlot.courseId, classId: pSlot.classId, dayOfWeek: pSlot.dayOfWeek,
                     slotId: pSlot.slotId, teacherId: 'A Definir', disciplineId: pSlot.disciplineId, room: pSlot.room,
-                    isSubstituted: false, originalSubject: null, isDisponibilizada: false
+                    isSubstituted: false, isPermuted: false, originalSubject: null, isDisponibilizada: false
                 });
             }
         });
