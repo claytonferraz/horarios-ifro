@@ -226,6 +226,25 @@ export const CourseGrid = React.memo(
                        ? mappedSchedules
                        : mappedSchedules.filter((r) => r.course === course);
 
+                    const courseGlobalShifts = new Set(
+                       courseRecords.map((r) => {
+                          const timeObj = safeTimes.find((t) => (t.timeStr || t) === r.time);
+                          return timeObj ? timeObj.shift : null;
+                       }).filter(Boolean)
+                    );
+
+                    const targetShifts = new Set();
+                    if (courseGlobalShifts.size === 0) {
+                       targetShifts.add("Matutino");
+                       targetShifts.add("Vespertino");
+                    } else if (courseGlobalShifts.has("Matutino") || courseGlobalShifts.has("Vespertino")) {
+                       targetShifts.add("Matutino");
+                       targetShifts.add("Vespertino");
+                    } else {
+                       targetShifts.add("Vespertino");
+                       targetShifts.add("Noturno");
+                    }
+
                     return (
                       <React.Fragment key={`grid-${course}`}>
                         {courseClasses.length === 0 ? (
@@ -299,13 +318,7 @@ export const CourseGrid = React.memo(
                                       (r) => r.day === day,
                                     );
                                     const activeTimes = safeTimes.filter(
-                                      (timeObj) =>
-                                        courseRecords.some(
-                                          (r) =>
-                                            r.day === day &&
-                                            r.time ===
-                                              (timeObj.timeStr || timeObj),
-                                        ),
+                                      (timeObj) => targetShifts.has(timeObj.shift)
                                     );
                                     const hasClassesToday =
                                       activeTimes.length > 0;

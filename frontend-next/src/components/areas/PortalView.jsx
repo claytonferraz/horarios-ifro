@@ -1211,12 +1211,14 @@ export function PortalView({
                             checkPendingSwapRequest={isSlotInvolvedInPendingRequest}
                             siape={selectedTeacher || siape}
                             onReverseSwapClick={(rec) => {
-                               if (String(rec.teacher) !== String(selectedTeacher || siape)) {
+                               if (rec.teacherId && !String(rec.teacherId).split(',').includes(String(selectedTeacher || siape))) {
                                  if (userRole !== 'admin' && userRole !== 'gestao' && !profClassesMemo.has(rec.className)) {
                                     alert('Você só pode interagir com grades e turmas nas quais você já leciona ao menos uma disciplina.');
                                     return;
                                  }
                                  setPendingReverseTarget(rec);
+                               } else if (rec.teacherId && String(rec.teacherId).split(',').includes(String(selectedTeacher || siape))) {
+                                 alert('Você não pode propor uma permuta com a sua própria aula.');
                                }
                             }}
                           />
