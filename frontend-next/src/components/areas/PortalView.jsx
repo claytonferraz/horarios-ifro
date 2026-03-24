@@ -1350,7 +1350,13 @@ export function PortalView({
             time={editorModal.time}
             timeObj={editorModal.tObj}
             courseRecords={getCellRecords ? getCellRecords(editorModal.cls, editorModal.day, editorModal.time) : []} 
-            weekData={rawData} 
+            weekData={{
+                id: String(selectedWeek),
+                week: String(selectedWeek),
+                academic_year: String(selectedConfigYear),
+                type: scheduleMode === 'consolidado' ? 'oficial' : scheduleMode,
+                records: rawData.filter(r => String(r.week) === String(selectedWeek) && r.type === (scheduleMode === 'consolidado' ? 'oficial' : scheduleMode))
+            }} 
             matrixData={[]}
             classesData={classesList || []}
             usersList={globalTeachersList || []}

@@ -814,7 +814,8 @@ app.post('/api/schedules', verifyToken, (req, res) => {
     });
   } catch (e) {
     if (e instanceof z.ZodError) {
-      return res.status(400).json({ error: "Dados inválidos: " + e.errors.map(err => err.message).join(', ') });
+      const errList = e.errors || e.issues || [];
+      return res.status(400).json({ error: "Dados inválidos: " + errList.map(err => err.message).join(', ') });
     }
     // Retorna erro 400 em caso de violação de regra do Motor de Conflitos
     return res.status(400).json({ error: e.message });
