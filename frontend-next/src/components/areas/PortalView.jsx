@@ -726,22 +726,24 @@ export function PortalView({
                 <div className={`grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 p-3 rounded-xl border no-print ${isDarkMode ? 'bg-slate-900/50 border-slate-800' : 'bg-slate-50 border-slate-100'}`}>
                   {(['turma', 'hoje', 'historico'].includes(viewMode)) && (
                     <>
-                      <div className="space-y-1 lg:col-span-2"><label className="text-[9px] font-black tracking-[0.2em] text-slate-400 uppercase ml-1">Filtrar por Curso</label>
+                      <div className="space-y-1 lg:col-span-2"><label className="text-[9px] font-black tracking-[0.2em] text-slate-400 uppercase ml-1 block">Filtrar por Curso</label>
                         <SearchableSelect isDarkMode={isDarkMode} options={dynamicCoursesList} value={selectedCourse} onChange={setSelectedCourse} colorClass={isDarkMode ? 'bg-slate-800 border-slate-700 text-slate-200 shadow-sm' : 'bg-white border-slate-200 text-slate-700 shadow-sm'} />
                       </div>
                       <div className="space-y-1 lg:col-span-2">
-                        <div className="flex items-center justify-between">
-                           <label className="text-[9px] font-black tracking-[0.2em] text-slate-400 uppercase ml-1">Visualizar Turma</label>
-                           {appMode === 'professor' && (
-                              <label className="flex items-center gap-1.5 cursor-pointer hover:bg-black/5 dark:hover:bg-white/5 px-2 py-0.5 rounded transition-colors group">
+                        {appMode === 'professor' ? (
+                          <div className="flex items-center justify-between">
+                            <label className="text-[9px] font-black tracking-[0.2em] text-slate-400 uppercase ml-1">Visualizar Turma</label>
+                            <label className="flex items-center gap-1.5 cursor-pointer hover:bg-black/5 dark:hover:bg-white/5 px-2 py-0.5 rounded transition-colors group">
                                 <input type="checkbox" checked={showOnlyMyClasses} onChange={e => setShowOnlyMyClasses(e.target.checked)} className="peer sr-only" />
                                 <div className={`w-3 h-3 rounded-sm border flex items-center justify-center transition-colors ${showOnlyMyClasses ? 'bg-indigo-500 border-indigo-500' : 'bg-transparent border-slate-300 dark:border-slate-600 group-hover:border-indigo-400'} ${isDarkMode ? 'peer-focus:ring-indigo-800' : 'peer-focus:ring-indigo-200'}`}>
                                   {showOnlyMyClasses && <Check size={8} className="text-white" />}
                                 </div>
                                 <span className={`text-[8px] font-black tracking-widest uppercase transition-colors ${showOnlyMyClasses ? 'text-indigo-600 dark:text-indigo-400' : 'text-slate-400 group-hover:text-slate-600 dark:group-hover:text-slate-300'}`}>Apenas Minhas Turmas</span>
-                              </label>
-                           )}
-                        </div>
+                            </label>
+                          </div>
+                        ) : (
+                          <label className="text-[9px] font-black tracking-[0.2em] text-slate-400 uppercase ml-1 block">Visualizar Turma</label>
+                        )}
                         <SearchableSelect isDarkMode={isDarkMode} options={filteredClassesList} value={selectedClass} onChange={setSelectedClass} colorClass={scheduleMode === 'previa' ? (isDarkMode ? "bg-violet-900/30 border-violet-800/50 text-violet-200 shadow-sm" : "bg-violet-50 border-violet-100 text-violet-900 shadow-sm") : viewMode === 'hoje' ? (isDarkMode ? "bg-blue-900/30 border-blue-800/50 text-blue-200 shadow-sm" : "bg-blue-50 border-blue-100 text-blue-900 shadow-sm") : (isDarkMode ? "bg-emerald-900/30 border-emerald-800/50 text-emerald-200 shadow-sm" : "bg-emerald-50 border-emerald-100 text-emerald-900 shadow-sm")} />
                       </div>
                     </>
@@ -749,7 +751,7 @@ export function PortalView({
                   {((viewMode === 'professor' && appMode === 'aluno') || viewMode === 'outro_professor') && (
                     <div className="space-y-1 col-span-full md:col-span-2">
                        {/* Mantido funcional para aluno ou modo legado que precise */}
-                      <label className="text-[9px] font-black tracking-[0.2em] text-slate-400 uppercase ml-1">
+                      <label className="text-[9px] font-black tracking-[0.2em] text-slate-400 uppercase ml-1 block">
                         Buscar Professor
                       </label>
                       <SearchableSelect 
@@ -768,16 +770,16 @@ export function PortalView({
 
                   {viewMode === 'total' && (
                     <>
-                      <div className="space-y-1"><label className="text-[9px] font-black tracking-[0.2em] text-slate-400 uppercase ml-1">Ano Letivo</label>
+                      <div className="space-y-1"><label className="text-[9px] font-black tracking-[0.2em] text-slate-400 uppercase ml-1 block">Ano Letivo</label>
                         <SearchableSelect isDarkMode={isDarkMode} options={availableYearsForTotal} value={totalFilterYear} onChange={setTotalFilterYear} colorClass={isDarkMode ? 'bg-slate-800 border-slate-700 text-slate-200 shadow-sm' : 'bg-white border-slate-200 text-slate-800 shadow-sm'} />
                       </div>
-                      <div className="space-y-1"><label className="text-[9px] font-black tracking-[0.2em] text-slate-400 uppercase ml-1">Professor</label>
+                      <div className="space-y-1"><label className="text-[9px] font-black tracking-[0.2em] text-slate-400 uppercase ml-1 block">Professor</label>
                         <SearchableSelect isDarkMode={isDarkMode} options={availableTeachersForTotal.map(t => ({value: t, label: resolveTeacherName(t, globalTeachers)}))} value={totalFilterTeacher} onChange={setTotalFilterTeacher} colorClass={isDarkMode ? 'bg-slate-800 border-slate-700 text-slate-200 shadow-sm' : 'bg-white border-slate-200 text-slate-800 shadow-sm'} />
                       </div>
-                      <div className="space-y-1"><label className="text-[9px] font-black tracking-[0.2em] text-slate-400 uppercase ml-1">Turma</label>
+                      <div className="space-y-1"><label className="text-[9px] font-black tracking-[0.2em] text-slate-400 uppercase ml-1 block">Turma</label>
                         <SearchableSelect isDarkMode={isDarkMode} options={availableClassesForTotal} value={totalFilterClass} onChange={setTotalFilterClass} colorClass={isDarkMode ? 'bg-slate-800 border-slate-700 text-slate-200 shadow-sm' : 'bg-white border-slate-200 text-slate-800 shadow-sm'} />
                       </div>
-                      <div className="space-y-1"><label className="text-[9px] font-black tracking-[0.2em] text-slate-400 uppercase ml-1">Disciplina</label>
+                      <div className="space-y-1"><label className="text-[9px] font-black tracking-[0.2em] text-slate-400 uppercase ml-1 block">Disciplina</label>
                         <SearchableSelect 
                            isDarkMode={isDarkMode} 
                            options={availableSubjectsForTotal.map(s => ({
