@@ -4,7 +4,7 @@ import { apiClient } from '@/lib/apiClient';
 import { useData } from '@/contexts/DataContext';
 
 export function TeacherRequestsSection({ isDarkMode, siape, selectedWeek, weekData, activeDays, classTimes, onCancel, isFloating }) {
-  const { academicWeeks } = useData();
+  const { academicWeeks, rawData } = useData();
   const [requests, setRequests] = useState([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isFloatingOpen, setIsFloatingOpen] = useState(false);
@@ -155,8 +155,22 @@ export function TeacherRequestsSection({ isDarkMode, siape, selectedWeek, weekDa
                              let pO = req.original_slot; try { if (typeof pO === 'string') pO = JSON.parse(pO); if (typeof pO === 'string') pO = JSON.parse(pO); if (typeof pO === 'string') pO = JSON.parse(pO); } catch(e){}
                              let pP = req.proposed_slot; try { if (typeof pP === 'string') pP = JSON.parse(pP); if (typeof pP === 'string') pP = JSON.parse(pP); if (typeof pP === 'string') pP = JSON.parse(pP); } catch(e){}
                              
-                             const origStr = typeof pO === 'object' && pO !== null ? `${pO.subject || pO.classType || 'VAGA'} - ${pO.day} às ${pO.time}` : String(pO).replace(/["{}]/g, '');
-                             const propStr = typeof pP === 'object' && pP !== null ? `${pP.subject || pP.classType || 'Mudança'} - ${pP.day} às ${pP.time}` : String(pP).replace(/["{}]/g, '');
+                             const resolveLabel = (slot) => {
+                                 if (!slot || typeof slot !== 'object') return String(slot || '').replace(/["{}]/g, '');
+                                 let subj = slot.subject || slot.classType || '';
+                                 let clName = slot.className || slot.classId || '';
+                                 if (clName && clName.length > 5 && rawData && rawData.length > 0) {
+                                    const match = rawData.find(r => r.className === clName || r.classId === clName || String(r.id) === String(clName));
+                                    if (match) {
+                                        clName = `${match.course || ''} ${match.className || ''}`.trim() || clName;
+                                    }
+                                 }
+                                 let dayInfo = slot.day ? `${slot.day} às ${slot.time}` : '';
+                                 return `${subj} - ${clName} \n ${dayInfo}`.replace(/^ - | - $/g, '').trim();
+                             };
+                             
+                             const origStr = resolveLabel(pO);
+                             const propStr = resolveLabel(pP);
                              
                              let leftLabel = "Original / Ofertada";
                              let leftVal = origStr;

@@ -15,7 +15,7 @@ export function FloatingRequestsWidget({ isDarkMode, userRole, appMode, controll
   const [notifications, setNotifications] = useState([]);
   const [loadingId, setLoadingId] = useState(null);
   
-  const { globalTeachers } = useData();
+  const { globalTeachers, rawData } = useData();
   const { siape } = useAuth();
   
   const prevCountRef = useRef(0);
@@ -191,7 +191,7 @@ export function FloatingRequestsWidget({ isDarkMode, userRole, appMode, controll
 
              {/* Pending First (Admins Only) */}
              {isAdmin && pendingRequests.map(req => (
-               <ChatItem key={`req-${req.id}`} req={req} isDarkMode={isDarkMode} loadingId={loadingId} handleUpdate={handleUpdate} globalTeachers={globalTeachers} />
+               <ChatItem key={`req-${req.id}`} req={req} isDarkMode={isDarkMode} loadingId={loadingId} handleUpdate={handleUpdate} globalTeachers={globalTeachers} rawData={rawData} />
              ))}
 
              {/* Resolved/Alerts Separator */}
@@ -206,7 +206,7 @@ export function FloatingRequestsWidget({ isDarkMode, userRole, appMode, controll
              {/* Mixed Feed Array */}
              {feed.map(item => {
                 if (item.isReq) {
-                  return <ChatItem key={`hist-${item.id}`} req={item} isDarkMode={isDarkMode} loadingId={loadingId} handleUpdate={handleUpdate} globalTeachers={globalTeachers} />;
+                  return <ChatItem key={`hist-${item.id}`} req={item} isDarkMode={isDarkMode} loadingId={loadingId} handleUpdate={handleUpdate} globalTeachers={globalTeachers} rawData={rawData} />;
                 } else if (item.isNotif) {
                   return <AlertItem key={`notif-${item.id}`} notif={item} isDarkMode={isDarkMode} />;
                 }
@@ -235,11 +235,25 @@ export function FloatingRequestsWidget({ isDarkMode, userRole, appMode, controll
   );
 }
 
-function ChatItem({ req, isDarkMode, loadingId, handleUpdate, globalTeachers }) {
+function ChatItem({ req, isDarkMode, loadingId, handleUpdate, globalTeachers, rawData = [] }) {
   const [isRejecting, setIsRejecting] = useState(false);
   const teacherSiape = req.requester_id || req.siape;
   const teacherName = resolveTeacherName(teacherSiape, globalTeachers) || teacherSiape;
   const isPending = req.status === 'pendente' || req.status === 'pending' || req.status === 'pronto_para_homologacao';
+  
+  const resolveLabel = (slot) => {
+      let subj = slot.subject || slot.classType || '';
+      let clName = slot.className || slot.classId || '';
+      
+      // Busca no rawData para traduzir classId (ex: 4jpcexp1m) em "Nome Oculto" ou "3o Ano Inf"
+      if (clName && clName.length > 5 && rawData.length > 0) {
+         const match = rawData.find(r => r.className === clName || r.classId === clName || String(r.id) === String(clName));
+         if (match) {
+             clName = `${match.course || ''} ${match.className || ''}`.trim() || clName;
+         }
+      }
+      return `${subj} - ${clName}`.replace(/^ - | - $/g, '');
+  };
   
   let descUI = <p className={isDarkMode ? 'text-slate-200' : 'text-slate-800'}>{req.description || req.reason}</p>;
   try {
@@ -253,12 +267,12 @@ function ChatItem({ req, isDarkMode, loadingId, handleUpdate, globalTeachers }) 
          <div className="flex flex-col gap-2">
            <div className={`p-2 rounded border text-[10px] uppercase font-bold tracking-widest leading-tight ${isDarkMode ? 'bg-slate-900 border-slate-700 text-slate-300' : 'bg-slate-100 border-slate-200 text-slate-600'}`}>
               <span className="opacity-50 block mb-1 text-[8px]">AULA ALVO SOLICITADA</span>
-              <span className="text-indigo-500 block">{pP.subject || pP.classType} - {pP.className || pP.classId}</span>
+              <span className="text-indigo-500 block">{resolveLabel(pP)}</span>
               <span className="opacity-80 text-[8px]">{pP.day} às {pP.time} <span title="Colega Solicitado" className='underline'>{resolveTeacherName(req.substitute_id, globalTeachers)?.split(' ')[0]}</span></span>
            </div>
            <div className={`p-2 rounded border text-[10px] uppercase font-bold tracking-widest leading-tight ${isDarkMode ? 'bg-slate-900 border-slate-700 text-slate-300' : 'bg-slate-100 border-slate-200 text-slate-600'}`}>
               <span className="opacity-50 block mb-1 text-[8px]">HORÁRIO CEDIDO P/ TROCA</span>
-              <span className="text-rose-500 block">{pO.subject || pO.classType} - {pO.className || pO.classId}</span>
+              <span className="text-rose-500 block">{resolveLabel(pO)}</span>
               <span className="opacity-80 text-[8px]">{pO.day} às {pO.time} <span title="Solicitante" className='underline'>{resolveTeacherName(req.requester_id, globalTeachers)?.split(' ')[0]}</span></span>
            </div>
          </div>
