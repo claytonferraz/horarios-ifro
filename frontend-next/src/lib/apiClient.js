@@ -178,6 +178,19 @@ export const apiClient = {
 
   // Funções avulsas de alterar senha e cadastro independente deletadas conforme instrução
 
+  async saveSingleSchedule(payload) {
+    try {
+      const res = await fetch(`${API_URL}/schedules/single`, { method: 'POST', headers: getHeaders(), body: JSON.stringify(payload) });
+      if (!res.ok) {
+        if(res.status === 401 || res.status === 403) throw new Error("Não autorizado. Faça login novamente.");
+        const errorBody = await res.json().catch(() => ({}));
+        throw new Error(errorBody.error || "Falha na API");
+      }
+    } catch (e) {
+      throw e;
+    }
+  },
+
   async saveSchedule(weekKey, dataObj) {
     try {
       const res = await fetch(`${API_URL}/schedules`, { method: 'POST', headers: getHeaders(), body: JSON.stringify({ id: weekKey, ...dataObj }) });

@@ -129,8 +129,10 @@ db.serialize(() => {
     system_message TEXT,
     original_slot TEXT,
     proposed_slot TEXT,
+    approved_by TEXT,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP
   )`);
+  db.run(`ALTER TABLE exchange_requests ADD COLUMN approved_by TEXT`, (err) => { /* ignorar se já existe */ });
 
   db.run(`CREATE TABLE IF NOT EXISTS config (
     id TEXT PRIMARY KEY, -- config_2026

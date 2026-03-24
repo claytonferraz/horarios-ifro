@@ -213,14 +213,21 @@ function RequestCard({ req, isDarkMode, loadingId, handleUpdate, globalTeachers,
                  <p className="text-[10px] font-bold text-slate-500">SIAPE: {req.requester_id}</p>
               </div>
             </div>
-            <span className={`text-[8px] font-black px-2 py-0.5 rounded-full uppercase tracking-widest print:bg-transparent print:text-slate-800 print:border print:border-slate-300 print:px-1 ${
-              (req.status === 'pendente' || req.status === 'pending' || req.status === 'pronto_para_homologacao' || req.status === 'aguardando_colega') ? (isDarkMode ? 'bg-amber-900/30 text-amber-500' : 'bg-amber-50 text-amber-600') :
-              (req.status === 'aprovado' || req.status === 'aprovada' || req.status === 'resolvida') ? (req.obs === 'Homologado Automaticamente' ? (isDarkMode ? 'bg-blue-900/30 text-blue-400' : 'bg-blue-50 text-blue-600') : (isDarkMode ? 'bg-emerald-900/30 text-emerald-500' : 'bg-emerald-50 text-emerald-600')) :
-              (req.status === 'rejeitado' || req.status === 'rejeitada') ? (isDarkMode ? 'bg-rose-900/30 text-rose-500' : 'bg-rose-50 text-rose-600') :
-              (isDarkMode ? 'bg-indigo-900/30 text-indigo-400' : 'bg-indigo-50 text-indigo-600')
-            }`}>
-              {req.status === 'pending' ? 'pendente' : req.status === 'pronto_para_homologacao' ? 'Pronto p/ Homologação' : req.status === 'aguardando_colega' ? 'Aguard. Colega (Pode Forçar)' : (req.status === 'aprovada' || req.status === 'aprovado') && req.obs === 'Homologado Automaticamente' ? 'Homologado Automaticamente' : req.status}
-            </span>
+            <div className="flex flex-col items-end gap-1">
+               <span className={`text-[8px] font-black px-2 py-0.5 rounded-full uppercase tracking-widest print:bg-transparent print:text-slate-800 print:border print:border-slate-300 print:px-1 ${
+                 (req.status === 'pendente' || req.status === 'pending' || req.status === 'pronto_para_homologacao' || req.status === 'aguardando_colega') ? (isDarkMode ? 'bg-amber-900/30 text-amber-500' : 'bg-amber-50 text-amber-600') :
+                 (req.status === 'aprovado' || req.status === 'aprovada' || req.status === 'resolvida') ? (req.obs === 'Homologado Automaticamente' ? (isDarkMode ? 'bg-blue-900/30 text-blue-400' : 'bg-blue-50 text-blue-600') : (isDarkMode ? 'bg-emerald-900/30 text-emerald-500' : 'bg-emerald-50 text-emerald-600')) :
+                 (req.status === 'rejeitado' || req.status === 'rejeitada') ? (isDarkMode ? 'bg-rose-900/30 text-rose-500' : 'bg-rose-50 text-rose-600') :
+                 (isDarkMode ? 'bg-indigo-900/30 text-indigo-400' : 'bg-indigo-50 text-indigo-600')
+               }`}>
+                 {req.status === 'pending' ? 'pendente' : req.status === 'pronto_para_homologacao' ? 'Pronto p/ Homologação' : req.status === 'aguardando_colega' ? 'Aguard. Colega (Pode Forçar)' : (req.status === 'aprovada' || req.status === 'aprovado') && req.obs === 'Homologado Automaticamente' ? 'Homologado Autom.' : req.status}
+               </span>
+               {req.approved_by && (
+                 <span className={`text-[8px] font-bold uppercase tracking-widest ${isDarkMode ? 'text-slate-500' : 'text-slate-400'}`}>
+                   Assinado por: {globalTeachers?.find(t => t.siape === req.approved_by)?.nome_exibicao || req.approved_by}
+                 </span>
+               )}
+            </div>
           </div>
 
           <div className={`p-4 rounded-xl text-xs font-medium leading-relaxed print:bg-transparent print:p-0 print:text-sm print:text-black ${isDarkMode ? 'bg-slate-800 text-slate-300' : 'bg-slate-50 text-slate-700'}`}>

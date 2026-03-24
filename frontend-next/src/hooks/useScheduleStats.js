@@ -107,7 +107,8 @@ export function useScheduleStats({
 
   const profStats = useMemo(() => {
     if (!selectedTeacher) return { dadas: 0, turmas: 0, semanaAtual: 0 };
-    const profData = activeData.filter(r => r.teacher === selectedTeacher && r.type === 'oficial');
+    const extraTypes = ['Recuperação', 'Exame Final', 'Atendimento ao aluno', 'Lançamento Extra'];
+    const profData = activeData.filter(r => r.teacher === selectedTeacher && r.type === 'oficial' && !extraTypes.includes(r.classType));
     const dadas = profData.filter(r => !isFutureWeek(r.date, r.year)).length;
     const turmas = new Set(profData.map(r => r.className)).size;
     const semanaAtual = profData.filter(r => isCurrentWeek(r.date, r.year)).length;
@@ -122,8 +123,12 @@ export function useScheduleStats({
     const uniqueDisciplines = new Set();
     const suapMap = {};
     const totalHoursMap = {};
+    const extraTypes = ['Recuperação', 'Exame Final', 'Atendimento ao aluno', 'Lançamento Extra'];
 
     finalFilteredTotalData.forEach(r => {
+      // Ignorar classes contadas como carga horária extra ou não dedutível da matriz original
+      if (extraTypes.includes(r.classType)) return;
+
       // Conta todas as aulas que já aconteceram para a query atual
       if (isDatePastOrToday(r.date, r.year)) {
         ministradas += 1;

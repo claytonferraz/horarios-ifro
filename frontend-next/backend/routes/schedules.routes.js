@@ -230,6 +230,68 @@ module.exports = function(io) {
     }
   });
 
+  router.post('/single', verifyToken, (req, res) => {
+    try {
+      const now = new Date().toISOString();
+      const { type, weekId, academicYear, schedules } = req.body;
+      
+      const classNamesToLookup = Array.from(new Set(schedules.map(s => s.classId || '')));
+      
+      // Busca todas as classes possíveis no Payload (na prática virá o mesmo className pra todos)
+      db.all("SELECT payload FROM curriculum_data WHERE dataType = 'class'", [], (err, rows) => {
+         const classMapping = {};
+         if (!err && rows) {
+             rows.forEach(r => {
+                 try {
+                    const obj = JSON.parse(r.payload);
+                    if (obj.name) classMapping[obj.name] = { mx: obj.matrixId, id: obj.id, ay: obj.academicYear };
+                 } catch(e){}
+             });
+         }
+
+         db.serialize(() => {
+           db.run("BEGIN TRANSACTION");
+           const stmt = db.prepare("INSERT OR REPLACE INTO schedules (id, courseId, academic_year, classId, dayOfWeek, slotId, teacherId, disciplineId, room, type, week_id, updatedAt, records) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
+           
+           for (const slot of schedules) {
+             const id = slot.id || `s_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
+             
+             let recordsJSON = null;
+             if (slot.classType || slot.isSubstituted || slot.isDisponibilizada) {
+                recordsJSON = JSON.stringify({
+                   classType: slot.classType || null,
+                   isSubstituted: slot.isSubstituted || false,
+                   originalSubject: slot.originalSubject || null,
+                   isDisponibilizada: slot.isDisponibilizada || false
+                });
+             }
+             
+             let realCourse = slot.courseId;
+             let realClass = slot.classId;
+             let realYr = academicYear || null;
+
+             if (classMapping[slot.classId]) {
+                 realCourse = classMapping[slot.classId].mx || slot.courseId;
+                 realClass = classMapping[slot.classId].id || slot.classId;
+                 realYr = classMapping[slot.classId].ay || academicYear || null;
+             }
+
+             stmt.run([id, realCourse, realYr, realClass, slot.dayOfWeek, slot.slotId, slot.teacherId, slot.disciplineId || null, slot.room || null, type, weekId || null, now, recordsJSON]);
+           }
+           stmt.finalize();
+
+           db.run("COMMIT", (errCommit) => {
+             if (errCommit) return res.status(500).json({ error: errCommit.message });
+             io.emit('schedule_updated');
+             res.json({ success: true, message: 'Lançamentos individuais gravados com sucesso!' });
+           });
+         }); // serialize
+      }); // all
+    } catch (e) {
+      return res.status(400).json({ error: e.message });
+    }
+  });
+
   router.delete('/bulk-course', verifyToken, (req, res) => {
     try {
       const type = req.query.type || req.body.type;

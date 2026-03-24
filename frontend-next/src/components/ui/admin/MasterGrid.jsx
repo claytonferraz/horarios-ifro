@@ -565,7 +565,8 @@ export function MasterGrid({ isDarkMode, ...props }) {
     if (origem !== 'neutra') {
        dropsToMake.push({ slotKey, hora });
     } else {
-         const countInGrid = Object.values(grade).filter(g => String(g.classId) === String(aula.classId) && String(g.id) === String(aula.id)).length;
+         const extraTypes = ['Recuperação', 'Exame Final', 'Atendimento ao aluno', 'Lançamento Extra'];
+         const countInGrid = Object.values(grade).filter(g => String(g.classId) === String(aula.classId) && String(g.id) === String(aula.id) && !extraTypes.includes(g.classType)).length;
          const maxEsperado = aula.numAulas || 1;
          const faltando = maxEsperado - countInGrid;
          const aulasAmount = faltando > 0 ? faltando : 1;
@@ -1107,7 +1108,8 @@ export function MasterGrid({ isDarkMode, ...props }) {
                 <div className="text-[10px] font-bold text-slate-400 mb-2 uppercase tracking-wider">{nomeTurma}</div>
                 <div className="flex flex-col gap-2">
                   {aulas.map(aula => {
-                    const countInGrid = Object.values(grade).filter(g => String(g.classId) === String(aula.classId) && String(g.id) === String(aula.id)).length;
+                    const extraTypes = ['Recuperação', 'Exame Final', 'Atendimento ao aluno', 'Lançamento Extra'];
+                    const countInGrid = Object.values(grade).filter(g => String(g.classId) === String(aula.classId) && String(g.id) === String(aula.id) && !extraTypes.includes(g.classType)).length;
                     const qtyPadrao = aula.numAulas || 1;
                     const isZero = countInGrid === 0;
 

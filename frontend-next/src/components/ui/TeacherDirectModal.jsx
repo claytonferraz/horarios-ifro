@@ -20,7 +20,7 @@ export function TeacherDirectModal({
   const [classType, setClassType] = useState("Regular");
   const [selectedTimes, setSelectedTimes] = useState([]);
 
-  const { classTimes, matrixData, schedules } = useData();
+  const { classTimes, rawData } = useData();
 
   useEffect(() => {
     if (isOpen && slotData) {
@@ -38,79 +38,30 @@ export function TeacherDirectModal({
   const currentShift = clickedTimeObj?.shift || "Manhã";
   const shiftTimes = classTimes.filter(t => t.shift === currentShift);
 
-  // Deriva todas as turmas onde este professor atua, puxando com segurança das matrizes ativas
+  // O Professor Portal precisa saber quais disciplinas esse SIAPE dá aula.
+  // Como as turmas reais estão em rawData, podemos extrair suas disciplinas reais lá!
   const classObj = dbClasses.find(c => c.name === selectedClass);
   let availableSubjects = [];
   
-  if (classObj && matrixData) {
-     const matrix = matrixData.find(m => m.id === classObj.matrixId);
-     if (matrix) {
-         const serie = matrix.series.find(s => s.id === classObj.serieId);
-         if (serie && serie.disciplines) {
-            availableSubjects = serie.disciplines.filter(d => {
-               if (!classObj.professorAssignments) return false;
-               const rawProfs = classObj.professorAssignments[d.id] || classObj.professorAssignments[String(d.id)];
-               if (!rawProfs) return false;
-               const mappedProfs = Array.isArray(rawProfs) ? rawProfs : [rawProfs];
-               return mappedProfs.some(p => String(p) === String(siape) || String(p).includes(String(siape)));
-            });
+  if (rawData && rawData.length > 0) {
+      // 1. Prioriza tentar encontrar a disciplina na turma atual selecionada
+      rawData.forEach(r => {
+         if (r.teacher && (String(r.teacher) === String(siape) || String(r.teacher).includes(String(siape)))) {
+             if (r.className === selectedClass && r.subject && !availableSubjects.some(ex => ex.name === r.subject)) {
+                 availableSubjects.push({ name: r.subject, id: r.subject });
+             }
          }
-     }
-  }
-
-  // FALLBACK PROTEÇÃO EXTREMA: Se não houver vínculos na classe exata, exibe qualquer disciplina
-  // que o professor lecione em outras turmas. (Evita bloqueio de lançamento)
-  if (availableSubjects.length === 0 && matrixData) {
-      dbClasses.forEach(c => {
-         const matrix = matrixData.find(m => m.id === c.matrixId);
-         const serie = matrix?.series?.find(s => s.id === c.serieId);
-         if (serie && serie.disciplines) {
-             serie.disciplines.forEach(d => {
-                 const rawProfs = c.professorAssignments?.[d.id] || c.professorAssignments?.[String(d.id)];
-                 if (rawProfs) {
-                     const mappedProfs = Array.isArray(rawProfs) ? rawProfs : [rawProfs];
-                     if (mappedProfs.some(p => String(p) === String(siape) || String(p).includes(String(siape)))) {
-                         if (!availableSubjects.find(ex => ex.name === d.name)) {
-                             availableSubjects.push(d);
-                         }
-                     }
-                 }
-             });
-         }
-      });
-  }
-
-  // ÚLTIMO RECURSO INQUEBRÁVEL: Se o banco de matrizes falhou ou não existe professor_assignments na base,
-  // vamos olhar o que ele já dá aula de fato nas grades já cadastradas (histórico real do usuário)
-  if (availableSubjects.length === 0 && schedules && schedules.length > 0) {
-      schedules.forEach(sched => {
-         if (!sched.records) return;
-         try {
-            const recs = JSON.parse(sched.records);
-            recs.forEach(r => {
-               if (r.teacher && (String(r.teacher) === String(siape) || String(r.teacher).includes(String(siape)))) {
-                   if (r.className === selectedClass && r.subject && !availableSubjects.some(ex => ex.name === r.subject)) {
-                       availableSubjects.push({ name: r.subject, id: r.subject });
-                   }
-               }
-            });
-         } catch(e) {}
       });
       
-      // E se nem na mesma turma ele tem histórico, pegamos de QUALQUER turma que ele já deu aula (Liberação total)
+      // 2. Se a turma atual não gerou nenhuma disciplina, libera qualquer disciplina
+      //    que o professor ministra na escola (Fallback de Liberação Total)
       if (availableSubjects.length === 0) {
-          schedules.forEach(sched => {
-             if (!sched.records) return;
-             try {
-                const recs = JSON.parse(sched.records);
-                recs.forEach(r => {
-                   if (r.teacher && (String(r.teacher) === String(siape) || String(r.teacher).includes(String(siape)))) {
-                       if (r.subject && !availableSubjects.some(ex => ex.name === r.subject)) {
-                           availableSubjects.push({ name: r.subject, id: r.subject });
-                       }
-                   }
-                });
-             } catch(e) {}
+          rawData.forEach(r => {
+             if (r.teacher && (String(r.teacher) === String(siape) || String(r.teacher).includes(String(siape)))) {
+                 if (r.subject && !availableSubjects.some(ex => ex.name === r.subject)) {
+                     availableSubjects.push({ name: r.subject, id: r.subject });
+                 }
+             }
           });
       }
   }
@@ -156,41 +107,75 @@ export function TeacherDirectModal({
          onClose();
          return;
       }
-
+      
       const newRecordsList = selectedTimes.map((selTime, i) => {
           const timeParts = selTime.split(' - ');
           const mappedTimeObj = classTimes.find(t => t.timeStr === selTime) || {};
           return {
-            id: "nd_" + Date.now() + "_" + i,
+            id: `s_${Date.now()}_${i}`,
+            courseId: slotData.course || selectedClass || "", 
+            classId: selectedClass || "", 
+            dayOfWeek: slotData.day,
+            slotId: selTime,
+            teacherId: String(siape),
+            disciplineId: selectedSubject,
+            room: null,
+            classType: classType,
+            // Mantemos os campos abaixo para compatibilizar renderização local rápida caso necessário
             day: slotData.day,
             time: selTime,
             startTime: timeParts[0] || mappedTimeObj.startTime || "",
             endTime: timeParts[1] || mappedTimeObj.endTime || "",
             className: selectedClass,
             subject: selectedSubject,
-            teacher: String(siape), // O modal já injeta o SIAPE fixo
-            classType: classType,
+            teacher: String(siape),
             course: slotData.course || "", 
           };
       });
 
-      const cleanedCurrentRecords = currentRecordsArray.filter(r => 
-          !(r.className === selectedClass && r.day === slotData.day && selectedTimes.includes(r.time))
-      );
-      const finalRecords = [...cleanedCurrentRecords, ...newRecordsList];
-      
-      const payloadId = scheduleForCurrentWeek?.id || `s_${Date.now()}`;
-
       const payload = {
-        id: payloadId,
-        week: String(selectedWeek),
-        type: targetType,
-        records: JSON.stringify(finalRecords)
+         type: targetType,
+         weekId: String(selectedWeek),
+         academicYear: classObj?.academicYear || null,
+         schedules: newRecordsList
       };
 
-      await apiClient.saveSchedule(payloadId, payload);
+      if (classType === 'Atendimento ao aluno') {
+         await apiClient.saveSingleSchedule(payload);
+         alert("Atendimento lançado e gravado com sucesso na matriz!");
+      } else {
+         const timeRange = selectedTimes.length > 1 
+            ? `${selectedTimes[0].split(' - ')[0]} às ${selectedTimes[selectedTimes.length-1].split(' - ')[1] || selectedTimes[selectedTimes.length-1]}` 
+            : selectedTimes[0];
+            
+         const requestPayload = {
+            action: 'lancamento_extra',
+            siape: String(siape),
+            week_id: String(selectedWeek),
+            description: `Solicito o lançamento de ${classType} na turma ${selectedClass} (${slotData.day})`,
+            original_slot: { day: slotData.day, time: timeRange, subject: selectedSubject, className: selectedClass },
+            proposed_day: slotData.day,
+            proposed_time: timeRange,
+            proposed_type: classType,
+            obs: `Lançamento Extra: ${classType}`,
+            proposed_slot: {
+                classType: classType,
+                subject: selectedSubject,
+                className: selectedClass,
+                day: slotData.day,
+                time: timeRange,
+                slots: newRecordsList, 
+                targetSubject: selectedSubject,
+                classId: selectedClass || "",
+                courseId: slotData.course || "", 
+                academicYear: null,
+                type: targetType
+            }
+         };
+         await apiClient.submitRequest(requestPayload);
+         alert(`A solicitação de ${classType} foi enviada com sucesso e aguarda homologação da Gestão!`);
+      }
       
-      alert("Aula lançada com sucesso!");
       onSuccess();
       onClose();
     } catch (e) {
