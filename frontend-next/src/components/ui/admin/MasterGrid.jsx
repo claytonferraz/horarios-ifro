@@ -141,7 +141,8 @@ export function MasterGrid({ isDarkMode, ...props }) {
        return true;
     }).map(t => t.timeStr);
   }, [classTimes, shiftFilter]);
-  const diasExibidos = activeDays && activeDays.length > 0 ? activeDays : ['Segunda-feira', 'Terça-feira', 'Quarta-feira', 'Quinta-feira', 'Sexta-feira'];
+  const defaultDays = useMemo(() => ['Segunda-feira', 'Terça-feira', 'Quarta-feira', 'Quinta-feira', 'Sexta-feira'], []);
+  const diasExibidos = activeDays && activeDays.length > 0 ? activeDays : defaultDays;
 
   // Auto-preenche os Cursos com base nos dados salvos no respectivo Padrão/Semana
   useEffect(() => {

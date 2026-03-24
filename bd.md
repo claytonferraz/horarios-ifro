@@ -25,11 +25,21 @@ Armazena as definições de Matrizes Curriculares e as Turmas do ano letivo.
 ### 3. `schedules`
 Armazena os agendamentos/quadros de horários semanais consolidados ou prévios.
 *   `id` (TEXT, PRIMARY KEY): String composta única do horário (ex: "43/2026_oficial").
-*   `week` (TEXT): Identificador da semana no formato "WW/YYYY".
+*   `academic_year` (TEXT): Ano acadêmico vinculado.
+*   `week_id` (TEXT): Identificador da semana no formato "WW/YYYY".
+*   `status` (TEXT, DEFAULT 'Padrão'): 'Padrão' (Template), 'Prévia' (Editável Semanal), 'Consolidado' (Imutável).
 *   `type` (TEXT): Tipo do agendamento ('oficial', 'previa', 'padrao').
 *   `fileName` (TEXT): Nome do arquivo CSV de origem.
-*   `records` (TEXT): JSON em formato stringfy contendo o array de aulas extraídas.
+*   `records` (TEXT): JSON em formato stringfy contendo o array de aulas extraídas e metadados.
 *   `updatedAt` (TEXT): Data e hora da última alteração no formato ISO 8601.
+*   `closedAt` (TEXT): Data de fechamento para 'Consolidado'.
+*   `courseId` (TEXT): Referência da disciplina/curso (Adicionado via Alter Table).
+*   `classId` (TEXT): Referência da turma (Adicionado via Alter Table).
+*   `dayOfWeek` (TEXT): Dia da semana.
+*   `slotId` (TEXT): ID do slot/horário.
+*   `teacherId` (TEXT): ID do professor.
+*   `disciplineId` (TEXT): ID da disciplina.
+*   `room` (TEXT): Sala da aula.
 
 ### 4. `config`
 Parâmetros gerais do sistema por ano letivo.
@@ -79,17 +89,63 @@ Armazena os objetos complexos JSON para matrizes curriculares e turmas.
 
 ### 10. `change_requests` (solicitacoes_troca)
 Armazena as solicitações de mudança de horário feitas pelos professores (Portal do Professor) para apreciação da gestão.
-*   `id` (INTEGER, PRIMARY KEY, AUTOINCREMENT): Identificador único da solicitação.
+*   `id` (INTEGER, PRIMARY KEY, AUTOINCREMENT): Identificador.
 *   `siape` (TEXT): Matrícula SIAPE do professor solicitante.
-*   `week_id` (TEXT): A semana alvo da solicitação (ex: "Semana 01", "24/03 a 28/03").
-*   `description` (TEXT): Descrição detalhada ou justificativa do pedido de mudança.
-*   `original_slot` (TEXT): Opcional. Bloco original (ex: "Segunda-feira - 1º e 2º Horário - TDS").
-*   `proposed_slot` (TEXT): Opcional. Bloco proposto em JSON contendo dia, horário e tipificação da aula.
-*   `status` (TEXT, DEFAULT 'pendente'): Status atual ('pendente', 'aprovado', 'rejeitado').
-*   `admin_feedback` (TEXT): Resposta ou recado opcional deixado pelo gestor/DAPE.
-*   `createdAt` (DATETIME, DEFAULT CURRENT_TIMESTAMP): Carimbo de data/hora de criação.
+*   `week_id` (TEXT): A semana alvo da solicitação.
+*   `description` (TEXT): Descrição detalhada.
+*   `original_slot` (TEXT): Bloco original.
+*   `proposed_slot` (TEXT): Bloco proposto em JSON.
+*   `status` (TEXT, DEFAULT 'pendente'): Status atual.
+*   `admin_feedback` (TEXT): Resposta da gestão.
+*   `createdAt` (TEXT): Data e hora de criação.
 
-### 11. `area_neutra_horario` (Estacionamento Temporário)
+### 11. `exchange_requests`
+Solicitações para troca de aulas entre professores ou turnos.
+*   `id` (INTEGER, PRIMARY KEY, AUTOINCREMENT)
+*   `action_type` (TEXT)
+*   `requester_id` (TEXT)
+*   `substitute_id` (TEXT)
+*   `target_class` (TEXT)
+*   `original_day` (TEXT)
+*   `original_time` (TEXT)
+*   `subject` (TEXT)
+*   `return_week` (TEXT)
+*   `reason` (TEXT)
+*   `obs` (TEXT)
+*   `status` (TEXT, DEFAULT 'pendente')
+*   `admin_feedback` (TEXT)
+*   `system_message` (TEXT)
+*   `original_slot` (TEXT)
+*   `proposed_slot` (TEXT)
+*   `created_at` (DATETIME)
+
+### 12. `conflict_logs`
+Tabela de Log de Conflitos (Para Auditoria/Motor de Regras).
+*   `id` (INTEGER, PRIMARY KEY, AUTOINCREMENT)
+*   `schedule_id` (TEXT)
+*   `type` (TEXT): 'Professor', 'SaúdeDocente', 'Espaço'
+*   `description` (TEXT)
+*   `severity` (TEXT): 'Bloqueio', 'Aviso'
+*   `createdAt` (TEXT)
+
+### 13. `audit_logs`
+Tabela de Auditoria (Audit Logs) para rastrear ações sensíveis.
+*   `id` (INTEGER, PRIMARY KEY, AUTOINCREMENT)
+*   `user_id` (TEXT)
+*   `action` (TEXT)
+*   `timestamp` (TEXT)
+*   `details` (TEXT)
+
+### 14. `notifications`
+Tabela de Notificações para o Chat/Alert Widget.
+*   `id` (INTEGER, PRIMARY KEY, AUTOINCREMENT)
+*   `target` (TEXT): ex. 'ALL', 'ALL_PROF', '{siape}'
+*   `type` (TEXT)
+*   `title` (TEXT)
+*   `message` (TEXT)
+*   `createdAt` (TEXT)
+
+### 15. `area_neutra_horario` (Estacionamento Temporário)
 Armazena os blocos de aula temporariamente removidos/desalocados do "Master Grid Interativo" pelo Gestor, permitindo que a aula seja reorganizada no quadro através de Drag-and-Drop sem perder seus dados vinculativos.
 *   `id` (TEXT, PRIMARY KEY): ID único do registro gerado no front-end.
 *   `week_id` (TEXT): Semana em que o estacionamento da aula ocorreu.

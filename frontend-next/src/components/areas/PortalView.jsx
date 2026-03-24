@@ -170,20 +170,26 @@ export function PortalView({
       });
   }, [pendingRequests]);
 
-  const safeDays = [...(activeDays || ['Segunda-feira', 'Terça-feira', 'Quarta-feira', 'Quinta-feira', 'Sexta-feira'])].sort((a,b) => MAP_DAYS.indexOf(a) - MAP_DAYS.indexOf(b));
+  const safeDays = React.useMemo(() => {
+    return [...(activeDays || ['Segunda-feira', 'Terça-feira', 'Quarta-feira', 'Quinta-feira', 'Sexta-feira'])].sort((a,b) => MAP_DAYS.indexOf(a) - MAP_DAYS.indexOf(b));
+  }, [activeDays]);
+  
   const shiftOrder = { 'Matutino': 1, 'Vespertino': 2, 'Noturno': 3 };
-  const safeTimes = [...(classTimes || [])].sort((a, b) => {
-    const shiftA = typeof a === 'object' ? a.shift : '';
-    const shiftB = typeof b === 'object' ? b.shift : '';
-    const orderA = shiftOrder[shiftA] || 99;
-    const orderB = shiftOrder[shiftB] || 99;
-    
-    if (orderA !== orderB) return orderA - orderB;
-    
-    const timeA = typeof a === 'object' ? a.timeStr : a;
-    const timeB = typeof b === 'object' ? b.timeStr : b;
-    return timeA.localeCompare(timeB);
-  });
+  
+  const safeTimes = React.useMemo(() => {
+    return [...(classTimes || [])].sort((a, b) => {
+      const shiftA = typeof a === 'object' ? a.shift : '';
+      const shiftB = typeof b === 'object' ? b.shift : '';
+      const orderA = shiftOrder[shiftA] || 99;
+      const orderB = shiftOrder[shiftB] || 99;
+      
+      if (orderA !== orderB) return orderA - orderB;
+      
+      const timeA = typeof a === 'object' ? a.timeStr : a;
+      const timeB = typeof b === 'object' ? b.timeStr : b;
+      return timeA.localeCompare(timeB);
+    });
+  }, [classTimes]);
 
   const checkConflict = React.useCallback((record, dDay, dTime, dCls) => {
     if (!record || !record.teacher || record.teacher === 'A Definir' || record.teacher === '-') return null;
