@@ -1,9 +1,26 @@
 const express = require('express');
 const db = require('../db');
-const { verifyToken } = require('../middlewares/auth.middleware');
+const { verifyToken, requireAdmin, requireManager } = require('../middlewares/auth.middleware');
 const bcrypt = require('bcryptjs');
+const crypto = require('crypto');
 const fs = require('fs');
 const path = require('path');
+const { z } = require('zod');
+
+const teacherSchema = z.object({
+  siape: z.string().trim().min(1),
+  nome_exibicao: z.string().trim().optional().or(z.literal('')),
+  nome_completo: z.string().trim().min(1),
+  email: z.string().trim().email().nullable().optional().or(z.literal('')),
+  senha: z.string().min(8).optional(),
+  status: z.string().trim().optional(),
+  perfis: z.array(z.string()).optional(),
+  atua_como_docente: z.boolean().optional(),
+});
+
+const adminStatusSchema = z.object({
+  is_admin: z.boolean(),
+});
 
 module.exports = function(io) {
   const router = express.Router();
@@ -21,7 +38,7 @@ router.get('/disciplines', (req, res) => { // Público para o painel do Professo
   });
 });
 
-router.put('/disciplines', verifyToken, (req, res) => {
+router.put('/disciplines', verifyToken, requireManager, (req, res) => {
   const { id, suapHours } = req.body;
   db.run(`INSERT OR REPLACE INTO discipline_meta (id, suapHours) VALUES (?, ?)`,
     [id, suapHours || null],
@@ -43,7 +60,7 @@ router.get('/subject-hours', (req, res) => { // Público para o painel do Profes
   });
 });
 
-router.put('/subject-hours', verifyToken, (req, res) => {
+router.put('/subject-hours', verifyToken, requireManager, (req, res) => {
   const { id, totalHours } = req.body;
   db.run(`INSERT OR REPLACE INTO subject_hours (id, totalHours) VALUES (?, ?)`,
     [id, totalHours || null],
@@ -89,7 +106,7 @@ router.get('/academic-years', (req, res) => { // Público para o painel do Profe
   });
 });
 
-router.put('/academic-years', verifyToken, (req, res) => {
+router.put('/academic-years', verifyToken, requireManager, (req, res) => {
   const { year, totalDays, currentDays } = req.body;
   db.run(`INSERT OR REPLACE INTO academic_years (year, totalDays, currentDays) VALUES (?, ?, ?)`,
     [year, totalDays || null, currentDays || null],
@@ -115,7 +132,7 @@ router.get('/curriculum/:type', (req, res) => {
   });
 });
 
-router.put('/curriculum/:type', verifyToken, (req, res) => {
+router.put('/curriculum/:type', verifyToken, requireManager, (req, res) => {
   const { type } = req.params;
   if (!['matrix', 'class'].includes(type)) return res.status(400).json({ error: 'Invalid type' });
   const payloadStr = JSON.stringify(req.body);
@@ -135,7 +152,7 @@ router.put('/curriculum/:type', verifyToken, (req, res) => {
   );
 });
 
-router.delete('/curriculum/:type/:id', verifyToken, (req, res) => {
+router.delete('/curriculum/:type/:id', verifyToken, requireManager, (req, res) => {
   const { type, id } = req.params;
   db.run("DELETE FROM curriculum_data WHERE id = ? AND dataType = ?", [id, type], (err) => {
     if (err) return res.status(500).json({ error: err.message });
@@ -147,7 +164,7 @@ router.delete('/curriculum/:type/:id', verifyToken, (req, res) => {
 // ==========================================
 // ROTAS DE USUÁRIOS/SERVIDORES (Antigo Teachers)
 // ==========================================
-router.get('/teachers', (req, res) => {
+router.get('/teachers', verifyToken, requireManager, (req, res) => {
   db.all("SELECT siape, nome_exibicao, nome_completo, email, status, perfis, atua_como_docente, exigir_troca_senha, is_admin FROM users ORDER BY nome_exibicao ASC", (err, rows) => {
     if (err) return res.status(500).json({ error: err.message });
     // Parse perfis string back to array for frontend
@@ -160,9 +177,15 @@ router.get('/teachers', (req, res) => {
   });
 });
 
-router.put('/teachers', verifyToken, async (req, res) => {
-  let { siape, nome_exibicao, nome_completo, email, senha, status, perfis, atua_como_docente } = req.body;
-  if (!siape || !nome_completo) return res.status(400).json({ error: "SIAPE e Nome Mínimos requeridos." });
+router.put('/teachers', verifyToken, requireAdmin, async (req, res) => {
+  let payload;
+  try {
+    payload = teacherSchema.parse(req.body);
+  } catch (error) {
+    return res.status(400).json({ error: error.issues?.[0]?.message || 'Dados inválidos.' });
+  }
+
+  let { siape, nome_exibicao, nome_completo, email, senha, status, perfis, atua_como_docente } = payload;
 
   const perfisStr = JSON.stringify(perfis || []);
   const atuaDoc = atua_como_docente ? 1 : 0;
@@ -172,7 +195,7 @@ router.put('/teachers', verifyToken, async (req, res) => {
     
     let finalHash = row ? row.senha_hash : null;
     
-    if (!finalHash && !senha) senha = "prof@2026";
+    if (!finalHash && !senha) senha = crypto.randomBytes(12).toString('base64url');
     if (senha) finalHash = await bcrypt.hash(senha, 10);
     
     // Se a senha foi alterada via admin, força a flag de exigir_troca_senha para 1. Se não, mantém a atual.
@@ -190,7 +213,7 @@ router.put('/teachers', verifyToken, async (req, res) => {
   });
 });
 
-router.post('/teachers/batch', verifyToken, async (req, res) => {
+router.post('/teachers/batch', verifyToken, requireAdmin, async (req, res) => {
   const users = req.body;
   if (!Array.isArray(users)) return res.status(400).json({ error: "O corpo da requisição deve ser um array." });
 
@@ -216,7 +239,7 @@ router.post('/teachers/batch', verifyToken, async (req, res) => {
           try {
             let finalHash = row ? row.senha_hash : null;
             if (!finalHash) {
-              finalHash = await bcrypt.hash(`prof@${new Date().getFullYear()}`, 10);
+              finalHash = await bcrypt.hash(crypto.randomBytes(12).toString('base64url'), 10);
               exigirTroca = 1;
             }
 
@@ -252,7 +275,7 @@ router.post('/teachers/batch', verifyToken, async (req, res) => {
   });
 });
 
-router.delete('/teachers/:siape', verifyToken, (req, res) => {
+router.delete('/teachers/:siape', verifyToken, requireAdmin, (req, res) => {
   db.run("DELETE FROM users WHERE siape = ?", [req.params.siape], (err) => {
     if (err) return res.status(500).json({ error: err.message });
     io.emit('schedule_updated');
@@ -260,8 +283,15 @@ router.delete('/teachers/:siape', verifyToken, (req, res) => {
   });
 });
 
-router.put('/teachers/:siape/admin-status', verifyToken, (req, res) => {
-  const { is_admin } = req.body;
+router.put('/teachers/:siape/admin-status', verifyToken, requireAdmin, (req, res) => {
+  let payload;
+  try {
+    payload = adminStatusSchema.parse(req.body);
+  } catch (error) {
+    return res.status(400).json({ error: error.issues?.[0]?.message || 'Dados inválidos.' });
+  }
+
+  const { is_admin } = payload;
   const adminValue = is_admin ? 1 : 0;
   
   db.run(
@@ -279,7 +309,7 @@ router.put('/teachers/:siape/admin-status', verifyToken, (req, res) => {
 // ROTAS DE BACKUP / RESTORE DO BANCO (DAPE)
 // ==========================================
 
-router.get('/export-db', verifyToken, (req, res) => {
+router.get('/export-db', verifyToken, requireAdmin, (req, res) => {
   try {
       const dbPath = path.join(__dirname, '../horarios.db');
       if (fs.existsSync(dbPath)) {
@@ -296,7 +326,7 @@ router.get('/export-db', verifyToken, (req, res) => {
   }
 });
 
-router.post('/import-db', verifyToken, express.raw({ type: '*/*', limit: '100mb' }), (req, res) => {
+router.post('/import-db', verifyToken, requireAdmin, express.raw({ type: 'application/octet-stream', limit: '100mb' }), (req, res) => {
   try {
       if (!req.body || req.body.length === 0) {
           return res.status(400).json({ error: "Arquivo vazio ou formato inválido." });

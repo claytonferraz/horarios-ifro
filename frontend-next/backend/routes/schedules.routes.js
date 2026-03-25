@@ -1,7 +1,7 @@
 const express = require('express');
 const { z } = require('zod');
 const db = require('../db');
-const { verifyToken } = require('../middlewares/auth.middleware');
+const { verifyToken, requireManager } = require('../middlewares/auth.middleware');
 
 module.exports = function(io) {
   const router = express.Router();
@@ -116,7 +116,7 @@ module.exports = function(io) {
     }))
   });
 
-  router.post('/bulk-course', verifyToken, (req, res) => {
+  router.post('/bulk-course', verifyToken, requireManager, (req, res) => {
     try {
       const now = new Date().toISOString();
       const { courseIds, courseId, type, weekId, academicYear, schedules } = bulkScheduleSchema.parse(req.body);
@@ -249,7 +249,7 @@ module.exports = function(io) {
     }
   });
 
-  router.post('/single', verifyToken, (req, res) => {
+  router.post('/single', verifyToken, requireManager, (req, res) => {
     try {
       const now = new Date().toISOString();
       const { type, weekId, academicYear, schedules } = req.body;
@@ -311,7 +311,7 @@ module.exports = function(io) {
     }
   });
 
-  router.delete('/bulk-course', verifyToken, (req, res) => {
+  router.delete('/bulk-course', verifyToken, requireManager, (req, res) => {
     try {
       const type = req.query.type || req.body.type;
       const weekId = req.query.weekId || req.body.weekId;
@@ -352,7 +352,7 @@ module.exports = function(io) {
     records: z.string().min(2, "Records deve ser uma string JSON válida")
   });
 
-  router.post('/', verifyToken, (req, res) => {
+  router.post('/', verifyToken, requireManager, (req, res) => {
     try {
       const validatedData = schedulePayloadSchema.parse(req.body);
       const { id, week, type, fileName, records: recordsStr } = validatedData;
@@ -440,7 +440,7 @@ module.exports = function(io) {
     }
   });
 
-  router.delete('/:id', verifyToken, (req, res) => {
+  router.delete('/:id', verifyToken, requireManager, (req, res) => {
     const id = req.params.id; 
     db.run("DELETE FROM schedules WHERE id = ?", [id], (err) => {
       if (err) return res.status(500).json({ error: err.message });

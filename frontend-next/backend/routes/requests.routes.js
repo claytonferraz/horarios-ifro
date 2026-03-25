@@ -1,30 +1,46 @@
 const express = require('express');
 const db = require('../db');
 const { verifyToken } = require('../middlewares/auth.middleware');
-const bcrypt = require('bcryptjs');
+const { z } = require('zod');
+
+const requestStatusSchema = z.object({
+  status: z.string().trim().min(1),
+  admin_feedback: z.string().optional().nullable(),
+  system_message: z.string().optional().nullable(),
+});
 
 module.exports = function(io) {
   const router = express.Router();
 // ==========================================
 // ROTAS DE SOLICITAÇÕES DE TROCA E VAGA
 // ==========================================
-router.get('/', (req, res) => {
+router.get('/', verifyToken, (req, res) => {
   try {
     let query = 'SELECT * FROM exchange_requests ORDER BY created_at DESC';
     let params = [];
-    if (req.query.siape) {
+    const requestedSiape = String(req.query.siape || '').trim();
+
+    if (!req.user.isAdmin && !req.user.isManager) {
+        query = 'SELECT * FROM exchange_requests WHERE requester_id = ? OR substitute_id = ? ORDER BY id DESC';
+        params = [req.user.siape, req.user.siape];
+    } else if (requestedSiape) {
         query = 'SELECT * FROM exchange_requests WHERE requester_id LIKE ? OR substitute_id LIKE ? ORDER BY id DESC';
-        const likeSiape = `%${req.query.siape}%`;
+        const likeSiape = `%${requestedSiape}%`;
         params = [likeSiape, likeSiape];
     }
     db.all(query, params, (err, rows) => {
       if (err) return res.status(500).json({ error: err.message });
       res.json(rows || []);
     });
-  } catch(e) { res.status(500).json({error: e.message}); }
+  } catch(e) {
+    if (e instanceof z.ZodError) {
+      return res.status(400).json({ error: e.issues[0]?.message || 'Dados inválidos.' });
+    }
+    res.status(500).json({error: e.message});
+  }
 });
 
-router.post('/', async (req, res) => {
+router.post('/', verifyToken, async (req, res) => {
   try {
     const data = req.body;
     let action = data.action || 'vaga';
@@ -34,7 +50,7 @@ router.post('/', async (req, res) => {
         return res.status(400).json({ error: "Ação não especificada ou inválida." });
     }
 
-    let requester = data.requester || data.requester_id || data.siape;
+    const requester = req.user.siape;
     let targetClass = data.targetClass || data.original_slot?.className || '';
     let returnWeekId = data.returnWeekId || data.week_id;
     let reason = data.reason || data.description;
@@ -47,7 +63,7 @@ router.post('/', async (req, res) => {
     const authCheckQ = `SELECT COUNT(*) as count FROM schedules WHERE (classId = ? OR classId = (SELECT id FROM curriculum_data WHERE dataType='class' AND (id=? OR payload LIKE '%"name":"' || ? || '"%'))) AND teacherId LIKE ?`;
     const checkRes = await new Promise(r => db.get(authCheckQ, [targetClass, targetClass, targetClass, `%${requester}%`], (e, row) => r(row?.count || 0)));
     
-    if (checkRes === 0 && action !== 'lancamento_extra') {
+    if (checkRes === 0 && action !== 'lancamento_extra' && !req.user.isAdmin && !req.user.isManager) {
          // Se for Admin/Gestao, permitimos (ou se for lancamento extra em nova turma)
          // Mas para permutas regulares do professor, bloqueamos.
          return res.status(403).json({ error: "Permissão Negada: Você só pode solicitar permutas em turmas onde você já leciona." });
@@ -265,13 +281,35 @@ router.post('/', async (req, res) => {
 
 router.put('/:id/status', verifyToken, (req, res) => {
   try {
-    const { status, admin_feedback, system_message } = req.body;
-    let approved_by = null;
-    if (status === 'aprovada' || status === 'aprovado' || status === 'rejeitado') {
-        approved_by = req.userId; // O SIAPE de quem clicou
-    }
-    
-    db.run('UPDATE exchange_requests SET status = ?, admin_feedback = COALESCE(?, admin_feedback), system_message = COALESCE(?, system_message), approved_by = COALESCE(?, approved_by) WHERE id = ?', 
+    const { status, admin_feedback, system_message } = requestStatusSchema.parse(req.body);
+
+    db.get("SELECT * FROM exchange_requests WHERE id = ?", [req.params.id], (loadErr, targetRequest) => {
+      if (loadErr) return res.status(500).json({ error: loadErr.message });
+      if (!targetRequest) return res.status(404).json({ error: 'Solicitação não encontrada.' });
+
+      const normalizedStatus = String(status).toLowerCase();
+      const isSubstituteApproval = normalizedStatus === 'pronto_para_homologacao';
+      const isManagementDecision = ['aprovada', 'aprovado', 'rejeitado', 'homologado'].includes(normalizedStatus);
+
+      if (isSubstituteApproval) {
+        const canAcceptAsColleague = String(targetRequest.substitute_id || '') === String(req.user.siape);
+        if (!canAcceptAsColleague && !req.user.isAdmin && !req.user.isManager) {
+          return res.status(403).json({ error: 'Sem permissão para aceitar esta solicitação.' });
+        }
+      } else if (isManagementDecision) {
+        if (!req.user.isAdmin && !req.user.isManager) {
+          return res.status(403).json({ error: 'Sem permissão para homologar esta solicitação.' });
+        }
+      } else if (!req.user.isAdmin && !req.user.isManager) {
+        return res.status(403).json({ error: 'Sem permissão para alterar o status desta solicitação.' });
+      }
+
+      let approved_by = null;
+      if (isManagementDecision) {
+          approved_by = req.userId;
+      }
+      
+      db.run('UPDATE exchange_requests SET status = ?, admin_feedback = COALESCE(?, admin_feedback), system_message = COALESCE(?, system_message), approved_by = COALESCE(?, approved_by) WHERE id = ?', 
       [status, admin_feedback || null, system_message || null, approved_by, req.params.id], function(err) {
       if (err) {
          console.error("ERRO_PUT_STATUS_DB_RUN:", err);
@@ -549,6 +587,7 @@ router.put('/:id/status', verifyToken, (req, res) => {
       } else {
          res.json({ success: true });
       }
+    });
     });
   } catch(e) { res.status(500).json({error: e.message}); }
 });
