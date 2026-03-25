@@ -84,9 +84,12 @@ app.use('/api/auth/', authLimiter);
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ limit: '50mb', extended: true }));
 
+const crypto = require('crypto');
 const path = require('path');
 const db = require('./db');
-const { verifyToken, JWT_SECRET } = require('./middlewares/auth.middleware');
+const { verifyToken, JWT_SECRET, requireManager } = require('./middlewares/auth.middleware');
+
+let lastUpdateTimestamp = new Date().toISOString();
 
 // CONTROLE DE SMART POLLING
 // ==========================================
@@ -261,22 +264,16 @@ app.get('/api/status', (req, res) => {
 // ==========================================
 // ROTA DE NOTIFICAÇÕES (Chat/Alert Widget)
 // ==========================================
-app.get('/api/notifications', (req, res) => {
-  const { siape, userRole } = req.query;
+app.get('/api/notifications', verifyToken, (req, res) => {
   const limit = 10;
 
-  let targets = ["ALL"]; // Sempre buscar eventos pra todo mundo
-  if (userRole === 'aluno') {
-    targets.push('ALL_STUDENT');
-  } else if (['professor', 'servidor', 'admin', 'gestao'].includes(userRole)) {
-    targets.push('ALL_PROF');
-    if (['admin', 'gestao'].includes(userRole)) targets.push('ALL_ADMIN');
-    if (siape && siape !== 'undefined') targets.push(siape);
-  }
+  const targets = ["ALL", "ALL_PROF"];
+  if (req.user.isAdmin || req.user.isManager) targets.push('ALL_ADMIN');
+  if (req.user.siape) targets.push(req.user.siape);
 
   const inStr = targets.map(() => '?').join(',');
   const query = `SELECT * FROM notifications WHERE target IN (${inStr}) ORDER BY id DESC LIMIT ?`;
-  
+
   db.all(query, [...targets, limit], (err, rows) => {
     if (err) return res.status(500).json({ error: err.message });
     res.json(rows || []);
@@ -320,7 +317,7 @@ app.get('/api/config', (req, res) => {
   });
 });
 
-app.put('/api/config', verifyToken, (req, res) => {
+app.put('/api/config', verifyToken, requireManager, (req, res) => {
   const { disabledWeeks, activeDays, classTimes, bimesters, activeDefaultScheduleId, intervals, year } = req.body;
   const targetYear = year || new Date().getFullYear().toString();
   const configId = `config_${targetYear}`;
@@ -339,13 +336,14 @@ app.put('/api/config', verifyToken, (req, res) => {
     ], 
     (err) => {
       if (err) return res.status(500).json({ error: err.message });
+      lastUpdateTimestamp = new Date().toISOString();
       io.emit('schedule_updated');
       res.json({ success: true });
     }
   );
 });
 
-app.post('/api/config/import', verifyToken, (req, res) => {
+app.post('/api/config/import', verifyToken, requireManager, (req, res) => {
   const { fromYear, toYear, options } = req.body;
   if (!fromYear || !toYear) return res.status(400).json({ error: "Anos de origem e destino são obrigatórios." });
 
@@ -390,7 +388,7 @@ app.post('/api/config/import', verifyToken, (req, res) => {
                    const classData = JSON.parse(cr.payload);
                    if (classData.academicYear === fromYear) {
                       // Duplica e ajusta
-                      const newId = `c_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+                      const newId = `c_${crypto.randomUUID()}`;
                       const newPayload = { ...classData, id: newId, academicYear: toYear };
                       classesToInsert.push([newId, JSON.stringify(newPayload)]);
                    }
@@ -421,6 +419,7 @@ app.post('/api/config/import', verifyToken, (req, res) => {
   });
 
   function finishImport(responseObj, partialErrors = false) {
+     lastUpdateTimestamp = new Date().toISOString();
      io.emit('schedule_updated');
      responseObj.json({ success: true, message: partialErrors ? 'Importação concluída com alguns alertas na cópia de turmas.' : 'Importação da configuração base e duplicação da malha de turmas concluída com sucesso!' });
   }

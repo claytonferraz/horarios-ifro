@@ -366,6 +366,11 @@ router.post('/import-db', verifyToken, requireAdmin, express.raw({ type: 'applic
       if (!req.body || req.body.length === 0) {
           return res.status(400).json({ error: "Arquivo vazio ou formato inválido." });
       }
+      // Valida magic bytes do SQLite ("SQLite format 3\0")
+      const SQLITE_MAGIC = Buffer.from('53514c69746520666f726d6174203300', 'hex');
+      if (req.body.length < 16 || !req.body.slice(0, 16).equals(SQLITE_MAGIC)) {
+          return res.status(400).json({ error: "Arquivo inválido: não é um banco SQLite." });
+      }
       
       const dbPath = path.join(__dirname, '../horarios.db');
       const backupDir = path.join(__dirname, '../backups');
