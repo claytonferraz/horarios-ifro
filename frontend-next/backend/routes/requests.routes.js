@@ -315,9 +315,10 @@ router.put('/:id/status', verifyToken, (req, res) => {
 
                      console.log(`[EXTRA_ENGINE] HOMOLOGANDO ${classType} PARA SIAPE: ${row.requester_id} na turma ${targetClassStr}`);
 
-                     // Auto-Healing
-                     db.run("DELETE FROM schedules WHERE dayOfWeek IN ('1', '2', '3', '4', '5', '6', 1, 2, 3, 4, 5, 6)", function(err) {
-                         if (this.changes > 0) console.log(`[SWAP_ENGINE] Auto-Healing: ${this.changes} aulas corrompidas com dia numérico apagadas.`);
+                     // 1. Auto-Healing Total (O Exterminador de Fantasmas)
+                     // Deleta qualquer aula corrompida que não possua um UUID válido na classId ou que esteja sem curso.
+                     db.run("DELETE FROM schedules WHERE courseId = 'DESCONHECIDO' OR classId NOT LIKE '%-%' OR dayOfWeek IN ('1', '2', '3', '4', '5', '6', 1, 2, 3, 4, 5, 6)", function(err) {
+                         if (this.changes > 0) console.log(`[EXTRA_ENGINE] Auto-Healing: ${this.changes} aulas fantasmas/corrompidas expurgadas do banco.`);
                      });
 
                      db.all("SELECT payload FROM curriculum_data WHERE dataType = 'class'", [], (cErr, cRows) => {
@@ -326,16 +327,30 @@ router.put('/:id/status', verifyToken, (req, res) => {
                          let realYear = new Date().getFullYear().toString();
 
                          if (!cErr && cRows) {
+                             // Limpeza agressiva para garantir o match absoluto (ex: "3ºA INF" vira "3ainf")
+                             const cleanTarget = targetClassStr.toLowerCase().replace(/[^a-z0-9]/g, '');
+                             
                              cRows.forEach(r => {
                                  try {
                                      const obj = JSON.parse(r.payload);
-                                     if (obj.name === targetClassStr || obj.id === targetClassStr) {
-                                         realClassId = obj.id;
-                                         realCourseId = obj.matrixId || obj.courseId || realCourseId;
+                                     const cleanName = (obj.name || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+                                     
+                                     // Se bater o nome limpo OU se o frontend já enviou o UUID correto
+                                     if (cleanName === cleanTarget || obj.id === targetClassStr) {
+                                         realClassId = obj.id; // AQUI GARANTIMOS O UUID DA TURMA
+                                         realCourseId = obj.matrixId || obj.courseId || realCourseId; // GARANTIMOS O CURSO PAI
                                          realYear = obj.academicYear || realYear;
                                      }
                                  } catch(e){}
                              });
+                         }
+
+                         console.log(`[EXTRA_ENGINE] Resolução: [${targetClassStr}] -> UUID: ${realClassId} | Curso: ${realCourseId}`);
+
+                         // Trava de Segurança: Se não achou o UUID e o Curso PAI, aborta para não sujar a grade!
+                         if (realCourseId === 'DESCONHECIDO' || !realClassId.includes('-')) {
+                             console.error("[EXTRA_ENGINE] ALERTA CRÍTICO: Falha ao resolver o UUID da Turma. Inserção abortada para proteger a integridade da grade.");
+                             return res.json({ success: false, error: "Turma não encontrada no banco. Abortado." });
                          }
 
                          db.serialize(() => {
@@ -351,7 +366,7 @@ router.put('/:id/status', verifyToken, (req, res) => {
                                  db.run(updateQ, [row.requester_id, targetSubject, patchData, realClassId, dayStr, timeStr, weekId, weekId], function(upErr) {
                                      if (upErr) hasError = true;
                                      if (this.changes === 0 && !upErr) {
-                                         // Força INSERT com a hierarquia completa
+                                         // Força INSERT com a hierarquia completa e validada
                                          const sid = 's_ext_' + Date.now() + Math.random().toString(36).substring(2,6);
                                          db.run(`INSERT INTO schedules (id, courseId, academic_year, classId, dayOfWeek, slotId, teacherId, disciplineId, type, week_id, records) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`, 
                                          [sid, realCourseId, realYear, realClassId, dayStr, timeStr, row.requester_id, targetSubject, targetType, weekId, patchData]);

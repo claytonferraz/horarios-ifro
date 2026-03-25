@@ -453,7 +453,8 @@ export function MasterGrid({ isDarkMode, ...props }) {
                  } catch(e) {}
              }
 
-             initialGrade[`${schedule.classId}|${schedule.dayOfWeek}|${schedule.slotId}`] = { 
+             const dbDayNorm = isNaN(schedule.dayOfWeek) ? String(schedule.dayOfWeek) : String(MAP_DAYS[schedule.dayOfWeek]);
+             initialGrade[`${schedule.classId}|${dbDayNorm}|${schedule.slotId}`] = { 
                  ...refCard, 
                  sala: schedule.room || refCard.sala,
                  teacherIds: dbTeacherIds || currentTeacherIds,
@@ -510,7 +511,10 @@ export function MasterGrid({ isDarkMode, ...props }) {
     }
 
     // 2. Verifica no banco global (outros cursos)
-    const relRows = schedules?.filter(s => String(s.dayOfWeek) === String(diaId) && s.slotId === hora && String(s.classId) !== String(currentClassId)) || [];
+    const relRows = schedules?.filter(s => {
+       const dbD = isNaN(s.dayOfWeek) ? String(s.dayOfWeek) : String(MAP_DAYS[s.dayOfWeek]);
+       return dbD === String(diaId) && s.slotId === hora && String(s.classId) !== String(currentClassId);
+    }) || [];
     for (const row of relRows) {
        for (const tId of teacherIdsArray) {
          if (tId && tId !== 'A Definir' && tId !== '-' && row.teacherId && String(row.teacherId).split(',').includes(String(tId))) {
@@ -703,7 +707,8 @@ export function MasterGrid({ isDarkMode, ...props }) {
                  teacherChanged = dbTeacherIds.length !== currentTeacherIds.length || sortedDb.some((val, idx) => val !== sortedCurr[idx]);
              }
 
-             clonedGrade[`${schedule.classId}|${schedule.dayOfWeek}|${schedule.slotId}`] = {
+             const dbDayNorm = isNaN(schedule.dayOfWeek) ? String(schedule.dayOfWeek) : String(MAP_DAYS[schedule.dayOfWeek]);
+             clonedGrade[`${schedule.classId}|${dbDayNorm}|${schedule.slotId}`] = {
                  ...refCard,
                  sala: schedule.room || refCard.sala,
                  teacherIds: dbTeacherIds || currentTeacherIds,
@@ -750,7 +755,7 @@ export function MasterGrid({ isDarkMode, ...props }) {
                         if (!teacherConflictsTracker.has(uniqueKey)) {
                             teacherConflictsTracker.add(uniqueKey);
                             const profName = resolveTeacherName(tId, globalTeachersList).split(' ')[0] || tId;
-                            alerts.push(`[${MAP_DAYS[diaId]} às ${hora}] - Choque: Prof(a) ${profName} alocado(a) em múltiplas turmas simultaneamente.`);
+                            alerts.push(`[${diaId} às ${hora}] - Choque: Prof(a) ${profName} alocado(a) em múltiplas turmas simultaneamente.`);
                         }
                     }
                 });
@@ -764,7 +769,7 @@ export function MasterGrid({ isDarkMode, ...props }) {
                     const uniqueKey = `${aula.sala}_${diaId}_${hora}`;
                     if (!roomConflictsTracker.has(uniqueKey)) {
                         roomConflictsTracker.add(uniqueKey);
-                        alerts.push(`[${MAP_DAYS[diaId]} às ${hora}] - Choque: Ambiente '${aula.sala}' alocado para múltiplas turmas.`);
+                        alerts.push(`[${diaId} às ${hora}] - Choque: Ambiente '${aula.sala}' alocado para múltiplas turmas.`);
                     }
                 }
             }
@@ -777,7 +782,8 @@ export function MasterGrid({ isDarkMode, ...props }) {
                  if (k.split('|')[1] === diaId && dObj.teacherIds?.includes(tId)) profSlots.add(k.split('|')[2]);
              }
              schedules?.forEach(s => {
-                 if (String(s.dayOfWeek) === diaId && s.teacherId && String(s.teacherId).split(',').includes(String(tId))) profSlots.add(s.slotId);
+                 const dbD = isNaN(s.dayOfWeek) ? String(s.dayOfWeek) : String(MAP_DAYS[s.dayOfWeek]);
+                 if (dbD === diaId && s.teacherId && String(s.teacherId).split(',').includes(String(tId))) profSlots.add(s.slotId);
              });
 
              let m = false; let t = false; let n = false;
@@ -789,8 +795,8 @@ export function MasterGrid({ isDarkMode, ...props }) {
                  cellAlerts[slotKey].profAlertMsg.push(noRest);
                  cellAlerts[slotKey].profAlert = true;
                  const pName = resolveTeacherName(tId, globalTeachersList).split(' ')[0];
-                 if (!alerts.some(a => a.includes(`[${MAP_DAYS[diaId]}] Professor(a) ${pName} leciona sem descanso`))) {
-                     alerts.push(`[${MAP_DAYS[diaId]}] Professor(a) ${pName} leciona sem descanso entre Turnos (M->T).`);
+                 if (!alerts.some(a => a.includes(`[${diaId}] Professor(a) ${pName} leciona sem descanso`))) {
+                     alerts.push(`[${diaId}] Professor(a) ${pName} leciona sem descanso entre Turnos (M->T).`);
                  }
              }
 
@@ -804,8 +810,8 @@ export function MasterGrid({ isDarkMode, ...props }) {
                 cellAlerts[slotKey].profAlertMsg.push(threeShifts);
                 cellAlerts[slotKey].profAlert = true;
                 const pName = resolveTeacherName(tId, globalTeachersList).split(' ')[0];
-                if (!alerts.some(a => a.includes(`[${MAP_DAYS[diaId]}] Professor(a) ${pName} atua`))) {
-                     alerts.push(`[${MAP_DAYS[diaId]}] Professor(a) ${pName} atua em 3 Turnos diferentes.`);
+                if (!alerts.some(a => a.includes(`[${diaId}] Professor(a) ${pName} atua`))) {
+                     alerts.push(`[${diaId}] Professor(a) ${pName} atua em 3 Turnos diferentes.`);
                 }
              }
          });
@@ -1197,7 +1203,7 @@ export function MasterGrid({ isDarkMode, ...props }) {
               </thead>
               <tbody>
                 {diasExibidos.map((diaNome) => {
-                  const diaId = String(MAP_DAYS.indexOf(diaNome));
+                  const diaId = diaNome;
                   return (
                   <React.Fragment key={diaId}>
                     {/* Linha Divisória do Dia com Botão de Feriado */}
