@@ -3,9 +3,9 @@ import { MessageSquare, Send, AlertCircle, CheckCircle2, Clock, XCircle, Printer
 import { apiClient } from '@/lib/apiClient';
 import { useData } from '@/contexts/DataContext';
 
-export function TeacherRequestsSection({ isDarkMode, siape, selectedWeek, weekData, activeDays, classTimes, onCancel, isFloating, scheduleMode }) {
+export function TeacherRequestsSection({ isDarkMode, siape, selectedWeek, weekData, activeDays, classTimes, onCancel, isFloating, scheduleMode, requests: propRequests }) {
   const { academicWeeks, rawData } = useData();
-  const [requests, setRequests] = useState([]);
+  const [requests, setRequests] = useState(propRequests || []);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isFloatingOpen, setIsFloatingOpen] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -23,8 +23,9 @@ export function TeacherRequestsSection({ isDarkMode, siape, selectedWeek, weekDa
   };
 
   React.useEffect(() => {
+    if (propRequests) setRequests(propRequests);
     if (siape) loadRequests();
-  }, [siape]);
+  }, [siape, propRequests]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();

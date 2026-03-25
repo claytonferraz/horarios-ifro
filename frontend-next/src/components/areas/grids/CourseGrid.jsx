@@ -213,7 +213,7 @@ export const CourseGrid = React.memo(
                              const isVacant = isTeacherPending(r.teacherId || r.teacher);
                              if (!isMatch && !isVacant) return false;
                          }
-                         if (r.course !== course) return false;
+                         if (course !== "Todas as Turmas do Professor" && r.course !== course) return false;
                          return true;
                       })
                       .map((r) => r.className);
