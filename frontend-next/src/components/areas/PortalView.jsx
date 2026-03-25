@@ -135,7 +135,7 @@ export function PortalView({
          else recs = s.records || {};
          return {
             id: s.id,
-            day: typeof s.dayOfWeek === 'number' ? MAP_DAYS[s.dayOfWeek-1] : (s.day_of_week || s.dayOfWeek),
+            day: isNaN(s.dayOfWeek) ? String(s.dayOfWeek) : String(MAP_DAYS[s.dayOfWeek]),
             time: s.slotId || s.time,
             subject: s.disciplineId,
             teacher: s.teacherId || '-',
@@ -375,7 +375,7 @@ export function PortalView({
                course: courseObj ? courseObj.course : (s.courseName || s.courseId),
                className: classObj ? classObj.name : (s.className || s.classId),
                classId: s.classId,
-               day: MAP_DAYS[s.dayOfWeek],
+               day: isNaN(s.dayOfWeek) ? String(s.dayOfWeek) : String(MAP_DAYS[s.dayOfWeek]),
                time: s.slotId,
                subject: discName,
                disciplineId: s.disciplineId,
