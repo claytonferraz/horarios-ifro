@@ -15,7 +15,11 @@ export function TeacherOfferModal({
   // 1) Agrupar aulas seguidas do mesmo professor
   const consecutiveSlots = useMemo(() => {
     if (!originalRecord || !classRecords) return [];
-    const mySlots = classRecords.filter(r => r.teacher === originalRecord.teacher && r.day === originalRecord.day);
+    // Busca robusta: compara SIAPE ou Nome para garantir o agrupamento correto
+    const mySlots = classRecords.filter(r => 
+      (r.teacher === originalRecord.teacher || (r.teacherId === originalRecord.teacherId && r.teacherId)) && 
+      r.day === originalRecord.day
+    );
     const timeOrder = safeTimes.map(t => t.timeStr || t);
     mySlots.sort((a,b) => timeOrder.indexOf(a.time) - timeOrder.indexOf(b.time));
 
@@ -94,15 +98,21 @@ export function TeacherOfferModal({
       } else {
         await apiClient.submitRequest({
           action: 'oferta_vaga',
+          requester: originalRecord.teacher,
           siape: originalRecord.teacher,
           week_id: selectedWeek,
+          returnWeekId: selectedWeek,
+          targetClass: targetClass,
           description: payload.reason,
-          original_slot: JSON.stringify(consecutiveSlots.map(s => ({ day: s.day, time: s.time }))),
-          proposed_day: originalRecord.day,
-          proposed_time: timeRange,
-          proposed_type: 'Disponibilização',
-          proposed_details: targetStr,
-          proposed_slot: payload.proposedSlot 
+          reason: payload.reason,
+          original_slot: { 
+             day: originalRecord.day, 
+             time: originalRecord.time,
+             subject: originalRecord.subject,
+             className: targetClass
+          },
+          proposed_slot: payload.proposedSlot,
+          obs: targetStr
         });
         alert('Disponibilização enviada com sucesso! Um aviso foi gerado para a coordenação.');
       }

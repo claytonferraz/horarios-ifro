@@ -148,8 +148,15 @@ export function PortalView({
 
   const profClassesMemo = React.useMemo(() => {
      if (appMode !== 'professor' || !schedules) return new Set();
-     const sf = selectedTeacher || siape;
-     return new Set(schedules.filter(s => s.teacherId && String(s.teacherId).split(',').includes(String(sf))).map(s => s.className || s.classId));
+     const sf = String(selectedTeacher || siape);
+     const classesSet = new Set();
+     schedules.forEach(s => {
+        if (s.teacherId && String(s.teacherId).split(',').includes(sf)) {
+           if (s.className) classesSet.add(String(s.className));
+           if (s.classId) classesSet.add(String(s.classId));
+        }
+     });
+     return classesSet;
   }, [appMode, selectedTeacher, siape, schedules]);
 
   const isSlotInvolvedInPendingRequest = React.useCallback((r) => {
@@ -985,6 +992,11 @@ export function PortalView({
                                              const isPending = isTeacherPending(r.teacher);
                                              return (
                                                 <div key={r.id} className={`p-3 rounded-lg border flex flex-col sm:flex-row justify-between sm:items-center gap-2 shadow-sm relative overflow-hidden ${isPending ? (isDarkMode ? 'bg-red-900/30 border-red-800/50 text-red-300' : 'bg-red-50 border-red-200 text-red-800') : getColorHash(r.subject, isDarkMode)}`}>
+                                                   {isPending && (
+                                                      <div className="absolute top-0 left-0 z-10 pointer-events-none print:hidden">
+                                                         <span className="text-[6px] font-black uppercase tracking-wide text-white px-2 py-0.5 rounded-br-[8px] bg-rose-600 border-r border-b border-rose-700 block animate-pulse shadow-sm shadow-rose-900/30">AULA VAGA</span>
+                                                      </div>
+                                                   )}
                                                    {r.isSubstituted && (
                                                       <div className="absolute top-0 right-0 z-10 pointer-events-none print:hidden">
                                                           <span title="Assumida no lugar de uma Vaga" className="text-[7px] font-black uppercase tracking-wide text-white px-2 py-0.5 rounded-bl-[8px] bg-indigo-600 border-l border-b border-indigo-700 block animate-pulse shadow-sm shadow-indigo-900/30">Substituição</span>
@@ -999,7 +1011,7 @@ export function PortalView({
                                                       <p className={`font-black text-sm leading-tight ${isDarkMode ? 'text-white' : 'text-slate-900'}`}>
                                                         {r.subject} {r.isSubstituted && r.originalSubject && <span className="block text-[8px] sm:text-[9.5px] opacity-80 mt-1 uppercase">Era: {r.originalSubject}</span>}
                                                       </p>
-                                                      <p className={`text-[10px] font-bold uppercase tracking-wider mt-1.5 ${isPending ? (isDarkMode ? 'text-red-400' : 'text-red-600') : 'opacity-80'}`}>{isPending ? 'Sem Professor' : resolveTeacherName(r.teacher, globalTeachers)}</p>
+                                                      <p className={`text-[10px] font-bold uppercase tracking-wider mt-1.5 ${isPending ? (isDarkMode ? 'text-red-400' : 'text-red-600') : 'opacity-80'}`}>{isPending ? 'AULA VAGA' : resolveTeacherName(r.teacher, globalTeachers)}</p>
                                                    </div>
                                                    {r.room && <span className={`text-[9px] font-black uppercase tracking-widest px-2 py-1 rounded-md self-start sm:self-auto shrink-0 mt-2 sm:mt-0 shadow-sm ${isDarkMode ? 'bg-white/20' : 'bg-black/10'}`}>{r.room}</span>}
                                                 </div>
@@ -1214,6 +1226,7 @@ export function PortalView({
                             isTeacherPending={isTeacherPending}
                             onDragStart={onDragStart}
                             onDragEnd={onDragEnd}
+                            profClassesMemo={profClassesMemo}
                             subjectHoursMeta={subjectHoursMeta}
                             activeData={activeData}
                             getFormattedDayLabel={getFormattedDayLabel}
@@ -1230,7 +1243,7 @@ export function PortalView({
                                     alert('Você só pode interagir com grades e turmas nas quais você já leciona ao menos uma disciplina.');
                                     return;
                                  }
-                                 setPendingReverseTarget(rec);
+                                 setTeacherDirectModal(rec);
                                } else if (rec.teacherId && String(rec.teacherId).split(',').includes(String(selectedTeacher || siape))) {
                                  alert('Você não pode propor uma permuta com a sua própria aula.');
                                }
@@ -1509,9 +1522,7 @@ export function PortalView({
             </button>
           </div>
         </div>
-      )}
-
-      <TeacherDirectModal 
+      )}      <TeacherDirectModal 
         isOpen={!!teacherDirectModal}
         slotData={teacherDirectModal}
         onClose={() => setTeacherDirectModal(null)}

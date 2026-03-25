@@ -35,6 +35,7 @@ export const CourseGrid = React.memo(
     isTeacherPending,
     onDragStart,
     onDragEnd,
+    profClassesMemo,
     subjectHoursMeta,
     activeData,
     getFormattedDayLabel,
@@ -499,6 +500,7 @@ export const CourseGrid = React.memo(
                                                     >
                                                       <Droppable
                                                         droppableId={`${day}|${time}|${cls}`}
+                                                        isDropDisabled={appMode === 'professor' && userRole !== 'admin' && userRole !== 'gestao' && profClassesMemo && !profClassesMemo.has(String(cls))}
                                                       >
                                                         {(
                                                           provided,
@@ -561,59 +563,65 @@ export const CourseGrid = React.memo(
                                                                     rIndex,
                                                                   ) => {
                                                                     const isPending =
-                                                                      isTeacherPending(
-                                                                        r.teacher,
-                                                                      );
-                                                                    const hasPendingSwap = typeof checkPendingSwapRequest === 'function' && checkPendingSwapRequest(r);
-                                                                    const isActiveTeacherInCard = activeTeacherFilter ? (r.teacherId && String(r.teacherId).split(',').includes(String(activeTeacherFilter))) : true;
-                                                                    
-                                                                    return (
-                                                                      <Draggable
-                                                                        key={String(
-                                                                          r.id,
-                                                                        )}
-                                                                        draggableId={String(
-                                                                          r.id,
-                                                                        )}
-                                                                        index={
-                                                                          rIndex
-                                                                        }
-                                                                        isDragDisabled={
-                                                                          !(
-                                                                            scheduleMode ===
-                                                                              "previa" &&
-                                                                            [
-                                                                              "admin",
-                                                                              "gestao",
-                                                                            ].includes(
-                                                                              userRole,
-                                                                            )
-                                                                          ) || !isActiveTeacherInCard
-                                                                        }
-                                                                      >
-                                                                        {(
-                                                                          prov2,
-                                                                          snap2,
-                                                                        ) => (
-                                                                          <div
-                                                                            ref={prov2.innerRef}
-                                                                            {...prov2.draggableProps}
-                                                                            {...prov2.dragHandleProps}
-                                                                            onClick={(e) => {
-                                                                               if (isGridInert) return;
-                                                                               if (appMode === "professor" && onReverseSwapClick) {
-                                                                                   if (hasPendingSwap) {
-                                                                                      e.stopPropagation();
-                                                                                      alert("Esta aula já possui uma permuta em andamento.");
-                                                                                      return;
-                                                                                   }
-                                                                                   e.stopPropagation();
-                                                                                   onReverseSwapClick(r);
-                                                                               }
-                                                                            }}
-                                                                            className={`print-clean-card p-1.5 print:p-1 rounded-xl print:rounded-none border-b-[3px] print:border-b-[1px] print:border-slate-400 shadow-sm print:shadow-none flex flex-col justify-center min-h-[46px] print:min-h-0 transition-all mb-1 print:mb-0 last:mb-0 relative overflow-visible ${snap2.isDragging ? "shadow-xl scale-105 z-50 hover:scale-105" : (isGridInert ? "cursor-default" : "hover:scale-[1.02] cursor-pointer")} ${hasPendingSwap ? (isDarkMode ? "bg-amber-900/30 border-amber-800/50 hover:bg-amber-900/40 text-amber-200" : "bg-amber-100 hover:bg-amber-200 border-amber-400 text-amber-900") : isPending ? (isDarkMode ? "bg-red-900/30 border-red-800/50 text-red-300" : "bg-red-50 border-red-300 text-red-800") : getColorHash(r.subject, isDarkMode)} ${!isActiveTeacherInCard ? "opacity-50 saturate-50 hover:opacity-100 hover:saturate-100 transition-all" : ""}`}
-                                                                          >
-                                                                            {hasPendingSwap && !isPending && (
+                                                                       isTeacherPending(
+                                                                         r.teacher,
+                                                                       );
+                                                                     const isVagaReal = isPending || r.subject === 'AULA VAGA' || r.teacherId === '0000001';
+                                                                     const hasPendingSwap = typeof checkPendingSwapRequest === 'function' && checkPendingSwapRequest(r);
+                                                                     const isActiveTeacherInCard = activeTeacherFilter ? (r.teacherId && String(r.teacherId).split(',').includes(String(activeTeacherFilter))) : true;
+                                                                     
+                                                                     return (
+                                                                       <Draggable
+                                                                         key={String(
+                                                                           r.id,
+                                                                         )}
+                                                                         draggableId={String(
+                                                                           r.id,
+                                                                         )}
+                                                                         index={
+                                                                           rIndex
+                                                                         }
+                                                                         isDragDisabled={
+                                                                           !(
+                                                                             scheduleMode ===
+                                                                               "previa" &&
+                                                                             [
+                                                                               "admin",
+                                                                               "gestao",
+                                                                             ].includes(
+                                                                               userRole,
+                                                                             )
+                                                                           ) || !isActiveTeacherInCard
+                                                                         }
+                                                                       >
+                                                                         {(
+                                                                           prov2,
+                                                                           snap2,
+                                                                         ) => (
+                                                                           <div
+                                                                             ref={prov2.innerRef}
+                                                                             {...prov2.draggableProps}
+                                                                             {...prov2.dragHandleProps}
+                                                                             onClick={(e) => {
+                                                                                if (isGridInert) return;
+                                                                                if (appMode === "professor" && onReverseSwapClick) {
+                                                                                    if (hasPendingSwap) {
+                                                                                       e.stopPropagation();
+                                                                                       alert("Esta aula já possui uma permuta em andamento.");
+                                                                                       return;
+                                                                                    }
+                                                                                    e.stopPropagation();
+                                                                                    onReverseSwapClick(r);
+                                                                                }
+                                                                             }}
+                                                                             className={`print-clean-card p-1.5 print:p-1 rounded-xl print:rounded-none border-b-[3px] print:border-b-[1px] print:border-slate-400 shadow-sm print:shadow-none flex flex-col justify-center min-h-[46px] print:min-h-0 transition-all mb-1 print:mb-0 last:mb-0 relative overflow-visible ${snap2.isDragging ? "shadow-xl scale-105 z-50 hover:scale-105" : (isGridInert ? "cursor-default" : "hover:scale-[1.02] cursor-pointer")} ${hasPendingSwap ? (isDarkMode ? "bg-amber-900/30 border-amber-800/50 hover:bg-amber-900/40 text-amber-200" : "bg-amber-100 hover:bg-amber-200 border-amber-400 text-amber-900") : isVagaReal ? (isDarkMode ? "bg-red-900/30 border-red-800/50 text-red-300" : "bg-red-50 border-red-300 text-red-800") : getColorHash(r.subject, isDarkMode)} ${!isActiveTeacherInCard ? "opacity-50 saturate-50 hover:opacity-100 hover:saturate-100 transition-all" : ""}`}
+                                                                           >
+                                                                             {isVagaReal && (
+                                                                                <div className="absolute top-0 left-0 z-10 pointer-events-none print:hidden">
+                                                                                   <span className="text-[6px] font-black uppercase tracking-wide text-white px-1.5 py-0.5 rounded-br-[8px] bg-rose-600 border-r border-b border-rose-700 block animate-pulse shadow-sm shadow-rose-900/30">AULA VAGA</span>
+                                                                                </div>
+                                                                             )}
+                                                                             {hasPendingSwap && !isVagaReal && (
                                                                                <div className="absolute -top-1.5 -left-1 z-10 print:hidden shadow-sm pointer-events-none">
                                                                                  <span
                                                                                    title="Há uma solicitação de troca envolvendo esta aula"

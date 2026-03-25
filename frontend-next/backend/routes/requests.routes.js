@@ -24,7 +24,7 @@ router.get('/', (req, res) => {
   } catch(e) { res.status(500).json({error: e.message}); }
 });
 
-router.post('/', (req, res) => {
+router.post('/', async (req, res) => {
   try {
     const data = req.body;
     let action = data.action || 'vaga';
@@ -34,15 +34,30 @@ router.post('/', (req, res) => {
         return res.status(400).json({ error: "Ação não especificada ou inválida." });
     }
 
-    let requester = data.requester_id || data.siape;
+    let requester = data.requester || data.requester_id || data.siape;
     let targetClass = data.targetClass || data.original_slot?.className || '';
     let returnWeekId = data.returnWeekId || data.week_id;
     let reason = data.reason || data.description;
     let substituteId = data.substitute_id || '';
 
-    let originalDay = data.original_slot?.day || '';
-    let originalTime = data.original_slot?.time || '';
-    let subject = data.original_slot?.subject || '';
+    // Extração robusta de Dia/Hora
+    const dayMap = { 'Domingo': '0', 'Segunda-feira': '1', 'Terça-feira': '2', 'Quarta-feira': '3', 'Quinta-feira': '4', 'Sexta-feira': '5', 'Sábado': '6' };
+    
+    // BLINDAGEM DE SEGURANÇA: Verificar se o professor realmente leciona na turma
+    const authCheckQ = `SELECT COUNT(*) as count FROM schedules WHERE (classId = ? OR classId = (SELECT id FROM curriculum_data WHERE dataType='class' AND (id=? OR payload LIKE '%"name":"' || ? || '"%'))) AND teacherId LIKE ?`;
+    const checkRes = await new Promise(r => db.get(authCheckQ, [targetClass, targetClass, targetClass, `%${requester}%`], (e, row) => r(row?.count || 0)));
+    
+    if (checkRes === 0 && action !== 'lancamento_extra') {
+         // Se for Admin/Gestao, permitimos (ou se for lancamento extra em nova turma)
+         // Mas para permutas regulares do professor, bloqueamos.
+         return res.status(403).json({ error: "Permissão Negada: Você só pode solicitar permutas em turmas onde você já leciona." });
+    }
+
+    const pS = data.proposed_slot || data.proposedSlot || {};
+    const oS = data.original_slot || data.originalSlot || {};
+    let originalDay = oS.day || pS.day || data.proposed_day || '';
+    let originalTime = oS.time || pS.time || data.proposed_time || '';
+    let subject = oS.subject || pS.subject || '';
 
     // Empacotamos toda a clareza da permuta na coluna OBS para facilitar o Motor de Troco
     const corePayload = JSON.stringify({ 
@@ -99,45 +114,47 @@ router.post('/', (req, res) => {
         });
 
     } else if (action === 'oferta_vaga') {
-        const slotsObj = data.proposed_slot || {};
-        const targets = slotsObj.slots || [];
-        const dayNum = slotsObj.day;
-        db.all("SELECT payload FROM curriculum_data WHERE dataType = 'class'", [], (err, rows) => {
-            const classMapping = {};
-            if (!err && rows) {
-                rows.forEach(r => {
-                    try {
-                        const obj = JSON.parse(r.payload);
-                        if (obj.name) classMapping[obj.name] = obj.id;
-                    } catch(e){}
-                });
-            }
+        const slotsObj = pS; // Usar a extração robusta definida acima
+        const targets = slotsObj.slots || (slotsObj.day ? [slotsObj] : []);
+        const dayNum = dayMap[slotsObj.day] || slotsObj.day;
 
-            const cid = classMapping[slotsObj.classId || targetClass] || slotsObj.classId || targetClass;
-
-            const promises = targets.map((s) => {
-               return new Promise((resolve) => {
-                   const uQ = `UPDATE schedules SET teacherId = 'A Definir', records = json_patch(COALESCE(records, '{}'), ?) WHERE classId = ? AND dayOfWeek = ? AND slotId = ? AND ( (week_id = ? AND type IN ('previa', 'atual', 'oficial')) OR (? IS NULL AND type = 'padrao' AND (week_id IS NULL OR week_id = '')) )`;
-                   const meta = JSON.stringify({ isSubstituted: true, originalSubject: (s.subject || subject), isDisponibilizada: true, offeredTo: slotsObj.targetSubject });
-                   db.run(uQ, [meta, cid, dayNum, s.time, returnWeekId || null, returnWeekId || null], () => resolve());
-               });
+    db.all("SELECT payload FROM curriculum_data WHERE dataType = 'class'", [], (err, rows) => {
+        const classMapping = {};
+        if (!err && rows) {
+            rows.forEach(r => {
+                try {
+                    const obj = JSON.parse(r.payload);
+                    if (obj.name) classMapping[obj.name] = obj.id;
+                } catch(e){}
             });
+        }
 
-            Promise.all(promises).then(() => {
-                db.run('INSERT INTO exchange_requests (action_type, requester_id, substitute_id, target_class, original_day, original_time, subject, return_week, reason, obs, status, original_slot, proposed_slot) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-                    [action, requester, (slotsObj.targetSubject === 'ALL' ? '' : slotsObj.targetSubject), targetClass, slotsObj.day, slotsObj.time, 'Aulas Agrupadas', returnWeekId || '', reason || '', obs || '', 'pendente', JSON.stringify(data.original_slot || {}), JSON.stringify(data.proposed_slot || {})],
-                    function(err) {
-                        if (err) return res.status(500).json({ error: err.message });
-                        const insertedId = this.lastID;
-                        const now = new Date().toISOString();
-                        const nMsg = `Professor(a) SIApE: ${requester} disponibilizou aula(s) vaga(s) na turma ${targetClass} em ${slotsObj.day} (${slotsObj.time}). Alvo: ${slotsObj.targetSubject}`;
-                        db.run("INSERT INTO notifications (type, target, title, message, createdAt) VALUES ('SYSTEM', 'ALL_ADMIN', 'Aula(s) Disponibilizada(s)', ?, ?)", [nMsg, now], function(){});
-                        io.emit('schedule_updated');
-                        res.json({ success: true, id: insertedId, automatic: true });
-                    }
-                );
-            });
+        const cid = classMapping[slotsObj.classId || targetClass] || slotsObj.classId || targetClass;
+        const targetLabel = slotsObj.subject || 'Livre';
+
+        const promises = targets.map((s) => {
+           return new Promise((resolve) => {
+               const uQ = `UPDATE schedules SET teacherId = 'A Definir', records = json_patch(COALESCE(records, '{}'), ?) WHERE (classId = ? OR classId = (SELECT id FROM curriculum_data WHERE dataType='class' AND (id=? OR payload LIKE '%"name":"' || ? || '"%'))) AND (dayOfWeek = ? OR dayOfWeek = ?) AND slotId = ? AND ( (week_id = ? AND type IN ('previa', 'atual', 'oficial')) OR (? IS NULL AND type = 'padrao' AND (week_id IS NULL OR week_id = '')) )`;
+               const meta = JSON.stringify({ isSubstituted: true, isPending: true, originalSubject: (s.subject || subject), isDisponibilizada: true, offeredTo: targetLabel });
+               db.run(uQ, [meta, cid, cid, cid, slotsObj.day, dayNum, s.time, returnWeekId || null, returnWeekId || null], () => resolve());
+           });
         });
+
+        Promise.all(promises).then(() => {
+            db.run('INSERT INTO exchange_requests (action_type, requester_id, substitute_id, target_class, original_day, original_time, subject, return_week, reason, obs, status, original_slot, proposed_slot) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+                [action, requester, (targetLabel === 'Livre' ? '' : targetLabel), targetClass, originalDay, originalTime, 'Aulas Agrupadas', returnWeekId || '', reason || '', obs || '', 'pendente', JSON.stringify(oS), JSON.stringify(pS)],
+                function(err) {
+                    if (err) return res.status(500).json({ error: err.message });
+                    const insertedId = this.lastID;
+                    const now = new Date().toISOString();
+                    const nMsg = `Professor(a) SIApE: ${requester} disponibilizou aula(s) vaga(s) na turma ${targetClass} em ${originalDay} (${originalTime}). Alvo: ${targetLabel}`;
+                    db.run("INSERT INTO notifications (type, target, title, message, createdAt) VALUES ('SYSTEM', 'ALL_ADMIN', 'Aula(s) Disponibilizada(s)', ?, ?)", [nMsg, now], function(){});
+                    io.emit('schedule_updated');
+                    res.json({ success: true, id: insertedId, automatic: true });
+                }
+            );
+        });
+    });
 
     } else if (action === 'lancamento_extra') {
         const propClassType = data.proposed_slot?.classType || '';
