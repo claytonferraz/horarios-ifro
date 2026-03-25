@@ -20,11 +20,11 @@ export function ScheduleEditorModal({
     if (isOpen) {
       apiClient.fetchCurriculum('matrix').then(res => setMatrixData(res));
       apiClient.fetchCurriculum('class').then(res => setClassesData(res));
-      apiClient.fetchAdminMeta().then(() => {
-         apiClient.fetchTeachers().then(res => setUsersList(res || []));
+      apiClient.fetchAdminMeta(userRole).then(() => {
+         apiClient.fetchTeachers(userRole).then(res => setUsersList(res || []));
       });
     }
-  }, [isOpen]);
+  }, [isOpen, userRole]);
 
   useEffect(() => {
     if (isOpen) {

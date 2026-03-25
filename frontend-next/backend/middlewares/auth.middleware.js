@@ -8,6 +8,24 @@ if (!process.env.JWT_SECRET) {
 
 const JWT_SECRET = process.env.JWT_SECRET;
 
+function getTokenFromCookieHeader(cookieHeader = '') {
+  if (!cookieHeader) return null;
+  const entries = String(cookieHeader).split(';');
+  for (const entry of entries) {
+    const [rawKey, ...rawValue] = entry.split('=');
+    const key = String(rawKey || '').trim();
+    if (key !== 'admin_token') continue;
+    const value = rawValue.join('=').trim();
+    if (!value) return null;
+    try {
+      return decodeURIComponent(value);
+    } catch (_) {
+      return value;
+    }
+  }
+  return null;
+}
+
 function parsePerfis(perfisRaw) {
   try {
     const parsed = JSON.parse(perfisRaw || '[]');
@@ -43,11 +61,9 @@ function buildAccessContext(user) {
 
 const verifyToken = (req, res, next) => {
   const auth = req.headers.authorization;
-  if (!auth?.startsWith('Bearer ')) {
-    return res.status(401).json({ error: 'Token ausente.' });
-  }
-
-  const token = auth.slice(7).trim();
+  const bearerToken = auth?.startsWith('Bearer ') ? auth.slice(7).trim() : '';
+  const cookieToken = getTokenFromCookieHeader(req.headers.cookie);
+  const token = bearerToken || cookieToken;
   if (!token) return res.status(401).json({ error: 'Token ausente.' });
 
   jwt.verify(token, JWT_SECRET, (err, decoded) => {

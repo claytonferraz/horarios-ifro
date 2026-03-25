@@ -19,30 +19,27 @@ export function AuthProvider({ children }) {
   const checkInitialAuth = async () => {
     setIsLoadingAuth(true);
     try {
-      const storedUser = localStorage.getItem('@app:user');
-      if (storedUser) {
-        const userData = JSON.parse(storedUser);
-        setIsUnlocked(true);
-        setUserRole(userData.role || null);
-        setSiape(userData.siape || null);
-        setUserName(userData.nome_exibicao || null);
-        if (userData.token) {
-          setToken(userData.token);
-        }
-        setIsLoadingAuth(false);
-        return;
-      }
-
-      // To validate token, we can just check local state or ping checkStatus
       const status = await apiClient.checkStatus();
-      const isValid = !!status; // Naive check
+      const isValid = !!status;
       setIsUnlocked(isValid);
       setUserRole(isValid && status.role ? status.role : null);
       setSiape(isValid && status.id ? status.id : null);
       setUserName(isValid && status.nome_exibicao ? status.nome_exibicao : null);
+      if (isValid) {
+        localStorage.setItem('@app:user', JSON.stringify({
+          role: status.role || null,
+          siape: status.id || null,
+          nome_exibicao: status.nome_exibicao || null
+        }));
+      } else {
+        localStorage.removeItem('@app:user');
+      }
     } catch (e) {
       setIsUnlocked(false);
       setUserRole(null);
+      setSiape(null);
+      setUserName(null);
+      localStorage.removeItem('@app:user');
     } finally {
       setIsLoadingAuth(false);
     }
@@ -56,20 +53,30 @@ export function AuthProvider({ children }) {
         const loginRes = await apiClient.login(username, password); 
         if (loginRes && loginRes.token) {
           setIsUnlocked(true);
-          setToken(loginRes.token);
+          await setToken(loginRes.token);
           setUserRole(loginRes.role || 'admin');
-          localStorage.setItem('@app:user', JSON.stringify(loginRes));
+          setSiape(loginRes.siape || null);
+          setUserName(loginRes.nome_exibicao || null);
+          localStorage.setItem('@app:user', JSON.stringify({
+            role: loginRes.role || 'admin',
+            siape: loginRes.siape || null,
+            nome_exibicao: loginRes.nome_exibicao || null
+          }));
         }
         return res;
       } else {
         const res = await apiClient.login(username, password); // uses apiClient.login, not loginAdmin
         if (res && res.token) {
           setIsUnlocked(true);
-          setToken(res.token);
+          await setToken(res.token);
           setUserRole(res.role || 'publico');
           setSiape(res.siape || null);
           setUserName(res.nome_exibicao || null);
-          localStorage.setItem('@app:user', JSON.stringify(res));
+          localStorage.setItem('@app:user', JSON.stringify({
+            role: res.role || 'publico',
+            siape: res.siape || null,
+            nome_exibicao: res.nome_exibicao || null
+          }));
         }
         return res;
       }
@@ -80,9 +87,7 @@ export function AuthProvider({ children }) {
   };
 
   const logout = () => {
-    setToken('');
-    localStorage.removeItem("adminToken");
-    sessionStorage.removeItem("adminToken");
+    setToken('').catch(() => {});
     localStorage.removeItem('@app:user');
     setIsUnlocked(false);
     setUserRole(null);

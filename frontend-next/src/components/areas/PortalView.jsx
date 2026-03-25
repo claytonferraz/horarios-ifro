@@ -1,5 +1,4 @@
 import React, { useState } from 'react';
-import { io } from 'socket.io-client';
 import { 
   Calendar, UserCircle, Layers, AlertTriangle, BarChart3, ListTodo, CalendarDays, Settings, Bell, Sun, RefreshCcw, HandHeart, X, ExternalLink, Scissors, MapPin, Monitor, Mail, MessageCircle,
   BookOpen, FileText, Users, CheckCircle, AlertCircle, XCircle, Eye, Clock, Check, Printer
@@ -15,6 +14,7 @@ import { ScheduleNotifications } from '../ui/admin/ScheduleNotifications';
 import { MAP_DAYS, getColorHash, isTeacherPending, resolveTeacherName } from '@/lib/dates';
 import { useData } from '@/contexts/DataContext';
 import { apiClient } from '@/lib/apiClient';
+import { getSocketClient } from '@/lib/socketClient';
 import { CourseGrid } from './grids/CourseGrid';
 import { TeacherGrid } from './grids/TeacherGrid';
 import { ClassGrid } from './grids/ClassGrid';
@@ -114,9 +114,10 @@ export function PortalView({
 
   React.useEffect(() => {
     loadPendingRequests();
-    const socket = io(process.env.NEXT_PUBLIC_SOCKET_URL || 'http://localhost:3012');
-    socket.on('schedule_updated', () => loadPendingRequests());
-    return () => socket.disconnect();
+    const socket = getSocketClient();
+    const onScheduleUpdated = () => loadPendingRequests();
+    socket.on('schedule_updated', onScheduleUpdated);
+    return () => socket.off('schedule_updated', onScheduleUpdated);
   }, [loadPendingRequests, scheduleMode]);
 
   const [draggingRecord, setDraggingRecord] = useState(null);
@@ -256,11 +257,6 @@ export function PortalView({
         className: dCls 
       };
 
-      // Optimistic Update (Prevent Ghost Effect)
-      record.day = dDay;
-      record.time = dTime;
-      record.className = dCls;
-      
       // Update via API
       await apiClient.updateScheduleRecord(selectedWeek, updatedRecord);
       if (typeof refreshData === 'function') await refreshData();
@@ -342,6 +338,11 @@ export function PortalView({
   const [dbClasses, setDbClasses] = useState([]);
 
   React.useEffect(() => {
+    if (!['admin', 'gestao'].includes(String(userRole || '').toLowerCase())) {
+      setDbCourses([]);
+      setDbClasses([]);
+      return;
+    }
     Promise.all([
       apiClient.fetchCurriculum('matrix'),
       apiClient.fetchCurriculum('class')
@@ -349,7 +350,7 @@ export function PortalView({
       setDbCourses(crs || []);
       setDbClasses(cls || []);
     }).catch(e => console.error("Falha ao carregar dicionários", e));
-  }, []);
+  }, [userRole]);
 
    const matrixDisciplinesMap = React.useMemo(() => {
      const map = {};

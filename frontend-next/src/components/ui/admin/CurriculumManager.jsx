@@ -1,10 +1,12 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { BookOpen, Users, Plus, Trash2, Edit2, Save, X, Settings2, CalendarDays, CheckCircle, User as UserIcon, AlertTriangle } from 'lucide-react';
 import { apiClient } from '@/lib/apiClient';
+import { useAuth } from '@/contexts/AuthContext';
 import { UsersManager } from './UsersManager';
 import { MultiSelect } from '../MultiSelect';
 
 export function CurriculumManager({ isDarkMode, academicYearsMeta, groupedDisciplinesBySerie = {} }) {
+  const { userRole } = useAuth();
   const [activeTab, setActiveTab] = useState('matrices');
   const [matrices, setMatrices] = useState([]);
   const [classes, setClasses] = useState([]);
@@ -20,7 +22,7 @@ export function CurriculumManager({ isDarkMode, academicYearsMeta, groupedDiscip
 
   const refreshGlobalTeachers = async () => {
     try {
-      const dbTeachers = await apiClient.fetchTeachers();
+      const dbTeachers = await apiClient.fetchTeachers(userRole);
       setGlobalTeachers(dbTeachers || []);
       return dbTeachers;
     } catch (e) {
@@ -47,7 +49,7 @@ export function CurriculumManager({ isDarkMode, academicYearsMeta, groupedDiscip
       setLoading(false);
     }
     load();
-  }, []);
+  }, [userRole]);
 
   // Shared Helper
   const generateId = () => Math.random().toString(36).substr(2, 9);

@@ -1,6 +1,6 @@
 "use client";
 
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
 import { AlertTriangle, CheckCircle, Info, X } from 'lucide-react';
 import { useTheme } from "./ThemeContext";
 
@@ -9,9 +9,15 @@ const AlertContext = createContext();
 export function AlertProvider({ children }) {
   const [alerts, setAlerts] = useState([]);
   const { isDarkMode } = useTheme();
+  const timeoutIdsRef = useRef([]);
+  const originalAlertRef = useRef(null);
+  const originalCustomAlertRef = useRef(null);
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
+
+    originalAlertRef.current = window.alert;
+    originalCustomAlertRef.current = window.customAlert;
 
     window.customAlert = (msg, type = 'error') => {
       const id = Date.now() + Math.random();
@@ -20,13 +26,13 @@ export function AlertProvider({ children }) {
       
       // Auto-dismiss
       const timeoutMs = type === 'error' ? 8000 : 5000; // Errors persist longer
-      setTimeout(() => {
+      const timeoutId = window.setTimeout(() => {
         setAlerts(prev => prev.filter(a => a.id !== id));
       }, timeoutMs);
+      timeoutIdsRef.current.push(timeoutId);
     };
     
     // Override native JS window.alert entirely with our beautiful Toast modal
-    window.oldAlert = window.alert;
     window.alert = (msg) => {
         let type = 'error'; // Error is default for most generic blocked rules
         const msgLow = String(msg).toLowerCase();
@@ -36,6 +42,17 @@ export function AlertProvider({ children }) {
         else if (msgLow.includes('atenção') || msgLow.includes('analisada') || msgLow.includes('vaga') || msgLow.includes('substituir')) type = 'warning';
         
         window.customAlert(msg, type);
+    };
+
+    return () => {
+      timeoutIdsRef.current.forEach((timeoutId) => clearTimeout(timeoutId));
+      timeoutIdsRef.current = [];
+      window.alert = originalAlertRef.current || window.alert;
+      if (originalCustomAlertRef.current) {
+        window.customAlert = originalCustomAlertRef.current;
+      } else {
+        delete window.customAlert;
+      }
     };
   }, []);
 

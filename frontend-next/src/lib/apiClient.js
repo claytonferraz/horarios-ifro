@@ -2,36 +2,26 @@
 // CONFIGURAÇÃO DA API REST (Backend SQLite)
 // ==========================================
 const API_URL = '/api';
+const ENABLE_OFFLINE_MOCKS = process.env.NEXT_PUBLIC_ENABLE_OFFLINE_MOCKS === 'true';
 
-// Proteção para ambientes de Container (SSR/Build) que não possuem window/sessionStorage na compilação
-let internalSessionToken = '';
+const canUseOfflineMocks = () => typeof window !== 'undefined' && ENABLE_OFFLINE_MOCKS;
+const isAdminLikeRole = (role) => ['admin', 'gestao'].includes(String(role || '').toLowerCase());
 
-export const setToken = (t) => { 
-  internalSessionToken = t;
-  if (typeof window !== 'undefined') {
-    if (t) {
-      sessionStorage.setItem('admin_token', t);
-      fetch('/api/session', { 
-        method: 'POST', 
-        headers: { 'Content-Type': 'application/json' }, 
-        body: JSON.stringify({ token: t })
-      }).catch(e => console.warn('session route fail', e));
-    } else {
-      sessionStorage.removeItem('admin_token');
-      fetch('/api/session', { 
-        method: 'POST', 
-        headers: { 'Content-Type': 'application/json' }, 
-        body: JSON.stringify({ action: 'logout' })
-      }).catch(e => console.warn('logout route fail', e));
-    }
-  }
+export const setToken = async (t) => {
+  if (typeof window === 'undefined') return;
+  const payload = t ? { token: t } : { action: 'logout' };
+  const res = await fetch('/api/session', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    credentials: 'same-origin',
+    body: JSON.stringify(payload)
+  });
+  if (!res.ok) throw new Error('Falha ao atualizar sessão segura.');
 };
 
 export const getHeaders = () => {
-  const token = typeof window !== 'undefined' ? sessionStorage.getItem('admin_token') || internalSessionToken : internalSessionToken;
   return {
-    'Content-Type': 'application/json',
-    ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+    'Content-Type': 'application/json'
   };
 };
 
@@ -52,7 +42,7 @@ export const apiClient = {
       const academicWeeks = weekRes.ok ? await weekRes.json() : [];
       return { schedules, config, academicWeeks };
     } catch (e) {
-      if (typeof window !== 'undefined') {
+      if (canUseOfflineMocks()) {
         console.warn("⚠️ Backend SQLite não detectado. Usando modo de simulação LocalStorage.");
         const configMockKey = year ? `sqlite_mock_config_${year}` : 'sqlite_mock_config';
         const schedules = JSON.parse(localStorage.getItem('sqlite_mock_schedules') || '[]');
@@ -60,13 +50,13 @@ export const apiClient = {
         const academicWeeks = JSON.parse(localStorage.getItem('sqlite_mock_academic_weeks') || '[]');
         return { schedules, config, academicWeeks };
       }
-      return { schedules: [], config: { disabledWeeks: [], activeDays: null, classTimes: null, bimesters: null, activeDefaultScheduleId: null }, academicWeeks: [] };
+      throw e;
     }
   },
 
   async checkStatus() {
     try {
-      const res = await fetch(`${API_URL}/auth/me`, { headers: getHeaders() });
+      const res = await fetch(`${API_URL}/auth/me`, { headers: getHeaders(), credentials: 'same-origin' });
       if (!res.ok) return null;
       return await res.json(); 
     } catch (e) {
@@ -74,12 +64,15 @@ export const apiClient = {
     }
   },
 
-  async fetchAdminMeta() {
+  async fetchAdminMeta(userRole) {
+    if (!isAdminLikeRole(userRole)) {
+      return { disciplines: {}, academicYears: {}, subjectHours: {} };
+    }
     try {
       const [discRes, yearsRes, subjRes] = await Promise.all([
-        fetch(`${API_URL}/admin/disciplines`),
-        fetch(`${API_URL}/admin/academic-years`),
-        fetch(`${API_URL}/admin/subject-hours`)
+        fetch(`${API_URL}/admin/disciplines`, { headers: getHeaders(), credentials: 'same-origin' }),
+        fetch(`${API_URL}/admin/academic-years`, { headers: getHeaders(), credentials: 'same-origin' }),
+        fetch(`${API_URL}/admin/subject-hours`, { headers: getHeaders(), credentials: 'same-origin' })
       ]);
       if (!discRes.ok || !yearsRes.ok || !subjRes.ok) throw new Error("API Meta Offline");
       return { 
@@ -88,14 +81,14 @@ export const apiClient = {
         subjectHours: await subjRes.json()
       };
     } catch (e) {
-      if (typeof window !== 'undefined') {
+      if (canUseOfflineMocks()) {
         return {
           disciplines: JSON.parse(localStorage.getItem('sqlite_mock_disciplines') || '{}'),
           academicYears: JSON.parse(localStorage.getItem('sqlite_mock_academic_years') || '{}'),
           subjectHours: JSON.parse(localStorage.getItem('sqlite_mock_subject_hours') || '{}')
         };
       }
-      return { disciplines: {}, academicYears: {}, subjectHours: {} };
+      throw e;
     }
   },
   
@@ -132,17 +125,17 @@ export const apiClient = {
       if (!res.ok) throw new Error("API Auth Offline");
       return await res.json(); 
     } catch (e) {
-      if (typeof window !== 'undefined') {
+      if (canUseOfflineMocks()) {
         const mockUsers = JSON.parse(localStorage.getItem('sqlite_mock_users') || '[]');
         return { needsSetup: mockUsers.length === 0 };
       }
-      return { needsSetup: false };
+      throw e;
     }
   },
 
   async setupAdmin(username, password) {
     try {
-      const res = await fetch(`${API_URL}/auth/setup`, { method: 'POST', headers: getHeaders(), body: JSON.stringify({ username, password }) });
+      const res = await fetch(`${API_URL}/auth/setup`, { method: 'POST', headers: getHeaders(), credentials: 'same-origin', body: JSON.stringify({ username, password }) });
       if (!res.ok) { const err = await res.json(); throw new Error(err.error || "Falha na criação"); }
       return await res.json();
     } catch (e) {
@@ -152,7 +145,7 @@ export const apiClient = {
 
   async login(username, password) {
     try {
-      const res = await fetch(`${API_URL}/auth/login`, { method: 'POST', headers: getHeaders(), body: JSON.stringify({ username, password }) });
+      const res = await fetch(`${API_URL}/auth/login`, { method: 'POST', headers: getHeaders(), credentials: 'same-origin', body: JSON.stringify({ username, password }) });
       
       if (!res.ok) { 
         let errorMsg = "Credenciais inválidas";
@@ -236,7 +229,7 @@ export const apiClient = {
       }
       return await res.json();
     } catch (e) {
-      if (typeof window !== 'undefined' && e.message.includes("fetch")) {
+      if (canUseOfflineMocks() && e.message.includes("fetch")) {
         const fromKey = `sqlite_mock_config_${fromYear}`;
         const toKey = `sqlite_mock_config_${toYear}`;
         const fromData = JSON.parse(localStorage.getItem(fromKey));
@@ -320,9 +313,10 @@ export const apiClient = {
     }
   },
 
-  async fetchTeachers() {
+  async fetchTeachers(userRole) {
+    if (!isAdminLikeRole(userRole)) return [];
     try {
-      const res = await fetch(`${API_URL}/admin/teachers`);
+      const res = await fetch(`${API_URL}/admin/teachers`, { headers: getHeaders(), credentials: 'same-origin' });
       if (!res.ok) throw new Error('Falha ao buscar professores');
       return await res.json();
     } catch (e) {

@@ -4,7 +4,7 @@ import { apiClient } from '@/lib/apiClient';
 import { useData } from '@/contexts/DataContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { resolveTeacherName } from '@/lib/dates';
-import { io } from "socket.io-client";
+import { getSocketClient } from '@/lib/socketClient';
 
 export function FloatingRequestsWidget({ isDarkMode, userRole, appMode, controlledIsOpen, setControlledIsOpen, hideButton }) {
   const [localIsOpen, setLocalIsOpen] = useState(false);
@@ -77,11 +77,11 @@ export function FloatingRequestsWidget({ isDarkMode, userRole, appMode, controll
 
     loadData();
 
-    // Socket Real-time
-    const socket = io(process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3012');
-    socket.on('schedule_updated', () => {
+    const socket = getSocketClient();
+    const onScheduleUpdated = () => {
       loadData();
-    });
+    };
+    socket.on('schedule_updated', onScheduleUpdated);
     
     let interval;
     if (isOpen) {
@@ -89,7 +89,7 @@ export function FloatingRequestsWidget({ isDarkMode, userRole, appMode, controll
     }
 
     return () => {
-      socket.disconnect();
+      socket.off('schedule_updated', onScheduleUpdated);
       clearInterval(interval);
     };
   }, [isOpen, userRole, appMode, siape]);

@@ -599,7 +599,17 @@ export function ScheduleConfigPanel({ isDarkMode }) {
                  <a 
                    href="/api/admin/export-db" 
                    target="_blank" 
-                   onClick={async (e) => { e.preventDefault(); const t = sessionStorage.getItem('admin_token'); if (!t) return; const r = await fetch('/api/admin/export-db', { headers: { 'Authorization': 'Bearer ' + t } }); if(!r.ok) return; const blob = await r.blob(); const url = window.URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = 'horarios.db'; a.click(); }}
+                   onClick={async (e) => {
+                     e.preventDefault();
+                     const r = await fetch('/api/admin/export-db', { credentials: 'same-origin' });
+                     if(!r.ok) return;
+                     const blob = await r.blob();
+                     const url = window.URL.createObjectURL(blob);
+                     const a = document.createElement('a');
+                     a.href = url;
+                     a.download = 'horarios.db';
+                     a.click();
+                   }}
                    className={`w-full py-4 rounded-2xl font-black text-sm uppercase tracking-widest flex items-center justify-center gap-2 transition-all mt-auto ${isDarkMode ? 'bg-emerald-600 hover:bg-emerald-500 text-white shadow-[0_0_20px_rgba(16,185,129,0.3)]' : 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-[0_4px_14px_0_rgba(16,185,129,0.39)]'}`}
                  >
                    Download DB (.db)
@@ -621,13 +631,12 @@ export function ScheduleConfigPanel({ isDarkMode }) {
                       if (!confirm('ATENÇÃO: Isso irá APAGAR todo o painel atual e substituí-lo pelas informações do arquivo enviado. Deseja prosseguir de imediato?')) return;
                       
                       try {
-                        const token = sessionStorage.getItem('admin_token');
                         const res = await fetch('/api/admin/import-db', {
                            method: 'POST',
                            headers: {
-                             'Content-Type': 'application/octet-stream',
-                             'Authorization': `Bearer ${token}`
+                             'Content-Type': 'application/octet-stream'
                            },
+                           credentials: 'same-origin',
                            body: file
                         });
                         const data = await res.json();

@@ -23,6 +23,35 @@ export function useAdminActions({
   const addInputRef = useRef(null);
   const [compareTargetWeekKey, setCompareTargetWeekKey] = useState(null);
 
+  const validateImportUrl = (rawUrl) => {
+    let parsed;
+    try {
+      parsed = new URL(rawUrl);
+    } catch (_) {
+      throw new Error('URL inválida.');
+    }
+
+    if (!['http:', 'https:'].includes(parsed.protocol)) {
+      throw new Error('Apenas URLs HTTP/HTTPS são permitidas.');
+    }
+
+    const allowedHosts = String(process.env.NEXT_PUBLIC_IMPORT_ALLOWED_HOSTS || '')
+      .split(',')
+      .map((item) => item.trim().toLowerCase())
+      .filter(Boolean);
+
+    const currentHost = typeof window !== 'undefined' ? window.location.hostname.toLowerCase() : '';
+    const normalizedHost = parsed.hostname.toLowerCase();
+    const isSameHost = currentHost && normalizedHost === currentHost;
+    const isExplicitlyAllowed = allowedHosts.includes(normalizedHost);
+
+    if (!isSameHost && !isExplicitlyAllowed) {
+      throw new Error('Domínio não permitido para importação.');
+    }
+
+    return parsed.toString();
+  };
+
   const processContent = async (content, originalFileName) => {
     setErrorMsg('');
     try {
@@ -105,7 +134,8 @@ export function useAdminActions({
     if (!importUrlModal.url) return;
     setIsLoading(true);
     try {
-      const response = await fetch(importUrlModal.url);
+      const safeUrl = validateImportUrl(importUrlModal.url);
+      const response = await fetch(safeUrl);
       if (!response.ok) throw new Error("Acesso negado ou link inválido.");
       const content = await response.text();
       await processContent(content, 'url_import.csv');

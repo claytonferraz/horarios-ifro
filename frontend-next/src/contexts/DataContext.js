@@ -1,12 +1,14 @@
 "use client";
 
-import React, { createContext, useContext, useState, useEffect, useMemo } from "react";
+import React, { createContext, useContext, useState, useEffect, useMemo, useCallback } from "react";
 import { apiClient } from "@/lib/apiClient";
+import { useAuth } from "@/contexts/AuthContext";
+import { getSocketClient } from "@/lib/socketClient";
 
 const DataContext = createContext();
-import { io } from "socket.io-client";
 
 export function DataProvider({ children }) {
+  const { userRole } = useAuth();
   const [rawData, setRawData] = useState([]);
   const [schedules, setSchedules] = useState([]);
   const [disabledWeeks, setDisabledWeeks] = useState([]);
@@ -24,7 +26,32 @@ export function DataProvider({ children }) {
   const [isLoading, setIsLoading] = useState(true);
   const [errorMsg, setErrorMsg] = useState("");
 
-  const loadData = async () => {
+  const [globalTeachers, setGlobalTeachers] = useState([]);
+  const loadMetadata = useCallback(async (role = userRole) => {
+    const canLoadAdminData = ['admin', 'gestao'].includes(String(role || '').toLowerCase());
+    if (!canLoadAdminData) {
+      setSubjectHoursMeta({});
+      setDisciplinesMeta({});
+      setAcademicYearsMeta({});
+      setGlobalTeachers([]);
+      return;
+    }
+
+    try {
+      const meta = await apiClient.fetchAdminMeta(role);
+      if (meta) {
+        setSubjectHoursMeta(meta.subjectHours || {});
+        setDisciplinesMeta(meta.disciplines || {});
+        setAcademicYearsMeta(meta.academicYears || {});
+      }
+      const teachers = await apiClient.fetchTeachers(role);
+      setGlobalTeachers(teachers || []);
+    } catch (err) {
+      console.warn("Falha ao carregar metadados administrativos:", err.message);
+    }
+  }, [userRole]);
+
+  const loadData = useCallback(async () => {
     try {
       setIsLoading(true);
       const { schedules, config, academicWeeks: loadedWeeks } = await apiClient.fetchAll(selectedConfigYear);
@@ -77,52 +104,35 @@ export function DataProvider({ children }) {
         setAcademicWeeks(loadedWeeks);
       }
 
-      await loadMetadata();
+      await loadMetadata(userRole);
     } catch (err) {
       setErrorMsg("Erro ao carregar dados: " + err.message);
     } finally {
       setIsLoading(false);
     }
-  };
-
-  const [globalTeachers, setGlobalTeachers] = useState([]);
-  const loadMetadata = async () => {
-    try {
-      const meta = await apiClient.fetchAdminMeta();
-      if (meta) {
-        setSubjectHoursMeta(meta.subjectHours || {});
-        setDisciplinesMeta(meta.disciplines || {});
-        setAcademicYearsMeta(meta.academicYears || {});
-      }
-      const teachers = await apiClient.fetchTeachers();
-      setGlobalTeachers(teachers || []);
-    } catch (err) {
-      console.warn("Falha ao carregar metadados administrativos:", err.message);
-    }
-  };
+  }, [selectedConfigYear, loadMetadata, userRole]);
 
   useEffect(() => {
     loadData();
     
-    let socketTimer;
-    // Real-Time Socket Connection
-    const socket = io(process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3012');
-    socket.on('schedule_updated', () => {
+    let socketTimer = null;
+    const socket = getSocketClient();
+    const onScheduleUpdated = () => {
       console.log('Real-time: Schedule Updated Event Reached. Throttling and refreshing data...');
       clearTimeout(socketTimer);
       socketTimer = setTimeout(() => {
         loadData();
       }, 500); // 500ms debounce
-    });
+    };
+    socket.on('schedule_updated', onScheduleUpdated);
 
     return () => {
       clearTimeout(socketTimer);
-      socket.disconnect();
+      socket.off('schedule_updated', onScheduleUpdated);
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedConfigYear]);
+  }, [selectedConfigYear, userRole, loadData]);
 
-  const value = {
+  const value = useMemo(() => ({
     rawData,
     setRawData,
     disabledWeeks,
@@ -152,7 +162,26 @@ export function DataProvider({ children }) {
     refreshData: loadData,
     loadAdminMetadata: loadMetadata,
     schedules,
-  };
+  }), [
+    rawData,
+    disabledWeeks,
+    subjectHoursMeta,
+    disciplinesMeta,
+    academicYearsMeta,
+    globalTeachers,
+    activeDays,
+    classTimes,
+    intervals,
+    bimesters,
+    activeDefaultScheduleId,
+    academicWeeks,
+    selectedConfigYear,
+    isLoading,
+    errorMsg,
+    schedules,
+    loadData,
+    loadMetadata
+  ]);
 
   return <DataContext.Provider value={value}>{children}</DataContext.Provider>;
 }
