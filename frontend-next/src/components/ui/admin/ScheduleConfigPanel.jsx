@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { Save, Plus, Trash2, Clock, Calendar, AlertCircle, List, Settings, Check, Download } from 'lucide-react';
+import { Save, Plus, Trash2, Clock, Calendar, AlertCircle, List, Settings, Check, Download, Database, Upload } from 'lucide-react';
 import { useData } from '@/contexts/DataContext';
 import { apiClient } from '@/lib/apiClient';
 import { AcademicWeeksPanel } from './AcademicWeeksPanel';
@@ -12,7 +12,8 @@ const TABS = [
   { id: 'days', label: 'Dias da Semana', icon: Calendar },
   { id: 'times', label: 'Horários & Turnos', icon: Clock },
   { id: 'bimesters', label: 'Bimestres', icon: Calendar },
-  { id: 'weeks', label: 'Semanas Acadêmicas', icon: Calendar }
+  { id: 'weeks', label: 'Semanas Acadêmicas', icon: Calendar },
+  { id: 'backup', label: 'Backup / DB', icon: Database }
 ];
 
 function sortTimes(times) {
@@ -575,6 +576,90 @@ export function ScheduleConfigPanel({ isDarkMode }) {
         {activeTab === 'weeks' && (
           <div className="animate-in fade-in slide-in-from-bottom-2">
             <AcademicWeeksPanel isDarkMode={isDarkMode} />
+          </div>
+        )}
+
+        {/* --- BACKUP / RESTORE --- */}
+        {activeTab === 'backup' && (
+          <div className="max-w-3xl animate-in fade-in slide-in-from-bottom-2">
+            <div className="flex items-center justify-between mb-8">
+              <h3 className="text-sm font-black uppercase tracking-widest flex items-center gap-2 opacity-70">
+                <Database size={16}/> Gerenciamento do Banco de Dados
+              </h3>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {/* EXPORT PANEL */}
+              <div className={`p-8 rounded-3xl border shadow-sm flex flex-col items-center text-center transition-transform hover:scale-[1.01] ${isDarkMode ? 'bg-slate-800/40 border-slate-700' : 'bg-slate-50 border-slate-200'}`}>
+                 <div className={`w-20 h-20 rounded-3xl flex items-center justify-center mb-6 shadow-inner ${isDarkMode ? 'bg-emerald-900/30 text-emerald-400 border border-emerald-800/50' : 'bg-emerald-100 text-emerald-600 border border-emerald-200'}`}>
+                    <Download size={40} className="drop-shadow-sm" />
+                 </div>
+                 <h4 className="text-xl font-black uppercase tracking-widest mb-3">Exportar Dados</h4>
+                 <p className="text-xs opacity-70 mb-8 font-bold leading-relaxed max-w-[250px]">Baixe uma cópia completa de toda a estrutura de horários, turmas, professores e configurações atuais (.db).</p>
+                 <a 
+                   href="/api/admin/export-db" 
+                   target="_blank" 
+                   onClick={(e) => {
+                     const t = localStorage.getItem('token');
+                     if (t) {
+                         e.preventDefault();
+                         window.open(`/api/admin/export-db?token=${t}`, '_blank');
+                     }
+                   }}
+                   className={`w-full py-4 rounded-2xl font-black text-sm uppercase tracking-widest flex items-center justify-center gap-2 transition-all mt-auto ${isDarkMode ? 'bg-emerald-600 hover:bg-emerald-500 text-white shadow-[0_0_20px_rgba(16,185,129,0.3)]' : 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-[0_4px_14px_0_rgba(16,185,129,0.39)]'}`}
+                 >
+                   Download DB (.db)
+                 </a>
+              </div>
+
+              {/* IMPORT PANEL */}
+              <div className={`p-8 rounded-3xl border shadow-sm flex flex-col items-center text-center transition-transform hover:scale-[1.01] ${isDarkMode ? 'bg-slate-800/40 border-slate-700' : 'bg-slate-50 border-slate-200'}`}>
+                 <div className={`w-20 h-20 rounded-3xl flex items-center justify-center mb-6 shadow-inner ${isDarkMode ? 'bg-rose-900/30 text-rose-400 border border-rose-800/50' : 'bg-rose-100 text-rose-600 border border-rose-200'}`}>
+                    <Upload size={40} className="drop-shadow-sm" />
+                 </div>
+                 <h4 className="text-xl font-black uppercase tracking-widest mb-3">Restaurar Dados</h4>
+                 <p className="text-xs opacity-70 mb-8 font-bold leading-relaxed max-w-[250px] text-rose-500 dark:text-rose-400">Faça upload de um arquivo horarios.db para sobrescrever todo o sistema. Uso com moderação.</p>
+                 
+                 <label className={`w-full py-4 rounded-2xl font-black text-sm uppercase tracking-widest flex items-center justify-center gap-2 transition-all cursor-pointer mt-auto ${isDarkMode ? 'bg-rose-600 hover:bg-rose-500 text-white shadow-[0_0_20px_rgba(225,29,72,0.3)]' : 'bg-rose-600 hover:bg-rose-700 text-white shadow-[0_4px_14px_0_rgba(225,29,72,0.39)]'}`}>
+                   <input type="file" accept=".db" className="hidden" onChange={async (e) => {
+                      const file = e.target.files[0];
+                      if (!file) return;
+                      if (!confirm('ATENÇÃO: Isso irá APAGAR todo o painel atual e substituí-lo pelas informações do arquivo enviado. Deseja prosseguir de imediato?')) return;
+                      
+                      try {
+                        const token = localStorage.getItem('token');
+                        const res = await fetch('/api/admin/import-db', {
+                           method: 'POST',
+                           headers: {
+                             'Content-Type': 'application/octet-stream',
+                             'Authorization': `Bearer ${token}`
+                           },
+                           body: file
+                        });
+                        const data = await res.json();
+                        if (data.success) {
+                           alert(data.message);
+                           window.location.reload();
+                        } else {
+                           alert(data.error || "Erro desconhecido");
+                        }
+                      } catch(err) {
+                        alert("Falha de conexão com o banco: " + err.message);
+                      }
+                      e.target.value = '';
+                   }} />
+                   Enviar Backup (.db)
+                 </label>
+              </div>
+            </div>
+            
+            <div className={`mt-8 p-4 rounded-2xl border text-xs font-bold flex items-start gap-3 ${isDarkMode ? 'bg-amber-900/10 border-amber-800/30 text-amber-500' : 'bg-amber-50 border-amber-200 text-amber-700'}`}>
+               <AlertCircle size={20} className="shrink-0" />
+               <p>
+                 Os backups de banco de dados são salvos no formato bruto do SQLite 3. 
+                 Ao restaurar uma base, todos os DAPE requests que ocorreram APÓS a criação do backup enviado serão apagados definitivamente do histórico em tempo real.
+               </p>
+             </div>
           </div>
         )}
 

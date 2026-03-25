@@ -2,6 +2,8 @@ const express = require('express');
 const db = require('../db');
 const { verifyToken } = require('../middlewares/auth.middleware');
 const bcrypt = require('bcryptjs');
+const fs = require('fs');
+const path = require('path');
 
 module.exports = function(io) {
   const router = express.Router();
@@ -271,6 +273,59 @@ router.put('/teachers/:siape/admin-status', verifyToken, (req, res) => {
       res.json({ success: true, is_admin: adminValue });
     }
   );
+});
+
+// ==========================================
+// ROTAS DE BACKUP / RESTORE DO BANCO (DAPE)
+// ==========================================
+
+router.get('/export-db', verifyToken, (req, res) => {
+  try {
+      const dbPath = path.join(__dirname, '../horarios.db');
+      if (fs.existsSync(dbPath)) {
+          // Força o checkpoint do WAL para garantir que todos os dados fluem para o DB principal antes do download
+          db.run("PRAGMA wal_checkpoint(TRUNCATE)", (err) => {
+              if (err) console.error("Erro ao fazer checkpoint do WAL:", err);
+              res.download(dbPath, `horarios_backup_${Date.now()}.db`);
+          });
+      } else {
+          res.status(404).json({ error: "Banco de dados não encontrado." });
+      }
+  } catch (error) {
+      res.status(500).json({ error: error.message });
+  }
+});
+
+router.post('/import-db', verifyToken, express.raw({ type: '*/*', limit: '100mb' }), (req, res) => {
+  try {
+      if (!req.body || req.body.length === 0) {
+          return res.status(400).json({ error: "Arquivo vazio ou formato inválido." });
+      }
+      
+      const dbPath = path.join(__dirname, '../horarios.db');
+      const backupDir = path.join(__dirname, '../backups');
+      
+      // Cria backup de segurança antes de sobrescrever
+      if (fs.existsSync(dbPath)) {
+          if (!fs.existsSync(backupDir)) fs.mkdirSync(backupDir, { recursive: true });
+          fs.copyFileSync(dbPath, path.join(backupDir, `horarios_pre_import_${Date.now()}.db`));
+      }
+      
+      // Sobrescreve o arquivo físico
+      fs.writeFileSync(dbPath, req.body);
+      
+      // Apaga os arquivos temporários do SQLite (WAL e SHM) para forçar leitura limpa
+      const walPath = dbPath + '-wal';
+      const shmPath = dbPath + '-shm';
+      if (fs.existsSync(walPath)) fs.unlinkSync(walPath);
+      if (fs.existsSync(shmPath)) fs.unlinkSync(shmPath);
+
+      io.emit('schedule_updated');
+      res.json({ success: true, message: "Banco importado com sucesso! A grade já foi atualizada." });
+  } catch (error) {
+      console.error("Erro na importação:", error);
+      res.status(500).json({ error: "Erro na restauração: " + error.message });
+  }
 });
 
 
