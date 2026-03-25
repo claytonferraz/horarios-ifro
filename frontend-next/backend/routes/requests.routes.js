@@ -195,8 +195,8 @@ router.post('/', (req, res) => {
 
                          if (realCourseId !== 'DESCONHECIDO') {
                              console.log("[POST] timesToProcess: ", timesToProcess, " realCourseId: ", realCourseId, " targetClassStr: ", targetClassStr); timesToProcess.forEach(timeStr => {
-                                 const cleanSubject = subject.replace('[Aguardando] ', '');
-                                 const patchData = JSON.stringify({ classType: propClassType, isExtra: true, isPending: true, requestId: insertedId });
+                                 const cleanSubject = subject.replace(/\[Aguardando\]\s*/g, '').trim();
+                                 const patchData = JSON.stringify({ classType: propClassType, isExtra: true, isPending: true, requestId: insertedId, subject: cleanSubject });
                                  const pendingDiscipline = `[Aguardando] ${cleanSubject}`;
 
                                  const updateQ = `UPDATE schedules SET teacherId = ?, disciplineId = ?, records = json_patch(COALESCE(records, '{}'), ?) WHERE classId = ? AND dayOfWeek = ? AND slotId = ? AND ( (week_id = ? AND type IN ('previa', 'atual', 'oficial')) OR (? IS NULL AND type = 'padrao' AND (week_id IS NULL OR week_id = '')) )`;
@@ -395,7 +395,7 @@ router.put('/:id/status', verifyToken, (req, res) => {
                      const weekId = row.return_week || null;
                      const targetType = propData.type || 'previa';
                      const classType = propData.classType || 'Regular';
-                     const targetSubject = (propData.subject || row.subject || '').replace('[Aguardando] ', '');
+                     const targetSubject = (propData.subject || row.subject || '').replace(/\[Aguardando\]\s*/g, '').trim();
 
                      const dayStr = propData.day || row.original_day; // Usando a string literal
                      const targetClassStr = propData.classId || propData.className || row.target_class;
@@ -442,7 +442,7 @@ router.put('/:id/status', verifyToken, (req, res) => {
                              let hasError = false;
 
                              console.log("[POST] timesToProcess: ", timesToProcess, " realCourseId: ", realCourseId, " targetClassStr: ", targetClassStr); timesToProcess.forEach(timeStr => {
-                                 const patchData = JSON.stringify({ classType: classType, isExtra: true, isPending: false });
+                                 const patchData = JSON.stringify({ classType: classType, isExtra: true, isPending: false, subject: targetSubject });
                                  
                                  // Tenta UPDATE usando a string exata (dayStr)
                                  const updateQ = `UPDATE schedules SET teacherId = ?, disciplineId = ?, records = json_patch(COALESCE(records, '{}'), ?) WHERE classId = ? AND dayOfWeek = ? AND slotId = ? AND ( (week_id = ? AND type IN ('previa', 'atual', 'oficial')) OR (? IS NULL AND type = 'padrao' AND (week_id IS NULL OR week_id = '')) )`;
