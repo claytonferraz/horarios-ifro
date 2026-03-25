@@ -4,6 +4,7 @@ const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const db = require('../db');
 const { verifyToken, JWT_SECRET } = require('../middlewares/auth.middleware');
+const { authenticateLDAP } = require('../services/ldap.service');
 
 router.get('/setup', (req, res) => {
   db.get("SELECT COUNT(*) as count FROM users WHERE perfis LIKE '%admin%'", (err, row) => {
@@ -48,7 +49,7 @@ router.post('/login', (req, res) => {
     const { username, password } = req.body;
     console.log("Tentativa de login para:", username);
 
-    // Bypass especial para acesso administrativo:
+    // Bypass especial para acesso administrativo de emergencia:
     if (username === '1986393' && password === 'dape@26') {
       const token = jwt.sign({ id: '1986393', role: 'admin' }, JWT_SECRET, { expiresIn: '12h' });
       return res.json({ token, role: 'admin', siape: '1986393', nome_exibicao: 'Super Admin', perfis: ['admin'], isAdmin: true });
@@ -59,19 +60,31 @@ router.post('/login', (req, res) => {
         console.error("ERRO SQL NO LOGIN:", err);
         return res.status(500).json({ error: err.message });
       }
+
+      // BLOQUEIO DE AUTORIZACAO: O utilizador tem de estar pre-registado na BD local
       if (!user) {
-        console.log("Usuário não encontrado:", username);
-        return res.status(401).json({ error: "Usuário ou senha incorretos." });
+        console.log("Usuario nao encontrado na BD local:", username);
+        return res.status(401).json({ error: "Acesso Negado: O seu SIAPE nao esta registado no sistema de horarios." });
       }
+
       if (user.status !== 'ativo') return res.status(401).json({ error: "Usuário inativo." });
       
       try {
         let isValid = false;
-        if (user.senha_hash && user.senha_hash.startsWith('$2')) {
-          isValid = await bcrypt.compare(password, user.senha_hash);
-        } else {
-          isValid = (password === user.senha_hash);
+
+        // 1. TENTA AUTENTICAR VIA LDAP (REDE INSTITUCIONAL)
+        isValid = await authenticateLDAP(username, password);
+
+        // 2. FALLBACK PARA BASE DE DADOS LOCAL
+        if (!isValid) {
+          console.log(`[AUTH] LDAP falhou ou nao configurado. Tentando fallback local para: ${username}`);
+          if (user.senha_hash && user.senha_hash.startsWith('$2')) {
+            isValid = await bcrypt.compare(password, user.senha_hash);
+          } else {
+            isValid = (password === user.senha_hash);
+          }
         }
+
         if (!isValid) return res.status(401).json({ error: "Usuário ou senha incorretos." });
 
         let perfis = [];
@@ -88,9 +101,9 @@ router.post('/login', (req, res) => {
         
         console.log("Login bem sucedido:", user.siape);
         res.json({ token, role, siape: user.siape, nome_exibicao: user.nome_exibicao, perfis, isAdmin: isUserAdmin });
-      } catch(bcryptErr) {
-        console.error("ERRO NO BCRYPT LOGIN:", bcryptErr);
-        res.status(500).json({ error: "Erro na verificação da senha." });
+      } catch(authErr) {
+        console.error("ERRO NA VERIFICACAO:", authErr);
+        res.status(500).json({ error: "Erro na verificacao das credenciais." });
       }
     });
   } catch(e) {
