@@ -278,7 +278,8 @@ function ChatItem({ req, isDarkMode, loadingId, handleUpdate, globalTeachers, ra
          </div>
        );
     } else if (pP) {
-       descUI = <p className={`leading-relaxed ${isDarkMode ? 'text-slate-200' : 'text-slate-800'}`}>{`Mudança / Vaga: ${pP.subject} (${pP.className}) para ${pP.day} às ${pP.time}.`}</p>;
+        const labelText = resolveLabel(pP);
+        descUI = <p className={`leading-relaxed ${isDarkMode ? 'text-slate-200' : 'text-slate-800'}`}>{`Mudança / Vaga: ${labelText} para ${pP.day || pP.originalDay || ''} às ${pP.time || pP.originalTime || ''}.`}</p>;
     }
   } catch(e) {}
 

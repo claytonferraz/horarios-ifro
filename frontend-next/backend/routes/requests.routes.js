@@ -381,6 +381,47 @@ router.put('/:id/status', verifyToken, (req, res) => {
                      io.emit('schedule_updated');
                      res.json({ success: true, homologacaoStatus: 'MANUAL_LEGADO' });
                  }
+          const dayMap = { 'Domingo': '0', 'Segunda-feira': '1', 'Terça-feira': '2', 'Quarta-feira': '3', 'Quinta-feira': '4', 'Sexta-feira': '5', 'Sábado': '6' };
+              } else if (!err3 && row && (row.action_type === 'vaga' || row.action_type === 'oferta_vaga')) {
+                  try {
+                      const propData = JSON.parse(row.proposed_slot || '{}');
+                      const weekId = row.return_week || null;
+                      const now = new Date().toISOString();
+                      let slotsToProcess = [];
+                      if (propData.slots && Array.isArray(propData.slots)) { slotsToProcess = propData.slots; } else { slotsToProcess = [propData]; }
+                      db.serialize(() => {
+                          db.run('BEGIN TRANSACTION;');
+                          let hasError = false;
+                          slotsToProcess.forEach(slot => {
+                              const day = slot.day || propData.day || row.original_day;
+                              const time = slot.time || propData.time || row.original_time;
+                              const classId = slot.classId || propData.className || row.target_class;
+                              const dNum = dayMap[day] || day;
+                              let newTeacher = null;
+                              let newDiscipline = null;
+                              let patchData = {};
+                              if (row.action_type === 'vaga') {
+                                  newTeacher = row.requester_id;
+                                  newDiscipline = slot.subject || propData.subject;
+                                  patchData = { isExtra: true, isPending: false, isVacant: false, subject: newDiscipline };
+                              } else {
+                                  newTeacher = '0000001';
+                                  newDiscipline = slot.subject || propData.subject || row.subject;
+                                  patchData = { isVacant: true, isPending: false, originalTeacher: row.requester_id, subject: newDiscipline };
+                              }
+                              const patchStr = JSON.stringify(patchData);
+                              const updateQ = "UPDATE schedules SET teacherId = ?, disciplineId = ?, records = json_patch(COALESCE(records, '{} '), ?) WHERE (classId = ? OR classId = (SELECT id FROM curriculum_data WHERE dataType='class' AND (id=? OR payload LIKE '%\"name\":\"' || ? || '\"%'))) AND (dayOfWeek = ? OR dayOfWeek = ?) AND slotId = ? AND ( (week_id = ? AND type IN ('previa', 'atual', 'oficial')) OR (? IS NULL AND type = 'padrao' AND (week_id IS NULL OR week_id = '')) )";
+                              db.run(updateQ, [newTeacher, newDiscipline, patchStr, classId, classId, classId, day, dNum, time, weekId, weekId], function(upErr) {
+                                  if (upErr || this.changes === 0) { console.error('[OFFER_ENGINE] Falha no slot', day, time); if (upErr) hasError = true; }
+                              });
+                          });
+                          db.run('COMMIT;', (commitErr) => {
+                              if (commitErr || hasError) { db.run('ROLLBACK;'); res.status(500).json({ error: 'Erro Transacional' }); }
+                              else { io.emit('schedule_updated'); res.json({ success: true, homologacaoStatus: 'EXECUTADA_VAGA_OFERTA' }); }
+                          });
+                      });
+                  } catch(errExtract) { console.error('[VAGA_ENGINE] Erro:', errExtract); res.json({ success: true, homologacaoStatus: 'FALHA_PARSE' }); }
+
              } else if (!err3 && row && row.action_type === 'lancamento_extra') {
                  // HOMOLOGAÇÃO DE LANÇAMENTO DE AULA EXTRA
                  try {

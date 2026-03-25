@@ -82,9 +82,10 @@ export function TeacherOfferModal({
            day: originalRecord.day,
            time: timeRange,
            slots: consecutiveSlots,
-           targetSubject: selectedDiscipline,
-           classId: consecutiveSlots[0]?.classId || targetClass
-        }
+            subject: selectedDiscipline === 'ALL' ? 'Livre' : selectedDiscipline,
+            className: targetClass,
+            classId: consecutiveSlots[0]?.classId || targetClass
+         }
       };
 
       if (typeof onSubmit === 'function') {
