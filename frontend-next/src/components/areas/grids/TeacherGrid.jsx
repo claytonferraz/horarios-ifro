@@ -42,12 +42,8 @@ export const TeacherGrid = React.memo(
     const directRecords = mappedSchedules.filter(r => r.teacherId && activeTeacher && String(r.teacherId).split(',').includes(String(activeTeacher)));
     const profClasses = new Set(directRecords.map(r => r.className));
     
-    // Exibe as aulas do professor e as AULAS VAGAS que pertencem às suas turmas (para ele poder solicitá-las)
-    let profRecords = mappedSchedules.filter(r => {
-        const isMyClass = r.teacherId && activeTeacher && String(r.teacherId).split(',').includes(String(activeTeacher));
-        const isVaga = profClasses.has(r.className) && (!r.teacherId || r.teacherId === 'A Definir' || r.teacher === '-' || /sem professor/i.test(r.teacher) || r.subject === 'AULA VAGA');
-        return isMyClass || isVaga;
-    });
+    // Exibe as aulas do professor, as AULAS VAGAS e as aulas de OUTROS PROFESSORES nas turmas onde ele leciona
+    let profRecords = mappedSchedules.filter(r => profClasses.has(r.className));
 
     const profCourses = [...new Set(profRecords.map((r) => r.course))].sort(
       (a, b) => String(a).localeCompare(String(b)),

@@ -122,6 +122,7 @@ export function PortalView({
   const [draggingRecord, setDraggingRecord] = useState(null);
   const [exchangeTarget, setExchangeTarget] = useState(null);
   const [exchangeAction, setExchangeAction] = useState(null);
+  const [pendingReverseTarget, setPendingReverseTarget] = useState(null);
   
 
   const padraoExchangeRecords = React.useMemo(() => {
@@ -1389,7 +1390,7 @@ export function PortalView({
                                     alert('Você só pode interagir com grades e turmas nas quais você já leciona ao menos uma disciplina.');
                                     return;
                                  }
-                                 setTeacherDirectModal(rec);
+                                 setPendingReverseTarget(rec);
                                } else if (rec.teacherId && String(rec.teacherId).split(',').includes(String(selectedTeacher || siape))) {
                                   alert('Você não pode propor uma permuta com a sua própria aula.');
                                 }
@@ -1407,6 +1408,15 @@ export function PortalView({
                          showEmptySlots={showEmptySlots}
                          setShowEmptySlots={setShowEmptySlots}
                          onEmptySlotClick={setTeacherDirectModal}
+                         onReverseSwapClick={(rec) => {
+                            if (rec.teacherId && !String(rec.teacherId).split(',').includes(String(selectedTeacher || siape))) {
+                               if (userRole !== 'admin' && userRole !== 'gestao' && !profClassesMemo.has(rec.className)) {
+                                  alert('Você só pode interagir com grades e turmas nas quais você já leciona ao menos uma disciplina.');
+                                  return;
+                               }
+                               setPendingReverseTarget(rec);
+                            }
+                         }}
                          mappedSchedules={mappedSchedules}
                          isDarkMode={isDarkMode}
                          scheduleMode={scheduleMode}
@@ -1658,17 +1668,92 @@ export function PortalView({
         </div>
       )}
 
-      <TeacherDirectModal 
-        isOpen={!!teacherDirectModal}
-        slotData={teacherDirectModal}
-        onClose={() => setTeacherDirectModal(null)}
-        onSuccess={() => { refreshData(); setTeacherDirectModal(null); }}
-        siape={selectedColleague || siape}
-        selectedWeek={selectedWeek}
-        isDarkMode={isDarkMode}
-        dbClasses={classesList}
-        scheduleMode={scheduleMode}
-      />
+      {pendingReverseTarget && (
+        <div className="fixed inset-0 z-[200] flex justify-center items-center bg-slate-900/60 backdrop-blur-sm p-4 animate-in fade-in duration-200 no-print">
+           <div className={`w-full max-w-lg rounded-3xl shadow-2xl border flex flex-col overflow-hidden ${isDarkMode ? 'bg-slate-900 border-slate-700' : 'bg-white border-slate-200'}`}>
+              <div className={`p-5 border-b flex items-center justify-between ${isDarkMode ? 'bg-slate-800' : 'bg-slate-50'}`}>
+                 <h3 className="font-black uppercase tracking-[0.2em] text-[10px] text-indigo-500">Escolha a Aula para Oferecer em Troca</h3>
+                 <button onClick={() => setPendingReverseTarget(null)} className="p-2 rounded-xl text-slate-400 hover:text-rose-500 hover:bg-rose-500/10 transition-colors"><XCircle size={20}/></button>
+              </div>
+              <div className="p-6 space-y-5">
+                 <div className={`p-4 rounded-2xl border ${isDarkMode ? 'bg-indigo-900/20 border-indigo-800/30 text-indigo-200' : 'bg-indigo-50 border-indigo-100 text-indigo-900'} text-xs relative overflow-hidden`}>
+                    <div className="absolute top-0 right-0 p-3 opacity-10"><Calendar size={48} /></div>
+                    <p className="font-black uppercase tracking-widest opacity-60 text-[9px] mb-2">AULA ALVO (Colega)</p>
+                    <p className="font-bold text-sm tracking-tight">{pendingReverseTarget.subject} - Turma {pendingReverseTarget.className}</p>
+                    <p className="font-medium opacity-80 mt-1">{pendingReverseTarget.day} às {pendingReverseTarget.time}</p>
+                 </div>
+
+                 <div>
+                    <label className="block text-[10px] font-black uppercase text-slate-500 mb-3 tracking-widest">Qual aula SUA deseja dar em troca?</label>
+                    <select id="reverseSlotSelect" className={`w-full p-4 rounded-2xl border text-xs font-bold outline-none transition-all focus:ring-2 focus:ring-indigo-500/50 ${isDarkMode ? 'bg-slate-950 border-slate-700 text-white' : 'bg-white border-slate-200 text-slate-800'}`}>
+                       <option value="">Selecione uma de suas aulas...</option>
+                       {mappedSchedules.filter(r => {
+                          const isMyClass = r.teacherId && String(r.teacherId).split(',').includes(String(selectedTeacher || siape));
+                          if (!isMyClass) return false;
+                          
+                          const rTurma = String(r.className || r.classId).toLowerCase().trim();
+                          const targetTurma = String(pendingReverseTarget.className || pendingReverseTarget.classId).toLowerCase().trim();
+                          if (rTurma !== targetTurma) return false;
+                          
+                          if (typeof isSlotInvolvedInPendingRequest === 'function' && isSlotInvolvedInPendingRequest(r)) return false;
+                          
+                          return true;
+                       }).map(r => (
+                          <option key={r.id} value={r.id}>{r.subject} ({r.className}) - {r.day} {r.time}</option>
+                       ))}
+                    </select>
+                 </div>
+
+                 <div className="flex justify-end gap-3 pt-4 border-t border-slate-100 dark:border-slate-800">
+                    <button onClick={() => setPendingReverseTarget(null)} className={`px-6 py-3 rounded-xl font-bold text-[10px] uppercase tracking-widest transition-all ${isDarkMode ? 'text-slate-400 hover:bg-slate-800' : 'text-slate-500 hover:bg-slate-100'}`}>Cancelar</button>
+                    <button 
+                       onClick={() => {
+                          const val = document.getElementById('reverseSlotSelect').value;
+                          if (!val) return alert('Selecione uma aula!');
+                          const selectedClasses = mappedSchedules.filter(r => String(r.id) === String(val));
+                          if (selectedClasses.length === 0) return;
+                          
+                          const originalRecord = selectedClasses[0];
+                          const targetRecord = pendingReverseTarget;
+
+                          const payload = {
+                             action: 'troca',
+                             requester_id: originalRecord.teacherId ? String(originalRecord.teacherId).split(',')[0] : (selectedTeacher || siape),
+                             substitute_id: targetRecord.teacherId ? String(targetRecord.teacherId).split(',')[0] : targetRecord.teacher,
+                             targetClass: targetRecord.className || targetRecord.classId,
+                             week_id: selectedWeek,
+                             reason: `Proposta Direta - Solicitação via Grade`,
+                             obs: `Troca Direta de ${originalRecord.subject} por ${targetRecord.subject}`,
+                             original_slot: { ...originalRecord, classId: originalRecord.classId || originalRecord.className },
+                             proposed_slot: {
+                                day: targetRecord.day,
+                                time: targetRecord.time,
+                                subject: targetRecord.subject,
+                                teacherId: targetRecord.teacherId || targetRecord.teacher,
+                                classId: targetRecord.classId || targetRecord.className,
+                                course: targetRecord.course || originalRecord.course,
+                                originalSubject: originalRecord.subject
+                             }
+                          };
+
+                          apiClient.submitRequest(payload).then(() => {
+                             alert('Solicitação de troca enviada com sucesso!');
+                             setPendingReverseTarget(null);
+                             refreshData();
+                             fetchRequests();
+                          }).catch(err => {
+                             alert('Erro ao enviar solicitação: ' + err.message);
+                          });
+                       }}
+                       className="px-8 py-3 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-black text-[10px] uppercase tracking-[0.2em] shadow-[0_10px_20px_-5px_rgba(79,70,229,0.4)] active:scale-95 transition-all"
+                    >
+                       Confirmar Proposta
+                    </button>
+                 </div>
+              </div>
+           </div>
+        </div>
+      )}
     </>
   );
 }
