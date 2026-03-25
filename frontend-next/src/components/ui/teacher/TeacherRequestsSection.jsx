@@ -3,7 +3,7 @@ import { MessageSquare, Send, AlertCircle, CheckCircle2, Clock, XCircle, Printer
 import { apiClient } from '@/lib/apiClient';
 import { useData } from '@/contexts/DataContext';
 
-export function TeacherRequestsSection({ isDarkMode, siape, selectedWeek, weekData, activeDays, classTimes, onCancel, isFloating }) {
+export function TeacherRequestsSection({ isDarkMode, siape, selectedWeek, weekData, activeDays, classTimes, onCancel, isFloating, scheduleMode }) {
   const { academicWeeks, rawData } = useData();
   const [requests, setRequests] = useState([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -101,8 +101,15 @@ export function TeacherRequestsSection({ isDarkMode, siape, selectedWeek, weekDa
               <Printer size={14} /> Imprimir
             </button>
             <button 
-              onClick={() => setIsModalOpen(true)}
-              className={`flex-1 sm:flex-none px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all shadow-md active:scale-95 flex items-center justify-center gap-2 ${isDarkMode ? 'bg-indigo-600 hover:bg-indigo-500 text-white' : 'bg-indigo-600 hover:bg-indigo-700 text-white'}`}
+              onClick={() => {
+                if (scheduleMode === 'consolidado' || scheduleMode === 'oficial') {
+                   alert('Aulas do histórico consolidado só podem ser retificadas diretamente pela gestão (MasterGrid).');
+                   return;
+                }
+                setIsModalOpen(true);
+              }}
+              title={(scheduleMode === 'consolidado' || scheduleMode === 'oficial') ? "Não é possível solicitar permutas para o Histórico Consolidado." : "Nova Solicitação"}
+              className={`flex-1 sm:flex-none px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all shadow-md flex items-center justify-center gap-2 ${(scheduleMode === 'consolidado' || scheduleMode === 'oficial') ? 'bg-slate-400 text-slate-200 cursor-not-allowed opacity-60' : (isDarkMode ? 'bg-indigo-600 hover:bg-indigo-500 text-white active:scale-95' : 'bg-indigo-600 hover:bg-indigo-700 text-white active:scale-95')}`}
             >
               <Send size={14} /> Nova Solicitação
             </button>

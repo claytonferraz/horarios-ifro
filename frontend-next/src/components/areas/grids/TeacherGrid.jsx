@@ -36,6 +36,7 @@ export const TeacherGrid = React.memo(
     classTimes,
   }) => {
     const activeTeacher = selectedColleague || selectedTeacher;
+    const isGridInert = appMode === 'aluno' || scheduleMode === 'consolidado' || scheduleMode === 'oficial';
     // 1. Descobre as turmas onde o professor leciona (protegendo contra string vazia que retorna true no includes)
     const directRecords = mappedSchedules.filter(r => r.teacherId && activeTeacher && String(r.teacherId).split(',').includes(String(activeTeacher)));
     const profClasses = new Set(directRecords.map(r => r.className));
@@ -314,11 +315,12 @@ export const TeacherGrid = React.memo(
                                                       ) : (
                                                           <div
                                                             onClick={() => {
+                                                               if (isGridInert) return;
                                                                if (showEmptySlots && appMode === 'professor' && typeof onEmptySlotClick === 'function') {
                                                                   onEmptySlotClick({ day, time: timeStr, className: cls, course });
                                                                }
                                                             }}
-                                                            className={`flex items-center justify-center h-full min-h-[76px] rounded-xl border-[2px] border-dashed transition-all select-none ${showEmptySlots && appMode === 'professor' ? (isDarkMode ? "border-slate-700 hover:border-indigo-500 hover:bg-indigo-900/20 text-slate-600 hover:text-indigo-400 cursor-pointer" : "border-slate-300 hover:border-indigo-400 hover:bg-indigo-50 text-slate-400 hover:text-indigo-600 cursor-pointer shadow-sm") : (isDarkMode ? "opacity-20 border-transparent text-slate-500" : "opacity-10 border-transparent text-slate-500")}`}
+                                                            className={`flex items-center justify-center h-full min-h-[76px] rounded-xl border-[2px] border-dashed transition-all select-none ${showEmptySlots && appMode === 'professor' && !isGridInert ? (isDarkMode ? "border-slate-700 hover:border-indigo-500 hover:bg-indigo-900/20 text-slate-600 hover:text-indigo-400 cursor-pointer" : "border-slate-300 hover:border-indigo-400 hover:bg-indigo-50 text-slate-400 hover:text-indigo-600 cursor-pointer shadow-sm") : (isDarkMode ? "opacity-20 border-transparent text-slate-500" : "opacity-10 border-transparent text-slate-500")}`}
                                                           >
                                                             {showEmptySlots && appMode === 'professor' ? (
                                                               <span className="text-[9px] font-black uppercase tracking-widest">+ Lançar</span>
@@ -342,16 +344,17 @@ export const TeacherGrid = React.memo(
                                                         const hasPendingSwap = checkPendingSwapRequest && checkPendingSwapRequest(r);
                                                         const isActive = r.teacherId && String(r.teacherId).split(',').includes(String(activeTeacher));
                                                         const isVagaReal = appMode !== 'aluno' && (!r.teacherId || r.teacherId === 'A Definir' || r.teacherId === '-' || /sem professor/i.test(r.teacher) || r.subject === 'AULA VAGA');
+                                                        const isInert = isGridInert;
                                                         
                                                         let cardStyle = "print-clean-card p-2 rounded-xl border shadow-sm flex flex-col justify-center min-h-[76px] transition-all relative ";
                                                         if (isVagaReal) {
-                                                           cardStyle += isDarkMode ? 'bg-red-900/30 border-red-800/50 cursor-pointer hover:scale-[1.02]' : 'bg-red-50 border-red-300 cursor-pointer hover:scale-[1.02]';
+                                                           cardStyle += isDarkMode ? `bg-red-900/30 border-red-800/50 ${isInert ? 'cursor-default' : 'cursor-pointer hover:scale-[1.02]'}` : `bg-red-50 border-red-300 ${isInert ? 'cursor-default' : 'cursor-pointer hover:scale-[1.02]'}`;
                                                         } else if (hasPendingSwap) {
-                                                           cardStyle += isDarkMode ? 'bg-amber-900/30 border-amber-800/50 cursor-pointer hover:scale-[1.02] text-amber-200 shadow-[0_0_10px_rgba(251,191,36,0.2)]' : 'bg-amber-100 border-amber-400 text-amber-900 cursor-pointer hover:scale-[1.02] shadow-[0_0_10px_rgba(251,191,36,0.2)]';
+                                                           cardStyle += isDarkMode ? `bg-amber-900/30 border-amber-800/50 ${isInert ? 'cursor-default' : 'cursor-pointer hover:scale-[1.02]'} text-amber-200 shadow-[0_0_10px_rgba(251,191,36,0.2)]` : `bg-amber-100 border-amber-400 text-amber-900 ${isInert ? 'cursor-default' : 'cursor-pointer hover:scale-[1.02]'} shadow-[0_0_10px_rgba(251,191,36,0.2)]`;
                                                         } else if (isActive) {
-                                                           cardStyle += getColorHash(r.subject, isDarkMode) + " ring-2 ring-indigo-500 shadow-md cursor-pointer hover:scale-[1.02] z-10";
+                                                           cardStyle += getColorHash(r.subject, isDarkMode) + ` ring-2 ring-indigo-500 shadow-md ${isInert ? 'cursor-default z-10' : 'cursor-pointer hover:scale-[1.02] z-10'}`;
                                                         } else {
-                                                           cardStyle += isDarkMode ? 'bg-slate-800/30 border-slate-700/50 opacity-40 grayscale hover:grayscale-0 hover:opacity-100 cursor-pointer' : 'bg-slate-100 border-slate-200 opacity-40 grayscale hover:grayscale-0 hover:opacity-100 cursor-pointer';
+                                                           cardStyle += isDarkMode ? `bg-slate-800/30 border-slate-700/50 opacity-40 grayscale ${isInert ? 'cursor-default' : 'hover:grayscale-0 hover:opacity-100 cursor-pointer'}` : `bg-slate-100 border-slate-200 opacity-40 grayscale ${isInert ? 'cursor-default' : 'hover:grayscale-0 hover:opacity-100 cursor-pointer'}`;
                                                         }
 
                                                         return (
@@ -359,6 +362,7 @@ export const TeacherGrid = React.memo(
                                                             key={r.id ? `prof-rec-${r.id}-${idx}` : `prof-rec-idx-${idx}`}
                                                             className={cardStyle}
                                                             onClick={() => {
+                                                              if (isInert) return;
                                                               if (appMode === "professor") {
                                                                 if (hasPendingSwap) {
                                                                    alert("Esta aula já possui uma permuta em andamento. Ela ficará bloqueada até sua recusa ou homologação.");

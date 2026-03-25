@@ -30,6 +30,8 @@ export const ClassGrid = React.memo(({
   siape,
   onReverseSwapClick
 }) => {
+  const isGridInert = appMode === 'aluno' || scheduleMode === 'consolidado' || scheduleMode === 'oficial';
+
   return (
     <div className="space-y-4">
       {/* ALERTS DE SOLICITAÇÃO NA PRÉVIA */}
@@ -132,10 +134,7 @@ export const ClassGrid = React.memo(({
                                                   {...drgProvided.draggableProps}
                                                   {...drgProvided.dragHandleProps}
                                                   onClick={(e) => {
-                                                    if (scheduleMode === 'consolidado' || scheduleMode === 'oficial') {
-                                                      alert("As aulas do histórico não podem ser substituídas pelo portal do professor. Em caso de necessidade técnica ou retificação, a alteração deve ser lançada pela gestão.");
-                                                      return;
-                                                    }
+                                                    if (isGridInert) return;
                                                     if (appMode === 'professor') {
                                                       if (typeof checkPendingSwapRequest === 'function' && checkPendingSwapRequest(aulaNesteSlot)) {
                                                          alert("Esta aula já possui uma permuta em andamento. Ela ficará bloqueada até sua recusa ou homologação.");
@@ -153,7 +152,7 @@ export const ClassGrid = React.memo(({
                                                       setEditorModal({ cls: selectedClass, day, time, tObj: timeObj });
                                                     }
                                                   }}
-                                                  className={`print-clean-card p-2 rounded-xl border shadow-sm flex flex-col justify-center min-h-[60px] transition-all relative ${drgSnapshot.isDragging ? 'z-50 scale-105 shadow-2xl rotate-2' : 'hover:scale-[1.02] hover:shadow-md active:scale-95'} ${typeof checkPendingSwapRequest === 'function' && checkPendingSwapRequest(aulaNesteSlot) ? (isDarkMode ? 'bg-amber-900/30 border-amber-800/50 hover:bg-amber-900/40 text-amber-200 shadow-[0_0_10px_rgba(251,191,36,0.2)]' : 'bg-amber-100 hover:bg-amber-200 border-amber-400 text-amber-900 shadow-[0_0_10px_rgba(251,191,36,0.2)]') : isPending ? (isDarkMode ? 'bg-red-900/30 border-red-800/50 text-red-300' : 'bg-red-50 border-red-300 text-red-800') : hasConflict ? (isDarkMode ? 'bg-rose-950/80 border-rose-500/80 text-rose-200 shadow-[0_0_10px_rgba(225,29,72,0.4)]' : 'bg-rose-100 border-rose-500 text-rose-900 shadow-[0_0_10px_rgba(225,29,72,0.3)]') : getColorHash(disciplineName, isDarkMode)}`}
+                                                  className={`print-clean-card p-2 rounded-xl border shadow-sm flex flex-col justify-center min-h-[60px] transition-all relative ${drgSnapshot.isDragging ? 'z-50 scale-105 shadow-2xl rotate-2' : (isGridInert ? 'cursor-default' : 'hover:scale-[1.02] hover:shadow-md active:scale-95 cursor-pointer')} ${typeof checkPendingSwapRequest === 'function' && checkPendingSwapRequest(aulaNesteSlot) ? (isDarkMode ? 'bg-amber-900/30 border-amber-800/50 hover:bg-amber-900/40 text-amber-200 shadow-[0_0_10px_rgba(251,191,36,0.2)]' : 'bg-amber-100 hover:bg-amber-200 border-amber-400 text-amber-900 shadow-[0_0_10px_rgba(251,191,36,0.2)]') : isPending ? (isDarkMode ? 'bg-red-900/30 border-red-800/50 text-red-300' : 'bg-red-50 border-red-300 text-red-800') : hasConflict ? (isDarkMode ? 'bg-rose-950/80 border-rose-500/80 text-rose-200 shadow-[0_0_10px_rgba(225,29,72,0.4)]' : 'bg-rose-100 border-rose-500 text-rose-900 shadow-[0_0_10px_rgba(225,29,72,0.3)]') : getColorHash(disciplineName, isDarkMode)}`}
                                                 >
                                                   {typeof checkPendingSwapRequest === 'function' && checkPendingSwapRequest(aulaNesteSlot) && !isPending && (
                                                      <div className="absolute top-0 right-0 z-10 pointer-events-none print:hidden">
@@ -223,7 +222,7 @@ export const ClassGrid = React.memo(({
                                           <div className={`w-full h-full min-h-[60px] flex flex-col items-center justify-center p-2 rounded-lg border border-dashed opacity-70 transition-colors ${isDarkMode ? 'bg-slate-800/40 border-slate-600' : 'bg-slate-100 border-slate-300'}`}>
                                               <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">Tempo Livre</span>
                                               
-                                              {userRole === 'professor' && scheduleMode !== 'padrao' && (
+                                              {userRole === 'professor' && scheduleMode !== 'padrao' && !isGridInert && (
                                                   <button
                                                       onClick={() => {
                                                           if(window.confirm(`Deseja solicitar à coordenação para assumir esta Aula Vaga na ${MAP_DAYS[diaIndex]} às ${time}?`)) {

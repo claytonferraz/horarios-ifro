@@ -49,6 +49,8 @@ export const CourseGrid = React.memo(
     const [mobileSelectedClasses, setMobileSelectedClasses] = useState({});
     const [activeCourseTab, setActiveCourseTab] = useState("Todos");
     const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
+    
+    const isGridInert = appMode === 'aluno' || (scheduleMode === 'consolidado' || scheduleMode === 'oficial');
 
     const activeTeacherFilter = showOnlyMyClasses ? siape : (padraoFilterTeacher && padraoFilterTeacher !== "Todos" ? padraoFilterTeacher : null);
 
@@ -541,7 +543,7 @@ export const CourseGrid = React.memo(
                                                                     },
                                                                   );
                                                               }}
-                                                              className={`w-full h-full min-h-[50px] p-0.5 rounded-lg transition-colors ${["admin", "gestao", "professor"].includes(userRole) && !["oficial", "consolidado"].includes(scheduleMode) ? "cursor-pointer hover:ring-2 hover:ring-indigo-500 hover:z-30 relative" : ""} ${conflictMsg ? "bg-red-500/20 ring-2 ring-red-500 !bg-red-500/20" : snapshot.isDraggingOver ? (isDarkMode ? "bg-slate-700/50" : "bg-slate-100") : isDarkMode ? "group-hover:bg-slate-700/30 bg-slate-800/20" : "group-hover:bg-slate-50/50 bg-slate-50/20"}`}
+                                                              className={`w-full h-full min-h-[50px] p-0.5 rounded-lg transition-colors ${["admin", "gestao", "professor"].includes(userRole) && !isGridInert ? "cursor-pointer hover:ring-2 hover:ring-indigo-500 hover:z-30 relative" : ""} ${conflictMsg ? "bg-red-500/20 ring-2 ring-red-500 !bg-red-500/20" : snapshot.isDraggingOver ? (isDarkMode ? "bg-slate-700/50" : "bg-slate-100") : isDarkMode ? "group-hover:bg-slate-700/30 bg-slate-800/20" : "group-hover:bg-slate-50/50 bg-slate-50/20"}`}
                                                             >
                                                               {conflictMsg &&
                                                                 snapshot.isDraggingOver && (
@@ -598,6 +600,7 @@ export const CourseGrid = React.memo(
                                                                             {...prov2.draggableProps}
                                                                             {...prov2.dragHandleProps}
                                                                             onClick={(e) => {
+                                                                               if (isGridInert) return;
                                                                                if (appMode === "professor" && onReverseSwapClick) {
                                                                                    if (hasPendingSwap) {
                                                                                       e.stopPropagation();
@@ -608,7 +611,7 @@ export const CourseGrid = React.memo(
                                                                                    onReverseSwapClick(r);
                                                                                }
                                                                             }}
-                                                                            className={`print-clean-card p-1.5 print:p-1 rounded-xl print:rounded-none border-b-[3px] print:border-b-[1px] print:border-slate-400 shadow-sm print:shadow-none flex flex-col justify-center min-h-[46px] print:min-h-0 transition-all mb-1 print:mb-0 last:mb-0 relative overflow-visible ${snap2.isDragging ? "shadow-xl scale-105 z-50 hover:scale-105" : "hover:scale-[1.02] cursor-pointer"} ${hasPendingSwap ? (isDarkMode ? "bg-amber-900/30 border-amber-800/50 hover:bg-amber-900/40 text-amber-200" : "bg-amber-100 hover:bg-amber-200 border-amber-400 text-amber-900") : isPending ? (isDarkMode ? "bg-red-900/30 border-red-800/50 text-red-300" : "bg-red-50 border-red-300 text-red-800") : getColorHash(r.subject, isDarkMode)} ${!isActiveTeacherInCard ? "opacity-50 saturate-50 hover:opacity-100 hover:saturate-100 transition-all" : ""}`}
+                                                                            className={`print-clean-card p-1.5 print:p-1 rounded-xl print:rounded-none border-b-[3px] print:border-b-[1px] print:border-slate-400 shadow-sm print:shadow-none flex flex-col justify-center min-h-[46px] print:min-h-0 transition-all mb-1 print:mb-0 last:mb-0 relative overflow-visible ${snap2.isDragging ? "shadow-xl scale-105 z-50 hover:scale-105" : (isGridInert ? "cursor-default" : "hover:scale-[1.02] cursor-pointer")} ${hasPendingSwap ? (isDarkMode ? "bg-amber-900/30 border-amber-800/50 hover:bg-amber-900/40 text-amber-200" : "bg-amber-100 hover:bg-amber-200 border-amber-400 text-amber-900") : isPending ? (isDarkMode ? "bg-red-900/30 border-red-800/50 text-red-300" : "bg-red-50 border-red-300 text-red-800") : getColorHash(r.subject, isDarkMode)} ${!isActiveTeacherInCard ? "opacity-50 saturate-50 hover:opacity-100 hover:saturate-100 transition-all" : ""}`}
                                                                           >
                                                                             {hasPendingSwap && !isPending && (
                                                                                <div className="absolute -top-1.5 -left-1 z-10 print:hidden shadow-sm pointer-events-none">

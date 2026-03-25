@@ -1244,7 +1244,7 @@ export function PortalView({
                   {/* GRADE DE HORÁRIO DO PROFESSOR (Separada por Curso) */}
                   {viewMode === 'professor' && selectedTeacher && (
                     <div className="flex flex-col gap-4">
-                      {appMode === 'professor' && (
+                      {appMode === 'professor' && scheduleMode !== 'consolidado' && scheduleMode !== 'oficial' && (
                         <div className={`p-3 rounded-xl border flex items-center justify-end sm:justify-start ${isDarkMode ? 'bg-slate-800 border-slate-700' : 'bg-slate-50 border-slate-200'}`}>
                            <label className="flex items-center gap-3 cursor-pointer group">
                                <div className={`w-8 h-4 rounded-full relative transition-colors ${showEmptySlots ? 'bg-indigo-500' : 'bg-slate-300 dark:bg-slate-600'}`}>
@@ -1413,6 +1413,7 @@ export function PortalView({
             activeDays={activeDays}
             classTimes={classTimes}
             weekData={recordsForWeek ? recordsForWeek.filter(r => String(r.teacherId).includes(String(siape))) : []}
+            scheduleMode={scheduleMode}
             isFloating={false}
           />
         </div>
