@@ -209,8 +209,9 @@ export const CourseGrid = React.memo(
                     const courseClassesGlobais = mappedSchedules
                       .filter((r) => {
                          if (activeTeacherFilter) {
-                             if (!r.teacherId || !String(r.teacherId).split(',').includes(String(activeTeacherFilter))) return false;
-                             return true;
+                             const isMatch = r.teacherId && String(r.teacherId).split(',').includes(String(activeTeacherFilter));
+                             const isVacant = isTeacherPending(r.teacherId || r.teacher);
+                             if (!isMatch && !isVacant) return false;
                          }
                          if (r.course !== course) return false;
                          return true;

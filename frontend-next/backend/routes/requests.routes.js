@@ -313,7 +313,7 @@ router.put('/:id/status', verifyToken, (req, res) => {
          });
          res.json({ success: true });
 
-      } else if (status === 'aprovada' || status === 'aprovado') {
+      } else if (/aprovad[oa]|homologado/i.test(status)) {
          // MOTOR DE TROCA (SWAP ENGINE) V2 - Execução Homologada
          db.get("SELECT * FROM exchange_requests WHERE id = ?", [req.params.id], (err3, row) => {
              if (!err3 && row && row.action_type === 'troca') {
@@ -446,9 +446,15 @@ router.put('/:id/status', verifyToken, (req, res) => {
                      
                      // Suporta o formato de array (times) ou string única (time/original_time)
                      let timesToProcess = [];
-                     if (propData.times && Array.isArray(propData.times)) timesToProcess = propData.times;
-                     else if (propData.time) timesToProcess = [propData.time];
-                     else if (row.original_time) timesToProcess = [row.original_time];
+                     if (propData.slots && Array.isArray(propData.slots)) {
+                         timesToProcess = propData.slots.map(s => s.time || s.slotId);
+                     } else if (propData.times && Array.isArray(propData.times)) {
+                         timesToProcess = propData.times;
+                     } else if (propData.time) {
+                         timesToProcess = [propData.time];
+                     } else if (row.original_time) {
+                         timesToProcess = [row.original_time];
+                     }
 
                      const weekId = row.return_week || null;
                      const targetType = propData.type || 'previa';
