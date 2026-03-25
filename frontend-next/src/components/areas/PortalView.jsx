@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { io } from 'socket.io-client';
 import { 
   Calendar, UserCircle, Layers, AlertTriangle, BarChart3, ListTodo, CalendarDays, Settings, Bell, Sun, RefreshCcw, HandHeart, X, ExternalLink, Scissors, MapPin, Monitor, Mail, MessageCircle,
-  BookOpen, FileText, Users, CheckCircle, AlertCircle, XCircle, Eye, Clock, Check
+  BookOpen, FileText, Users, CheckCircle, AlertCircle, XCircle, Eye, Clock, Check, Printer
 } from 'lucide-react';
 import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd';
 import { SearchableSelect } from '../ui/SearchableSelect';
@@ -1754,6 +1754,18 @@ export function PortalView({
            </div>
         </div>
       )}
+
+      <TeacherDirectModal 
+        isOpen={!!teacherDirectModal}
+        slotData={teacherDirectModal}
+        onClose={() => setTeacherDirectModal(null)}
+        onSuccess={() => { refreshData(); setTeacherDirectModal(null); }}
+        siape={selectedColleague || siape}
+        selectedWeek={selectedWeek}
+        isDarkMode={isDarkMode}
+        dbClasses={classesList}
+        scheduleMode={scheduleMode}
+      />
     </>
   );
 }
