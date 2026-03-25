@@ -106,8 +106,11 @@ module.exports = function(io) {
       disciplineId: z.union([z.string(), z.number()]).transform(String).optional().nullable(),
       room: z.union([z.string(), z.number()]).transform(String).optional().nullable(),
       isSubstituted: z.boolean().optional(),
+      isPermuted: z.boolean().optional(),
       originalSubject: z.string().optional().nullable(),
-      isDisponibilizada: z.boolean().optional()
+      isDisponibilizada: z.boolean().optional(),
+      classType: z.string().optional().nullable(),
+      isExtra: z.boolean().optional().nullable()
     }))
   });
 
@@ -194,12 +197,26 @@ module.exports = function(io) {
             for (const slot of schedules) {
               const id = `s_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
               const targetCourse = slot.courseId || coursesToClear[0];
+              
+              const oR = (oldRows || []).find(old => old.classId === slot.classId && String(old.dayOfWeek) === String(slot.dayOfWeek) && String(old.slotId) === String(slot.slotId));
+              let oldRecordsObj = {};
+              if (oR && oR.records) {
+                 try {
+                     const parsed = JSON.parse(oR.records);
+                     oldRecordsObj = Array.isArray(parsed) ? (parsed[0] || {}) : parsed;
+                 } catch(e){}
+              }
+
               let recordsJSON = null;
-              if (type !== 'padrao' && type !== 'oficial' && (slot.isSubstituted || slot.isDisponibilizada)) {
+              if (type !== 'padrao' && type !== 'oficial' && (slot.isSubstituted || slot.isPermuted || slot.isDisponibilizada || slot.classType || slot.isExtra || Object.keys(oldRecordsObj).length > 0)) {
                  recordsJSON = JSON.stringify({
-                    isSubstituted: slot.isSubstituted || false,
-                    originalSubject: slot.originalSubject || null,
-                    isDisponibilizada: slot.isDisponibilizada || false
+                    ...oldRecordsObj,
+                    isSubstituted: slot.isSubstituted !== undefined ? slot.isSubstituted : (oldRecordsObj.isSubstituted || false),
+                    isPermuted: slot.isPermuted !== undefined ? slot.isPermuted : (oldRecordsObj.isPermuted || false),
+                    originalSubject: slot.originalSubject !== undefined ? slot.originalSubject : (oldRecordsObj.originalSubject || null),
+                    isDisponibilizada: slot.isDisponibilizada !== undefined ? slot.isDisponibilizada : (oldRecordsObj.isDisponibilizada || false),
+                    classType: slot.classType !== undefined ? slot.classType : (oldRecordsObj.classType || null),
+                    isExtra: slot.isExtra !== undefined ? slot.isExtra : (oldRecordsObj.isExtra || false)
                  });
               }
               stmt.run([id, targetCourse, academicYear || null, slot.classId, slot.dayOfWeek, slot.slotId, slot.teacherId, slot.disciplineId || null, slot.room || null, type, weekId || null, now, recordsJSON]);

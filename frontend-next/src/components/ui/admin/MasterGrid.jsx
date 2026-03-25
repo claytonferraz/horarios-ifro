@@ -418,6 +418,7 @@ export function MasterGrid({ isDarkMode, ...props }) {
              let flagOriginalSubject = null;
              let flagIsDisponibilizada = false;
              let flagClassType = null; // New declaration
+             let flagIsExtra = false;
              if (schedule.records) {
                  try {
                      const recs = JSON.parse(schedule.records);
@@ -434,6 +435,9 @@ export function MasterGrid({ isDarkMode, ...props }) {
                      if (recs.classType) { // New logic
                          flagClassType = recs.classType;
                      }
+                     if (recs.isExtra) {
+                         flagIsExtra = recs.isExtra;
+                     }
                      if (Array.isArray(recs)) {
                          const found = recs.find(r => String(r.day) === String(schedule.dayOfWeek) && String(r.time) === String(schedule.slotId));
                          if (found?.isSubstituted) {
@@ -448,6 +452,9 @@ export function MasterGrid({ isDarkMode, ...props }) {
                          }
                          if (found?.classType) { // New logic
                              flagClassType = found.classType;
+                         }
+                         if (found?.isExtra) {
+                             flagIsExtra = found.isExtra;
                          }
                      }
                  } catch(e) {}
@@ -464,7 +471,8 @@ export function MasterGrid({ isDarkMode, ...props }) {
                  isPermuted: flagIsPermuted,
                  originalSubject: flagOriginalSubject,
                  isDisponibilizada: flagIsDisponibilizada,
-                 classType: flagClassType
+                 classType: flagClassType,
+                 isExtra: flagIsExtra
              };
              aulasAlocadasIds.push(String(refCard.id));
         }
@@ -1672,7 +1680,8 @@ function SaveMatrixModal({ isDarkMode, grade, selectedCourses, courses, saveOpti
         isPermuted: aula.isPermuted || false,
         originalSubject: aula.originalSubject || null,
         isDisponibilizada: aula.isDisponibilizada || false,
-        classType: aula.classType || null
+        classType: aula.classType || null,
+        isExtra: aula.isExtra || false
       };
     });
 
@@ -1680,12 +1689,13 @@ function SaveMatrixModal({ isDarkMode, grade, selectedCourses, courses, saveOpti
         const padraoBase = schedules.filter(s => s.type === 'padrao' && selectedCourses.includes(String(s.courseId)) && (s.week_id === padraoBaseVersion || (!s.week_id && padraoBaseVersion === 'V1')));
         
         padraoBase.forEach(pSlot => {
-            const exists = payload.some(pl => String(pl.classId) === String(pSlot.classId) && String(pl.dayOfWeek) === String(pSlot.dayOfWeek) && String(pl.slotId) === String(pSlot.slotId));
+            const normDbDay = isNaN(pSlot.dayOfWeek) ? String(pSlot.dayOfWeek) : String(MAP_DAYS[pSlot.dayOfWeek]);
+            const exists = payload.some(pl => String(pl.classId) === String(pSlot.classId) && String(pl.dayOfWeek) === normDbDay && String(pl.slotId) === String(pSlot.slotId));
             if (!exists) {
                 payload.push({
-                    courseId: pSlot.courseId, classId: pSlot.classId, dayOfWeek: pSlot.dayOfWeek,
+                    courseId: pSlot.courseId, classId: pSlot.classId, dayOfWeek: normDbDay,
                     slotId: pSlot.slotId, teacherId: 'A Definir', disciplineId: pSlot.disciplineId, room: pSlot.room,
-                    isSubstituted: false, isPermuted: false, originalSubject: null, isDisponibilizada: false, classType: null
+                    isSubstituted: false, isPermuted: false, originalSubject: null, isDisponibilizada: false, classType: null, isExtra: false
                 });
             }
         });
