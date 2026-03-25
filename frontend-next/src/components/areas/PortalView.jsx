@@ -3,7 +3,7 @@ import { io } from 'socket.io-client';
 import { 
   ChevronDown, Clock, Printer, CheckCircle, Check, Eye, BookOpen, FileText, Users,
   MessageSquare, Send, CheckCircle2, XCircle, AlertCircle, GripVertical,
-  Calendar, UserCircle, Layers, AlertTriangle, BarChart3, ListTodo, CalendarDays, Settings, Bell, Sun, RefreshCcw, HandHeart, X
+  Calendar, UserCircle, Layers, AlertTriangle, BarChart3, ListTodo, CalendarDays, Settings, Bell, Sun, RefreshCcw, HandHeart, X, ExternalLink, Scissors, MapPin, Monitor
 } from 'lucide-react';
 import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd';
 import { SearchableSelect } from '../ui/SearchableSelect';
@@ -667,6 +667,39 @@ export function PortalView({
 
   return (
     <>
+        {/* LINKS RÁPIDOS E FERRAMENTAS - SEMPRE VISÍVEL PARA PROFESSOR LOGADO NO TOPO */}
+        {appMode === 'professor' && !selectedColleague && (
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 no-print mb-6 animate-in slide-in-from-top-4 duration-700">
+            <a href="https://sip.ifro.edu.br/sip/login.php?sigla_orgao_sistema=IFRO&sigla_sistema=SEI&infra_url=L3NlaS8=" target="_blank" rel="noopener noreferrer" className={`group flex flex-col items-center justify-center p-4 rounded-2xl border transition-all hover:scale-[1.03] active:scale-95 text-center ${isDarkMode ? 'bg-slate-900 border-slate-800 hover:border-indigo-500/50' : 'bg-white border-slate-100 shadow-sm hover:border-indigo-200'}`}>
+              <div className={`w-10 h-10 rounded-xl flex items-center justify-center mb-2 transition-colors ${isDarkMode ? 'bg-indigo-950 text-indigo-400 group-hover:bg-indigo-600 group-hover:text-white' : 'bg-indigo-50 text-indigo-600 group-hover:bg-indigo-600 group-hover:text-white'}`}>
+                <ExternalLink size={18} />
+              </div>
+              <span className={`text-[9px] font-black uppercase tracking-widest ${isDarkMode ? 'text-slate-200' : 'text-slate-800'}`}>Acesso ao SEI</span>
+            </a>
+
+            <a href="https://suap.ifro.edu.br/edu/meus_diarios/" target="_blank" rel="noopener noreferrer" className={`group flex flex-col items-center justify-center p-4 rounded-2xl border transition-all hover:scale-[1.03] active:scale-95 text-center ${isDarkMode ? 'bg-slate-900 border-slate-800 hover:border-emerald-500/50' : 'bg-white border-slate-100 shadow-sm hover:border-emerald-200'}`}>
+              <div className={`w-10 h-10 rounded-xl flex items-center justify-center mb-2 transition-colors ${isDarkMode ? 'bg-emerald-950 text-emerald-400 group-hover:bg-emerald-600 group-hover:text-white' : 'bg-emerald-50 text-emerald-600 group-hover:bg-emerald-600 group-hover:text-white'}`}>
+                <ListTodo size={18} />
+              </div>
+              <span className={`text-[9px] font-black uppercase tracking-widest ${isDarkMode ? 'text-slate-200' : 'text-slate-800'}`}>Meus Diários</span>
+            </a>
+
+            <a href="https://suap.ifro.edu.br/admin/comum/sala/?agendavel__exact=1&all=&predio__uo=7&tab=tab_any_data" target="_blank" rel="noopener noreferrer" className={`group flex flex-col items-center justify-center p-4 rounded-2xl border transition-all hover:scale-[1.03] active:scale-95 text-center ${isDarkMode ? 'bg-slate-900 border-slate-800 hover:border-blue-500/50' : 'bg-white border-slate-100 shadow-sm hover:border-blue-200'}`}>
+              <div className={`w-10 h-10 rounded-xl flex items-center justify-center mb-2 transition-colors ${isDarkMode ? 'bg-blue-950 text-blue-400 group-hover:bg-blue-600 group-hover:text-white' : 'bg-blue-50 text-blue-600 group-hover:bg-blue-600 group-hover:text-white'}`}>
+                <MapPin size={18} />
+              </div>
+              <span className={`text-[9px] font-black uppercase tracking-widest ${isDarkMode ? 'text-slate-200' : 'text-slate-800'}`}>Agendar Salas</span>
+            </a>
+
+            <a href="https://docs.google.com/spreadsheets/d/1k9Tyy_2pYsJyRKeSq3NpSpXHzUoPigyweyRUHGiAbW4/edit?gid=176889928#gid=176889928" target="_blank" rel="noopener noreferrer" className={`group flex flex-col items-center justify-center p-4 rounded-2xl border transition-all hover:scale-[1.03] active:scale-95 text-center ${isDarkMode ? 'bg-slate-900 border-slate-800 hover:border-amber-500/50' : 'bg-white border-slate-100 shadow-sm hover:border-amber-200'}`}>
+              <div className={`w-10 h-10 rounded-xl flex items-center justify-center mb-2 transition-colors ${isDarkMode ? 'bg-amber-950 text-amber-400 group-hover:bg-amber-600 group-hover:text-white' : 'bg-amber-50 text-amber-600 group-hover:bg-amber-600 group-hover:text-white'}`}>
+                <Monitor size={18} />
+              </div>
+              <span className={`text-[9px] font-black uppercase tracking-widest ${isDarkMode ? 'text-slate-200' : 'text-slate-800'}`}>Agendar Lab</span>
+            </a>
+          </div>
+        )}
+
         {(!schedules || schedules.length === 0) ? (
             <div className={`rounded-2xl border p-12 text-center shadow-sm animate-in fade-in ${isDarkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'}`}>
               <Calendar size={40} className={`mx-auto mb-4 ${isDarkMode ? 'text-slate-600' : 'text-slate-300'}`} />
@@ -847,8 +880,8 @@ export function PortalView({
                   </div>
                 </div>
               )}
-              </React.Fragment>
-              )}
+            </React.Fragment>
+          )}
             </div>
 
             {viewMode !== 'solicitacoes' && (
