@@ -7,18 +7,49 @@ const helmet = require('helmet');
 // const xss = require('xss-clean'); (Incompatível com Express 5)
 const rateLimit = require('express-rate-limit');
 const { z } = require('zod');
+require('dotenv').config();
 
 const app = express();
 const http = require('http');
 const { Server } = require('socket.io');
 
-// Restrição Extrema de CORS: Apenas o domínio Next.js oficial operando em produção ou local
-const allowedOrigins = ['http://localhost:3001', 'http://localhost:3000', 'https://10.60.5.67:3001','http://10.60.5.67:3001'];
+const defaultAllowedOrigins = [
+  'http://localhost:3001',
+  'http://localhost:3000',
+  'http://127.0.0.1:3001',
+  'http://127.0.0.1:3000',
+  'https://10.60.5.67:3001',
+  'http://10.60.5.67:3001'
+];
+const envAllowedOrigins = String(process.env.CORS_ORIGINS || '')
+  .split(',')
+  .map((item) => item.trim())
+  .filter(Boolean);
+const allowedOrigins = Array.from(new Set([...defaultAllowedOrigins, ...envAllowedOrigins]));
+
+const localNetworkOriginPattern = /^https?:\/\/((localhost|127\.0\.0\.1|\[::1\])(:\d+)?|(192\.168\.\d{1,3}\.\d{1,3}|10\.\d{1,3}\.\d{1,3}\.\d{1,3}|172\.(1[6-9]|2\d|3[0-1])\.\d{1,3}\.\d{1,3})(:\d+)?)$/;
+
+function isAllowedOrigin(origin) {
+  if (!origin) return true;
+  if (allowedOrigins.includes(origin)) return true;
+  if (localNetworkOriginPattern.test(origin)) return true;
+  if (process.env.NODE_ENV !== 'production') return true;
+  return false;
+}
+
+const corsOptions = {
+  origin(origin, callback) {
+    if (isAllowedOrigin(origin)) return callback(null, true);
+    return callback(null, false);
+  },
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS']
+};
 
 const server = http.createServer(app);
 const io = new Server(server, {
   cors: {
-    origin: allowedOrigins,
+    origin: process.env.NODE_ENV !== 'production' ? true : allowedOrigins,
     methods: ["GET", "POST", "PUT", "DELETE"],
     credentials: true
   }
@@ -30,18 +61,8 @@ app.use(helmet());
 
 // app.use(xss()); // Comentado pois o pacote xss-clean v0.1.4 ainda quebra no Express 5 (req.query sem setter)
 
-app.options(/.*/, cors());
-app.use(cors({
-  origin: function(origin, callback) {
-    if(!origin) return callback(null, true); // Mobile / Postman
-    // Libera conexões de rede locais e outras abas do dev (necessário para testes em outros navegadores/dispositivos)
-    if (origin.startsWith('http://localhost') || origin.startsWith('http://127.0.0.1') || origin.startsWith('http://192.168.') || allowedOrigins.includes(origin)) {
-      return callback(null, true);
-    }
-    return callback(new Error('CORS Blocked'), false);
-  },
-  credentials: true
-}));
+app.options(/.*/, cors(corsOptions));
+app.use(cors(corsOptions));
 
 // Proteção contra DDoS e Brute Force Geral
 const generalLimiter = rateLimit({
@@ -63,7 +84,6 @@ app.use('/api/auth/', authLimiter);
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ limit: '50mb', extended: true }));
 
-require('dotenv').config();
 const path = require('path');
 const db = require('./db');
 const { verifyToken, JWT_SECRET } = require('./middlewares/auth.middleware');
