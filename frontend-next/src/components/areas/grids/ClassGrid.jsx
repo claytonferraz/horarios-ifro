@@ -134,10 +134,11 @@ export const ClassGrid = React.memo(({
                                                   {...drgProvided.draggableProps}
                                                   {...drgProvided.dragHandleProps}
                                                   onClick={(e) => {
-                                                    if (isGridInert) return;
+                                                    const isExtraPending = aulaNesteSlot.isPending === true;
+                                                    if (isGridInert || isExtraPending) return;
                                                     if (appMode === 'professor') {
                                                       if (typeof checkPendingSwapRequest === 'function' && checkPendingSwapRequest(aulaNesteSlot)) {
-                                                         alert("Esta aula já possui uma permuta em andamento. Ela ficará bloqueada até sua recusa ou homologação.");
+                                                         alert("Esta aula já possui uma permuta em andamento. Ela ficará bloqueada.");
                                                          return;
                                                       }
                                                       const isActiveTeacherInCard = typeof siape !== 'undefined' && aulaNesteSlot.teacherId ? String(aulaNesteSlot.teacherId).split(',').includes(String(siape)) : true;
@@ -152,9 +153,9 @@ export const ClassGrid = React.memo(({
                                                       setEditorModal({ cls: selectedClass, day, time, tObj: timeObj });
                                                     }
                                                   }}
-                                                  className={`print-clean-card p-2 rounded-xl border shadow-sm flex flex-col justify-center min-h-[60px] transition-all relative ${drgSnapshot.isDragging ? 'z-50 scale-105 shadow-2xl rotate-2' : (isGridInert ? 'cursor-default' : 'hover:scale-[1.02] hover:shadow-md active:scale-95 cursor-pointer')} ${typeof checkPendingSwapRequest === 'function' && checkPendingSwapRequest(aulaNesteSlot) ? (isDarkMode ? 'bg-amber-900/30 border-amber-800/50 hover:bg-amber-900/40 text-amber-200 shadow-[0_0_10px_rgba(251,191,36,0.2)]' : 'bg-amber-100 hover:bg-amber-200 border-amber-400 text-amber-900 shadow-[0_0_10px_rgba(251,191,36,0.2)]') : isPending ? (isDarkMode ? 'bg-red-900/30 border-red-800/50 text-red-300' : 'bg-red-50 border-red-300 text-red-800') : hasConflict ? (isDarkMode ? 'bg-rose-950/80 border-rose-500/80 text-rose-200 shadow-[0_0_10px_rgba(225,29,72,0.4)]' : 'bg-rose-100 border-rose-500 text-rose-900 shadow-[0_0_10px_rgba(225,29,72,0.3)]') : getColorHash(disciplineName, isDarkMode)}`}
+                                                  className={`print-clean-card p-2 rounded-xl border shadow-sm flex flex-col justify-center min-h-[60px] transition-all relative ${drgSnapshot.isDragging ? 'z-50 scale-105 shadow-2xl rotate-2' : (isGridInert || aulaNesteSlot.isPending ? 'cursor-default opacity-80' : 'hover:scale-[1.02] hover:shadow-md active:scale-95 cursor-pointer')} ${typeof checkPendingSwapRequest === 'function' && checkPendingSwapRequest(aulaNesteSlot) ? (isDarkMode ? 'bg-amber-900/30 border-amber-800/50 hover:bg-amber-900/40 text-amber-200 shadow-[0_0_10px_rgba(251,191,36,0.2)]' : 'bg-amber-100 hover:bg-amber-200 border-amber-400 text-amber-900 shadow-[0_0_10px_rgba(251,191,36,0.2)]') : aulaNesteSlot.isPending ? (isDarkMode ? 'bg-slate-800 border-dashed border-slate-500 text-slate-400' : 'bg-slate-100 border-dashed border-slate-400 text-slate-500') : isVacant ? (isDarkMode ? 'bg-red-900/30 border-red-800/50 text-red-300' : 'bg-red-50 border-red-300 text-red-800') : hasConflict ? (isDarkMode ? 'bg-rose-950/80 border-rose-500/80 text-rose-200 shadow-[0_0_10px_rgba(225,29,72,0.4)]' : 'bg-rose-100 border-rose-500 text-rose-900 shadow-[0_0_10px_rgba(225,29,72,0.3)]') : getColorHash(disciplineName, isDarkMode)}`}
                                                 >
-                                                  {typeof checkPendingSwapRequest === 'function' && checkPendingSwapRequest(aulaNesteSlot) && !isPending && (
+                                                  {typeof checkPendingSwapRequest === 'function' && checkPendingSwapRequest(aulaNesteSlot) && !isVacant && (
                                                      <div className="absolute top-0 right-0 z-10 pointer-events-none print:hidden">
                                                         <span className="text-[5px] font-black uppercase tracking-widest text-amber-900 px-[5px] py-[3px] rounded-bl-[8px] rounded-tr-[10px] bg-amber-400 border-l border-b border-amber-500 block animate-pulse shadow-[0_2px_4px_rgba(251,191,36,0.3)]">SOLICITADO</span>
                                                      </div>
@@ -179,9 +180,9 @@ export const ClassGrid = React.memo(({
                                                           <span title="Assumida no lugar de uma Vaga" className="text-[6px] font-black uppercase tracking-wide text-white px-1.5 py-0.5 rounded-br-[8px] bg-indigo-600 border-r border-b border-indigo-700 block animate-pulse shadow-sm shadow-indigo-900/30">Substituição</span>
                                                       </div>
                                                    )}
-                                                   {aulaNesteSlot.classType && aulaNesteSlot.classType !== 'Regular' && (
+                                                   {aulaNesteSlot.classType && aulaNesteSlot.classType !== 'Regular' && !isVacant && (
                                                       <div className="absolute bottom-0 right-0 z-10 pointer-events-none print:hidden">
-                                                          <span className="text-[6px] font-black uppercase tracking-wide text-white px-1.5 py-0.5 rounded-tl-[8px] bg-emerald-600 border-l border-t border-emerald-700 block shadow-sm shadow-emerald-900/30">{aulaNesteSlot.classType}</span>
+                                                          <span className={`text-[6px] font-black uppercase tracking-wide text-white px-1.5 py-0.5 rounded-tl-[8px] ${aulaNesteSlot.isPending ? 'bg-slate-500 border-slate-600' : 'bg-emerald-600 border-emerald-700'} border-l border-t block shadow-sm shadow-emerald-900/30`}>{aulaNesteSlot.isPending ? 'ANÁLISE DAPE' : aulaNesteSlot.classType}</span>
                                                       </div>
                                                    )}
                                                   <p className="subject font-bold text-[10px] leading-tight mb-0.5 text-center flex flex-col items-center gap-0.5">

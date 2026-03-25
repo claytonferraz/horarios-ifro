@@ -344,17 +344,20 @@ export const TeacherGrid = React.memo(
                                                         const hasPendingSwap = checkPendingSwapRequest && checkPendingSwapRequest(r);
                                                         const isActive = r.teacherId && String(r.teacherId).split(',').includes(String(activeTeacher));
                                                         const isVagaReal = appMode !== 'aluno' && (!r.teacherId || r.teacherId === 'A Definir' || r.teacherId === '-' || /sem professor/i.test(r.teacher) || r.subject === 'AULA VAGA');
-                                                        const isInert = isGridInert;
+                                                        const isExtraPending = r.isPending === true;
+                                                        const finalInert = isGridInert || isExtraPending;
                                                         
                                                         let cardStyle = "print-clean-card p-2 rounded-xl border shadow-sm flex flex-col justify-center min-h-[76px] transition-all relative ";
-                                                        if (isVagaReal) {
-                                                           cardStyle += isDarkMode ? `bg-red-900/30 border-red-800/50 ${isInert ? 'cursor-default' : 'cursor-pointer hover:scale-[1.02]'}` : `bg-red-50 border-red-300 ${isInert ? 'cursor-default' : 'cursor-pointer hover:scale-[1.02]'}`;
+                                                        if (isExtraPending) {
+                                                           cardStyle += isDarkMode ? `bg-slate-800 border-dashed border-slate-500 text-slate-400 ${finalInert ? 'cursor-default opacity-80' : ''}` : `bg-slate-100 border-dashed border-slate-400 text-slate-500 ${finalInert ? 'cursor-default opacity-80' : ''}`;
+                                                        } else if (isVagaReal) {
+                                                           cardStyle += isDarkMode ? `bg-red-900/30 border-red-800/50 ${finalInert ? 'cursor-default' : 'cursor-pointer hover:scale-[1.02]'}` : `bg-red-50 border-red-300 ${finalInert ? 'cursor-default' : 'cursor-pointer hover:scale-[1.02]'}`;
                                                         } else if (hasPendingSwap) {
-                                                           cardStyle += isDarkMode ? `bg-amber-900/30 border-amber-800/50 ${isInert ? 'cursor-default' : 'cursor-pointer hover:scale-[1.02]'} text-amber-200 shadow-[0_0_10px_rgba(251,191,36,0.2)]` : `bg-amber-100 border-amber-400 text-amber-900 ${isInert ? 'cursor-default' : 'cursor-pointer hover:scale-[1.02]'} shadow-[0_0_10px_rgba(251,191,36,0.2)]`;
+                                                           cardStyle += isDarkMode ? `bg-amber-900/30 border-amber-800/50 ${finalInert ? 'cursor-default' : 'cursor-pointer hover:scale-[1.02]'} text-amber-200 shadow-[0_0_10px_rgba(251,191,36,0.2)]` : `bg-amber-100 border-amber-400 text-amber-900 ${finalInert ? 'cursor-default' : 'cursor-pointer hover:scale-[1.02]'} shadow-[0_0_10px_rgba(251,191,36,0.2)]`;
                                                         } else if (isActive) {
-                                                           cardStyle += getColorHash(r.subject, isDarkMode) + ` ring-2 ring-indigo-500 shadow-md ${isInert ? 'cursor-default z-10' : 'cursor-pointer hover:scale-[1.02] z-10'}`;
+                                                           cardStyle += getColorHash(r.subject, isDarkMode) + ` ring-2 ring-indigo-500 shadow-md ${finalInert ? 'cursor-default z-10' : 'cursor-pointer hover:scale-[1.02] z-10'}`;
                                                         } else {
-                                                           cardStyle += isDarkMode ? `bg-slate-800/30 border-slate-700/50 opacity-40 grayscale ${isInert ? 'cursor-default' : 'hover:grayscale-0 hover:opacity-100 cursor-pointer'}` : `bg-slate-100 border-slate-200 opacity-40 grayscale ${isInert ? 'cursor-default' : 'hover:grayscale-0 hover:opacity-100 cursor-pointer'}`;
+                                                           cardStyle += isDarkMode ? `bg-slate-800/30 border-slate-700/50 opacity-40 grayscale ${finalInert ? 'cursor-default' : 'hover:grayscale-0 hover:opacity-100 cursor-pointer'}` : `bg-slate-100 border-slate-200 opacity-40 grayscale ${finalInert ? 'cursor-default' : 'hover:grayscale-0 hover:opacity-100 cursor-pointer'}`;
                                                         }
 
                                                         return (
@@ -362,7 +365,7 @@ export const TeacherGrid = React.memo(
                                                             key={r.id ? `prof-rec-${r.id}-${idx}` : `prof-rec-idx-${idx}`}
                                                             className={cardStyle}
                                                             onClick={() => {
-                                                              if (isInert) return;
+                                                              if (finalInert) return;
                                                               if (appMode === "professor") {
                                                                 if (hasPendingSwap) {
                                                                    alert("Esta aula já possui uma permuta em andamento. Ela ficará bloqueada até sua recusa ou homologação.");
@@ -423,7 +426,7 @@ export const TeacherGrid = React.memo(
                                                             )}
                                                             {r.classType && r.classType !== 'Regular' && !isVagaReal && (
                                                                 <div className="absolute bottom-0 right-0 z-10 pointer-events-none print:hidden">
-                                                                   <span className="text-[6px] font-black uppercase tracking-wide text-white px-1.5 py-0.5 rounded-tl-[8px] bg-emerald-600 border-l border-t border-emerald-700 block shadow-sm shadow-emerald-900/30">{r.classType}</span>
+                                                                   <span className={`text-[6px] font-black uppercase tracking-wide text-white px-1.5 py-0.5 rounded-tl-[8px] ${isExtraPending ? 'bg-slate-500 border-slate-600' : 'bg-emerald-600 border-emerald-700'} border-l border-t block shadow-sm shadow-emerald-900/30`}>{isExtraPending ? 'ANÁLISE DAPE' : r.classType}</span>
                                                                 </div>
                                                             )}
                                                             <React.Fragment>

@@ -140,7 +140,6 @@ router.post('/', (req, res) => {
         });
 
     } else if (action === 'lancamento_extra') {
-        // Regra de Negócio: Atendimento ao Aluno não precisa de homologação da Gestão (DAPE).
         const propClassType = data.proposed_slot?.classType || '';
         const isAtendimento = propClassType.toLowerCase().includes('atendimento');
         
@@ -154,8 +153,59 @@ router.post('/', (req, res) => {
                 if (err) return res.status(500).json({ error: err.message });
                 const insertedId = this.lastID;
                 
-                // Se for Atendimento, enviamos um sinal ao Frontend informando 'autoApproved: true'
-                // O frontend cuidará de disparar o PUT /status internamente para acionar o motor de inserção na grade.
+                // === BLOQUEIO IMEDIATO NA GRADE ===
+                if (!isAtendimento) {
+                    const propData = data.proposed_slot || {};
+                    let timesToProcess = [];
+                    if (propData.slots && Array.isArray(propData.slots)) timesToProcess = propData.slots.map(s => s.time || s.slotId);
+                    else if (propData.time) timesToProcess = [propData.time];
+
+                    const weekIdFilter = returnWeekId || null;
+                    const dayStr = propData.day || originalDay;
+                    const targetClassStr = propData.classId || propData.className || targetClass;
+
+                    db.all("SELECT payload FROM curriculum_data WHERE dataType = 'class'", [], (cErr, cRows) => {
+                         let realClassId = targetClassStr;
+                         let realCourseId = 'DESCONHECIDO';
+                         let realYear = new Date().getFullYear().toString();
+
+                         if (!cErr && cRows) {
+                             const cleanTarget = targetClassStr.toLowerCase().replace(/[^a-z0-9]/g, '');
+                             cRows.forEach(r => {
+                                 try {
+                                     const obj = JSON.parse(r.payload);
+                                     const cleanName = (obj.name || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+                                     if (cleanName === cleanTarget || obj.id === targetClassStr) {
+                                         realClassId = obj.id;
+                                         realCourseId = obj.matrixId || obj.courseId || realCourseId;
+                                         realYear = obj.academicYear || realYear;
+                                     }
+                                 } catch(e){}
+                             });
+                         }
+
+                         if (realCourseId !== 'DESCONHECIDO') {
+                             console.log("[POST] timesToProcess: ", timesToProcess, " realCourseId: ", realCourseId, " targetClassStr: ", targetClassStr); timesToProcess.forEach(timeStr => {
+                                 const patchData = JSON.stringify({ classType: propClassType, isExtra: true, isPending: true, requestId: insertedId });
+                                 const pendingDiscipline = `[Aguardando] ${subject}`;
+
+                                 const updateQ = `UPDATE schedules SET teacherId = ?, disciplineId = ?, records = json_patch(COALESCE(records, '{}'), ?) WHERE classId = ? AND dayOfWeek = ? AND slotId = ? AND ( (week_id = ? AND type IN ('previa', 'atual', 'oficial')) OR (? IS NULL AND type = 'padrao' AND (week_id IS NULL OR week_id = '')) )`;
+
+                                 db.run(updateQ, [requester, pendingDiscipline, patchData, realClassId, dayStr, timeStr, weekIdFilter, weekIdFilter], function(upErr) {
+                                     if (upErr) console.error("Update Block Error: ", upErr);
+                                     if (this.changes === 0 && !upErr) {
+                                         const sid = 's_ext_pend_' + Date.now() + Math.random().toString(36).substring(2,6);
+                                         db.run(`INSERT INTO schedules (id, courseId, academic_year, classId, dayOfWeek, slotId, teacherId, disciplineId, type, week_id, records) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`, 
+                                         [sid, realCourseId, realYear, realClassId, dayStr, timeStr, requester, pendingDiscipline, propData.type || 'previa', weekIdFilter, patchData], function(insErr) {
+                                            if (insErr) console.error("Insert Block Error: ", insErr);
+                                         });
+                                     }
+                                 });
+                             });
+                             io.emit('schedule_updated');
+                         }
+                    });
+                }
                 res.json({ success: true, id: insertedId, autoApproved: isAtendimento });
             }
         );
@@ -200,11 +250,29 @@ router.put('/:id/status', verifyToken, (req, res) => {
         res.json({ success: true });
 
       } else if (status === 'rejeitado') {
-         db.get("SELECT requester_id FROM exchange_requests WHERE id = ?", [req.params.id], (err2, row) => {
+         db.get("SELECT requester_id, action_type FROM exchange_requests WHERE id = ?", [req.params.id], (err2, row) => {
             if (!err2 && row && row.requester_id) {
-               db.run("INSERT INTO notifications (type, target, title, message, createdAt) VALUES ('SYSTEM', ?, 'Permuta Recusada', 'O seu colega não aceitou a proposta de troca de aula(s).', ?)", [row.requester_id, now], function(){
-                 io.emit('schedule_updated');
-               });
+               const notifyRejection = () => {
+                   const now = new Date().toISOString();
+                   db.run("INSERT INTO notifications (type, target, title, message, createdAt) VALUES ('SYSTEM', ?, 'Solicitação Recusada', 'A sua solicitação foi recusada pela gestão. O horário foi libertado.', ?)", [row.requester_id, now], function(){
+                       io.emit('schedule_updated');
+                   });
+               };
+
+               if (row.action_type === 'lancamento_extra') {
+                   // Rollback Blindado 1: Apaga APENAS as linhas que o sistema inseriu temporariamente (identificadas pelo ID s_ext_pend_)
+                   const deleteQ = `DELETE FROM schedules WHERE id LIKE 's_ext_pend_%' AND records LIKE '%"requestId":${req.params.id}%'`;
+                   db.run(deleteQ, [], () => {
+                       
+                       // Rollback Blindado 2: Para linhas da matriz que apenas sofreram UPDATE, limpamos os campos e mantemos a estrutura intacta
+                       const clearPatch = JSON.stringify({ isPending: false, requestId: null, isExtra: false });
+                       const updateQ = `UPDATE schedules SET teacherId = 'A Definir', disciplineId = '', records = json_patch(records, ?) WHERE records LIKE '%"requestId":${req.params.id}%'`;
+                       
+                       db.run(updateQ, [clearPatch], () => notifyRejection());
+                   });
+               } else {
+                   notifyRejection();
+               }
             }
          });
          res.json({ success: true });
@@ -355,8 +423,8 @@ router.put('/:id/status', verifyToken, (req, res) => {
                              db.run("BEGIN TRANSACTION;");
                              let hasError = false;
 
-                             timesToProcess.forEach(timeStr => {
-                                 const patchData = JSON.stringify({ classType: classType, isExtra: true });
+                             console.log("[POST] timesToProcess: ", timesToProcess, " realCourseId: ", realCourseId, " targetClassStr: ", targetClassStr); timesToProcess.forEach(timeStr => {
+                                 const patchData = JSON.stringify({ classType: classType, isExtra: true, isPending: false });
                                  
                                  // Tenta UPDATE usando a string exata (dayStr)
                                  const updateQ = `UPDATE schedules SET teacherId = ?, disciplineId = ?, records = json_patch(COALESCE(records, '{}'), ?) WHERE classId = ? AND dayOfWeek = ? AND slotId = ? AND ( (week_id = ? AND type IN ('previa', 'atual', 'oficial')) OR (? IS NULL AND type = 'padrao' AND (week_id IS NULL OR week_id = '')) )`;
