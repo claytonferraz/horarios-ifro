@@ -58,8 +58,7 @@ router.post('/', (req, res) => {
         const classIdToUpdate = data.proposed_slot?.classId || targetClass;
         const originalSubjectName = data.proposed_slot?.originalSubject || subject;
 
-        const REVERSE_MAP_DAYS = { 'Segunda-feira': 1, 'Terça-feira': 2, 'Quarta-feira': 3, 'Quinta-feira': 4, 'Sexta-feira': 5, 'Sábado': 6 };
-        const dayOfWeekToUpdate = REVERSE_MAP_DAYS[proposedDay] || proposedDay;
+        const dayOfWeekToUpdate = proposedDay;
 
         const updateQ = `UPDATE schedules SET teacherId = ?, disciplineId = ?, records = json_patch(COALESCE(records, '{}'), ?) WHERE classId = ? AND dayOfWeek = ? AND slotId = ? AND ( (week_id = ? AND type IN ('previa', 'atual', 'oficial')) OR (? IS NULL AND type = 'padrao' AND (week_id IS NULL OR week_id = '')) )`;
         const newRecordsFragment = JSON.stringify({ isSubstituted: true, originalSubject: originalSubjectName });
@@ -102,8 +101,7 @@ router.post('/', (req, res) => {
     } else if (action === 'oferta_vaga') {
         const slotsObj = data.proposed_slot || {};
         const targets = slotsObj.slots || [];
-        const REVERSE_MAP_DAYS = { 'Segunda-feira': 1, 'Terça-feira': 2, 'Quarta-feira': 3, 'Quinta-feira': 4, 'Sexta-feira': 5, 'Sábado': 6 };
-        const dayNum = REVERSE_MAP_DAYS[slotsObj.day] || slotsObj.day;
+        const dayNum = slotsObj.day;
         db.all("SELECT payload FROM curriculum_data WHERE dataType = 'class'", [], (err, rows) => {
             const classMapping = {};
             if (!err && rows) {
@@ -227,9 +225,8 @@ router.put('/:id/status', verifyToken, (req, res) => {
                      const orig = payloadData.original;
                      const prop = payloadData.proposed;
                      
-                     const REVERSE_MAP_DAYS = { 'Segunda-feira': 1, 'Terça-feira': 2, 'Quarta-feira': 3, 'Quinta-feira': 4, 'Sexta-feira': 5, 'Sábado': 6 };
-                     const origDay = REVERSE_MAP_DAYS[orig.day] || orig.day;
-                     const propDay = REVERSE_MAP_DAYS[prop.day] || prop.day;
+                     const origDay = orig.day;
+                     const propDay = prop.day;
                      
                      const weekIdFilter = row.return_week || null;
 
@@ -313,23 +310,33 @@ router.put('/:id/status', verifyToken, (req, res) => {
                      const classType = propData.classType || 'Regular';
                      const targetSubject = propData.subject || row.subject;
 
-                     const REVERSE_MAP_DAYS = { 'Segunda-feira': 1, 'Terça-feira': 2, 'Quarta-feira': 3, 'Quinta-feira': 4, 'Sexta-feira': 5, 'Sábado': 6 };
-                     const dayNum = REVERSE_MAP_DAYS[propData.day || row.original_day] || propData.day || row.original_day;
+                     const dayStr = propData.day || row.original_day; // Usando a string literal
                      const targetClassStr = propData.classId || propData.className || row.target_class;
 
                      console.log(`[EXTRA_ENGINE] HOMOLOGANDO ${classType} PARA SIAPE: ${row.requester_id} na turma ${targetClassStr}`);
 
+                     // Auto-Healing
+                     db.run("DELETE FROM schedules WHERE dayOfWeek IN ('1', '2', '3', '4', '5', '6', 1, 2, 3, 4, 5, 6)", function(err) {
+                         if (this.changes > 0) console.log(`[SWAP_ENGINE] Auto-Healing: ${this.changes} aulas corrompidas com dia numérico apagadas.`);
+                     });
+
                      db.all("SELECT payload FROM curriculum_data WHERE dataType = 'class'", [], (cErr, cRows) => {
-                         const classMapping = {};
+                         let realClassId = targetClassStr;
+                         let realCourseId = 'DESCONHECIDO';
+                         let realYear = new Date().getFullYear().toString();
+
                          if (!cErr && cRows) {
                              cRows.forEach(r => {
                                  try {
                                      const obj = JSON.parse(r.payload);
-                                     if (obj.name) classMapping[obj.name] = obj.id;
+                                     if (obj.name === targetClassStr || obj.id === targetClassStr) {
+                                         realClassId = obj.id;
+                                         realCourseId = obj.matrixId || obj.courseId || realCourseId;
+                                         realYear = obj.academicYear || realYear;
+                                     }
                                  } catch(e){}
                              });
                          }
-                         const realClassId = classMapping[targetClassStr] || targetClassStr;
 
                          db.serialize(() => {
                              db.run("BEGIN TRANSACTION;");
@@ -338,16 +345,16 @@ router.put('/:id/status', verifyToken, (req, res) => {
                              timesToProcess.forEach(timeStr => {
                                  const patchData = JSON.stringify({ classType: classType, isExtra: true });
                                  
-                                 // Primeiro tenta fazer o UPDATE de um slot vazio ou já existente na grade prévia
+                                 // Tenta UPDATE usando a string exata (dayStr)
                                  const updateQ = `UPDATE schedules SET teacherId = ?, disciplineId = ?, records = json_patch(COALESCE(records, '{}'), ?) WHERE classId = ? AND dayOfWeek = ? AND slotId = ? AND ( (week_id = ? AND type IN ('previa', 'atual', 'oficial')) OR (? IS NULL AND type = 'padrao' AND (week_id IS NULL OR week_id = '')) )`;
                                  
-                                 db.run(updateQ, [row.requester_id, targetSubject, patchData, realClassId, dayNum, timeStr, weekId, weekId], function(upErr) {
+                                 db.run(updateQ, [row.requester_id, targetSubject, patchData, realClassId, dayStr, timeStr, weekId, weekId], function(upErr) {
                                      if (upErr) hasError = true;
-                                     // Se o UPDATE afetou 0 linhas, significa que o slot não existe nem na matriz padrão. Forçamos o INSERT.
                                      if (this.changes === 0 && !upErr) {
+                                         // Força INSERT com a hierarquia completa
                                          const sid = 's_ext_' + Date.now() + Math.random().toString(36).substring(2,6);
-                                         db.run(`INSERT INTO schedules (id, classId, dayOfWeek, slotId, teacherId, disciplineId, type, week_id, records) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`, 
-                                         [sid, realClassId, dayNum, timeStr, row.requester_id, targetSubject, targetType, weekId, patchData]);
+                                         db.run(`INSERT INTO schedules (id, courseId, academic_year, classId, dayOfWeek, slotId, teacherId, disciplineId, type, week_id, records) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`, 
+                                         [sid, realCourseId, realYear, realClassId, dayStr, timeStr, row.requester_id, targetSubject, targetType, weekId, patchData]);
                                      }
                                  });
                              });
@@ -358,7 +365,7 @@ router.put('/:id/status', verifyToken, (req, res) => {
                                      res.status(500).json({ error: "Erro na integridade da Transação" });
                                  } else {
                                      const notifyTitle = 'Lançamento Extra Homologado';
-                                     const notifyMsg = `Sua solicitação para inserir aula de ${classType} (${targetSubject}) foi inserida na grade com sucesso.`;
+                                     const notifyMsg = `Sua solicitação para inserir aula de ${classType} (${targetSubject}) em ${dayStr} foi homologada e está na grade.`;
                                      const now = new Date().toISOString();
                                      db.run("INSERT INTO notifications (type, target, title, message, createdAt) VALUES ('SYSTEM', ?, ?, ?, ?)", [row.requester_id, notifyTitle, notifyMsg, now], function(){});
                                      io.emit('schedule_updated');
