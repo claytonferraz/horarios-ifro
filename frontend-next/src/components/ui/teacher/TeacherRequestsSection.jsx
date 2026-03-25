@@ -48,21 +48,45 @@ export function TeacherRequestsSection({ isDarkMode, siape, selectedWeek, weekDa
         teacherId: selectedOriginal.teacherId || siape
       };
 
-      await apiClient.submitRequest({
-        action: 'troca',
-        week_id: selectedWeek,
-        description: newRequest.description,
-        targetClass: selectedOriginal.className,
-        original_slot: originalSlotPayload,
-        proposed_slot: {
-          day: newRequest.proposed_day,
-          time: newRequest.proposed_time,
-          classType: newRequest.proposed_type,
-          className: selectedOriginal.className,
-          classId: resolvedClassId,
-          subject: selectedOriginal.subject
-        }
-      });
+      // BUG 2 FIX: Atendimento ao Aluno não requer aprovação da chefia → usa lancamento_extra
+      // Os demais tipos (Regular, Recuperação, Exame) são permutas que requerem aprovação → usa troca
+      const isAtendimento = newRequest.proposed_type === 'Atendimento';
+      const action = isAtendimento ? 'lancamento_extra' : 'troca';
+
+      const requestPayload = isAtendimento
+        ? {
+            action,
+            week_id: selectedWeek,
+            description: newRequest.description,
+            targetClass: selectedOriginal.className,
+            original_slot: originalSlotPayload,
+            proposed_slot: {
+              classType: newRequest.proposed_type,
+              subject: selectedOriginal.subject,
+              className: selectedOriginal.className,
+              classId: resolvedClassId,
+              day: newRequest.proposed_day || originalSlotPayload.day,
+              time: newRequest.proposed_time || originalSlotPayload.time,
+              type: 'previa'
+            }
+          }
+        : {
+            action,
+            week_id: selectedWeek,
+            description: newRequest.description,
+            targetClass: selectedOriginal.className,
+            original_slot: originalSlotPayload,
+            proposed_slot: {
+              day: newRequest.proposed_day,
+              time: newRequest.proposed_time,
+              classType: newRequest.proposed_type,
+              className: selectedOriginal.className,
+              classId: resolvedClassId,
+              subject: selectedOriginal.subject
+            }
+          };
+
+      await apiClient.submitRequest(requestPayload);
       setNewRequest({ description: '', original_slot_id: '', proposed_day: '', proposed_time: '', proposed_type: 'Regular' });
       setIsModalOpen(false);
       loadRequests();

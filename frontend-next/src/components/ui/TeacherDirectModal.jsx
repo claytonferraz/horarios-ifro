@@ -84,22 +84,15 @@ export function TeacherDirectModal({
       const currentSchedules = data.schedules || [];
       const targetSchedules = currentSchedules.filter(s => s.type === targetType && String(s.week_id) === String(selectedWeek));
       
-      let isOccupied = false;
-      let existingRecord = null;
-      let currentRecordsArray = [];
-      const scheduleForCurrentWeek = targetSchedules[0];
-
-      if (scheduleForCurrentWeek && scheduleForCurrentWeek.records) {
-         try { currentRecordsArray = JSON.parse(scheduleForCurrentWeek.records); } catch(e) {}
-         existingRecord = currentRecordsArray.find(r => 
-             r.className === selectedClass && 
-             r.day === slotData.day && 
-             selectedTimes.includes(r.time) && 
-             r.teacher && 
-             !/A Definir|sem professor|Pendente|-/i.test(r.teacher)
-         );
-         if (existingRecord) isOccupied = true;
-      }
+      // BUG 3 FIX: usar formato atual de schedules (uma linha por slot) em vez do formato legado (records como array)
+      const resolvedClassId = classObj?.id || selectedClass;
+      const isOccupied = targetSchedules.some(s =>
+          (s.classId === resolvedClassId || s.classId === selectedClass) &&
+          s.dayOfWeek === slotData.day &&
+          selectedTimes.includes(s.slotId) &&
+          s.teacherId &&
+          !/A Definir|sem professor|Pendente|-/i.test(s.teacherId)
+      );
 
       if (isOccupied) {
          alert(`Vaga Recusada: Um colega ocupou esta aula exatamente instantes antes de você atualizar.`);
@@ -171,15 +164,10 @@ export function TeacherDirectModal({
       
       const response = await apiClient.submitRequest(requestPayload);
 
+      // BUG 1 FIX: o backend agora insere o atendimento na grade diretamente no POST.
+      // Não é mais necessária uma segunda chamada PUT para acionar o motor.
       if (response && response.autoApproved) {
-          try {
-              // Dispara o gatilho de execução na rota de status para forçar a inserção na grade
-              await apiClient.updateRequestStatus(response.id, 'aprovada', 'Auto-homologado pelo sistema (Atendimento ao Aluno)');
-              alert('Atendimento registrado e inserido na grade automaticamente!');
-          } catch (autoErr) {
-              console.error("Erro na auto-homologação:", autoErr);
-              alert('O pedido de atendimento foi criado, mas houve uma falha na inserção automática. Comunique ao DAPE.');
-          }
+          alert('Atendimento registrado e inserido na grade automaticamente!');
       } else {
           alert(`A solicitação de ${classType} foi enviada com sucesso e aguarda homologação da Gestão!`);
       }

@@ -1,4 +1,5 @@
 const express = require('express');
+const crypto = require('crypto');
 const db = require('../db');
 const { verifyToken } = require('../middlewares/auth.middleware');
 const { z } = require('zod');
@@ -175,106 +176,132 @@ router.post('/', verifyToken, async (req, res) => {
     } else if (action === 'lancamento_extra') {
         const propClassType = data.proposed_slot?.classType || '';
         const isAtendimento = propClassType.toLowerCase().includes('atendimento');
-        
+
         const initialStatus = isAtendimento ? 'aprovada' : 'pronto_para_homologacao';
         const finalFeedback = isAtendimento ? 'Auto-homologado pelo sistema (Atendimento ao Aluno)' : null;
 
-                 // Verifica redundância
-                 db.get("SELECT id FROM exchange_requests WHERE action_type = 'lancamento_extra' AND target_class = ? AND original_day = ? AND original_time = ? AND status IN ('pendente', 'pronto_para_homologacao', 'approved', 'aprovada', 'aguardando_colega')", 
-                    [targetClass, originalDay, originalTime], (checkErr, checkRow) => {
-                     
-                     if (!checkErr && checkRow) {
-                         // Já há uma solicitação desse tipo na mesma banda horária, evitar clone
-                         return res.status(400).json({ error: "Já existe uma solicitação de Lançamento Extra ou Permuta em andamento ou aprovada para este horário." });
-                     }
-
-                     db.run(
-                         'INSERT INTO exchange_requests (action_type, requester_id, substitute_id, target_class, original_day, original_time, subject, return_week, reason, obs, status, admin_feedback, original_slot, proposed_slot) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-                         [action, requester, '', targetClass, originalDay, originalTime, subject, returnWeekId || '', reason || '', obs || '', initialStatus, finalFeedback, JSON.stringify(data.original_slot || {}), JSON.stringify(data.proposed_slot || {})],
-            function(err) {
-                if (err) return res.status(500).json({ error: err.message });
-                const insertedId = this.lastID;
-                
-                // === BLOQUEIO IMEDIATO NA GRADE ===
-                if (!isAtendimento) {
-                    const propData = data.proposed_slot || {};
-                    let timesToProcess = [];
-                    if (propData.slots && Array.isArray(propData.slots)) timesToProcess = propData.slots.map(s => s.time || s.slotId);
-                    else if (propData.time) timesToProcess = [propData.time];
-
-                    const weekIdFilter = returnWeekId || null;
-                    const dayStr = propData.day || originalDay;
-                    const targetClassStr = propData.classId || propData.className || targetClass;
-
-                    db.all("SELECT payload FROM curriculum_data WHERE dataType = 'class'", [], (cErr, cRows) => {
-                         let realClassId = targetClassStr;
-                         let realCourseId = 'DESCONHECIDO';
-                         let realYear = new Date().getFullYear().toString();
-
-                         if (!cErr && cRows) {
-                             const cleanTarget = targetClassStr.toLowerCase().replace(/[^a-z0-9]/g, '');
-                             cRows.forEach(r => {
-                                 try {
-                                     const obj = JSON.parse(r.payload);
-                                     const cleanName = (obj.name || '').toLowerCase().replace(/[^a-z0-9]/g, '');
-                                     if (cleanName === cleanTarget || obj.id === targetClassStr) {
-                                         realClassId = obj.id;
-                                         realCourseId = obj.matrixId || obj.courseId || realCourseId;
-                                         realYear = obj.academicYear || realYear;
-                                     }
-                                 } catch(e){}
-                             });
-                         }
-
-                         if (realCourseId !== 'DESCONHECIDO') {
-                             timesToProcess.forEach(timeStr => {
-                                 const cleanSubject = subject.replace(/\[Aguardando\]\s*/g, '').trim();
-                                 const patchData = JSON.stringify({ classType: propClassType, isExtra: true, isPending: true, requestId: insertedId, subject: cleanSubject });
-                                 const pendingDiscipline = `[Aguardando] ${cleanSubject}`;
-
-                                 const updateQ = `UPDATE schedules SET teacherId = ?, disciplineId = ?, records = json_patch(COALESCE(records, '{}'), ?) WHERE classId = ? AND dayOfWeek = ? AND slotId = ? AND ( (week_id = ? AND type IN ('previa', 'atual', 'oficial')) OR (? IS NULL AND type = 'padrao' AND (week_id IS NULL OR week_id = '')) )`;
-
-                                 db.run(updateQ, [requester, pendingDiscipline, patchData, realClassId, dayStr, timeStr, weekIdFilter, weekIdFilter], function(upErr) {
-                                     if (upErr) console.error("Update Block Error: ", upErr);
-                                     if (this.changes === 0 && !upErr) {
-                                         const sid = 's_ext_pend_' + Date.now() + Math.random().toString(36).substring(2,6);
-                                         db.run(`INSERT INTO schedules (id, courseId, academic_year, classId, dayOfWeek, slotId, teacherId, disciplineId, type, week_id, records) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`, 
-                                         [sid, realCourseId, realYear, realClassId, dayStr, timeStr, requester, pendingDiscipline, propData.type || 'previa', weekIdFilter, patchData], function(insErr) {
-                                            if (insErr) console.error("Insert Block Error: ", insErr);
-                                         });
-                                     }
-                                 });
-                             });
-                             io.emit('schedule_updated');
-                         }
-                    });
+        // BUG 4 FIX: restringir por semana e excluir 'aprovada' — aprovados já executados não bloqueiam novas semanas
+        db.get(
+            "SELECT id FROM exchange_requests WHERE action_type = 'lancamento_extra' AND target_class = ? AND original_day = ? AND original_time = ? AND return_week = ? AND status IN ('pendente', 'pronto_para_homologacao', 'aguardando_colega')",
+            [targetClass, originalDay, originalTime, returnWeekId || ''],
+            (checkErr, checkRow) => {
+                if (!checkErr && checkRow) {
+                    return res.status(400).json({ error: "Já existe uma solicitação de Lançamento Extra em andamento para este horário nesta semana." });
                 }
-                res.json({ success: true, id: insertedId, autoApproved: isAtendimento });
+
+                db.run(
+                    'INSERT INTO exchange_requests (action_type, requester_id, substitute_id, target_class, original_day, original_time, subject, return_week, reason, obs, status, admin_feedback, original_slot, proposed_slot) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+                    [action, requester, '', targetClass, originalDay, originalTime, subject, returnWeekId || '', reason || '', obs || '', initialStatus, finalFeedback, JSON.stringify(data.original_slot || {}), JSON.stringify(data.proposed_slot || {})],
+                    function(err) {
+                        if (err) return res.status(500).json({ error: err.message });
+                        const insertedId = this.lastID;
+
+                        const propData = data.proposed_slot || {};
+                        let timesToProcess = [];
+                        if (propData.slots && Array.isArray(propData.slots)) timesToProcess = propData.slots.map(s => s.time || s.slotId);
+                        else if (propData.time) timesToProcess = [propData.time];
+
+                        const weekIdFilter = returnWeekId || null;
+                        const dayStr = propData.day || originalDay;
+                        const targetClassStr = propData.classId || propData.className || targetClass;
+
+                        if (timesToProcess.length === 0) {
+                            io.emit('schedule_updated');
+                            return res.json({ success: true, id: insertedId, autoApproved: isAtendimento });
+                        }
+
+                        // BUG 1 FIX: atendimento agora também atualiza a grade inline (antes só non-atendimento fazia isso)
+                        db.all("SELECT payload FROM curriculum_data WHERE dataType = 'class'", [], (cErr, cRows) => {
+                            let realClassId = targetClassStr;
+                            let realCourseId = 'DESCONHECIDO';
+                            let realYear = new Date().getFullYear().toString();
+
+                            if (!cErr && cRows) {
+                                const cleanTarget = targetClassStr.toLowerCase().replace(/[^a-z0-9]/g, '');
+                                cRows.forEach(r => {
+                                    try {
+                                        const obj = JSON.parse(r.payload);
+                                        const cleanName = (obj.name || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+                                        if (cleanName === cleanTarget || obj.id === targetClassStr) {
+                                            realClassId = obj.id;
+                                            realCourseId = obj.matrixId || obj.courseId || realCourseId;
+                                            realYear = obj.academicYear || realYear;
+                                        }
+                                    } catch(e){}
+                                });
+                            }
+
+                            if (realCourseId === 'DESCONHECIDO') {
+                                // Turma não encontrada: registro criado mas grade não atualizada
+                                io.emit('schedule_updated');
+                                return res.json({ success: true, id: insertedId, autoApproved: isAtendimento });
+                            }
+
+                            const cleanSubject = subject.replace(/\[Aguardando\]\s*/g, '').trim();
+
+                            timesToProcess.forEach(timeStr => {
+                                // Atendimento: insere direto (isPending: false). Outros: bloqueia como pendente.
+                                const isPending = !isAtendimento;
+                                const disciplineVal = isPending ? `[Aguardando] ${cleanSubject}` : cleanSubject;
+                                const patchData = JSON.stringify({ classType: propClassType, isExtra: true, isPending, requestId: insertedId, subject: cleanSubject });
+
+                                const updateQ = `UPDATE schedules SET teacherId = ?, disciplineId = ?, records = json_patch(COALESCE(records, '{}'), ?) WHERE classId = ? AND dayOfWeek = ? AND slotId = ? AND ( (week_id = ? AND type IN ('previa', 'atual', 'oficial')) OR (? IS NULL AND type = 'padrao' AND (week_id IS NULL OR week_id = '')) )`;
+
+                                db.run(updateQ, [requester, disciplineVal, patchData, realClassId, dayStr, timeStr, weekIdFilter, weekIdFilter], function(upErr) {
+                                    if (upErr) console.error("Update Block Error:", upErr);
+                                    if (this.changes === 0 && !upErr) {
+                                        // BUG 5 FIX: usar crypto.randomUUID()
+                                        const sid = isPending ? `s_ext_pend_${crypto.randomUUID()}` : `s_ext_${crypto.randomUUID()}`;
+                                        db.run(
+                                            `INSERT INTO schedules (id, courseId, academic_year, classId, dayOfWeek, slotId, teacherId, disciplineId, type, week_id, records) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+                                            [sid, realCourseId, realYear, realClassId, dayStr, timeStr, requester, disciplineVal, propData.type || 'previa', weekIdFilter, patchData],
+                                            function(insErr) { if (insErr) console.error("Insert Block Error:", insErr); }
+                                        );
+                                    }
+                                });
+                            });
+
+                            io.emit('schedule_updated');
+                            res.json({ success: true, id: insertedId, autoApproved: isAtendimento });
+                        });
+                    }
+                );
             }
         );
-        }); // Fim do check callback
+
     } else if (action === 'troca' || !action) {
-        // Se action_type estiver estritamente vazio (modal antigo/incompleto), forçamos 'troca_aberta' ou assumimos o fluxo base para evitar nulls
         const finalAction = action || 'vaga';
-        const status = finalAction === 'troca' ? 'aguardando_colega' : 'pendente'; 
+        const status = finalAction === 'troca' ? 'aguardando_colega' : 'pendente';
 
-        db.get("SELECT id FROM exchange_requests WHERE target_class = ? AND original_day = ? AND original_time = ? AND status IN ('pendente', 'pronto_para_homologacao', 'approved', 'aprovada', 'aguardando_colega')", 
-           [targetClass, originalDay, originalTime], (checkErrTroca, checkRowTroca) => {
-            
-            if (!checkErrTroca && checkRowTroca) {
-                return res.status(400).json({ error: "Já existe uma solicitação em andamento ou aprovada para este horário." });
-            }
+        const doInsert = () => {
+            db.get(
+                "SELECT id FROM exchange_requests WHERE target_class = ? AND original_day = ? AND original_time = ? AND status IN ('pendente', 'pronto_para_homologacao', 'aguardando_colega')",
+                [targetClass, originalDay, originalTime],
+                (checkErrTroca, checkRowTroca) => {
+                    if (!checkErrTroca && checkRowTroca) {
+                        return res.status(400).json({ error: "Já existe uma solicitação em andamento para este horário." });
+                    }
+                    db.run(
+                        'INSERT INTO exchange_requests (action_type, requester_id, substitute_id, target_class, original_day, original_time, subject, return_week, reason, obs, status, original_slot, proposed_slot) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+                        [finalAction, requester, substituteId || '', targetClass, originalDay, originalTime, subject, returnWeekId || '', reason || '', obs, status, JSON.stringify(data.original_slot || {}), JSON.stringify(data.proposed_slot || {})],
+                        function(err) {
+                            if (err) return res.status(500).json({ error: err.message });
+                            res.json({ success: true, id: this.lastID });
+                        }
+                    );
+                }
+            );
+        };
 
-            db.run(
-              // Na tabela, usaremos a query com "obs" espelhando o formato stricto.
-              'INSERT INTO exchange_requests (action_type, requester_id, substitute_id, target_class, original_day, original_time, subject, return_week, reason, obs, status, original_slot, proposed_slot) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-          [finalAction, requester, substituteId || '', targetClass, originalDay, originalTime, subject, returnWeekId || '', reason || '', obs, status, JSON.stringify(data.original_slot || {}), JSON.stringify(data.proposed_slot || {})],
-          function(err) {
-            if (err) return res.status(500).json({ error: err.message });
-            res.json({ success: true, id: this.lastID });
-          }
-        );
-        }); // Fim check clone
+        // BUG 7 FIX: validar existência e status ativo do professor substituto
+        if (substituteId) {
+            db.get("SELECT siape FROM users WHERE siape = ? AND status = 'ativo'", [substituteId], (subErr, subRow) => {
+                if (subErr || !subRow) return res.status(400).json({ error: "Professor substituto não encontrado ou inativo." });
+                doInsert();
+            });
+        } else {
+            doInsert();
+        }
     }
   } catch(e) { res.status(500).json({error: e.message}); }
 });
@@ -539,7 +566,7 @@ router.put('/:id/status', verifyToken, (req, res) => {
                                      if (upErr) hasError = true;
                                      if (this.changes === 0 && !upErr) {
                                          // Força INSERT com a hierarquia completa e validada
-                                         const sid = 's_ext_' + Date.now() + Math.random().toString(36).substring(2,6);
+                                         const sid = `s_ext_${crypto.randomUUID()}`;
                                          db.run(`INSERT INTO schedules (id, courseId, academic_year, classId, dayOfWeek, slotId, teacherId, disciplineId, type, week_id, records) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`, 
                                          [sid, realCourseId, realYear, realClassId, dayStr, timeStr, row.requester_id, targetSubject, targetType, weekId, patchData]);
                                      }

@@ -126,9 +126,16 @@ export function MasterGrid({ isDarkMode, ...props }) {
   const [isRequestsWidgetOpen, setIsRequestsWidgetOpen] = useState(false);
   const [isWidgetMenuOpen, setIsWidgetMenuOpen] = useState(false);
   
-  React.useEffect(() => {
-    apiClient.getRequests().then(data => setPendingRequests(data.filter(r => r.status === 'pronto_para_homologacao'))).catch(console.error);
+  // BUG 6 FIX: recarregar quando refreshTrigger muda (ex: após salvar grade) e também ao montar
+  const loadPendingRequests = React.useCallback(() => {
+    apiClient.getRequests()
+      .then(data => setPendingRequests(data.filter(r => r.status === 'pronto_para_homologacao')))
+      .catch(console.error);
   }, []);
+
+  React.useEffect(() => {
+    loadPendingRequests();
+  }, [loadPendingRequests, refreshTrigger]);
 
   const horariosExibidos = useMemo(() => {
     if (!classTimes || classTimes.length === 0) {
