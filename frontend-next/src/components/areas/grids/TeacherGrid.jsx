@@ -34,6 +34,7 @@ export const TeacherGrid = React.memo(
     recordsForWeek,
     activeDays,
     classTimes,
+    setShowEmptySlots,
   }) => {
     const activeTeacher = selectedColleague || selectedTeacher;
     const isGridInert = appMode === 'aluno' || scheduleMode === 'consolidado' || scheduleMode === 'oficial';
@@ -98,12 +99,23 @@ export const TeacherGrid = React.memo(
                 </div>
 
                 <div className="flex flex-col sm:flex-row items-start sm:items-center justify-end gap-3 mt-2 sm:mt-0">
+                  
+                  {/* TOGGLE: HORÁRIOS LIVRES (UX REFINADA) */}
+                  {appMode === 'professor' && scheduleMode !== 'consolidado' && scheduleMode !== 'oficial' && (
+                    <label className="flex items-center gap-2.5 cursor-pointer group bg-white/10 hover:bg-white/15 px-3 py-1.5 rounded-xl transition-all ring-1 ring-white/5 no-print">
+                        <div className={`w-9 h-5 rounded-full relative transition-all duration-300 ${showEmptySlots ? 'bg-emerald-500 shadow-[0_0_10px_rgba(16,185,129,0.3)]' : 'bg-white/20'}`}>
+                          <div className={`absolute top-1 left-1 w-3 h-3 rounded-full bg-white transition-all duration-300 shadow-sm ${showEmptySlots ? 'translate-x-[16px]' : 'translate-x-0'}`} />
+                        </div>
+                        <span className="text-[9px] font-black uppercase tracking-widest text-white/90 group-hover:text-white transition-colors">Horários Livres</span>
+                        <input type="checkbox" checked={showEmptySlots} onChange={e => typeof setShowEmptySlots === 'function' && setShowEmptySlots(e.target.checked)} className="peer sr-only" />
+                    </label>
+                  )}
 
                   <button
                     onClick={handlePrint}
-                    className="flex items-center gap-2 bg-white/20 hover:bg-white/30 text-white px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all shadow-sm active:scale-95 no-print ring-1 ring-white/10"
+                    className="flex items-center gap-2 bg-white/10 hover:bg-white/25 text-white px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all shadow-sm active:scale-95 no-print ring-1 ring-white/10"
                   >
-                    <Printer size={15} /> Imprimir Horário
+                    <Printer size={14} /> Imprimir Horário
                   </button>
                 </div>
               </div>

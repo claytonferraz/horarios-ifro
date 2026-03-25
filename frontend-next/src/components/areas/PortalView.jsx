@@ -669,33 +669,66 @@ export function PortalView({
     <>
         {/* LINKS RÁPIDOS E FERRAMENTAS - SEMPRE VISÍVEL PARA PROFESSOR LOGADO NO TOPO */}
         {appMode === 'professor' && !selectedColleague && (
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 no-print mb-6 animate-in slide-in-from-top-4 duration-700">
-            <a href="https://sip.ifro.edu.br/sip/login.php?sigla_orgao_sistema=IFRO&sigla_sistema=SEI&infra_url=L3NlaS8=" target="_blank" rel="noopener noreferrer" className={`group flex flex-col items-center justify-center p-4 rounded-2xl border transition-all hover:scale-[1.03] active:scale-95 text-center ${isDarkMode ? 'bg-slate-900 border-slate-800 hover:border-indigo-500/50' : 'bg-white border-slate-100 shadow-sm hover:border-indigo-200'}`}>
-              <div className={`w-10 h-10 rounded-xl flex items-center justify-center mb-2 transition-colors ${isDarkMode ? 'bg-indigo-950 text-indigo-400 group-hover:bg-indigo-600 group-hover:text-white' : 'bg-indigo-50 text-indigo-600 group-hover:bg-indigo-600 group-hover:text-white'}`}>
-                <ExternalLink size={18} />
-              </div>
-              <span className={`text-[9px] font-black uppercase tracking-widest ${isDarkMode ? 'text-slate-200' : 'text-slate-800'}`}>Acesso ao SEI</span>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-10 no-print animate-in duration-1000 slide-in-from-top-4">
+            
+            {/* SEI */}
+            <a href="https://sip.ifro.edu.br/sip/login.php?sigla_orgao_sistema=IFRO&sigla_sistema=SEI&infra_url=L3NlaS8=" target="_blank" rel="noopener noreferrer" 
+               className={`group relative flex items-center gap-5 p-5 rounded-3xl border transition-all duration-500 overflow-hidden ${isDarkMode ? 'bg-slate-900 border-slate-800 hover:bg-slate-800/80 hover:scale-[1.02] hover:shadow-2xl shadow-indigo-900/10' : 'bg-white border-slate-100 shadow-xl shadow-slate-200/50 hover:shadow-2xl hover:scale-[1.02]'}`}>
+               <div className={`p-3.5 rounded-2xl transition-all duration-500 ${isDarkMode ? 'bg-indigo-950 text-indigo-400 group-hover:bg-indigo-600 group-hover:text-white group-hover:shadow-[0_0_20px_rgba(79,70,229,0.4)]' : 'bg-indigo-50 text-indigo-600 group-hover:bg-indigo-600 group-hover:text-white group-hover:shadow-[0_0_20px_rgba(79,70,229,0.2)]'}`}>
+                  <FileText size={22} className="transition-transform duration-500 group-hover:rotate-12" />
+               </div>
+               <div className="flex flex-col">
+                 <h4 className={`text-[11px] font-black uppercase tracking-widest leading-none ${isDarkMode ? 'text-slate-200' : 'text-slate-900'}`}>Acesso ao SEI</h4>
+                 <p className="text-[9px] font-bold text-slate-500 mt-1.5 uppercase tracking-tighter opacity-80">Documentos e Processos</p>
+               </div>
+               <div className="absolute -bottom-3 -right-3 opacity-[0.03] group-hover:opacity-[0.08] group-hover:scale-110 transition-all duration-700 pointer-events-none">
+                  <FileText size={80} />
+               </div>
             </a>
 
-            <a href="https://suap.ifro.edu.br/edu/meus_diarios/" target="_blank" rel="noopener noreferrer" className={`group flex flex-col items-center justify-center p-4 rounded-2xl border transition-all hover:scale-[1.03] active:scale-95 text-center ${isDarkMode ? 'bg-slate-900 border-slate-800 hover:border-emerald-500/50' : 'bg-white border-slate-100 shadow-sm hover:border-emerald-200'}`}>
-              <div className={`w-10 h-10 rounded-xl flex items-center justify-center mb-2 transition-colors ${isDarkMode ? 'bg-emerald-950 text-emerald-400 group-hover:bg-emerald-600 group-hover:text-white' : 'bg-emerald-50 text-emerald-600 group-hover:bg-emerald-600 group-hover:text-white'}`}>
-                <ListTodo size={18} />
-              </div>
-              <span className={`text-[9px] font-black uppercase tracking-widest ${isDarkMode ? 'text-slate-200' : 'text-slate-800'}`}>Meus Diários</span>
+            {/* MEUS DIÁRIOS (SUAP) */}
+            <a href="https://suap.ifro.edu.br/edu/meus_diarios/" target="_blank" rel="noopener noreferrer" 
+               className={`group relative flex items-center gap-5 p-5 rounded-3xl border transition-all duration-500 overflow-hidden ${isDarkMode ? 'bg-slate-900 border-slate-800 hover:bg-slate-800/80 hover:scale-[1.02] hover:shadow-2xl shadow-emerald-900/10' : 'bg-white border-slate-100 shadow-xl shadow-slate-200/50 hover:shadow-2xl hover:scale-[1.02]'}`}>
+               <div className={`p-3.5 rounded-2xl transition-all duration-500 ${isDarkMode ? 'bg-emerald-950 text-emerald-400 group-hover:bg-emerald-600 group-hover:text-white group-hover:shadow-[0_0_20px_rgba(16,185,129,0.4)]' : 'bg-emerald-50 text-emerald-600 group-hover:bg-emerald-600 group-hover:text-white group-hover:shadow-[0_0_20px_rgba(16,185,129,0.2)]'}`}>
+                  <BookOpen size={22} className="transition-transform duration-500 group-hover:-rotate-12" />
+               </div>
+               <div className="flex flex-col">
+                 <h4 className={`text-[11px] font-black uppercase tracking-widest leading-none ${isDarkMode ? 'text-slate-200' : 'text-slate-900'}`}>Meus Diários</h4>
+                 <p className="text-[9px] font-bold text-slate-500 mt-1.5 uppercase tracking-tighter opacity-80">Frequência e Notas</p>
+               </div>
+               <div className="absolute -bottom-3 -right-3 opacity-[0.03] group-hover:opacity-[0.08] group-hover:scale-110 transition-all duration-700 pointer-events-none">
+                  <BookOpen size={80} />
+               </div>
             </a>
 
-            <a href="https://suap.ifro.edu.br/admin/comum/sala/?agendavel__exact=1&all=&predio__uo=7&tab=tab_any_data" target="_blank" rel="noopener noreferrer" className={`group flex flex-col items-center justify-center p-4 rounded-2xl border transition-all hover:scale-[1.03] active:scale-95 text-center ${isDarkMode ? 'bg-slate-900 border-slate-800 hover:border-blue-500/50' : 'bg-white border-slate-100 shadow-sm hover:border-blue-200'}`}>
-              <div className={`w-10 h-10 rounded-xl flex items-center justify-center mb-2 transition-colors ${isDarkMode ? 'bg-blue-950 text-blue-400 group-hover:bg-blue-600 group-hover:text-white' : 'bg-blue-50 text-blue-600 group-hover:bg-blue-600 group-hover:text-white'}`}>
-                <MapPin size={18} />
-              </div>
-              <span className={`text-[9px] font-black uppercase tracking-widest ${isDarkMode ? 'text-slate-200' : 'text-slate-800'}`}>Agendar Salas</span>
+            {/* AGENDAR SALAS */}
+            <a href="https://suap.ifro.edu.br/admin/comum/sala/?agendavel__exact=1&all=&predio__uo=7&tab=tab_any_data" target="_blank" rel="noopener noreferrer" 
+               className={`group relative flex items-center gap-5 p-5 rounded-3xl border transition-all duration-500 overflow-hidden ${isDarkMode ? 'bg-slate-900 border-slate-800 hover:bg-slate-800/80 hover:scale-[1.02] hover:shadow-2xl shadow-blue-900/10' : 'bg-white border-slate-100 shadow-xl shadow-slate-200/50 hover:shadow-2xl hover:scale-[1.02]'}`}>
+               <div className={`p-3.5 rounded-2xl transition-all duration-500 ${isDarkMode ? 'bg-blue-950 text-blue-400 group-hover:bg-blue-600 group-hover:text-white group-hover:shadow-[0_0_20px_rgba(37,99,235,0.4)]' : 'bg-blue-50 text-blue-600 group-hover:bg-blue-600 group-hover:text-white group-hover:shadow-[0_0_20px_rgba(37,99,235,0.2)]'}`}>
+                  <MapPin size={22} className="transition-transform duration-500 group-hover:translate-y-[-2px]" />
+               </div>
+               <div className="flex flex-col">
+                 <h4 className={`text-[11px] font-black uppercase tracking-widest leading-none ${isDarkMode ? 'text-slate-200' : 'text-slate-900'}`}>Agendar Salas</h4>
+                 <p className="text-[9px] font-bold text-slate-500 mt-1.5 uppercase tracking-tighter opacity-80">Reserva via SUAP</p>
+               </div>
+               <div className="absolute -bottom-3 -right-3 opacity-[0.03] group-hover:opacity-[0.08] group-hover:scale-110 transition-all duration-700 pointer-events-none">
+                  <MapPin size={80} />
+               </div>
             </a>
 
-            <a href="https://docs.google.com/spreadsheets/d/1k9Tyy_2pYsJyRKeSq3NpSpXHzUoPigyweyRUHGiAbW4/edit?gid=176889928#gid=176889928" target="_blank" rel="noopener noreferrer" className={`group flex flex-col items-center justify-center p-4 rounded-2xl border transition-all hover:scale-[1.03] active:scale-95 text-center ${isDarkMode ? 'bg-slate-900 border-slate-800 hover:border-amber-500/50' : 'bg-white border-slate-100 shadow-sm hover:border-amber-200'}`}>
-              <div className={`w-10 h-10 rounded-xl flex items-center justify-center mb-2 transition-colors ${isDarkMode ? 'bg-amber-950 text-amber-400 group-hover:bg-amber-600 group-hover:text-white' : 'bg-amber-50 text-amber-600 group-hover:bg-amber-600 group-hover:text-white'}`}>
-                <Monitor size={18} />
-              </div>
-              <span className={`text-[9px] font-black uppercase tracking-widest ${isDarkMode ? 'text-slate-200' : 'text-slate-800'}`}>Agendar Lab</span>
+            {/* AGENDAR LABORATÓRIOS */}
+            <a href="https://docs.google.com/spreadsheets/d/1k9Tyy_2pYsJyRKeSq3NpSpXHzUoPigyweyRUHGiAbW4/edit?gid=176889928#gid=176889928" target="_blank" rel="noopener noreferrer" 
+               className={`group relative flex items-center gap-5 p-5 rounded-3xl border transition-all duration-500 overflow-hidden ${isDarkMode ? 'bg-slate-900 border-slate-800 hover:bg-slate-800/80 hover:scale-[1.02] hover:shadow-2xl shadow-amber-900/10' : 'bg-white border-slate-100 shadow-xl shadow-slate-200/50 hover:shadow-2xl hover:scale-[1.02]'}`}>
+               <div className={`p-3.5 rounded-2xl transition-all duration-500 ${isDarkMode ? 'bg-amber-950 text-amber-400 group-hover:bg-amber-600 group-hover:text-white group-hover:shadow-[0_0_20px_rgba(217,119,6,0.4)]' : 'bg-amber-50 text-amber-600 group-hover:bg-amber-600 group-hover:text-white group-hover:shadow-[0_0_20px_rgba(217,119,6,0.2)]'}`}>
+                  <Monitor size={22} className="transition-transform duration-500 group-hover:scale-110" />
+               </div>
+               <div className="flex flex-col">
+                 <h4 className={`text-[11px] font-black uppercase tracking-widest leading-none ${isDarkMode ? 'text-slate-200' : 'text-slate-900'}`}>Laboratórios</h4>
+                 <p className="text-[9px] font-bold text-slate-500 mt-1.5 uppercase tracking-tighter opacity-80">Gestão de Reservas</p>
+               </div>
+               <div className="absolute -bottom-3 -right-3 opacity-[0.03] group-hover:opacity-[0.08] group-hover:scale-110 transition-all duration-700 pointer-events-none">
+                  <Monitor size={80} />
+               </div>
             </a>
           </div>
         )}
@@ -1278,66 +1311,54 @@ export function PortalView({
                                  }
                                  setTeacherDirectModal(rec);
                                } else if (rec.teacherId && String(rec.teacherId).split(',').includes(String(selectedTeacher || siape))) {
-                                 alert('Você não pode propor uma permuta com a sua própria aula.');
-                               }
-                            }}
-                          />
-                        </div>
-                      </DragDropContext>
-                    </div>
-                  )}
+                                  alert('Você não pode propor uma permuta com a sua própria aula.');
+                                }
+                             }}
+                           />
+                         </div>
+                       </DragDropContext>
+                     </div>
+                   )}
 
-                  {/* GRADE DE HORÁRIO DO PROFESSOR (Separada por Curso) */}
-                  {viewMode === 'professor' && selectedTeacher && (
-                    <div className="flex flex-col gap-4">
-                      {appMode === 'professor' && scheduleMode !== 'consolidado' && scheduleMode !== 'oficial' && (
-                        <div className={`p-3 rounded-xl border flex items-center justify-end sm:justify-start ${isDarkMode ? 'bg-slate-800 border-slate-700' : 'bg-slate-50 border-slate-200'}`}>
-                           <label className="flex items-center gap-3 cursor-pointer group">
-                               <div className={`w-8 h-4 rounded-full relative transition-colors ${showEmptySlots ? 'bg-indigo-500' : 'bg-slate-300 dark:bg-slate-600'}`}>
-                                 <div className={`absolute top-0.5 w-3 h-3 rounded-full bg-white transition-all ${showEmptySlots ? 'left-4.5 translate-x-[14px]' : 'left-0.5'}`} />
-                               </div>
-                               <span className={`text-[9px] font-black uppercase tracking-widest transition-colors ${showEmptySlots ? (isDarkMode ? 'text-indigo-400' : 'text-indigo-600') : (isDarkMode ? 'text-slate-400 group-hover:text-slate-300' : 'text-slate-500 group-hover:text-slate-700')}`}>Mostrar horários livres na semana</span>
-                               <input type="checkbox" checked={showEmptySlots} onChange={e => setShowEmptySlots(e.target.checked)} className="peer sr-only" />
-                           </label>
-                        </div>
-                      )}
-                      
-                      <TeacherGrid 
-                        selectedColleague={selectedColleague}
-                        showEmptySlots={showEmptySlots}
-                        onEmptySlotClick={setTeacherDirectModal}
-                        mappedSchedules={mappedSchedules}
-                        isDarkMode={isDarkMode}
-                        scheduleMode={scheduleMode}
-                        appMode={appMode}
-                        viewMode={viewMode}
-                        userRole={userRole}
-                        selectedTeacher={selectedTeacher}
-                        globalTeachers={globalTeachers}
-                        safeDays={safeDays}
-                        safeTimes={safeTimes}
-                        dynamicWeeksList={dynamicWeeksList}
-                        selectedWeek={selectedWeek}
-                        weekLabel={weekLabel}
-                        showVacantInMyClasses={showVacantInMyClasses}
-                        setShowVacantInMyClasses={setShowVacantInMyClasses}
-                        handlePrint={handlePrint}
-                        resolveTeacherName={resolveTeacherName}
-                        isTeacherPending={isTeacherPending}
-                        checkPendingSwapRequest={isSlotInvolvedInPendingRequest}
-                        setVacantRequestModal={setVacantRequestModal}
-                        setExchangeTarget={(target) => { 
-                           setExchangeTarget(target); 
-                           setExchangeAction('offer'); 
-                        }}
-                        getColorHash={getColorHash}
-                        getFormattedDayLabel={getFormattedDayLabel}
-                        recordsForWeek={recordsForWeek}
-                        activeDays={activeDays}
-                        classTimes={classTimes}
-                      />
-                    </div>
-                  )}
+                   {/* GRADE DE HORÁRIO DO PROFESSOR (Separada por Curso) */}
+                   {viewMode === 'professor' && selectedTeacher && (
+                       <TeacherGrid 
+                         selectedColleague={selectedColleague}
+                         showEmptySlots={showEmptySlots}
+                         setShowEmptySlots={setShowEmptySlots}
+                         onEmptySlotClick={setTeacherDirectModal}
+                         mappedSchedules={mappedSchedules}
+                         isDarkMode={isDarkMode}
+                         scheduleMode={scheduleMode}
+                         appMode={appMode}
+                         viewMode={viewMode}
+                         userRole={userRole}
+                         selectedTeacher={selectedTeacher}
+                         globalTeachers={globalTeachers}
+                         safeDays={safeDays}
+                         safeTimes={safeTimes}
+                         dynamicWeeksList={dynamicWeeksList}
+                         selectedWeek={selectedWeek}
+                         weekLabel={weekLabel}
+                         showVacantInMyClasses={showVacantInMyClasses}
+                         setShowVacantInMyClasses={setShowVacantInMyClasses}
+                         handlePrint={handlePrint}
+                         resolveTeacherName={resolveTeacherName}
+                         isTeacherPending={isTeacherPending}
+                         checkPendingSwapRequest={isSlotInvolvedInPendingRequest}
+                         setVacantRequestModal={setVacantRequestModal}
+                         setExchangeTarget={(target) => { 
+                            setExchangeTarget(target); 
+                            setExchangeAction('offer'); 
+                         }}
+                         getColorHash={getColorHash}
+                         getFormattedDayLabel={getFormattedDayLabel}
+                         recordsForWeek={recordsForWeek}
+                         activeDays={activeDays}
+                         classTimes={classTimes}
+                       />
+                   )}
+
 
                   {/* GRADE DE HORÁRIO GERAL (Turma COMPLETA E HISTORICO) */}
                   {['turma', 'historico'].includes(viewMode) && (
