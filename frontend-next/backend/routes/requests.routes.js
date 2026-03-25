@@ -146,9 +146,18 @@ router.post('/', (req, res) => {
         const initialStatus = isAtendimento ? 'aprovada' : 'pronto_para_homologacao';
         const finalFeedback = isAtendimento ? 'Auto-homologado pelo sistema (Atendimento ao Aluno)' : null;
 
-        db.run(
-            'INSERT INTO exchange_requests (action_type, requester_id, substitute_id, target_class, original_day, original_time, subject, return_week, reason, obs, status, admin_feedback, original_slot, proposed_slot) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-            [action, requester, '', targetClass, originalDay, originalTime, subject, returnWeekId || '', reason || '', obs || '', initialStatus, finalFeedback, JSON.stringify(data.original_slot || {}), JSON.stringify(data.proposed_slot || {})],
+                 // Verifica redundância
+                 db.get("SELECT id FROM exchange_requests WHERE action_type = 'lancamento_extra' AND target_class = ? AND original_day = ? AND original_time = ? AND status IN ('pendente', 'pronto_para_homologacao', 'approved', 'aprovada', 'aguardando_colega')", 
+                    [targetClass, originalDay, originalTime], (checkErr, checkRow) => {
+                     
+                     if (!checkErr && checkRow) {
+                         // Já há uma solicitação desse tipo na mesma banda horária, evitar clone
+                         return res.status(400).json({ error: "Já existe uma solicitação de Lançamento Extra ou Permuta em andamento ou aprovada para este horário." });
+                     }
+
+                     db.run(
+                         'INSERT INTO exchange_requests (action_type, requester_id, substitute_id, target_class, original_day, original_time, subject, return_week, reason, obs, status, admin_feedback, original_slot, proposed_slot) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+                         [action, requester, '', targetClass, originalDay, originalTime, subject, returnWeekId || '', reason || '', obs || '', initialStatus, finalFeedback, JSON.stringify(data.original_slot || {}), JSON.stringify(data.proposed_slot || {})],
             function(err) {
                 if (err) return res.status(500).json({ error: err.message });
                 const insertedId = this.lastID;
@@ -186,8 +195,9 @@ router.post('/', (req, res) => {
 
                          if (realCourseId !== 'DESCONHECIDO') {
                              console.log("[POST] timesToProcess: ", timesToProcess, " realCourseId: ", realCourseId, " targetClassStr: ", targetClassStr); timesToProcess.forEach(timeStr => {
+                                 const cleanSubject = subject.replace('[Aguardando] ', '');
                                  const patchData = JSON.stringify({ classType: propClassType, isExtra: true, isPending: true, requestId: insertedId });
-                                 const pendingDiscipline = `[Aguardando] ${subject}`;
+                                 const pendingDiscipline = `[Aguardando] ${cleanSubject}`;
 
                                  const updateQ = `UPDATE schedules SET teacherId = ?, disciplineId = ?, records = json_patch(COALESCE(records, '{}'), ?) WHERE classId = ? AND dayOfWeek = ? AND slotId = ? AND ( (week_id = ? AND type IN ('previa', 'atual', 'oficial')) OR (? IS NULL AND type = 'padrao' AND (week_id IS NULL OR week_id = '')) )`;
 
@@ -209,20 +219,29 @@ router.post('/', (req, res) => {
                 res.json({ success: true, id: insertedId, autoApproved: isAtendimento });
             }
         );
+        }); // Fim do check callback
     } else if (action === 'troca' || !action) {
         // Se action_type estiver estritamente vazio (modal antigo/incompleto), forçamos 'troca_aberta' ou assumimos o fluxo base para evitar nulls
         const finalAction = action || 'vaga';
         const status = finalAction === 'troca' ? 'aguardando_colega' : 'pendente'; 
 
-        db.run(
-          // Na tabela, usaremos a query com "obs" espelhando o formato stricto.
-          'INSERT INTO exchange_requests (action_type, requester_id, substitute_id, target_class, original_day, original_time, subject, return_week, reason, obs, status, original_slot, proposed_slot) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+        db.get("SELECT id FROM exchange_requests WHERE target_class = ? AND original_day = ? AND original_time = ? AND status IN ('pendente', 'pronto_para_homologacao', 'approved', 'aprovada', 'aguardando_colega')", 
+           [targetClass, originalDay, originalTime], (checkErrTroca, checkRowTroca) => {
+            
+            if (!checkErrTroca && checkRowTroca) {
+                return res.status(400).json({ error: "Já existe uma solicitação em andamento ou aprovada para este horário." });
+            }
+
+            db.run(
+              // Na tabela, usaremos a query com "obs" espelhando o formato stricto.
+              'INSERT INTO exchange_requests (action_type, requester_id, substitute_id, target_class, original_day, original_time, subject, return_week, reason, obs, status, original_slot, proposed_slot) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
           [finalAction, requester, substituteId || '', targetClass, originalDay, originalTime, subject, returnWeekId || '', reason || '', obs, status, JSON.stringify(data.original_slot || {}), JSON.stringify(data.proposed_slot || {})],
           function(err) {
             if (err) return res.status(500).json({ error: err.message });
             res.json({ success: true, id: this.lastID });
           }
         );
+        }); // Fim check clone
     }
   } catch(e) { res.status(500).json({error: e.message}); }
 });
@@ -376,16 +395,15 @@ router.put('/:id/status', verifyToken, (req, res) => {
                      const weekId = row.return_week || null;
                      const targetType = propData.type || 'previa';
                      const classType = propData.classType || 'Regular';
-                     const targetSubject = propData.subject || row.subject;
+                     const targetSubject = (propData.subject || row.subject || '').replace('[Aguardando] ', '');
 
                      const dayStr = propData.day || row.original_day; // Usando a string literal
                      const targetClassStr = propData.classId || propData.className || row.target_class;
 
                      console.log(`[EXTRA_ENGINE] HOMOLOGANDO ${classType} PARA SIAPE: ${row.requester_id} na turma ${targetClassStr}`);
 
-                     // 1. Auto-Healing Total (O Exterminador de Fantasmas)
-                     // Deleta qualquer aula corrompida que esteja sem curso ou com dia numerico.
-                     db.run("DELETE FROM schedules WHERE courseId = 'DESCONHECIDO' OR dayOfWeek IN ('1', '2', '3', '4', '5', '6', 1, 2, 3, 4, 5, 6)");
+                     // 1. Limpeza de slots sem curso associado
+                     db.run("DELETE FROM schedules WHERE courseId = 'DESCONHECIDO'");
 
                      db.all("SELECT payload FROM curriculum_data WHERE dataType = 'class'", [], (cErr, cRows) => {
                          let realClassId = targetClassStr;
