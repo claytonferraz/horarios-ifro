@@ -1582,8 +1582,13 @@ export function PortalView({
               {Object.values(mappedSchedules.filter(r => r.teacherId && String(r.teacherId).split(',').includes(String(selectedTeacher || siape)) && r.className === vacantRequestModal.className).reduce((acc, curr) => { 
                   if (!acc[curr.subject]) acc[curr.subject] = { id: curr.disciplineId, name: curr.subject };
                   return acc;
-              }, {})).map(sub => (
-                <option key={sub.id} value={`${sub.id}|${sub.name}`}>{sub.name}</option>
+              }, {})).map((sub, idx) => (
+                <option
+                  key={`vacant-subject-${String(sub.id ?? 'sem-id')}-${sub.name}-${idx}`}
+                  value={`${sub.id}|${sub.name}`}
+                >
+                  {sub.name}
+                </option>
               ))}
             </select>
             <div className="flex gap-3 mt-6">
