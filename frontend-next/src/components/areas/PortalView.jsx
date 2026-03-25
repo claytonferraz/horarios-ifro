@@ -9,7 +9,7 @@ import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd';
 import { SearchableSelect } from '../ui/SearchableSelect';
 import { InlineInput } from '../ui/InlineInput';
 import { ScheduleEditorModal } from '../ui/admin/ScheduleEditorModal';
-import { TeacherExchangeModal } from '../ui/TeacherExchangeModal';
+
 import { TeacherOfferModal } from '../ui/TeacherOfferModal';
 import { TeacherDirectModal } from '../ui/TeacherDirectModal';
 import { ScheduleNotifications } from '../ui/admin/ScheduleNotifications';
@@ -77,7 +77,7 @@ export function PortalView({
   const [vacantRequestModal, setVacantRequestModal] = useState(null);
   const [teacherDirectModal, setTeacherDirectModal] = useState(null);
   const [alertModal, setAlertModal] = useState(null);
-  const [confirmReverseSwapPayload, setConfirmReverseSwapPayload] = useState(null);
+  
 
   React.useEffect(() => {
     if (appMode === 'aluno') {
@@ -123,7 +123,7 @@ export function PortalView({
   const [draggingRecord, setDraggingRecord] = useState(null);
   const [exchangeTarget, setExchangeTarget] = useState(null);
   const [exchangeAction, setExchangeAction] = useState(null);
-  const [pendingReverseTarget, setPendingReverseTarget] = useState(null);
+  
 
   const padraoExchangeRecords = React.useMemo(() => {
     if (!exchangeTarget || !exchangeTarget.targetClass || !schedules) return [];
@@ -1280,15 +1280,9 @@ export function PortalView({
                         isTeacherPending={isTeacherPending}
                         checkPendingSwapRequest={isSlotInvolvedInPendingRequest}
                         setVacantRequestModal={setVacantRequestModal}
-                        setExchangeTarget={setExchangeTarget}
-                        onReverseSwapClick={(rec) => {
-                           if (String(rec.teacher) !== String(selectedTeacher || siape)) {
-                             if (userRole !== 'admin' && userRole !== 'gestao' && !profClassesMemo.has(rec.className)) {
-                                alert('Você só pode interagir com grades e turmas nas quais você já leciona ao menos uma disciplina.');
-                                return;
-                             }
-                             setPendingReverseTarget(rec);
-                           }
+                        setExchangeTarget={(target) => { 
+                           setExchangeTarget(target); 
+                           setExchangeAction('offer'); 
                         }}
                         getColorHash={getColorHash}
                         getFormattedDayLabel={getFormattedDayLabel}
@@ -1323,17 +1317,9 @@ export function PortalView({
                       getFormattedDayLabel={getFormattedDayLabel}
                       onDragEnd={onDragEnd}
                       setEditorModal={setEditorModal}
-                      setExchangeTarget={setExchangeTarget}
-                      checkPendingSwapRequest={isSlotInvolvedInPendingRequest}
-                      siape={siape}
-                      onReverseSwapClick={(rec) => {
-                         if (String(rec.teacher) !== String(selectedTeacher || siape)) {
-                           if (userRole !== 'admin' && userRole !== 'gestao' && !profClassesMemo.has(rec.className)) {
-                              alert('Você só pode interagir com grades e turmas nas quais você já leciona ao menos uma disciplina.');
-                              return;
-                           }
-                           setPendingReverseTarget(rec);
-                         }
+                      setExchangeTarget={(target) => { 
+                         setExchangeTarget(target); 
+                         setExchangeAction('offer'); 
                       }}
                     />
                   )}
@@ -1477,32 +1463,6 @@ export function PortalView({
         </div>
       )}
 
-      {exchangeTarget && !exchangeAction && (
-        <div className="fixed inset-0 z-[200] flex justify-center items-center bg-slate-900/60 backdrop-blur-sm p-4 animate-in fade-in duration-200">
-           <div className={`w-full max-w-sm rounded-2xl shadow-xl border flex flex-col ${isDarkMode ? 'bg-slate-900 border-slate-700' : 'bg-white border-slate-200'}`}>
-              <div className={`p-4 border-b flex items-center justify-between ${isDarkMode ? 'bg-slate-800' : 'bg-slate-50'}`}>
-                 <h3 className="font-black uppercase tracking-widest text-sm text-indigo-500">Ação da Aula</h3>
-                 <button onClick={() => { setExchangeTarget(null); setExchangeAction(null); }} className="p-2 rounded-lg text-slate-400 hover:text-slate-200"><X size={16}/></button>
-              </div>
-              <div className="p-6 space-y-4">
-                 <button onClick={() => setExchangeAction('swap')} className="w-full flex items-center gap-3 p-4 border rounded-xl bg-indigo-50/50 hover:bg-indigo-100 hover:border-indigo-400 !text-indigo-900 transition-all text-left">
-                    <span className="p-2 bg-indigo-500 text-white rounded-lg"><RefreshCcw size={20} /></span>
-                    <div>
-                      <span className="font-black text-sm uppercase block tracking-widest">Trocar com Colega</span>
-                      <span className="text-[10px] opacity-80 font-bold block">Assumir aula de outro professor em troca</span>
-                    </div>
-                 </button>
-                 <button onClick={() => setExchangeAction('offer')} className="w-full flex items-center gap-3 p-4 border rounded-xl bg-rose-50/50 hover:bg-rose-100 hover:border-rose-400 !text-rose-900 transition-all text-left">
-                    <span className="p-2 bg-rose-500 text-white rounded-lg"><HandHeart size={20} /></span>
-                    <div>
-                      <span className="font-black text-sm uppercase block tracking-widest">Disponibilizar (Vaga)</span>
-                      <span className="text-[10px] opacity-80 font-bold block">Gera ausência (livre ou específica)</span>
-                    </div>
-                 </button>
-              </div>
-           </div>
-        </div>
-      )}
 
       {exchangeTarget && exchangeAction === 'offer' && (
         <TeacherOfferModal 
@@ -1520,117 +1480,14 @@ export function PortalView({
           selectedWeek={selectedWeek}
           onSubmit={(payload) => {
             apiClient.submitRequest({ ...payload, requester_id: selectedTeacher }).then(() => {
-              alert('Solicitação enviada!');
+              setAlertModal({ title: 'Tudo Certo!', message: 'Solicitação de disponibilização enviada com sucesso!', type: 'success' });
               fetchRequests();
               setExchangeTarget(null); setExchangeAction(null);
-            }).catch(e => alert(e.message));
+            }).catch(e => {
+              setAlertModal({ title: 'Erro', message: e.message || 'Não foi possível enviar a solicitação.', type: 'error' });
+            });
           }}
         />
-      )}
-
-      {exchangeTarget && exchangeAction === 'swap' && (
-        <TeacherExchangeModal 
-          isOpen={true} 
-          isDarkMode={isDarkMode}
-          onClose={() => { setExchangeTarget(null); setExchangeAction(null); }}
-          originalRecord={exchangeTarget.originalRecord}
-          targetRecord={exchangeTarget.targetRecord}
-          targetClass={exchangeTarget.targetClass}
-          targetCourse={exchangeTarget.targetCourse}
-          classRecords={padraoExchangeRecords}
-          safeDays={safeDays}
-          safeTimes={safeTimes}
-          globalTeachers={globalTeachersList}
-          apiClient={apiClient}
-          selectedWeek={selectedWeek}
-          onSubmit={(payload) => {
-            apiClient.submitRequest(payload).then(() => {
-              alert('Solicitação enviada e está aguardando aceite!');
-              fetchRequests();
-              setExchangeTarget(null); setExchangeAction(null);
-            }).catch(e => alert(e.message));
-          }}
-        />
-      )}
-
-      {pendingReverseTarget && (
-        <div className="fixed inset-0 z-[200] flex justify-center items-center bg-slate-900/60 backdrop-blur-sm p-4 animate-in fade-in duration-200">
-           <div className={`w-full max-w-lg rounded-2xl shadow-xl border flex flex-col ${isDarkMode ? 'bg-slate-900 border-slate-700' : 'bg-white border-slate-200'}`}>
-              <div className={`p-4 border-b flex items-center justify-between ${isDarkMode ? 'bg-slate-800' : 'bg-slate-50'}`}>
-                 <h3 className="font-black uppercase tracking-widest text-sm text-indigo-500">Escolha a Aula para Oferecer</h3>
-                 <button onClick={() => setPendingReverseTarget(null)} className="p-2 rounded-lg text-slate-400 hover:text-slate-200"><X size={16}/></button>
-              </div>
-              <div className="p-6 space-y-4">
-                 <div className={`p-3 rounded-lg border ${isDarkMode ? 'bg-indigo-900/20 border-indigo-800/50' : 'bg-indigo-50 border-indigo-200'} text-xs`}>
-                    <p className="font-black uppercase tracking-widest opacity-80 mb-1">AULA ALVO (Colega)</p>
-                    <p className="font-bold">{pendingReverseTarget.subject} - Turma {pendingReverseTarget.className}</p>
-                    <p className="opacity-80">{pendingReverseTarget.day} às {pendingReverseTarget.time}</p>
-                 </div>
-                 <div>
-                    <label className="block text-[10px] font-black uppercase text-slate-500 mb-2">Qual aula SUA deseja dar em troca?</label>
-                    <select id="reverseSlotSelect" className={`w-full p-3 rounded-xl border text-sm font-bold outline-none ${isDarkMode ? 'bg-slate-950 border-slate-700' : 'bg-white border-slate-200'}`}>
-                       <option value="">Selecione uma de suas aulas...</option>
-                       {mappedSchedules.filter(r => {
-                          const isMyClass = r.teacherId && String(r.teacherId).split(',').includes(String(selectedTeacher || siape));
-                          if (!isMyClass) return false;
-                          
-                          const rTurma = String(r.className || r.classId).toLowerCase().trim();
-                          const targetTurma = String(pendingReverseTarget.className || pendingReverseTarget.classId).toLowerCase().trim();
-                          if (rTurma !== targetTurma) return false;
-                          
-                          if (typeof isSlotInvolvedInPendingRequest === 'function' && isSlotInvolvedInPendingRequest(r)) return false;
-                          
-                          return true;
-                       }).map(r => (
-                          <option key={r.id} value={r.id}>{r.subject} ({r.className}) - {r.day} {r.time}</option>
-                       ))}
-                    </select>
-                 </div>
-                 <div className="flex justify-end gap-3 mt-4">
-                    <button onClick={() => setPendingReverseTarget(null)} className="px-4 py-2 font-bold text-xs">Cancelar</button>
-                    <button 
-                       onClick={() => {
-                          const val = document.getElementById('reverseSlotSelect').value;
-                          if (!val) return alert('Selecione uma aula!');
-                          const selectedClasses = mappedSchedules.filter(r => String(r.id) === String(val));
-                          if (selectedClasses.length === 0) return;
-                          
-                          const originalRecord = selectedClasses[0];
-                          const targetRecord = pendingReverseTarget;
-
-                          const confirmMsg = `Deseja realmente solicitar a troca da sua aula de ${originalRecord.subject} (${originalRecord.day} às ${originalRecord.time}) pela aula de ${targetRecord.subject} (${targetRecord.day} às ${targetRecord.time})?`;
-
-                          const payload = {
-                             action: 'troca',
-                             requester_id: originalRecord.teacherId ? String(originalRecord.teacherId).split(',')[0] : (selectedTeacher || siape),
-                             substitute_id: targetRecord.teacherId ? String(targetRecord.teacherId).split(',')[0] : targetRecord.teacher,
-                             targetClass: targetRecord.className || targetRecord.classId,
-                             week_id: selectedWeek,
-                             reason: `Proposta Direta - Solicitação via Grade`,
-                             obs: `Troca Direta de ${originalRecord.subject} por ${targetRecord.subject}`,
-                             original_slot: { ...originalRecord, classId: originalRecord.classId || originalRecord.className },
-                             proposed_slot: {
-                                day: targetRecord.day,
-                                time: targetRecord.time,
-                                subject: targetRecord.subject,
-                                teacherId: targetRecord.teacherId || targetRecord.teacher,
-                                classId: targetRecord.classId || targetRecord.className,
-                                course: targetRecord.course || originalRecord.course,
-                                originalSubject: originalRecord.subject
-                             }
-                          };
-
-                          setConfirmReverseSwapPayload({ message: confirmMsg, payload });
-                          setPendingReverseTarget(null);
-                       }}
-                       className="px-6 py-2 bg-indigo-600 hover:bg-indigo-500 text-white font-black uppercase tracking-widest rounded-xl text-xs shadow-md transition-all active:scale-95"
-                    >
-                       Continuar Solicitação
-                    </button>
-                 </div>
-              </div>
-           </div>
-        </div>
       )}
 
       {/* MODAL GLOBAL ESTILIZADO PARA FEEDBACKS (Ex: Sessão expirada, Sucesso) */}
@@ -1654,33 +1511,6 @@ export function PortalView({
         </div>
       )}
 
-      {confirmReverseSwapPayload && (
-        <div className="fixed inset-0 z-[99999] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in zoom-in-95 duration-200">
-           <div className={`w-full max-w-sm rounded-3xl shadow-2xl flex flex-col items-center text-center p-6 ${isDarkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'} border`}>
-              <div className="w-16 h-16 rounded-full flex items-center justify-center mb-4 bg-indigo-100 text-indigo-600 shadow-sm border border-indigo-200">
-                 <CheckCircle size={32} />
-              </div>
-              <h3 className={`text-lg font-black mb-2 uppercase tracking-widest ${isDarkMode ? 'text-white' : 'text-slate-900'}`}>Confirmação</h3>
-              <p className={`text-xs mb-6 px-2 leading-relaxed font-semibold ${isDarkMode ? 'text-slate-300' : 'text-slate-600'}`}>{confirmReverseSwapPayload.message}</p>
-              
-              <div className="flex gap-3 w-full">
-                 <button onClick={() => setConfirmReverseSwapPayload(null)} className={`flex-1 py-3 rounded-xl font-bold uppercase tracking-widest text-[10px] transition-all shadow-sm ${isDarkMode ? 'bg-slate-700 text-slate-300 hover:bg-slate-600 border border-slate-600' : 'bg-slate-100 text-slate-500 hover:bg-slate-200 border border-slate-300'}`}>
-                    Rever
-                 </button>
-                 <button onClick={() => {
-                    apiClient.submitRequest(confirmReverseSwapPayload.payload).then(() => {
-                       setAlertModal({ title: 'Sucesso!', message: 'Solicitação de troca enviada ao colega com sucesso!', type: 'success' });
-                       if (typeof fetchRequests === 'function') fetchRequests();
-                       if (typeof loadPendingRequests === 'function') loadPendingRequests();
-                       setConfirmReverseSwapPayload(null);
-                    }).catch(e => setAlertModal({ title: 'Ops!', message: e.message || 'Erro ao comunicar com o servidor.', type: 'error' }));
-                 }} className={`flex-1 py-3 rounded-xl font-black uppercase tracking-widest text-[10px] text-white transition-all shadow-md active:scale-95 bg-indigo-600 hover:bg-indigo-500`}>
-                    Sim, Enviar
-                 </button>
-              </div>
-           </div>
-        </div>
-      )}
       <TeacherDirectModal 
         isOpen={!!teacherDirectModal}
         slotData={teacherDirectModal}
