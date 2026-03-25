@@ -19,6 +19,7 @@ module.exports = function(io) {
     if (scheduleMemCache.has(cacheKey)) {
        const cached = scheduleMemCache.get(cacheKey);
        if (now - cached.timestamp < SCHEDULE_CACHE_TTL_MS) {
+           res.setHeader('Cache-Control', 'no-store, max-age=0');
            return res.json(cached.data);
        }
     }
@@ -87,6 +88,7 @@ module.exports = function(io) {
       });
       
       scheduleMemCache.set(cacheKey, { data: mapped, timestamp: now });
+      res.setHeader('Cache-Control', 'no-store, max-age=0');
       res.json(mapped);
     });
   });
