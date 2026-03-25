@@ -316,10 +316,8 @@ router.put('/:id/status', verifyToken, (req, res) => {
                      console.log(`[EXTRA_ENGINE] HOMOLOGANDO ${classType} PARA SIAPE: ${row.requester_id} na turma ${targetClassStr}`);
 
                      // 1. Auto-Healing Total (O Exterminador de Fantasmas)
-                     // Deleta qualquer aula corrompida que não possua um UUID válido na classId ou que esteja sem curso.
-                     db.run("DELETE FROM schedules WHERE courseId = 'DESCONHECIDO' OR classId NOT LIKE '%-%' OR dayOfWeek IN ('1', '2', '3', '4', '5', '6', 1, 2, 3, 4, 5, 6)", function(err) {
-                         if (this.changes > 0) console.log(`[EXTRA_ENGINE] Auto-Healing: ${this.changes} aulas fantasmas/corrompidas expurgadas do banco.`);
-                     });
+                     // Deleta qualquer aula corrompida que esteja sem curso ou com dia numerico.
+                     db.run("DELETE FROM schedules WHERE courseId = 'DESCONHECIDO' OR dayOfWeek IN ('1', '2', '3', '4', '5', '6', 1, 2, 3, 4, 5, 6)");
 
                      db.all("SELECT payload FROM curriculum_data WHERE dataType = 'class'", [], (cErr, cRows) => {
                          let realClassId = targetClassStr;
@@ -347,8 +345,8 @@ router.put('/:id/status', verifyToken, (req, res) => {
 
                          console.log(`[EXTRA_ENGINE] Resolução: [${targetClassStr}] -> UUID: ${realClassId} | Curso: ${realCourseId}`);
 
-                         // Trava de Segurança: Se não achou o UUID e o Curso PAI, aborta para não sujar a grade!
-                         if (realCourseId === 'DESCONHECIDO' || !realClassId.includes('-')) {
+                         // Trava de Segurança: Se não achou o Curso PAI, aborta para não sujar a grade!
+                         if (realCourseId === 'DESCONHECIDO') {
                              console.error("[EXTRA_ENGINE] ALERTA CRÍTICO: Falha ao resolver o UUID da Turma. Inserção abortada para proteger a integridade da grade.");
                              return res.json({ success: false, error: "Turma não encontrada no banco. Abortado." });
                          }

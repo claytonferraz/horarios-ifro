@@ -140,40 +140,48 @@ export function TeacherDirectModal({
          schedules: newRecordsList
       };
 
-      if (classType === 'Atendimento ao aluno') {
-         await apiClient.saveSingleSchedule(payload);
-         alert("Atendimento lançado e gravado com sucesso na matriz!");
+      const timeRange = selectedTimes.length > 1 
+         ? `${selectedTimes[0].split(' - ')[0]} às ${selectedTimes[selectedTimes.length-1].split(' - ')[1] || selectedTimes[selectedTimes.length-1]}` 
+         : selectedTimes[0];
+         
+      const requestPayload = {
+         action: 'lancamento_extra',
+         siape: String(siape),
+         week_id: String(selectedWeek),
+         description: `Solicito o lançamento de ${classType} na turma ${selectedClass} (${slotData.day})`,
+         original_slot: { day: slotData.day, time: timeRange, subject: selectedSubject, className: selectedClass },
+         proposed_day: slotData.day,
+         proposed_time: timeRange,
+         proposed_type: classType,
+         obs: `Lançamento Extra: ${classType}`,
+         proposed_slot: {
+             classType: classType,
+             subject: selectedSubject,
+             className: selectedClass,
+             day: slotData.day,
+             time: timeRange,
+             slots: newRecordsList, 
+             targetSubject: selectedSubject,
+             classId: selectedClass || "",
+             courseId: slotData.course || "", 
+             academicYear: null,
+             type: targetType
+         }
+      };
+      
+      const response = await apiClient.submitRequest(requestPayload);
+
+      if (response && response.autoApproved) {
+          try {
+              // Dispara o gatilho de execução na rota de status para forçar a inserção na grade
+              await apiClient.updateRequestStatus(response.id, 'aprovada', 'Auto-homologado pelo sistema (Atendimento ao Aluno)');
+              alert('Atendimento registrado e inserido na grade automaticamente!');
+          } catch (autoErr) {
+              console.error("Erro na auto-homologação:", autoErr);
+              alert('O pedido de atendimento foi criado, mas houve uma falha na inserção automática. Comunique ao DAPE.');
+          }
       } else {
-         const timeRange = selectedTimes.length > 1 
-            ? `${selectedTimes[0].split(' - ')[0]} às ${selectedTimes[selectedTimes.length-1].split(' - ')[1] || selectedTimes[selectedTimes.length-1]}` 
-            : selectedTimes[0];
-            
-         const requestPayload = {
-            action: 'lancamento_extra',
-            siape: String(siape),
-            week_id: String(selectedWeek),
-            description: `Solicito o lançamento de ${classType} na turma ${selectedClass} (${slotData.day})`,
-            original_slot: { day: slotData.day, time: timeRange, subject: selectedSubject, className: selectedClass },
-            proposed_day: slotData.day,
-            proposed_time: timeRange,
-            proposed_type: classType,
-            obs: `Lançamento Extra: ${classType}`,
-            proposed_slot: {
-                classType: classType,
-                subject: selectedSubject,
-                className: selectedClass,
-                day: slotData.day,
-                time: timeRange,
-                slots: newRecordsList, 
-                targetSubject: selectedSubject,
-                classId: selectedClass || "",
-                courseId: slotData.course || "", 
-                academicYear: null,
-                type: targetType
-            }
-         };
-         await apiClient.submitRequest(requestPayload);
-         alert(`A solicitação de ${classType} foi enviada com sucesso e aguarda homologação da Gestão!`);
+          alert(`A solicitação de ${classType} foi enviada com sucesso e aguarda homologação da Gestão!`);
       }
       
       onSuccess();
