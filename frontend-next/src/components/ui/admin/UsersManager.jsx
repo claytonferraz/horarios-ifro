@@ -161,14 +161,18 @@ export function UsersManager({ isDarkMode, showConfirm, refreshGlobalTeachers })
          if (typeof window !== 'undefined') localStorage.removeItem('sqlite_mock_teachers');
          const unique = [];
          const names = new Set();
+         const toDelete = [];
          originalTeachers.forEach(t => {
             if (!names.has(t.nome_completo)) {
                names.add(t.nome_completo);
                unique.push(t);
             } else {
-               apiClient.deleteTeacher(t.siape);
+               toDelete.push(t.siape);
             }
          });
+         if (toDelete.length > 0) {
+           await Promise.all(toDelete.map((siape) => apiClient.deleteTeacher(siape)));
+         }
          setTeachers(unique);
          setOriginalTeachers(JSON.parse(JSON.stringify(unique)));
        } catch (e) {
@@ -199,7 +203,12 @@ export function UsersManager({ isDarkMode, showConfirm, refreshGlobalTeachers })
     const newPass = `prof@${currentYear}`;
     showConfirm("Resetar Senha", `Deseja resetar a senha de ${teacher.nome_completo} para '${newPass}'?`, async () => {
       try {
-        await apiClient.saveTeacher({ ...teacher, senha: newPass, exigir_troca_senha: 1 });
+        await apiClient.saveTeacher({
+          ...teacher,
+          atua_como_docente: !!teacher.atua_como_docente,
+          senha: newPass,
+          exigir_troca_senha: 1
+        });
         alert("Senha resetada com sucesso!");
         load();
       } catch(e) {

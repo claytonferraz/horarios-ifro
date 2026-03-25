@@ -7,6 +7,8 @@ const fs = require('fs');
 const path = require('path');
 const { z } = require('zod');
 
+const booleanishSchema = z.union([z.boolean(), z.number().int().min(0).max(1)]);
+
 const teacherSchema = z.object({
   siape: z.string().trim().min(1),
   nome_exibicao: z.string().trim().optional().or(z.literal('')),
@@ -15,7 +17,7 @@ const teacherSchema = z.object({
   senha: z.string().min(8).optional(),
   status: z.string().trim().optional(),
   perfis: z.array(z.string()).optional(),
-  atua_como_docente: z.boolean().optional(),
+  atua_como_docente: booleanishSchema.optional(),
 });
 
 const adminStatusSchema = z.object({
@@ -201,8 +203,24 @@ router.put('/teachers', verifyToken, requireAdmin, async (req, res) => {
     // Se a senha foi alterada via admin, força a flag de exigir_troca_senha para 1. Se não, mantém a atual.
     const exigirTroca = senha ? 1 : (row ? row.exigir_troca_senha : 1);
 
+    if (row) {
+      db.run(
+        `UPDATE users
+         SET nome_exibicao = ?, nome_completo = ?, email = ?, senha_hash = ?, status = ?, perfis = ?, atua_como_docente = ?, exigir_troca_senha = ?
+         WHERE siape = ?`,
+        [nome_exibicao || '', nome_completo, email || null, finalHash, status || 'ativo', perfisStr, atuaDoc, exigirTroca, siape],
+        (err2) => {
+          if (err2) return res.status(500).json({ error: err2.message });
+          io.emit('schedule_updated');
+          res.json({ success: true, siape });
+        }
+      );
+      return;
+    }
+
     db.run(
-      `INSERT OR REPLACE INTO users (siape, nome_exibicao, nome_completo, email, senha_hash, status, perfis, atua_como_docente, exigir_troca_senha) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      `INSERT INTO users (siape, nome_exibicao, nome_completo, email, senha_hash, status, perfis, atua_como_docente, exigir_troca_senha)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [siape, nome_exibicao || '', nome_completo, email || null, finalHash, status || 'ativo', perfisStr, atuaDoc, exigirTroca],
       (err2) => {
         if (err2) return res.status(500).json({ error: err2.message });
@@ -220,7 +238,19 @@ router.post('/teachers/batch', verifyToken, requireAdmin, async (req, res) => {
   db.serialize(() => {
     db.run("BEGIN TRANSACTION");
 
-    const stmtMerge = db.prepare("INSERT OR REPLACE INTO users (siape, nome_exibicao, nome_completo, email, senha_hash, status, perfis, atua_como_docente, exigir_troca_senha) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)");
+    const stmtMerge = db.prepare(`
+      INSERT INTO users (siape, nome_exibicao, nome_completo, email, senha_hash, status, perfis, atua_como_docente, exigir_troca_senha)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ON CONFLICT(siape) DO UPDATE SET
+        nome_exibicao = excluded.nome_exibicao,
+        nome_completo = excluded.nome_completo,
+        email = excluded.email,
+        senha_hash = excluded.senha_hash,
+        status = excluded.status,
+        perfis = excluded.perfis,
+        atua_como_docente = excluded.atua_como_docente,
+        exigir_troca_senha = excluded.exigir_troca_senha
+    `);
     const stmtUpdateSiape = db.prepare("UPDATE users SET siape = ?, nome_exibicao = ?, nome_completo = ?, email = ?, status = ?, perfis = ?, atua_como_docente = ? WHERE siape = ?");
     const stmtCheck = db.prepare("SELECT senha_hash, exigir_troca_senha FROM users WHERE siape = ?");
 

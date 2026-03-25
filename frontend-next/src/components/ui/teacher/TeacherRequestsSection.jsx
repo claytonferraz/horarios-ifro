@@ -9,7 +9,7 @@ export function TeacherRequestsSection({ isDarkMode, siape, selectedWeek, weekDa
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isFloatingOpen, setIsFloatingOpen] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [newRequest, setNewRequest] = useState({ description: '', original_slot: '', proposed_day: '', proposed_time: '', proposed_type: 'Regular' });
+  const [newRequest, setNewRequest] = useState({ description: '', original_slot_id: '', proposed_day: '', proposed_time: '', proposed_type: 'Regular' });
   const [rejectionTarget, setRejectionTarget] = useState(null);
   const [alertModal, setAlertModal] = useState(null);
 
@@ -27,18 +27,43 @@ export function TeacherRequestsSection({ isDarkMode, siape, selectedWeek, weekDa
     if (siape) loadRequests();
   }, [siape, propRequests]);
 
+  const getSlotKey = (slot) => String(slot?.id || `${slot?.day}|${slot?.time}|${slot?.className}|${slot?.subject || ''}`);
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
     try {
+      const selectedOriginal = (weekData || []).find((slot) => getSlotKey(slot) === String(newRequest.original_slot_id));
+      if (!selectedOriginal) {
+        throw new Error('Selecione uma aula original válida.');
+      }
+
+      const resolvedClassId = selectedOriginal.classId || selectedOriginal.raw?.classId || selectedOriginal.className;
+      const originalSlotPayload = {
+        day: selectedOriginal.day,
+        time: selectedOriginal.time,
+        className: selectedOriginal.className,
+        classId: resolvedClassId,
+        subject: selectedOriginal.subject,
+        teacherId: selectedOriginal.teacherId || siape
+      };
+
       await apiClient.submitRequest({
-        siape,
+        action: 'troca',
         week_id: selectedWeek,
         description: newRequest.description,
-        original_slot: newRequest.original_slot,
-        proposed_slot: { day: newRequest.proposed_day, time: newRequest.proposed_time, classType: newRequest.proposed_type }
+        targetClass: selectedOriginal.className,
+        original_slot: originalSlotPayload,
+        proposed_slot: {
+          day: newRequest.proposed_day,
+          time: newRequest.proposed_time,
+          classType: newRequest.proposed_type,
+          className: selectedOriginal.className,
+          classId: resolvedClassId,
+          subject: selectedOriginal.subject
+        }
       });
-      setNewRequest({ description: '', original_slot: '', proposed_day: '', proposed_time: '', proposed_type: 'Regular' });
+      setNewRequest({ description: '', original_slot_id: '', proposed_day: '', proposed_time: '', proposed_type: 'Regular' });
       setIsModalOpen(false);
       loadRequests();
     } catch (err) {
@@ -325,12 +350,12 @@ export function TeacherRequestsSection({ isDarkMode, siape, selectedWeek, weekDa
                   <select 
                     required
                     className={`w-full p-3.5 rounded-xl border text-xs font-bold focus:ring-2 focus:ring-indigo-500 transition-all outline-none ${isDarkMode ? 'bg-slate-950 border-slate-700 text-white' : 'bg-white border-slate-200 text-slate-900'}`}
-                    value={newRequest.original_slot}
-                    onChange={e => setNewRequest({...newRequest, original_slot: e.target.value})}
+                    value={newRequest.original_slot_id}
+                    onChange={e => setNewRequest({...newRequest, original_slot_id: e.target.value})}
                   >
                      <option value="">Selecione a aula atual</option>
                      {weekData.map(r => (
-                        <option key={r.id} value={`${r.day} ${r.time} - ${r.className} (${r.subject})`}>
+                        <option key={getSlotKey(r)} value={getSlotKey(r)}>
                            {r.day} {r.time} | Turma: {r.className} | {r.subject}
                         </option>
                      ))}
