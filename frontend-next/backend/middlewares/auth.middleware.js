@@ -4,10 +4,16 @@ require('dotenv').config();
 const JWT_SECRET = process.env.JWT_SECRET || 'SUA_CHAVE_SECRETA_AQUI_MUITO_SEGURA_2026';
 
 const verifyToken = (req, res, next) => {
+  let token = null;
   const bearerHeader = req.headers['authorization'];
-  if (!bearerHeader) return res.status(403).json({ error: 'Acesso negado.' });
   
-  const token = bearerHeader.split(' ')[1];
+  if (bearerHeader) {
+    token = bearerHeader.split(' ')[1];
+  } else if (req.query.token) {
+    token = req.query.token;
+  }
+
+  if (!token) return res.status(403).json({ error: 'Acesso negado.' });
   jwt.verify(token, JWT_SECRET, (err, decoded) => {
     if (err) return res.status(401).json({ error: 'Sessão expirada.' });
     req.userId = decoded.id;
