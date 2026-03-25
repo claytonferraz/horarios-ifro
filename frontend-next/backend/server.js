@@ -434,7 +434,6 @@ const requestsRoutes = require('./routes/requests.routes')(io);
 app.use('/api/academic-weeks', configRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/requests', requestsRoutes);
-app.use('/api/teachers', adminRoutes); // fallback for /api/teachers/:siape/admin-status
 
 const PORT = process.env.PORT || 3012;
 server.listen(PORT, () => console.log(`Backend rodando com alta performance na porta ${PORT}`));

@@ -32,7 +32,7 @@ import { Calendar, Upload, Clock, BookOpen, Users, ChevronDown, FileText, AlertC
 // ==========================================
 // FUNÇÕES UTILITÁRIAS GLOBAIS
 // ==========================================
-import { DAYS, MAP_DAYS, getWeekBoundaries, isDatePastOrToday, isTeacherPending, getColorHash, isCurrentWeek, isNextWeek, isFutureWeek, isCurrentOrNextWeek, parseRecordDate } from "@/lib/dates";
+import { isTeacherPending, getColorHash } from "@/lib/dates";
 // ==========================================
 // APLICAÇÃO PRINCIPAL
 // ==========================================

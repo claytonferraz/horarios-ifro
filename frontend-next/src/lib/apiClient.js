@@ -364,7 +364,7 @@ export const apiClient = {
 
   async updateAdminStatus(siape, is_admin) {
     try {
-      const res = await fetch(`${API_URL}/teachers/${siape}/admin-status`, {
+      const res = await fetch(`${API_URL}/admin/teachers/${siape}/admin-status`, {
         method: 'PUT',
         headers: getHeaders(),
         body: JSON.stringify({ is_admin })
