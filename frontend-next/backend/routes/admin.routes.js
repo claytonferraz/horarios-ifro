@@ -264,9 +264,14 @@ router.post('/teachers/batch', verifyToken, requireAdmin, async (req, res) => {
     (async () => {
       try {
         for (const item of users) await processItem(item);
-        db.run("COMMIT");
-        io.emit('schedule_updated');
-        res.json({ success: true, count: users.length });
+        db.run("COMMIT", (commitErr) => {
+          if (commitErr) {
+            db.run("ROLLBACK");
+            return res.status(500).json({ error: commitErr.message });
+          }
+          io.emit('schedule_updated');
+          return res.json({ success: true, count: users.length });
+        });
       } catch (err) {
         db.run("ROLLBACK");
         res.status(500).json({ error: err.message });

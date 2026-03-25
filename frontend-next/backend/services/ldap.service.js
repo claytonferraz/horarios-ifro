@@ -15,10 +15,10 @@ async function authenticateLDAP(username, password) {
 
   try {
     await client.bind(bindDN, password);
-    console.log(`[LDAP] Autenticacao bem-sucedida para: ${bindDN}`);
+    console.log('[LDAP] Autenticacao bem-sucedida.');
     return true;
   } catch (err) {
-    console.warn(`[LDAP] Falha de autenticacao para: ${bindDN}`);
+    console.warn('[LDAP] Falha de autenticacao.');
     if (err && err.message) {
       console.error('[LDAP] Detalhe do erro:', err.message);
     }

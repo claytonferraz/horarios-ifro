@@ -227,7 +227,7 @@ router.post('/', verifyToken, async (req, res) => {
                          }
 
                          if (realCourseId !== 'DESCONHECIDO') {
-                             console.log("[POST] timesToProcess: ", timesToProcess, " realCourseId: ", realCourseId, " targetClassStr: ", targetClassStr); timesToProcess.forEach(timeStr => {
+                             timesToProcess.forEach(timeStr => {
                                  const cleanSubject = subject.replace(/\[Aguardando\]\s*/g, '').trim();
                                  const patchData = JSON.stringify({ classType: propClassType, isExtra: true, isPending: true, requestId: insertedId, subject: cleanSubject });
                                  const pendingDiscipline = `[Aguardando] ${cleanSubject}`;
@@ -324,12 +324,13 @@ router.put('/:id/status', verifyToken, (req, res) => {
         res.json({ success: true });
 
       } else if (status === 'rejeitado') {
-         db.get("SELECT requester_id, action_type FROM exchange_requests WHERE id = ?", [req.params.id], (err2, row) => {
+         return db.get("SELECT requester_id, action_type FROM exchange_requests WHERE id = ?", [req.params.id], (err2, row) => {
             if (!err2 && row && row.requester_id) {
                const notifyRejection = () => {
                    const now = new Date().toISOString();
                    db.run("INSERT INTO notifications (type, target, title, message, createdAt) VALUES ('SYSTEM', ?, 'Solicitação Recusada', 'A sua solicitação foi recusada pela gestão. O horário foi libertado.', ?)", [row.requester_id, now], function(){
                        io.emit('schedule_updated');
+                       return res.json({ success: true });
                    });
                };
 
@@ -347,9 +348,10 @@ router.put('/:id/status', verifyToken, (req, res) => {
                } else {
                    notifyRejection();
                }
+            } else {
+              return res.json({ success: true });
             }
          });
-         res.json({ success: true });
 
       } else if (/aprovad[oa]|homologado/i.test(status)) {
          // MOTOR DE TROCA (SWAP ENGINE) V2 - Execução Homologada
@@ -389,13 +391,7 @@ router.put('/:id/status', verifyToken, (req, res) => {
                          const origTargetClass = classMapping[origClassStr] || origClassStr;
                          const propTargetClass = classMapping[propClassStr] || propClassStr;
 
-                         console.log("\n[SWAP_ENGINE] ==============================================");
-                         console.log("[SWAP_ENGINE] INICIANDO HOMOLOGAÇÃO / SWAP CRUZADO IDREQ:", req.params.id);
-                         console.log(`[SWAP_ENGINE] NÓ ORIGEM  -> SIApE (A): ${row.requester_id} entregando ${orig.subject} [${orig.day} ${orig.time}] - T: ${origTargetClass}`);
-                         console.log(`[SWAP_ENGINE] NÓ OBJETIVO-> SIApE (B): ${row.substitute_id} receiving ${prop.subject} [${prop.day} ${prop.time}] - T: ${propTargetClass}`);
-
                          db.serialize(() => {
-                             console.log("[SWAP_ENGINE] > BEGIN TRANSACTION");
                              db.run("BEGIN TRANSACTION;");
 
                              // AULA 1 (A passa para B) -> Update Original Node
@@ -416,9 +412,6 @@ router.put('/:id/status', verifyToken, (req, res) => {
                                      db.run("ROLLBACK;");
                                      res.status(500).json({ error: "Erro na integridade da Transação" });
                                  } else {
-                                     console.log("[SWAP_ENGINE] > COMMIT REALIZADO COM SUCESSO. GRADE MUTADA DE FORMA SEGURA.");
-                                     console.log("[SWAP_ENGINE] ==============================================\n");
-                                     
                                      const notifyTitle = 'Sua Permuta de Aulas foi Efetivada na Grade';
                                      const notifyMsg = `A troca envolvendo suas aulas de ${orig.subject} (${orig.day}) e ${prop.subject} (${prop.day}) acaba de ser homologada oficialmente.`;
                                      db.run("INSERT INTO notifications (type, target, title, message, createdAt) VALUES ('SYSTEM', ?, ?, ?, ?)", [row.requester_id, notifyTitle, notifyMsg, now], function(){});
@@ -502,11 +495,6 @@ router.put('/:id/status', verifyToken, (req, res) => {
                      const dayStr = propData.day || row.original_day; // Usando a string literal
                      const targetClassStr = propData.classId || propData.className || row.target_class;
 
-                     console.log(`[EXTRA_ENGINE] HOMOLOGANDO ${classType} PARA SIAPE: ${row.requester_id} na turma ${targetClassStr}`);
-
-                     // 1. Limpeza de slots sem curso associado
-                     db.run("DELETE FROM schedules WHERE courseId = 'DESCONHECIDO'");
-
                      db.all("SELECT payload FROM curriculum_data WHERE dataType = 'class'", [], (cErr, cRows) => {
                          let realClassId = targetClassStr;
                          let realCourseId = 'DESCONHECIDO';
@@ -531,19 +519,17 @@ router.put('/:id/status', verifyToken, (req, res) => {
                              });
                          }
 
-                         console.log(`[EXTRA_ENGINE] Resolução: [${targetClassStr}] -> UUID: ${realClassId} | Curso: ${realCourseId}`);
-
                          // Trava de Segurança: Se não achou o Curso PAI, aborta para não sujar a grade!
                          if (realCourseId === 'DESCONHECIDO') {
                              console.error("[EXTRA_ENGINE] ALERTA CRÍTICO: Falha ao resolver o UUID da Turma. Inserção abortada para proteger a integridade da grade.");
-                             return res.json({ success: false, error: "Turma não encontrada no banco. Abortado." });
+                             return res.status(400).json({ success: false, error: "Turma não encontrada no banco. Abortado." });
                          }
 
                          db.serialize(() => {
                              db.run("BEGIN TRANSACTION;");
                              let hasError = false;
 
-                             console.log("[POST] timesToProcess: ", timesToProcess, " realCourseId: ", realCourseId, " targetClassStr: ", targetClassStr); timesToProcess.forEach(timeStr => {
+                             timesToProcess.forEach(timeStr => {
                                  const patchData = JSON.stringify({ classType: classType, isExtra: true, isPending: false, subject: targetSubject });
                                  
                                  // Tenta UPDATE usando a string exata (dayStr)

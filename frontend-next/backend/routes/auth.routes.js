@@ -77,7 +77,7 @@ router.post('/setup', async (req, res) => {
 router.post('/login', (req, res) => {
   try {
     const { username, password } = authSchema.parse(req.body);
-    console.log("Tentativa de login para:", username);
+    console.log("Tentativa de login recebida.");
     
     db.get("SELECT * FROM users WHERE email = ? OR siape = ?", [username, username], async (err, user) => {
       if (err) {
@@ -87,7 +87,7 @@ router.post('/login', (req, res) => {
 
       // BLOQUEIO DE AUTORIZACAO: O utilizador tem de estar pre-registado na BD local
       if (!user) {
-        console.log("Usuario nao encontrado na BD local:", username);
+        console.warn("Tentativa de login para usuário não registrado.");
         return res.status(401).json({ error: "Acesso Negado: O seu SIAPE nao esta registado no sistema de horarios." });
       }
 
@@ -101,11 +101,11 @@ router.post('/login', (req, res) => {
 
         // 2. FALLBACK PARA BASE DE DADOS LOCAL
         if (!isValid) {
-          console.log(`[AUTH] LDAP falhou ou nao configurado. Tentando fallback local para: ${username}`);
+          console.log("[AUTH] LDAP indisponível ou credencial inválida. Usando fallback local.");
           if (user.senha_hash && /^\$2[aby]\$/.test(user.senha_hash)) {
             isValid = await bcrypt.compare(password, user.senha_hash);
           } else {
-            console.warn(`[AUTH] Senha local legada bloqueada para: ${username}`);
+            console.warn("[AUTH] Senha local legada bloqueada.");
             isValid = false;
           }
         }
@@ -115,7 +115,7 @@ router.post('/login', (req, res) => {
         const accessContext = buildAccessContext(user);
         const token = jwt.sign({ id: user.siape, role: accessContext.role }, JWT_SECRET, { expiresIn: '12h' });
         
-        console.log("Login bem sucedido:", user.siape);
+        console.log("Login bem sucedido.");
         res.json({
           token,
           role: accessContext.role,

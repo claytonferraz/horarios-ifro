@@ -169,6 +169,7 @@ module.exports = function(io) {
         let params = weekId ? [type, weekId] : [type];
         
         db.all(`SELECT * FROM schedules WHERE courseId IN (${placeholders}) AND ${condStr}`, [...coursesToClear, ...params], (errOld, oldRows) => {
+          if (errOld) return res.status(500).json({ error: errOld.message });
           let involvedTeachers = new Set();
           if (type === 'previa') {
             involvedTeachers.add('ALL_PROF');
@@ -196,6 +197,7 @@ module.exports = function(io) {
             }
 
             const stmt = db.prepare("INSERT INTO schedules (id, courseId, academic_year, classId, dayOfWeek, slotId, teacherId, disciplineId, room, type, week_id, updatedAt, records) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
+            let statementError = null;
             for (const slot of schedules) {
               const id = `s_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
               const targetCourse = slot.courseId || coursesToClear[0];
@@ -221,9 +223,13 @@ module.exports = function(io) {
                     isExtra: slot.isExtra !== undefined ? slot.isExtra : (oldRecordsObj.isExtra || false)
                  });
               }
-              stmt.run([id, targetCourse, academicYear || null, slot.classId, slot.dayOfWeek, slot.slotId, slot.teacherId, slot.disciplineId || null, slot.room || null, type, weekId || null, now, recordsJSON]);
+              stmt.run([id, targetCourse, academicYear || null, slot.classId, slot.dayOfWeek, slot.slotId, slot.teacherId, slot.disciplineId || null, slot.room || null, type, weekId || null, now, recordsJSON], (stmtErr) => {
+                if (stmtErr && !statementError) statementError = stmtErr;
+              });
             }
-            stmt.finalize();
+            stmt.finalize((finalizeErr) => {
+              if (finalizeErr && !statementError) statementError = finalizeErr;
+            });
 
             involvedTeachers.forEach(t => {
               const targetWeekDesc = req.body.weekLabel || `da Semana ${weekId || ''}`;
@@ -233,7 +239,10 @@ module.exports = function(io) {
             });
 
             db.run("COMMIT", (errCommit) => {
-              if (errCommit) return res.status(500).json({ error: errCommit.message });
+              if (errCommit || statementError) {
+                db.run("ROLLBACK");
+                return res.status(500).json({ error: (statementError || errCommit).message });
+              }
               io.emit('schedule_updated');
               res.json({ success: true, message: 'Grades gravadas com sucesso!' });
             });
@@ -271,6 +280,7 @@ module.exports = function(io) {
          db.serialize(() => {
            db.run("BEGIN TRANSACTION");
            const stmt = db.prepare("INSERT OR REPLACE INTO schedules (id, courseId, academic_year, classId, dayOfWeek, slotId, teacherId, disciplineId, room, type, week_id, updatedAt, records) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
+           let statementError = null;
            
            for (const slot of schedules) {
              const id = slot.id || `s_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
@@ -295,12 +305,19 @@ module.exports = function(io) {
                  realYr = classMapping[slot.classId].ay || academicYear || null;
              }
 
-             stmt.run([id, realCourse, realYr, realClass, slot.dayOfWeek, slot.slotId, slot.teacherId, slot.disciplineId || null, slot.room || null, type, weekId || null, now, recordsJSON]);
+             stmt.run([id, realCourse, realYr, realClass, slot.dayOfWeek, slot.slotId, slot.teacherId, slot.disciplineId || null, slot.room || null, type, weekId || null, now, recordsJSON], (stmtErr) => {
+               if (stmtErr && !statementError) statementError = stmtErr;
+             });
            }
-           stmt.finalize();
+           stmt.finalize((finalizeErr) => {
+             if (finalizeErr && !statementError) statementError = finalizeErr;
+           });
 
            db.run("COMMIT", (errCommit) => {
-             if (errCommit) return res.status(500).json({ error: errCommit.message });
+             if (errCommit || statementError) {
+               db.run("ROLLBACK");
+               return res.status(500).json({ error: (statementError || errCommit).message });
+             }
              io.emit('schedule_updated');
              res.json({ success: true, message: 'Lançamentos individuais gravados com sucesso!' });
            });
@@ -337,7 +354,10 @@ module.exports = function(io) {
               db.run(`DELETE FROM schedules WHERE courseId IN (${placeholders}) AND type = ? AND (academic_year = ? OR academic_year IS NULL) AND (week_id IS NULL OR week_id = '')`, [...courseIds, type, academicYear || '']);
           }
           db.run("COMMIT", (err) => {
-            if (err) return res.status(500).json({ error: err.message });
+            if (err) {
+              db.run("ROLLBACK");
+              return res.status(500).json({ error: err.message });
+            }
             res.json({ success: true, message: 'Matrizes limpas com sucesso!' });
           });
       });
