@@ -380,9 +380,9 @@ router.put('/:id/status', verifyToken, (req, res) => {
                      console.warn("[SWAP_ENGINE] Falha ao parsear JSON payload. Requisição Legada. Pulando motor.", jsonErr);
                      io.emit('schedule_updated');
                      res.json({ success: true, homologacaoStatus: 'MANUAL_LEGADO' });
-                 }
-          const dayMap = { 'Domingo': '0', 'Segunda-feira': '1', 'Terça-feira': '2', 'Quarta-feira': '3', 'Quinta-feira': '4', 'Sexta-feira': '5', 'Sábado': '6' };
+                  }
               } else if (!err3 && row && (row.action_type === 'vaga' || row.action_type === 'oferta_vaga')) {
+                  const dayMap = { 'Domingo': '0', 'Segunda-feira': '1', 'Terça-feira': '2', 'Quarta-feira': '3', 'Quinta-feira': '4', 'Sexta-feira': '5', 'Sábado': '6' };
                   try {
                       const propData = JSON.parse(row.proposed_slot || '{}');
                       const weekId = row.return_week || null;

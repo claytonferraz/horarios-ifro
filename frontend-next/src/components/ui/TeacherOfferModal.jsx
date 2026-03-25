@@ -4,7 +4,7 @@ import { resolveTeacherName } from '@/lib/dates';
 
 export function TeacherOfferModal({
   isOpen, onClose, isDarkMode, 
-  originalRecord, targetClass, classRecords = [], 
+  originalRecord, targetClass, targetCourse, classRecords = [], 
   safeDays = [], safeTimes = [], globalTeachers = [],
   apiClient, selectedWeek, onSubmit
 }) {
@@ -84,6 +84,7 @@ export function TeacherOfferModal({
            slots: consecutiveSlots,
             subject: selectedDiscipline === 'ALL' ? 'Livre' : selectedDiscipline,
             className: targetClass,
+            course: originalRecord.course || targetCourse || '',
             classId: consecutiveSlots[0]?.classId || targetClass
          }
       };

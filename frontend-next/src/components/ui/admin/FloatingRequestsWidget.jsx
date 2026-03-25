@@ -277,6 +277,17 @@ function ChatItem({ req, isDarkMode, loadingId, handleUpdate, globalTeachers, ra
            </div>
          </div>
        );
+    } else if (pP && req.action_type === 'oferta_vaga') {
+        const subj = pP.subject || pP.targetSubject || req.subject || 'Aula';
+        const clName = pP.className || pP.classId || req.target_class || '';
+        const day = pP.day || pP.originalDay || req.original_day || '';
+        const time = pP.time || pP.originalTime || req.original_time || '';
+        const course = pP.course || '';
+        descUI = (
+          <p className={`leading-relaxed font-bold ${isDarkMode ? 'text-slate-200' : 'text-slate-800'}`}>
+            {`Mudança de ${subj}${course ? ' - ' + course : ''} ${clName} para ${day} às ${time}, PARA AULA VAGA`}
+          </p>
+        );
     } else if (pP) {
         const labelText = resolveLabel(pP);
         descUI = <p className={`leading-relaxed ${isDarkMode ? 'text-slate-200' : 'text-slate-800'}`}>{`Mudança / Vaga: ${labelText} para ${pP.day || pP.originalDay || ''} às ${pP.time || pP.originalTime || ''}.`}</p>;
@@ -293,16 +304,22 @@ function ChatItem({ req, isDarkMode, loadingId, handleUpdate, globalTeachers, ra
         </div>
         
         <div className="flex-1 flex flex-col justify-center gap-2">
-           {descUI}
-           
-           {req.admin_feedback && !isPending && (
-             <div className={`p-2 rounded-lg text-xs italic ${isDarkMode ? 'bg-black/20 text-slate-400' : 'bg-black/5 text-slate-600'}`}>
-               &quot;{req.admin_feedback}&quot;
-             </div>
-           )}
+            {descUI}
+            
+            {req.admin_feedback && !isPending && (
+              <div className={`p-2 rounded-lg text-xs italic ${isDarkMode ? 'bg-black/20 text-slate-400' : 'bg-black/5 text-slate-600'}`}>
+                &quot;{req.admin_feedback}&quot;
+              </div>
+            )}
 
-           {isPending && !isRejecting && (
-             <div className="flex flex-col sm:flex-row gap-2 mt-1">
+            {!isPending && (req.status === 'aprovado' || req.status === 'approved') && (
+              <div className={`text-[9px] font-black uppercase tracking-widest px-2 py-1 rounded border border-emerald-500/30 ${isDarkMode ? 'text-emerald-400 bg-emerald-500/10' : 'text-emerald-700 bg-emerald-100'}`}>
+                 Aprovado pelo Gestor {resolveTeacherName(req.approved_by, globalTeachers) || 'DAPE'} em: {new Date(req.updated_at || req.created_at || req.createdAt).toLocaleString()}
+              </div>
+            )}
+
+            {isPending && !isRejecting && (
+              <div className="flex flex-col sm:flex-row gap-2 mt-1">
                <button 
                  onClick={() => handleUpdate(req.id, 'aprovado', 'Aprovado')}
                  disabled={loadingId === req.id}
