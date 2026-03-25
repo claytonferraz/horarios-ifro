@@ -55,7 +55,7 @@ export function PublicHome({ isDarkMode, navigateTo }) {
             <Settings size={44} />
           </div>
           <h3 className={`text-2xl font-black mb-2 ${isDarkMode ? 'text-white' : 'text-slate-800'}`}>Administração</h3>
-          <p className={`text-sm font-medium ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>Faça upload de CSVs e gerencie o banco de dados institucional.</p>
+          <p className={`text-sm font-medium ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>Gestão de horários, permutas e base de dados institucional.</p>
         </button>
       </div>
     </div>

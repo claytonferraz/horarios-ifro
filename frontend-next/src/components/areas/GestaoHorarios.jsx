@@ -2,7 +2,7 @@ import React from 'react';
 import { 
   Upload, Link as LinkIcon, FileText, Trash2,
   MessageSquare, Clock, CheckCircle2, XCircle, Send, AlertCircle,
-  Database, ClipboardList, Settings
+  Database, ClipboardList, Settings, Home, Calendar
 } from 'lucide-react';
 import { MasterGrid } from '../ui/admin/MasterGrid';
 import { AdminStatsPanel } from '../ui/AdminStatsPanel';
@@ -50,17 +50,22 @@ export function GestaoHorarios({
         {/* BARRA DE NAVEGAÇÃO INTERNA ADMIN (REFINADA) */}
         <div className={`flex flex-wrap items-center gap-2 p-1.5 rounded-xl shadow-inner w-full mb-4 print:hidden ${isDarkMode ? 'bg-slate-900' : 'bg-slate-100'}`}>
           
+          <button onClick={() => setAdminTab('dashboard')} 
+                  className={`px-6 py-3 rounded-lg text-[11px] font-black uppercase tracking-widest transition-all flex items-center gap-2 ${adminTab === 'dashboard' ? 'bg-slate-700 text-white shadow-lg' : (isDarkMode ? 'bg-slate-800 text-slate-300 hover:text-white hover:bg-slate-700' : 'bg-white text-slate-600 hover:text-slate-900 border border-slate-200 hover:bg-slate-100')}`}>
+            <Home size={16} /> Painel Administrador
+          </button>
+
           {/* DESTAQUES (MASTER GRID & SOLICITAÇÕES) */}
           {['admin','gestao'].includes(userRole) && (
             <button onClick={() => { setAdminTab('master_grid'); props.setScheduleMode('previa'); props.setViewMode('curso'); }} 
-                    className={`flex-1 sm:flex-none min-w-[200px] flex items-center justify-center gap-2 px-6 py-3 rounded-lg text-[11px] font-black uppercase tracking-widest transition-all ${adminTab === 'master_grid' ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-900/40 ring-2 ring-indigo-400/50' : (isDarkMode ? 'bg-slate-800 text-slate-300 hover:text-white hover:bg-slate-700' : 'bg-white text-slate-600 hover:text-slate-900 border border-slate-200')}`}>
+                    className={`flex-1 sm:flex-none min-w-[150px] flex items-center justify-center gap-2 px-6 py-3 rounded-lg text-[11px] font-black uppercase tracking-widest transition-all ${adminTab === 'master_grid' ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-900/40 ring-2 ring-indigo-400/50' : (isDarkMode ? 'bg-slate-800 text-slate-300 hover:text-white hover:bg-slate-700' : 'bg-white text-slate-600 hover:text-slate-900 border border-slate-200 hover:bg-slate-100')}`}>
               <CalendarDays size={16} /> Montar Horário
             </button>
           )}
           
           {['admin','gestao'].includes(userRole) && (
              <button onClick={() => setAdminTab('solicitacoes')} 
-                     className={`flex-1 sm:flex-none min-w-[200px] flex items-center justify-center gap-2 px-6 py-3 rounded-lg text-[11px] font-black uppercase tracking-widest transition-all ${adminTab === 'solicitacoes' ? 'bg-rose-600 text-white shadow-lg shadow-rose-900/40 ring-2 ring-rose-400/50' : (isDarkMode ? 'bg-slate-800 text-slate-300 hover:text-white hover:bg-slate-700' : 'bg-white text-slate-600 hover:text-slate-900 border border-slate-200')}`}>
+                     className={`flex-1 sm:flex-none min-w-[150px] flex items-center justify-center gap-2 px-6 py-3 rounded-lg text-[11px] font-black uppercase tracking-widest transition-all ${adminTab === 'solicitacoes' ? 'bg-rose-600 text-white shadow-lg shadow-rose-900/40 ring-2 ring-rose-400/50' : (isDarkMode ? 'bg-slate-800 text-slate-300 hover:text-white hover:bg-slate-700' : 'bg-white text-slate-600 hover:text-slate-900 border border-slate-200 hover:bg-slate-100')}`}>
                <MessageSquare size={16} /> Solicitações
              </button>
           )}
@@ -103,111 +108,68 @@ export function GestaoHorarios({
           </div>
         )}
 
-        {/* ABA 1: PLANILHAS */}
-        {adminTab === 'planilhas' && (
-          <div className="space-y-4">
-            <div className={`p-8 text-center rounded-2xl border ${isDarkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'}`}>
-              <Database size={48} className="mx-auto mb-4 text-slate-400 opacity-50" />
-              <h3 className="text-lg font-black uppercase tracking-widest text-slate-500 mb-2">Módulo Inativo</h3>
-              <p className="text-sm text-slate-400 font-bold max-w-md mx-auto">O módulo de Gestão de Planilhas via CSV foi desativado. Utilize a nova Gestão de Matriz.</p>
-            </div>
-            
-            {/* TODO: Módulo de Gestão de Planilhas inativado. Dados preservados para migração futura. */}
-            {/*
-            <div className={`rounded-2xl shadow-sm border overflow-hidden ${isDarkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'}`}>
-              <div className={`text-white px-6 py-4 flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4 border-b ${isDarkMode ? 'bg-slate-950 border-slate-800' : 'bg-slate-900 border-slate-800'}`}>
-                <div className="flex items-center gap-3">
-                  <Database size={18} className="text-indigo-400" />
-                  <h2 className="font-black text-xs uppercase tracking-[0.2em]">Gestão de Planilhas</h2>
-                  <span className="bg-indigo-600 text-white text-[9px] px-2 py-0.5 rounded-full font-black tracking-widest uppercase ml-2">{dbSummary.length} Envios</span>
-                </div>
-                
-                <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 w-full lg:w-auto">
-                  <div className="flex items-center bg-slate-800 p-1 rounded-lg border border-slate-700 w-full sm:w-auto">
-                    <button onClick={() => setUploadType('padrao')} className={`flex-1 sm:flex-none px-3 py-1.5 rounded-md text-[9px] font-black uppercase tracking-widest transition-all ${uploadType === 'padrao' ? 'bg-blue-500 text-white shadow-sm' : 'text-slate-400 hover:text-slate-200'}`}>Padrão Anual</button>
-                    <button onClick={() => setUploadType('oficial')} className={`flex-1 sm:flex-none px-3 py-1.5 rounded-md text-[9px] font-black uppercase tracking-widest transition-all ${uploadType === 'oficial' ? 'bg-emerald-500 text-white shadow-sm' : 'text-slate-400 hover:text-slate-200'}`}>Oficial</button>
-                    <button onClick={() => setUploadType('previa')} className={`flex-1 sm:flex-none px-3 py-1.5 rounded-md text-[9px] font-black uppercase tracking-widest transition-all ${uploadType === 'previa' ? 'bg-violet-500 text-white shadow-sm' : 'text-slate-400 hover:text-slate-200'}`}>Prévia</button>
-                  </div>
+        {/* DASHBOARD INICIAL ADMIN - CARDS ELEGANTES */}
+        {adminTab === 'dashboard' && (
+           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 animate-in fade-in zoom-in duration-500">
+             
+             {/* Card 1: Montar Horário */}
+             {['admin','gestao'].includes(userRole) && (
+               <button onClick={() => { setAdminTab('master_grid'); props.setScheduleMode('previa'); props.setViewMode('curso'); }} 
+                       className={`group p-8 rounded-[2.5rem] border text-left transition-all hover:scale-[1.02] active:scale-95 ${isDarkMode ? 'bg-slate-800 border-slate-700 hover:border-indigo-500/50 hover:shadow-2xl hover:shadow-indigo-500/10' : 'bg-white border-slate-200 hover:border-indigo-300 hover:shadow-2xl hover:shadow-indigo-500/5'}`}>
+                 <div className={`w-14 h-14 rounded-2xl flex items-center justify-center mb-6 transition-colors ${isDarkMode ? 'bg-indigo-950 text-indigo-400 group-hover:bg-indigo-600 group-hover:text-white' : 'bg-indigo-50 text-indigo-600 group-hover:bg-indigo-600 group-hover:text-white'}`}>
+                   <CalendarDays size={28} />
+                 </div>
+                 <h3 className={`text-xl font-black mb-2 ${isDarkMode ? 'text-white' : 'text-slate-800'}`}>Montar Horário</h3>
+                 <p className={`text-sm font-medium ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>Gestão dinâmica de turmas e salas. Arraste e solte para organizar a grade de aulas e ambientes.</p>
+               </button>
+             )}
 
-                  <button 
-                    onClick={() => addInputRef.current.click()}
-                    className={`flex justify-center items-center gap-2 text-white px-4 py-2 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all shadow-sm active:scale-95 w-full sm:w-auto ${uploadType === 'previa' ? 'bg-violet-600 hover:bg-violet-700 shadow-violet-900/20' : uploadType === 'padrao' ? 'bg-blue-600 hover:bg-blue-700 shadow-blue-900/20' : 'bg-emerald-600 hover:bg-emerald-700 shadow-emerald-900/20'}`}
-                  >
-                    <Upload size={14} /> Enviar Arquivo
-                  </button>
+             {/* Card 2: Solicitações */}
+             {['admin','gestao'].includes(userRole) && (
+               <button onClick={() => setAdminTab('solicitacoes')} 
+                       className={`group p-8 rounded-[2.5rem] border text-left transition-all hover:scale-[1.02] active:scale-95 ${isDarkMode ? 'bg-slate-800 border-slate-700 hover:border-rose-500/50 hover:shadow-2xl hover:shadow-rose-500/10' : 'bg-white border-slate-200 hover:border-rose-300 hover:shadow-2xl hover:shadow-rose-500/5'}`}>
+                 <div className={`w-14 h-14 rounded-2xl flex items-center justify-center mb-6 transition-colors ${isDarkMode ? 'bg-rose-950 text-rose-400 group-hover:bg-rose-600 group-hover:text-white' : 'bg-rose-50 text-rose-600 group-hover:bg-rose-600 group-hover:text-white'}`}>
+                   <MessageSquare size={28} />
+                 </div>
+                 <h3 className={`text-xl font-black mb-2 ${isDarkMode ? 'text-white' : 'text-slate-800'}`}>Solicitações</h3>
+                 <p className={`text-sm font-medium ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>Gerencie pedidos de permutas, reposições e lançamentos extras realizados pelos professores.</p>
+               </button>
+             )}
 
-                  <button 
-                    onClick={() => setImportUrlModal({show: true, url: ''})}
-                    className={`flex justify-center items-center gap-2 bg-slate-700 hover:bg-slate-600 text-white px-4 py-2 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all shadow-sm active:scale-95 w-full sm:w-auto`}
-                  >
-                    <LinkIcon size={14} /> Importar URL
-                  </button>
-                  
-                  <input type="file" ref={addInputRef} className="hidden" accept=".csv" onChange={handleFileUpload} />
-                </div>
-              </div>
-              
-              <div className="overflow-x-auto">
-                <table className="w-full text-left border-collapse text-xs">
-                  <thead>
-                    <tr className={`border-b text-[9px] uppercase tracking-[0.2em] font-black ${isDarkMode ? 'bg-slate-800/50 text-slate-400 border-slate-700' : 'bg-slate-50 text-slate-400 border-slate-200'}`}>
-                      <th className="py-4 px-6">Semana / Arquivo</th>
-                      <th className="py-4 px-6 text-center">Tipo</th>
-                      <th className="py-4 px-6 text-center">Atualizado</th>
-                      <th className="py-4 px-6 text-center">Visibilidade</th>
-                      <th className="py-4 px-6 text-right">Controles</th>
-                    </tr>
-                  </thead>
-                  <tbody className={`divide-y ${isDarkMode ? 'divide-slate-700' : 'divide-slate-100'}`}>
-                    {dbSummary.length > 0 ? dbSummary.map((item) => (
-                      <tr key={item.key} className={`transition-colors group ${!item.isActive ? (isDarkMode ? 'bg-slate-900/50 grayscale opacity-60' : 'bg-slate-50/50 grayscale opacity-60') : (isDarkMode ? 'hover:bg-slate-700/50' : 'hover:bg-slate-50')}`}>
-                        <td className="py-3 px-6">
-                          <div className={`font-black flex items-center ${isDarkMode ? 'text-slate-200' : 'text-slate-700'}`}>
-                            {item.week}
-                            <span className="ml-2 text-slate-400 font-medium text-[10px]">({item.count} aulas)</span>
-                          </div>
-                          <div className="text-[9px] text-slate-400 font-bold truncate max-w-[250px] flex items-center gap-1 mt-0.5" title={item.fileName}>
-                            <FileText size={10} /> {item.fileName}
-                          </div>
-                        </td>
-                        <td className="py-3 px-6 text-center">
-                          {item.type === 'padrao' ? (
-                            <span className={`text-[8px] px-2 py-0.5 rounded font-black uppercase tracking-widest border ${isDarkMode ? 'bg-blue-900/40 text-blue-300 border-blue-800/50' : 'bg-blue-100 text-blue-800 border-blue-200'}`}>Horário Padrão</span>
-                          ) : item.type === 'previa' ? (
-                            <span className={`text-[8px] px-2 py-0.5 rounded font-black uppercase tracking-widest border ${isDarkMode ? 'bg-violet-900/40 text-violet-300 border-violet-800/50' : 'bg-violet-100 text-violet-800 border-violet-200'}`}>Prévia</span>
-                          ) : (
-                            <span className={`text-[8px] px-2 py-0.5 rounded font-black uppercase tracking-widest border ${isDarkMode ? 'bg-emerald-900/40 text-emerald-300 border-emerald-800/50' : 'bg-emerald-100 text-emerald-800 border-emerald-200'}`}>Consolidado</span>
-                          )}
-                        </td>
-                        <td className="py-3 px-6 text-center">
-                          {item.updatedAt ? (
-                            <span className="text-[10px] font-medium text-slate-500" title={new Date(item.updatedAt).toLocaleString('pt-BR')}>
-                               {new Date(item.updatedAt).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: '2-digit' })}{' '}
-                               <span className="opacity-70">{new Date(item.updatedAt).toLocaleTimeString('pt-BR', { hour: '2-digit', minute:'2-digit' })}</span>
-                            </span>
-                          ) : (
-                            <span className="text-[10px] text-slate-400 opacity-50">-</span>
-                          )}
-                        </td>
-                        <td className="py-3 px-6 text-center">
-                          {item.isActive 
-                            ? <span className={`font-bold text-[10px] uppercase tracking-wider ${isDarkMode ? 'text-emerald-400' : 'text-emerald-600'}`}>Público</span>
-                            : <span className="text-slate-400 font-bold text-[10px] uppercase tracking-wider">Oculto</span>
-                          }
-                        </td>
-                        <td className="py-3 px-6 text-right space-x-2">
-                          <button onClick={() => triggerCompare(item.key)} className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-[9px] font-black uppercase tracking-widest transition-all shadow-sm">Alterar</button>
-                          <button onClick={() => toggleVisibility(item)} className={`px-3 py-1.5 rounded-lg text-[9px] font-black uppercase tracking-widest border transition-all ${item.isActive ? (isDarkMode ? 'bg-slate-800 border-slate-600 text-slate-300 hover:bg-slate-700' : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-100') : (isDarkMode ? 'bg-slate-700 border-slate-600 text-white' : 'bg-slate-800 border-slate-800 text-white')}`}>{item.isActive ? 'Ocultar' : 'Exibir'}</button>
-                          <button onClick={() => handleOpenDelete(item.key, item.week)} className={`px-2 py-1.5 rounded-lg transition-all ${isDarkMode ? 'text-rose-400 hover:bg-rose-900/30' : 'text-rose-600 hover:bg-rose-50'}`}><Trash2 size={14}/></button>
-                        </td>
-                      </tr>
-                    )) : <tr><td colSpan={5} className="py-8 text-center text-slate-400 font-black uppercase tracking-widest text-xs">Nenhuma semana registrada no banco de dados.</td></tr>}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-            */}
-          </div>
+             {/* Card 3: Gestão Escolar */}
+             <button onClick={() => setAdminTab('disciplinas')} 
+                     className={`group p-8 rounded-[2.5rem] border text-left transition-all hover:scale-[1.02] active:scale-95 ${isDarkMode ? 'bg-slate-800 border-slate-700 hover:border-emerald-500/50 hover:shadow-2xl hover:shadow-emerald-500/10' : 'bg-white border-slate-200 hover:border-emerald-300 hover:shadow-2xl hover:shadow-emerald-500/5'}`}>
+               <div className={`w-14 h-14 rounded-2xl flex items-center justify-center mb-6 transition-colors ${isDarkMode ? 'bg-emerald-950 text-emerald-400 group-hover:bg-emerald-600 group-hover:text-white' : 'bg-emerald-50 text-emerald-600 group-hover:bg-emerald-600 group-hover:text-white'}`}>
+                 <ClipboardList size={28} />
+               </div>
+               <h3 className={`text-xl font-black mb-2 ${isDarkMode ? 'text-white' : 'text-slate-800'}`}>Gestão Escolar</h3>
+               <p className={`text-sm font-medium ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>Base de dados de disciplinas, cursos, turmas e ambientes pedagógicos/laboratórios.</p>
+             </button>
+
+             {/* Card 4: Ano Letivo */}
+             {['admin','gestao'].includes(userRole) && (
+               <button onClick={() => setAdminTab('ano_letivo')} 
+                       className={`group p-8 rounded-[2.5rem] border text-left transition-all hover:scale-[1.02] active:scale-95 ${isDarkMode ? 'bg-slate-800 border-slate-700 hover:border-teal-500/50 hover:shadow-2xl hover:shadow-teal-500/10' : 'bg-white border-slate-200 hover:border-teal-300 hover:shadow-2xl hover:shadow-teal-500/5'}`}>
+                 <div className={`w-14 h-14 rounded-2xl flex items-center justify-center mb-6 transition-colors ${isDarkMode ? 'bg-teal-950 text-teal-400 group-hover:bg-teal-600 group-hover:text-white' : 'bg-teal-50 text-teal-600 group-hover:bg-teal-600 group-hover:text-white'}`}>
+                   <Calendar size={28} />
+                 </div>
+                 <h3 className={`text-xl font-black mb-2 ${isDarkMode ? 'text-white' : 'text-slate-800'}`}>Calendário Letivo</h3>
+                 <p className={`text-sm font-medium ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>Configure datas de semestres, bimestres e semanas letivas para o controle acadêmico.</p>
+               </button>
+             )}
+
+             {/* Card 5: Configurações */}
+             {['admin','gestao'].includes(userRole) && (
+               <button onClick={() => setAdminTab('configuracoes')} 
+                       className={`group p-8 rounded-[2.5rem] border text-left transition-all hover:scale-[1.02] active:scale-95 ${isDarkMode ? 'bg-slate-800 border-slate-700 hover:border-amber-500/50 hover:shadow-2xl hover:shadow-amber-500/10' : 'bg-white border-slate-200 hover:border-amber-300 hover:shadow-2xl hover:shadow-amber-500/5'}`}>
+                 <div className={`w-14 h-14 rounded-2xl flex items-center justify-center mb-6 transition-colors ${isDarkMode ? 'bg-amber-950 text-amber-400 group-hover:bg-amber-600 group-hover:text-white' : 'bg-amber-50 text-amber-600 group-hover:bg-amber-600 group-hover:text-white'}`}>
+                   <Settings size={28} />
+                 </div>
+                 <h3 className={`text-xl font-black mb-2 ${isDarkMode ? 'text-white' : 'text-slate-800'}`}>Configurações</h3>
+                 <p className={`text-sm font-medium ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>Ajuste turnos, horários de aula, limites de carga horária e parâmetros globais do sistema.</p>
+               </button>
+             )}
+           </div>
         )}
 
         {/* ABA: MASTER GRID */}

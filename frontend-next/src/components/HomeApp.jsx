@@ -52,7 +52,7 @@ export function HomeApp({ appMode }) {
     rawData, setRawData, rawDataRef, disabledWeeks, setDisabledWeeks, refreshData, setErrorMsg: security.setErrorMsg, uploadType
   });
 
-  const [adminTab, setAdminTab] = useState('planilhas');
+  const [adminTab, setAdminTab] = useState('dashboard');
   const [adminFilterCourses, setAdminFilterCourses] = useState([]);
   const [adminFilterClasses, setAdminFilterClasses] = useState([]);
 
@@ -64,7 +64,7 @@ export function HomeApp({ appMode }) {
     if (mode === 'home') { router.push('/'); setMobileMenuOpen(false); }
     else if (mode === 'aluno') { scheduleState.setViewMode('hoje'); scheduleState.setScheduleMode('oficial'); router.push('/aluno'); setMobileMenuOpen(false); } 
     else if (mode === 'professor') { scheduleState.setViewMode('professor'); scheduleState.setScheduleMode('oficial'); router.push('/professor'); setMobileMenuOpen(false); } 
-    else if (mode === 'admin') { router.push('/admin'); setAdminTab('planilhas'); setMobileMenuOpen(false); }
+    else if (mode === 'admin') { router.push('/admin'); setAdminTab('dashboard'); setMobileMenuOpen(false); }
   };
 
   const executePrint = React.useCallback(() => {
