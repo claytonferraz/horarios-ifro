@@ -111,7 +111,7 @@ export function useAdminActions({
       await processContent(content, 'url_import.csv');
       setImportUrlModal({ show: false, url: '' });
     } catch (err) {
-      setErrorMsg(`Erro ao importar URL: ${err.message}. Verifique permissões e validade do CSV.`);
+      setErrorMsg(`Erro ao importar URL: ${err.message}. Verifique permissões e validade da planilha.`);
       setImportUrlModal({ show: false, url: '' });
     } finally {
       setIsLoading(false);

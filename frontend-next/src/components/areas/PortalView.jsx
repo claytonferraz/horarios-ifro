@@ -1,9 +1,8 @@
 import React, { useState } from 'react';
 import { io } from 'socket.io-client';
 import { 
-  ChevronDown, Clock, Printer, CheckCircle, Check, Eye, BookOpen, FileText, Users,
-  MessageSquare, Send, CheckCircle2, XCircle, AlertCircle, GripVertical,
-  Calendar, UserCircle, Layers, AlertTriangle, BarChart3, ListTodo, CalendarDays, Settings, Bell, Sun, RefreshCcw, HandHeart, X, ExternalLink, Scissors, MapPin, Monitor
+  Calendar, UserCircle, Layers, AlertTriangle, BarChart3, ListTodo, CalendarDays, Settings, Bell, Sun, RefreshCcw, HandHeart, X, ExternalLink, Scissors, MapPin, Monitor, Mail, MessageCircle,
+  BookOpen, FileText, Users, CheckCircle, AlertCircle, XCircle, Eye, Clock, Check
 } from 'lucide-react';
 import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd';
 import { SearchableSelect } from '../ui/SearchableSelect';
@@ -669,65 +668,146 @@ export function PortalView({
     <>
         {/* LINKS RÁPIDOS E FERRAMENTAS - SEMPRE VISÍVEL PARA PROFESSOR LOGADO NO TOPO */}
         {appMode === 'professor' && !selectedColleague && (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-10 no-print animate-in duration-1000 slide-in-from-top-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4 mb-10 no-print animate-in duration-1000 slide-in-from-top-4">
             
             {/* SEI */}
             <a href="https://sip.ifro.edu.br/sip/login.php?sigla_orgao_sistema=IFRO&sigla_sistema=SEI&infra_url=L3NlaS8=" target="_blank" rel="noopener noreferrer" 
-               className={`group relative flex items-center gap-5 p-5 rounded-3xl border transition-all duration-500 overflow-hidden ${isDarkMode ? 'bg-slate-900 border-slate-800 hover:bg-slate-800/80 hover:scale-[1.02] hover:shadow-2xl shadow-indigo-900/10' : 'bg-white border-slate-100 shadow-xl shadow-slate-200/50 hover:shadow-2xl hover:scale-[1.02]'}`}>
-               <div className={`p-3.5 rounded-2xl transition-all duration-500 ${isDarkMode ? 'bg-indigo-950 text-indigo-400 group-hover:bg-indigo-600 group-hover:text-white group-hover:shadow-[0_0_20px_rgba(79,70,229,0.4)]' : 'bg-indigo-50 text-indigo-600 group-hover:bg-indigo-600 group-hover:text-white group-hover:shadow-[0_0_20px_rgba(79,70,229,0.2)]'}`}>
-                  <FileText size={22} className="transition-transform duration-500 group-hover:rotate-12" />
+               className={`group relative flex items-center gap-4 p-4 rounded-3xl border transition-all duration-500 overflow-hidden ${isDarkMode ? 'bg-slate-900 border-slate-800 hover:bg-slate-800/80 hover:scale-[1.02] hover:shadow-2xl shadow-indigo-900/10' : 'bg-white border-slate-100 shadow-xl shadow-slate-200/50 hover:shadow-2xl hover:scale-[1.02]'}`}>
+               <div className={`p-3 rounded-2xl transition-all duration-500 ${isDarkMode ? 'bg-indigo-950 text-indigo-400 group-hover:bg-indigo-600 group-hover:text-white group-hover:shadow-[0_0_20px_rgba(79,70,229,0.4)]' : 'bg-indigo-50 text-indigo-600 group-hover:bg-indigo-600 group-hover:text-white group-hover:shadow-[0_0_20px_rgba(79,70,229,0.2)]'}`}>
+                  <FileText size={20} className="transition-transform duration-500 group-hover:rotate-12" />
                </div>
                <div className="flex flex-col">
-                 <h4 className={`text-[11px] font-black uppercase tracking-widest leading-none ${isDarkMode ? 'text-slate-200' : 'text-slate-900'}`}>Acesso ao SEI</h4>
-                 <p className="text-[9px] font-bold text-slate-500 mt-1.5 uppercase tracking-tighter opacity-80">Documentos e Processos</p>
+                 <h4 className={`text-[10px] font-black uppercase tracking-widest leading-none ${isDarkMode ? 'text-slate-200' : 'text-slate-900'}`}>Acesso ao SEI</h4>
+                 <p className="text-[8px] font-bold text-slate-500 mt-1 uppercase tracking-tighter opacity-80">Documentos</p>
                </div>
                <div className="absolute -bottom-3 -right-3 opacity-[0.03] group-hover:opacity-[0.08] group-hover:scale-110 transition-all duration-700 pointer-events-none">
-                  <FileText size={80} />
+                  <FileText size={70} />
                </div>
             </a>
 
             {/* MEUS DIÁRIOS (SUAP) */}
             <a href="https://suap.ifro.edu.br/edu/meus_diarios/" target="_blank" rel="noopener noreferrer" 
-               className={`group relative flex items-center gap-5 p-5 rounded-3xl border transition-all duration-500 overflow-hidden ${isDarkMode ? 'bg-slate-900 border-slate-800 hover:bg-slate-800/80 hover:scale-[1.02] hover:shadow-2xl shadow-emerald-900/10' : 'bg-white border-slate-100 shadow-xl shadow-slate-200/50 hover:shadow-2xl hover:scale-[1.02]'}`}>
-               <div className={`p-3.5 rounded-2xl transition-all duration-500 ${isDarkMode ? 'bg-emerald-950 text-emerald-400 group-hover:bg-emerald-600 group-hover:text-white group-hover:shadow-[0_0_20px_rgba(16,185,129,0.4)]' : 'bg-emerald-50 text-emerald-600 group-hover:bg-emerald-600 group-hover:text-white group-hover:shadow-[0_0_20px_rgba(16,185,129,0.2)]'}`}>
-                  <BookOpen size={22} className="transition-transform duration-500 group-hover:-rotate-12" />
+               className={`group relative flex items-center gap-4 p-4 rounded-3xl border transition-all duration-500 overflow-hidden ${isDarkMode ? 'bg-slate-900 border-slate-800 hover:bg-slate-800/80 hover:scale-[1.02] hover:shadow-2xl shadow-emerald-900/10' : 'bg-white border-slate-100 shadow-xl shadow-slate-200/50 hover:shadow-2xl hover:scale-[1.02]'}`}>
+               <div className={`p-3 rounded-2xl transition-all duration-500 ${isDarkMode ? 'bg-emerald-950 text-emerald-400 group-hover:bg-emerald-600 group-hover:text-white group-hover:shadow-[0_0_20px_rgba(16,185,129,0.4)]' : 'bg-emerald-50 text-emerald-600 group-hover:bg-emerald-600 group-hover:text-white group-hover:shadow-[0_0_20px_rgba(16,185,129,0.2)]'}`}>
+                  <BookOpen size={20} className="transition-transform duration-500 group-hover:-rotate-12" />
                </div>
                <div className="flex flex-col">
-                 <h4 className={`text-[11px] font-black uppercase tracking-widest leading-none ${isDarkMode ? 'text-slate-200' : 'text-slate-900'}`}>Meus Diários</h4>
-                 <p className="text-[9px] font-bold text-slate-500 mt-1.5 uppercase tracking-tighter opacity-80">Frequência e Notas</p>
+                 <h4 className={`text-[10px] font-black uppercase tracking-widest leading-none ${isDarkMode ? 'text-slate-200' : 'text-slate-900'}`}>Meus Diários</h4>
+                 <p className="text-[8px] font-bold text-slate-500 mt-1 uppercase tracking-tighter opacity-80">SUAP Diários</p>
                </div>
                <div className="absolute -bottom-3 -right-3 opacity-[0.03] group-hover:opacity-[0.08] group-hover:scale-110 transition-all duration-700 pointer-events-none">
-                  <BookOpen size={80} />
+                  <BookOpen size={70} />
+               </div>
+            </a>
+
+            {/* GMAIL */}
+            <a href="https://mail.google.com/" target="_blank" rel="noopener noreferrer" 
+               className={`group relative flex items-center gap-4 p-4 rounded-3xl border transition-all duration-500 overflow-hidden ${isDarkMode ? 'bg-slate-900 border-slate-800 hover:bg-rose-900/20 hover:scale-[1.02] hover:shadow-2xl shadow-rose-900/10' : 'bg-white border-slate-100 shadow-xl shadow-slate-200/50 hover:shadow-2xl hover:scale-[1.02]'}`}>
+               <div className={`p-3 rounded-2xl transition-all duration-500 ${isDarkMode ? 'bg-rose-950 text-rose-400 group-hover:bg-rose-600 group-hover:text-white group-hover:shadow-[0_0_20px_rgba(225,29,72,0.4)]' : 'bg-rose-50 text-rose-600 group-hover:bg-rose-600 group-hover:text-white group-hover:shadow-[0_0_20px_rgba(225,29,72,0.2)]'}`}>
+                  <Mail size={20} className="transition-transform duration-500 group-hover:scale-110" />
+               </div>
+               <div className="flex flex-col">
+                 <h4 className={`text-[10px] font-black uppercase tracking-widest leading-none ${isDarkMode ? 'text-slate-200' : 'text-slate-900'}`}>Gmail IFRO</h4>
+                 <p className="text-[8px] font-bold text-slate-500 mt-1 uppercase tracking-tighter opacity-80">E-mail Institucional</p>
+               </div>
+               <div className="absolute -bottom-3 -right-3 opacity-[0.03] group-hover:opacity-[0.08] group-hover:scale-110 transition-all duration-700 pointer-events-none">
+                  <Mail size={70} />
+               </div>
+            </a>
+
+            {/* WHATSAPP DAPE */}
+            <a href="https://wa.me/556921836926" target="_blank" rel="noopener noreferrer" 
+               className={`group relative flex items-center gap-4 p-4 rounded-3xl border transition-all duration-500 overflow-hidden ${isDarkMode ? 'bg-slate-900 border-slate-800 hover:bg-green-900/20 hover:scale-[1.02] hover:shadow-2xl shadow-green-900/10' : 'bg-white border-slate-100 shadow-xl shadow-slate-200/50 hover:shadow-2xl hover:scale-[1.02]'}`}>
+               <div className={`p-3 rounded-2xl transition-all duration-500 ${isDarkMode ? 'bg-green-950 text-green-400 group-hover:bg-green-600 group-hover:text-white group-hover:shadow-[0_0_20px_rgba(22,163,74,0.4)]' : 'bg-green-50 text-green-600 group-hover:bg-green-600 group-hover:text-white group-hover:shadow-[0_0_20px_rgba(22,163,74,0.2)]'}`}>
+                  <MessageCircle size={20} className="transition-transform duration-500 group-hover:rotate-6" />
+               </div>
+               <div className="flex flex-col">
+                 <h4 className={`text-[10px] font-black uppercase tracking-widest leading-none ${isDarkMode ? 'text-slate-200' : 'text-slate-900'}`}>WhatsApp DAPE</h4>
+                 <p className="text-[8px] font-bold text-slate-500 mt-1 uppercase tracking-tighter opacity-80">(69) 2183-6926</p>
+               </div>
+               <div className="absolute -bottom-3 -right-3 opacity-[0.03] group-hover:opacity-[0.08] group-hover:scale-110 transition-all duration-700 pointer-events-none">
+                  <MessageCircle size={70} />
                </div>
             </a>
 
             {/* AGENDAR SALAS */}
             <a href="https://suap.ifro.edu.br/admin/comum/sala/?agendavel__exact=1&all=&predio__uo=7&tab=tab_any_data" target="_blank" rel="noopener noreferrer" 
-               className={`group relative flex items-center gap-5 p-5 rounded-3xl border transition-all duration-500 overflow-hidden ${isDarkMode ? 'bg-slate-900 border-slate-800 hover:bg-slate-800/80 hover:scale-[1.02] hover:shadow-2xl shadow-blue-900/10' : 'bg-white border-slate-100 shadow-xl shadow-slate-200/50 hover:shadow-2xl hover:scale-[1.02]'}`}>
-               <div className={`p-3.5 rounded-2xl transition-all duration-500 ${isDarkMode ? 'bg-blue-950 text-blue-400 group-hover:bg-blue-600 group-hover:text-white group-hover:shadow-[0_0_20px_rgba(37,99,235,0.4)]' : 'bg-blue-50 text-blue-600 group-hover:bg-blue-600 group-hover:text-white group-hover:shadow-[0_0_20px_rgba(37,99,235,0.2)]'}`}>
-                  <MapPin size={22} className="transition-transform duration-500 group-hover:translate-y-[-2px]" />
+               className={`group relative flex items-center gap-4 p-4 rounded-3xl border transition-all duration-500 overflow-hidden ${isDarkMode ? 'bg-slate-900 border-slate-800 hover:bg-slate-800/80 hover:scale-[1.02] hover:shadow-2xl shadow-blue-900/10' : 'bg-white border-slate-100 shadow-xl shadow-slate-200/50 hover:shadow-2xl hover:scale-[1.02]'}`}>
+               <div className={`p-3 rounded-2xl transition-all duration-500 ${isDarkMode ? 'bg-blue-950 text-blue-400 group-hover:bg-blue-600 group-hover:text-white group-hover:shadow-[0_0_20px_rgba(37,99,235,0.4)]' : 'bg-blue-50 text-blue-600 group-hover:bg-blue-600 group-hover:text-white group-hover:shadow-[0_0_20px_rgba(37,99,235,0.2)]'}`}>
+                  <MapPin size={20} className="transition-transform duration-500 group-hover:translate-y-[-2px]" />
                </div>
                <div className="flex flex-col">
-                 <h4 className={`text-[11px] font-black uppercase tracking-widest leading-none ${isDarkMode ? 'text-slate-200' : 'text-slate-900'}`}>Agendar Salas</h4>
-                 <p className="text-[9px] font-bold text-slate-500 mt-1.5 uppercase tracking-tighter opacity-80">Reserva via SUAP</p>
+                 <h4 className={`text-[10px] font-black uppercase tracking-widest leading-none ${isDarkMode ? 'text-slate-200' : 'text-slate-900'}`}>Agendar Salas</h4>
+                 <p className="text-[8px] font-bold text-slate-500 mt-1 uppercase tracking-tighter opacity-80">Ambientes SUAP</p>
                </div>
                <div className="absolute -bottom-3 -right-3 opacity-[0.03] group-hover:opacity-[0.08] group-hover:scale-110 transition-all duration-700 pointer-events-none">
-                  <MapPin size={80} />
+                  <MapPin size={70} />
                </div>
             </a>
 
-            {/* AGENDAR LABORATÓRIOS */}
+            {/* LABORATORIOS */}
             <a href="https://docs.google.com/spreadsheets/d/1k9Tyy_2pYsJyRKeSq3NpSpXHzUoPigyweyRUHGiAbW4/edit?gid=176889928#gid=176889928" target="_blank" rel="noopener noreferrer" 
-               className={`group relative flex items-center gap-5 p-5 rounded-3xl border transition-all duration-500 overflow-hidden ${isDarkMode ? 'bg-slate-900 border-slate-800 hover:bg-slate-800/80 hover:scale-[1.02] hover:shadow-2xl shadow-amber-900/10' : 'bg-white border-slate-100 shadow-xl shadow-slate-200/50 hover:shadow-2xl hover:scale-[1.02]'}`}>
-               <div className={`p-3.5 rounded-2xl transition-all duration-500 ${isDarkMode ? 'bg-amber-950 text-amber-400 group-hover:bg-amber-600 group-hover:text-white group-hover:shadow-[0_0_20px_rgba(217,119,6,0.4)]' : 'bg-amber-50 text-amber-600 group-hover:bg-amber-600 group-hover:text-white group-hover:shadow-[0_0_20px_rgba(217,119,6,0.2)]'}`}>
-                  <Monitor size={22} className="transition-transform duration-500 group-hover:scale-110" />
+               className={`group relative flex items-center gap-4 p-4 rounded-3xl border transition-all duration-500 overflow-hidden ${isDarkMode ? 'bg-slate-900 border-slate-800 hover:bg-slate-800/80 hover:scale-[1.02] hover:shadow-2xl shadow-amber-900/10' : 'bg-white border-slate-100 shadow-xl shadow-slate-200/50 hover:shadow-2xl hover:scale-[1.02]'}`}>
+               <div className={`p-3 rounded-2xl transition-all duration-500 ${isDarkMode ? 'bg-amber-950 text-amber-400 group-hover:bg-amber-600 group-hover:text-white group-hover:shadow-[0_0_20px_rgba(217,119,6,0.4)]' : 'bg-amber-50 text-amber-600 group-hover:bg-amber-600 group-hover:text-white group-hover:shadow-[0_0_20px_rgba(217,119,6,0.2)]'}`}>
+                  <Monitor size={20} className="transition-transform duration-500 group-hover:scale-110" />
                </div>
                <div className="flex flex-col">
-                 <h4 className={`text-[11px] font-black uppercase tracking-widest leading-none ${isDarkMode ? 'text-slate-200' : 'text-slate-900'}`}>Laboratórios</h4>
-                 <p className="text-[9px] font-bold text-slate-500 mt-1.5 uppercase tracking-tighter opacity-80">Gestão de Reservas</p>
+                 <h4 className={`text-[10px] font-black uppercase tracking-widest leading-none ${isDarkMode ? 'text-slate-200' : 'text-slate-900'}`}>Laboratórios</h4>
+                 <p className="text-[8px] font-bold text-slate-500 mt-1 uppercase tracking-tighter opacity-80">Reserva de Labs</p>
                </div>
                <div className="absolute -bottom-3 -right-3 opacity-[0.03] group-hover:opacity-[0.08] group-hover:scale-110 transition-all duration-700 pointer-events-none">
-                  <Monitor size={80} />
+                  <Monitor size={70} />
+               </div>
+            </a>
+          </div>
+        )}
+
+        {/* DASHBOARD HEADER: LINKS ALUNO (UX PREMIUM) */}
+        {appMode === 'aluno' && (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 mb-10 no-print animate-in duration-1000 slide-in-from-top-4">
+            
+            {/* AVA IFRO */}
+            <a href="https://virtual.ifro.edu.br/jiparana/" target="_blank" rel="noopener noreferrer" 
+               className={`group relative flex items-center gap-5 p-6 rounded-3xl border transition-all duration-500 overflow-hidden ${isDarkMode ? 'bg-slate-900 border-slate-800 hover:bg-slate-800/80 hover:scale-[1.02] hover:shadow-2xl shadow-indigo-900/10' : 'bg-white border-slate-100 shadow-xl shadow-slate-200/50 hover:shadow-2xl hover:scale-[1.02]'}`}>
+               <div className={`p-4 rounded-2xl transition-all duration-500 ${isDarkMode ? 'bg-indigo-950 text-indigo-400 group-hover:bg-indigo-600 group-hover:text-white group-hover:shadow-[0_0_20px_rgba(79,70,229,0.4)]' : 'bg-indigo-50 text-indigo-600 group-hover:bg-indigo-600 group-hover:text-white group-hover:shadow-[0_0_20px_rgba(79,70,229,0.2)]'}`}>
+                  <BookOpen size={24} className="transition-transform duration-500 group-hover:-rotate-12" />
+               </div>
+               <div className="flex flex-col">
+                 <h4 className={`text-[13px] font-black uppercase tracking-widest leading-none ${isDarkMode ? 'text-slate-200' : 'text-slate-900'}`}>AVA IFRO</h4>
+                 <p className="text-[10px] font-bold text-slate-500 mt-1.5 uppercase tracking-tighter opacity-80">Sala de Aula Virtual</p>
+               </div>
+               <div className="absolute -bottom-4 -right-4 opacity-[0.04] group-hover:opacity-[0.09] group-hover:scale-110 transition-all duration-700 pointer-events-none">
+                  <BookOpen size={100} />
+               </div>
+            </a>
+
+            {/* SUAP ALUNO */}
+            <a href="https://suap.ifro.edu.br/" target="_blank" rel="noopener noreferrer" 
+               className={`group relative flex items-center gap-5 p-6 rounded-3xl border transition-all duration-500 overflow-hidden ${isDarkMode ? 'bg-slate-900 border-slate-800 hover:bg-slate-800/80 hover:scale-[1.02] hover:shadow-2xl shadow-emerald-900/10' : 'bg-white border-slate-100 shadow-xl shadow-slate-200/50 hover:shadow-2xl hover:scale-[1.02]'}`}>
+               <div className={`p-4 rounded-2xl transition-all duration-500 ${isDarkMode ? 'bg-emerald-950 text-emerald-400 group-hover:bg-emerald-600 group-hover:text-white group-hover:shadow-[0_0_20px_rgba(16,185,129,0.4)]' : 'bg-emerald-50 text-emerald-600 group-hover:bg-emerald-600 group-hover:text-white group-hover:shadow-[0_0_20px_rgba(16,185,129,0.2)]'}`}>
+                  <Users size={24} className="transition-transform duration-500 group-hover:scale-110" />
+               </div>
+               <div className="flex flex-col">
+                 <h4 className={`text-[13px] font-black uppercase tracking-widest leading-none ${isDarkMode ? 'text-slate-200' : 'text-slate-900'}`}>Portal SUAP</h4>
+                 <p className="text-[10px] font-bold text-slate-500 mt-1.5 uppercase tracking-tighter opacity-80">Notas & Frequência</p>
+               </div>
+               <div className="absolute -bottom-4 -right-4 opacity-[0.04] group-hover:opacity-[0.09] group-hover:scale-110 transition-all duration-700 pointer-events-none">
+                  <Users size={100} />
+               </div>
+            </a>
+
+            {/* WHATSAPP CAED */}
+            <a href="https://wa.me/5569999047804" target="_blank" rel="noopener noreferrer" 
+               className={`group relative flex items-center gap-5 p-6 rounded-3xl border transition-all duration-500 overflow-hidden ${isDarkMode ? 'bg-slate-900 border-slate-800 hover:bg-green-900/20 hover:scale-[1.02] hover:shadow-2xl shadow-green-900/10' : 'bg-white border-slate-100 shadow-xl shadow-slate-200/50 hover:shadow-2xl hover:scale-[1.02]'}`}>
+               <div className={`p-4 rounded-2xl transition-all duration-500 ${isDarkMode ? 'bg-green-950 text-green-400 group-hover:bg-green-600 group-hover:text-white group-hover:shadow-[0_0_20px_rgba(22,163,74,0.4)]' : 'bg-green-50 text-green-600 group-hover:bg-green-600 group-hover:text-white group-hover:shadow-[0_0_20px_rgba(22,163,74,0.2)]'}`}>
+                  <MessageCircle size={24} className="transition-transform duration-500 group-hover:rotate-6" />
+               </div>
+               <div className="flex flex-col">
+                 <h4 className={`text-[13px] font-black uppercase tracking-widest leading-none ${isDarkMode ? 'text-slate-200' : 'text-slate-900'}`}>WhatsApp CAED</h4>
+                 <p className="text-[10px] font-bold text-slate-500 mt-1.5 uppercase tracking-tighter opacity-80">(69) 99904-7804</p>
+               </div>
+               <div className="absolute -bottom-4 -right-4 opacity-[0.04] group-hover:opacity-[0.09] group-hover:scale-110 transition-all duration-700 pointer-events-none">
+                  <MessageCircle size={100} />
                </div>
             </a>
           </div>
@@ -1576,7 +1656,9 @@ export function PortalView({
             </button>
           </div>
         </div>
-      )}      <TeacherDirectModal 
+      )}
+
+      <TeacherDirectModal 
         isOpen={!!teacherDirectModal}
         slotData={teacherDirectModal}
         onClose={() => setTeacherDirectModal(null)}

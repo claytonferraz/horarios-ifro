@@ -26,7 +26,7 @@ export function ImportUrlModal({
         <div className="p-6">
           <form onSubmit={processUrlUpload} className="space-y-4">
             <p className={`text-sm font-medium mb-2 leading-relaxed ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>
-              Insira o link direto do arquivo CSV (ex: Google Planilhas) para importar os dados como <strong className={`font-black ${isDarkMode ? 'text-blue-400' : 'text-blue-600'}`}>{uploadType.toUpperCase()}</strong>.
+              Insira o link direto da planilha de horários (ex: Google Planilhas) para importar os dados como <strong className={`font-black ${isDarkMode ? 'text-blue-400' : 'text-blue-600'}`}>{uploadType.toUpperCase()}</strong>.
             </p>
             <input 
               type="url" 
