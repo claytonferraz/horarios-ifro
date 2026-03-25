@@ -762,52 +762,52 @@ export function PortalView({
           </div>
         )}
 
-        {/* DASHBOARD HEADER: LINKS ALUNO (UX PREMIUM) */}
+        {/* DASHBOARD HEADER: LINKS ALUNO (UX PREMIUM - MOBILE OPTIMIZED) */}
         {appMode === 'aluno' && (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 mb-10 no-print animate-in duration-1000 slide-in-from-top-4">
+          <div className="flex flex-row overflow-x-auto lg:grid lg:grid-cols-3 gap-4 mb-8 no-print animate-in duration-1000 slide-in-from-top-4 pb-2 scrollbar-hide">
             
             {/* AVA IFRO */}
             <a href="https://virtual.ifro.edu.br/jiparana/" target="_blank" rel="noopener noreferrer" 
-               className={`group relative flex items-center gap-5 p-6 rounded-3xl border transition-all duration-500 overflow-hidden ${isDarkMode ? 'bg-slate-900 border-slate-800 hover:bg-slate-800/80 hover:scale-[1.02] hover:shadow-2xl shadow-indigo-900/10' : 'bg-white border-slate-100 shadow-xl shadow-slate-200/50 hover:shadow-2xl hover:scale-[1.02]'}`}>
-               <div className={`p-4 rounded-2xl transition-all duration-500 ${isDarkMode ? 'bg-indigo-950 text-indigo-400 group-hover:bg-indigo-600 group-hover:text-white group-hover:shadow-[0_0_20px_rgba(79,70,229,0.4)]' : 'bg-indigo-50 text-indigo-600 group-hover:bg-indigo-600 group-hover:text-white group-hover:shadow-[0_0_20px_rgba(79,70,229,0.2)]'}`}>
-                  <BookOpen size={24} className="transition-transform duration-500 group-hover:-rotate-12" />
+               className={`flex-none w-[140px] sm:w-auto group relative flex flex-col sm:flex-row items-center sm:items-center gap-2 sm:gap-4 p-4 rounded-2xl border transition-all duration-500 overflow-hidden ${isDarkMode ? 'bg-slate-900 border-slate-800 hover:bg-slate-800/80 hover:scale-[1.02] hover:shadow-2xl shadow-indigo-900/10' : 'bg-white border-slate-100 shadow-xl shadow-slate-200/50 hover:shadow-2xl hover:scale-[1.02]'}`}>
+               <div className={`p-2.5 rounded-xl transition-all duration-500 ${isDarkMode ? 'bg-indigo-950 text-indigo-400 group-hover:bg-indigo-600 group-hover:text-white group-hover:shadow-[0_0_20px_rgba(79,70,229,0.4)]' : 'bg-indigo-50 text-indigo-600 group-hover:bg-indigo-600 group-hover:text-white group-hover:shadow-[0_0_20px_rgba(79,70,229,0.2)]'}`}>
+                  <BookOpen size={18} className="transition-transform duration-500 group-hover:-rotate-12" />
                </div>
-               <div className="flex flex-col">
-                 <h4 className={`text-[13px] font-black uppercase tracking-widest leading-none ${isDarkMode ? 'text-slate-200' : 'text-slate-900'}`}>AVA IFRO</h4>
-                 <p className="text-[10px] font-bold text-slate-500 mt-1.5 uppercase tracking-tighter opacity-80">Sala de Aula Virtual</p>
+               <div className="flex flex-col text-center sm:text-left">
+                 <h4 className={`text-[10px] font-black uppercase tracking-widest leading-none ${isDarkMode ? 'text-slate-200' : 'text-slate-900'}`}>AVA IFRO</h4>
+                 <p className="text-[8px] font-bold text-slate-500 mt-1 uppercase tracking-tighter opacity-80 hidden sm:block">Virtual</p>
                </div>
-               <div className="absolute -bottom-4 -right-4 opacity-[0.04] group-hover:opacity-[0.09] group-hover:scale-110 transition-all duration-700 pointer-events-none">
-                  <BookOpen size={100} />
+               <div className="absolute -bottom-2 -right-2 opacity-[0.03] group-hover:opacity-[0.06] group-hover:scale-110 transition-all duration-700 pointer-events-none">
+                  <BookOpen size={60} />
                </div>
             </a>
 
             {/* SUAP ALUNO */}
             <a href="https://suap.ifro.edu.br/" target="_blank" rel="noopener noreferrer" 
-               className={`group relative flex items-center gap-5 p-6 rounded-3xl border transition-all duration-500 overflow-hidden ${isDarkMode ? 'bg-slate-900 border-slate-800 hover:bg-slate-800/80 hover:scale-[1.02] hover:shadow-2xl shadow-emerald-900/10' : 'bg-white border-slate-100 shadow-xl shadow-slate-200/50 hover:shadow-2xl hover:scale-[1.02]'}`}>
-               <div className={`p-4 rounded-2xl transition-all duration-500 ${isDarkMode ? 'bg-emerald-950 text-emerald-400 group-hover:bg-emerald-600 group-hover:text-white group-hover:shadow-[0_0_20px_rgba(16,185,129,0.4)]' : 'bg-emerald-50 text-emerald-600 group-hover:bg-emerald-600 group-hover:text-white group-hover:shadow-[0_0_20px_rgba(16,185,129,0.2)]'}`}>
-                  <Users size={24} className="transition-transform duration-500 group-hover:scale-110" />
+               className={`flex-none w-[140px] sm:w-auto group relative flex flex-col sm:flex-row items-center sm:items-center gap-2 sm:gap-4 p-4 rounded-2xl border transition-all duration-500 overflow-hidden ${isDarkMode ? 'bg-slate-900 border-slate-800 hover:bg-slate-800/80 hover:scale-[1.02] hover:shadow-2xl shadow-emerald-900/10' : 'bg-white border-slate-100 shadow-xl shadow-slate-200/50 hover:shadow-2xl hover:scale-[1.02]'}`}>
+               <div className={`p-2.5 rounded-xl transition-all duration-500 ${isDarkMode ? 'bg-emerald-950 text-emerald-400 group-hover:bg-emerald-600 group-hover:text-white group-hover:shadow-[0_0_20px_rgba(16,185,129,0.4)]' : 'bg-emerald-50 text-emerald-600 group-hover:bg-emerald-600 group-hover:text-white group-hover:shadow-[0_0_20px_rgba(16,185,129,0.2)]'}`}>
+                  <Users size={18} className="transition-transform duration-500 group-hover:scale-110" />
                </div>
-               <div className="flex flex-col">
-                 <h4 className={`text-[13px] font-black uppercase tracking-widest leading-none ${isDarkMode ? 'text-slate-200' : 'text-slate-900'}`}>Portal SUAP</h4>
-                 <p className="text-[10px] font-bold text-slate-500 mt-1.5 uppercase tracking-tighter opacity-80">Notas & Frequência</p>
+               <div className="flex flex-col text-center sm:text-left">
+                 <h4 className={`text-[10px] font-black uppercase tracking-widest leading-none ${isDarkMode ? 'text-slate-200' : 'text-slate-900'}`}>Portal SUAP</h4>
+                 <p className="text-[8px] font-bold text-slate-500 mt-1 uppercase tracking-tighter opacity-80 hidden sm:block">Notas</p>
                </div>
-               <div className="absolute -bottom-4 -right-4 opacity-[0.04] group-hover:opacity-[0.09] group-hover:scale-110 transition-all duration-700 pointer-events-none">
-                  <Users size={100} />
+               <div className="absolute -bottom-2 -right-2 opacity-[0.03] group-hover:opacity-[0.06] group-hover:scale-110 transition-all duration-700 pointer-events-none">
+                  <Users size={60} />
                </div>
             </a>
 
             {/* WHATSAPP CAED */}
             <a href="https://wa.me/5569999047804" target="_blank" rel="noopener noreferrer" 
-               className={`group relative flex items-center gap-5 p-6 rounded-3xl border transition-all duration-500 overflow-hidden ${isDarkMode ? 'bg-slate-900 border-slate-800 hover:bg-green-900/20 hover:scale-[1.02] hover:shadow-2xl shadow-green-900/10' : 'bg-white border-slate-100 shadow-xl shadow-slate-200/50 hover:shadow-2xl hover:scale-[1.02]'}`}>
-               <div className={`p-4 rounded-2xl transition-all duration-500 ${isDarkMode ? 'bg-green-950 text-green-400 group-hover:bg-green-600 group-hover:text-white group-hover:shadow-[0_0_20px_rgba(22,163,74,0.4)]' : 'bg-green-50 text-green-600 group-hover:bg-green-600 group-hover:text-white group-hover:shadow-[0_0_20px_rgba(22,163,74,0.2)]'}`}>
-                  <MessageCircle size={24} className="transition-transform duration-500 group-hover:rotate-6" />
+               className={`flex-none w-[140px] sm:w-auto group relative flex flex-col sm:flex-row items-center sm:items-center gap-2 sm:gap-4 p-4 rounded-2xl border transition-all duration-500 overflow-hidden ${isDarkMode ? 'bg-slate-900 border-slate-800 hover:bg-green-900/20 hover:scale-[1.02] hover:shadow-2xl shadow-green-900/10' : 'bg-white border-slate-100 shadow-xl shadow-slate-200/50 hover:shadow-2xl hover:scale-[1.02]'}`}>
+               <div className={`p-2.5 rounded-xl transition-all duration-500 ${isDarkMode ? 'bg-green-950 text-green-400 group-hover:bg-green-600 group-hover:text-white group-hover:shadow-[0_0_20px_rgba(22,163,74,0.4)]' : 'bg-green-50 text-green-600 group-hover:bg-green-600 group-hover:text-white group-hover:shadow-[0_0_20px_rgba(22,163,74,0.2)]'}`}>
+                  <MessageCircle size={18} className="transition-transform duration-500 group-hover:rotate-6" />
                </div>
-               <div className="flex flex-col">
-                 <h4 className={`text-[13px] font-black uppercase tracking-widest leading-none ${isDarkMode ? 'text-slate-200' : 'text-slate-900'}`}>WhatsApp CAED</h4>
-                 <p className="text-[10px] font-bold text-slate-500 mt-1.5 uppercase tracking-tighter opacity-80">(69) 99904-7804</p>
+               <div className="flex flex-col text-center sm:text-left">
+                 <h4 className={`text-[10px] font-black uppercase tracking-widest leading-none ${isDarkMode ? 'text-slate-200' : 'text-slate-900'}`}>WhatsApp</h4>
+                 <p className="text-[8px] font-bold text-slate-500 mt-1 uppercase tracking-tighter opacity-80 hidden sm:block">CAED</p>
                </div>
-               <div className="absolute -bottom-4 -right-4 opacity-[0.04] group-hover:opacity-[0.09] group-hover:scale-110 transition-all duration-700 pointer-events-none">
-                  <MessageCircle size={100} />
+               <div className="absolute -bottom-2 -right-2 opacity-[0.03] group-hover:opacity-[0.06] group-hover:scale-110 transition-all duration-700 pointer-events-none">
+                  <MessageCircle size={60} />
                </div>
             </a>
           </div>
