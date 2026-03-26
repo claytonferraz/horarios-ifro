@@ -330,7 +330,7 @@ export const TeacherGrid = React.memo(
                                                             }}
                                                             className={`flex items-center justify-center h-full min-h-[76px] rounded-xl border-[2px] border-dashed transition-all select-none ${showEmptySlots && appMode === 'professor' && !isGridInert ? (isDarkMode ? "border-slate-700 hover:border-indigo-500 hover:bg-indigo-900/20 text-slate-600 hover:text-indigo-400 cursor-pointer" : "border-slate-300 hover:border-indigo-400 hover:bg-indigo-50 text-slate-400 hover:text-indigo-600 cursor-pointer shadow-sm") : (isDarkMode ? "opacity-20 border-transparent text-slate-500" : "opacity-10 border-transparent text-slate-500")}`}
                                                           >
-                                                            {showEmptySlots && appMode === 'professor' ? (
+                                                            {showEmptySlots && appMode === 'professor' && !isGridInert ? (
                                                               <span className="text-[9px] font-black uppercase tracking-widest">+ Lançar</span>
                                                             ) : "-"}
                                                           </div>
@@ -443,7 +443,9 @@ export const TeacherGrid = React.memo(
                                                             <React.Fragment>
                                                                <p className={"subject font-black text-xs sm:text-sm leading-snug text-center drop-shadow-sm mt-1 " + (isVagaReal ? "text-orange-700 dark:text-orange-300" : !isActive ? "text-slate-500 dark:text-slate-400" : "")}>{r.subject || "Pendente"}</p>
                                                                <span className={"details text-[10px] sm:text-xs font-black tracking-widest px-2 py-1 rounded mt-1 w-fit uppercase mx-auto shadow-sm " + (isVagaReal ? (isDarkMode ? 'bg-orange-900/40 text-orange-300 border border-orange-700/50' : 'bg-orange-100 text-orange-700 border border-orange-300') : isActive ? (isDarkMode ? 'bg-indigo-800/60 text-indigo-100 border border-indigo-600/50' : 'bg-indigo-100 text-indigo-800 border border-indigo-300') : (isDarkMode ? 'bg-slate-700 text-slate-400' : 'bg-slate-200 text-slate-500'))}>
-                                                                 {isVagaReal ? '⚠ Sem Professor' : !isActive ? resolveTeacherName(r.teacherId, globalTeachers).split(' ').slice(0,2).join(' ') : (r.className || 'Sem Turma') + (r.room ? ' · ' + r.room : '')}
+                                                                 {isVagaReal 
+                                                                   ? '⚠ Sem Professor' 
+                                                                   : resolveTeacherName(r.teacherId, globalTeachers).split(' ').slice(0,2).join(' ') + (isActive ? ` · ${r.className || 'S/Turma'} ${r.room ? ' · ' + r.room : ''}` : '')}
                                                                </span>
                                                              </React.Fragment>
                                                           </div>
@@ -584,7 +586,7 @@ export const TeacherGrid = React.memo(
                                              }}
                                              className={`w-full py-2.5 rounded-lg border-[2px] border-dashed text-center flex items-center justify-center transition-all ${showEmptySlots && appMode === 'professor' ? (isDarkMode ? "border-slate-700 bg-slate-800/30 text-indigo-400" : "border-slate-300 bg-slate-50 text-indigo-600 hover:bg-slate-100 cursor-pointer") : (isDarkMode ? "opacity-20 border-transparent text-slate-500" : "opacity-10 border-transparent text-slate-500")}`}
                                           >
-                                            {showEmptySlots && appMode === 'professor' ? <span className="text-[9px] font-black uppercase tracking-widest">+ Lançar Aula</span> : "-"}
+                                            {showEmptySlots && appMode === 'professor' && !isGridInert ? <span className="text-[9px] font-black uppercase tracking-widest">+ Lançar Aula</span> : "-"}
                                           </div>
                                         )}
                                       </div>
