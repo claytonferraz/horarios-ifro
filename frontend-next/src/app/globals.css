@@ -236,4 +236,61 @@ button:hover .lucide-calendar-days { animation: calendarBounce 0.5s ease; }
   animation: vacantPulseDark 2.5s ease-in-out infinite;
 }
 
+/* ================================================
+   TRANSIÇÕES DE CARREGAMENTO HÍBRIDAS
+   Usadas em conjunto com useTransition do React 18
+   ================================================ */
+
+/* Desfoque Suave para o Grid durante processamento pesado */
+.page-transition-blur {
+  filter: blur(4px);
+  opacity: 0.65;
+  pointer-events: none;
+  transition: filter 0.4s ease, opacity 0.4s ease;
+  transform: scale(0.995);
+}
+
+/* Animação Shimmer (Brilho de Carregamento) */
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+.skeleton-shimmer {
+  background: linear-gradient(90deg, 
+    rgba(255,255,255,0) 0%, 
+    rgba(255,255,255,0.05) 50%, 
+    rgba(255,255,255,0) 100%);
+  background-size: 200% 100%;
+  animation: shimmer 1.5s infinite;
+}
+
+.dark .skeleton-shimmer {
+  background: linear-gradient(90deg, 
+    rgba(255,255,255,0) 0%, 
+    rgba(255,255,255,0.03) 50%, 
+    rgba(255,255,255,0) 100%);
+  background-size: 200% 100%;
+  animation: shimmer 1.5s infinite;
+}
+
+/* Barra de progresso ultra-fina no topo (estilo YouTube) */
+.top-loading-bar {
+  position: fixed;
+  top: 0;
+  left: 0;
+  height: 3px;
+  background: linear-gradient(to right, #10b981, #3b82f6);
+  z-index: 9999;
+  animation: loadingBarProgress 2s ease-in-out infinite;
+  box-shadow: 0 0 10px rgba(16,185,129,0.5);
+}
+
+@keyframes loadingBarProgress {
+  0% { width: 0; left: 0; }
+  50% { width: 70%; left: 0; }
+  100% { width: 100%; left: 100%; }
+}
+
+
 
