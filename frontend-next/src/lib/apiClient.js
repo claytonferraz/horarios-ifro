@@ -261,6 +261,21 @@ export const apiClient = {
     } catch(e) { return []; }
   },
 
+  async markNotificationsRead(ids) {
+    try {
+      const res = await fetch(`${API_URL}/notifications/read`, {
+        method: 'POST',
+        headers: getHeaders(),
+        body: JSON.stringify({ ids })
+      });
+      if (!res.ok) throw new Error("Falha ao marcar como lidas");
+      return await res.json();
+    } catch(e) {
+      console.error(e);
+      return { success: false };
+    }
+  },
+
   async createAcademicWeek(data) {
     const res = await fetch(`${API_URL}/academic-weeks`, { method: 'POST', headers: getHeaders(), body: JSON.stringify(data) });
     if (!res.ok) {

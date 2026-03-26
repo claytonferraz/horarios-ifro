@@ -247,6 +247,12 @@ db.serialize(() => {
     createdAt TEXT
   )`);
 
+  db.run(`CREATE TABLE IF NOT EXISTS notification_read_status (
+    notification_id INTEGER,
+    siape TEXT,
+    PRIMARY KEY(notification_id, siape)
+  )`);
+
 });
 
 
@@ -267,18 +273,43 @@ app.get('/api/status', (req, res) => {
 // ROTA DE NOTIFICAÇÕES (Chat/Alert Widget)
 // ==========================================
 app.get('/api/notifications', verifyToken, (req, res) => {
-  const limit = 10;
+  const limit = 30; // Aumentado um pouco
+  const siape = req.user.siape || '';
 
   const targets = ["ALL", "ALL_PROF"];
   if (req.user.isAdmin || req.user.isManager) targets.push('ALL_ADMIN');
-  if (req.user.siape) targets.push(req.user.siape);
+  if (siape) targets.push(siape);
 
   const inStr = targets.map(() => '?').join(',');
-  const query = `SELECT * FROM notifications WHERE target IN (${inStr}) ORDER BY id DESC LIMIT ?`;
+  // Join para saber se o usuário já leu
+  const query = `
+    SELECT n.*, (CASE WHEN r.siape IS NOT NULL THEN 1 ELSE 0 END) as isRead
+    FROM notifications n
+    LEFT JOIN notification_read_status r ON n.id = r.notification_id AND r.siape = ?
+    WHERE n.target IN (${inStr}) 
+    ORDER BY n.id DESC LIMIT ?
+  `;
 
-  db.all(query, [...targets, limit], (err, rows) => {
+  db.all(query, [siape, ...targets, limit], (err, rows) => {
     if (err) return res.status(500).json({ error: err.message });
     res.json(rows || []);
+  });
+});
+
+app.post('/api/notifications/read', verifyToken, (req, res) => {
+  const { ids } = req.body; // Array de IDs
+  const siape = req.user.siape;
+  if (!siape) return res.status(401).json({ error: "SIAPE não identificado." });
+  if (!ids || !Array.isArray(ids)) return res.status(400).json({ error: "Lista de IDs inválida." });
+
+  const stmt = db.prepare("INSERT OR IGNORE INTO notification_read_status (notification_id, siape) VALUES (?, ?)");
+  db.serialize(() => {
+    db.run("BEGIN");
+    ids.forEach(id => stmt.run(id, siape));
+    db.run("COMMIT", (err) => {
+      if (err) return res.status(500).json({ error: err.message });
+      res.json({ success: true });
+    });
   });
 });
 

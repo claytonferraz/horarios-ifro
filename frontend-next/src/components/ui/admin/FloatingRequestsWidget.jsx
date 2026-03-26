@@ -169,7 +169,11 @@ export function FloatingRequestsWidget({ isDarkMode, userRole, appMode, controll
   const filterOptions = Array.from(filterOptionsMap.entries()).map(([value, label]) => ({ value, label }));
 
   const getReadKey = (item) => `${item.kind}:${item.id}`;
-  const isItemRead = (item) => Boolean(readMap[getReadKey(item)]);
+  const isItemRead = (item) => {
+    // Para notificações, prioriza o que vem do banco (idRead === 1)
+    if (item.kind === 'notification' && item.data.isRead) return true;
+    return Boolean(readMap[getReadKey(item)]);
+  };
 
   const visibleFeed = fullFeed.filter((item) => {
     if (feedFilter === 'todos') return true;
@@ -181,13 +185,28 @@ export function FloatingRequestsWidget({ isDarkMode, userRole, appMode, controll
   const unreadCount = fullFeed.filter((item) => !isItemRead(item)).length;
   const bubbleCount = unreadCount;
 
-  const toggleReadState = (item) => {
+  const toggleReadState = async (item) => {
     const key = getReadKey(item);
-    setReadMap((prev) => ({ ...prev, [key]: !prev[key] }));
+    const newState = !isItemRead(item);
+    
+    // Atualiza localmente imediato
+    setReadMap((prev) => ({ ...prev, [key]: newState }));
+
+    // Persiste no banco se for notificação e estiver marcando como lido
+    if (item.kind === 'notification' && newState) {
+      try {
+        await apiClient.markNotificationsRead([item.id]);
+      } catch(e) { console.error("Erro ao persistir leitura", e); }
+    }
   };
 
-  const markVisibleAsRead = () => {
+  const markVisibleAsRead = async () => {
     if (visibleFeed.length === 0) return;
+    
+    const notificationIds = visibleFeed
+      .filter(item => item.kind === 'notification' && !isItemRead(item))
+      .map(item => item.id);
+
     setReadMap((prev) => {
       const next = { ...prev };
       visibleFeed.forEach((item) => {
@@ -195,6 +214,12 @@ export function FloatingRequestsWidget({ isDarkMode, userRole, appMode, controll
       });
       return next;
     });
+
+    if (notificationIds.length > 0) {
+      try {
+        await apiClient.markNotificationsRead(notificationIds);
+      } catch(e) { console.error("Erro ao persistir leitura em lote", e); }
+    }
   };
 
   const handleUpdate = async (id, status, feedback) => {
