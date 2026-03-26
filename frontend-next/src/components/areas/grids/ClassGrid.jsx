@@ -193,8 +193,8 @@ export const ClassGrid = React.memo(({
                                                      )}
                                                      {aulaNesteSlot.isSubstituted && !aulaNesteSlot.isPermuted && aulaNesteSlot.originalSubject && <span className="block text-[8px] sm:text-[9.5px] opacity-80 mt-1 uppercase">Era: {aulaNesteSlot.originalSubject}</span>}
                                                   </p>
-                                                  <p className="details text-[8px] font-bold opacity-80 flex items-center justify-center gap-1 uppercase truncate">
-                                                    {teacherName}
+                                                  <p className="details text-[8px] font-bold opacity-80 flex flex-col items-center justify-center gap-1 uppercase text-center">
+                                                    {resolveTeacherName(aulaNesteSlot.teacherId || aulaNesteSlot.teacher, globalTeachers)}
                                                   </p>
                                                   {aulaNesteSlot.room && <span className={`details text-[8px] font-black tracking-tighter opacity-60 px-1.5 py-0.5 rounded mt-1 w-fit uppercase mx-auto ${isDarkMode ? 'bg-white/10' : 'bg-black/5'}`}>{aulaNesteSlot.room}</span>}
                                                 </div>

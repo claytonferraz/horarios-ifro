@@ -67,8 +67,22 @@ export function isTeacherPending(teacher) {
 
 export function resolveTeacherName(siapeOrName, globalTeachersList = []) {
   if (isTeacherPending(siapeOrName)) return 'AULA VAGA';
+  if (!siapeOrName) return '-';
+  
+  // Suporte a múltiplos SIAPEs separados por vírgula
+  const parts = String(siapeOrName).split(',').map(p => p.trim());
+  
+  if (parts.length > 1) {
+    return parts.map(p => {
+       if (isTeacherPending(p)) return 'VAGA';
+       if (!globalTeachersList || !Array.isArray(globalTeachersList)) return p;
+       const teacher = globalTeachersList.find(t => String(t.siape) === String(p) || String(t.id) === String(p));
+       return teacher ? (teacher.nome_exibicao || teacher.nome_completo || p) : p;
+    }).join(' / ');
+  }
+
   if (!globalTeachersList || !Array.isArray(globalTeachersList)) return siapeOrName;
-  const teacher = globalTeachersList.find(t => t.siape === siapeOrName || t.id === siapeOrName);
+  const teacher = globalTeachersList.find(t => String(t.siape) === String(siapeOrName) || String(t.id) === String(siapeOrName));
   return teacher ? (teacher.nome_exibicao || teacher.nome_completo || teacher.siape) : siapeOrName;
 }
 

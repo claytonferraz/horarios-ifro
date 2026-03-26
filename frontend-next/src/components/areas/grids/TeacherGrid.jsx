@@ -445,7 +445,7 @@ export const TeacherGrid = React.memo(
                                                                <span className={"details text-[10px] sm:text-xs font-black tracking-widest px-2 py-1 rounded mt-1 w-fit uppercase mx-auto shadow-sm " + (isVagaReal ? (isDarkMode ? 'bg-orange-900/40 text-orange-300 border border-orange-700/50' : 'bg-orange-100 text-orange-700 border border-orange-300') : isActive ? (isDarkMode ? 'bg-indigo-800/60 text-indigo-100 border border-indigo-600/50' : 'bg-indigo-100 text-indigo-800 border border-indigo-300') : (isDarkMode ? 'bg-slate-700 text-slate-400' : 'bg-slate-200 text-slate-500'))}>
                                                                  {isVagaReal 
                                                                    ? '⚠ Sem Professor' 
-                                                                   : resolveTeacherName(r.teacherId, globalTeachers).split(' ').slice(0,2).join(' ') + (isActive ? ` · ${r.className || 'S/Turma'} ${r.room ? ' · ' + r.room : ''}` : '')}
+                                                                   : resolveTeacherName(r.teacherId, globalTeachers) + (isActive ? ` · ${r.className || 'S/Turma'} ${r.room ? ' · ' + r.room : ''}` : '')}
                                                                </span>
                                                              </React.Fragment>
                                                           </div>
