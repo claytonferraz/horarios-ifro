@@ -348,19 +348,18 @@ export function PortalView({
   const [dbClasses, setDbClasses] = useState([]);
 
   React.useEffect(() => {
-    if (!['admin', 'gestao'].includes(String(userRole || '').toLowerCase())) {
-      setDbCourses([]);
-      setDbClasses([]);
-      return;
-    }
     Promise.all([
       apiClient.fetchCurriculum('matrix'),
       apiClient.fetchCurriculum('class')
     ]).then(([crs, cls]) => {
       setDbCourses(crs || []);
       setDbClasses(cls || []);
-    }).catch(e => console.error("Falha ao carregar dicionários", e));
-  }, [userRole]);
+    }).catch(e => {
+      console.error("Falha ao carregar dicionários", e);
+      setDbCourses([]);
+      setDbClasses([]);
+    });
+  }, []);
 
    const matrixDisciplinesMap = React.useMemo(() => {
      const map = {};
@@ -433,13 +432,23 @@ export function PortalView({
      }
    }, [mappedSchedules, selectedWeek, appMode, safeDays, setSelectedDay]);
 
+   const scheduleDerivedCourses = React.useMemo(() => {
+     return [...new Set(mappedSchedules.map(s => s.course))].filter(Boolean).sort((a,b) => a.localeCompare(b));
+   }, [mappedSchedules]);
+
+   const scheduleDerivedClasses = React.useMemo(() => {
+     return [...new Set(mappedSchedules.map(s => s.className))].filter(Boolean).sort((a,b) => a.localeCompare(b));
+   }, [mappedSchedules]);
+
    const dynamicCoursesList = React.useMemo(() => {
-     return ['Todos', ...[...new Set(dbCourses.map(c => c.course))].filter(Boolean).sort((a,b) => a.localeCompare(b))];
-   }, [dbCourses]);
+     const dbCourseNames = dbCourses.map(c => c.course).filter(Boolean);
+     return ['Todos', ...[...new Set([...dbCourseNames, ...scheduleDerivedCourses])].sort((a,b) => a.localeCompare(b))];
+   }, [dbCourses, scheduleDerivedCourses]);
 
    const dynamicClassesList = React.useMemo(() => {
-     return [...new Set(dbClasses.map(c => c.name))].filter(Boolean).sort((a,b) => a.localeCompare(b));
-   }, [dbClasses]);
+     const dbClassNames = dbClasses.map(c => c.name).filter(Boolean);
+     return [...new Set([...dbClassNames, ...scheduleDerivedClasses])].sort((a,b) => a.localeCompare(b));
+   }, [dbClasses, scheduleDerivedClasses]);
 
    const filteredCourseClasses = React.useMemo(() => {
      let classes = dynamicClassesList;
@@ -474,6 +483,14 @@ export function PortalView({
             .map(c => c.name)
             .filter(Boolean)
             .sort((a,b) => a.localeCompare(b));
+        } else {
+          lists = [...new Set(
+            mappedSchedules
+              .filter(s => String(s.course) === String(selectedCourse))
+              .map(s => s.className)
+          )]
+            .filter(Boolean)
+            .sort((a,b) => a.localeCompare(b));
         }
       }
       
@@ -487,7 +504,7 @@ export function PortalView({
       }
 
       return lists.length > 0 ? lists : dynamicClassesList;
-    }, [selectedCourse, dbClasses, dbCourses, dynamicClassesList, appMode, showOnlyMyClasses, schedules, siape]);
+    }, [selectedCourse, dbClasses, dbCourses, dynamicClassesList, appMode, showOnlyMyClasses, schedules, siape, mappedSchedules]);
 
    const dynamicWeeksList = React.useMemo(() => {
      if (!schedules || !Array.isArray(schedules) || !academicWeeks) return [];
