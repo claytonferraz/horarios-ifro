@@ -513,6 +513,24 @@ const configRoutes = require('./routes/config.routes')(io);
 const adminRoutes = require('./routes/admin.routes')(io);
 const requestsRoutes = require('./routes/requests.routes')(io);
 
+// ==========================================
+// ROTA PÚBLICA DE DICIONÁRIO DE CURRÍCULO
+// Leitura de matrizes e turmas é necessária para renderizar a grade
+// em qualquer modo (público, aluno, professor) — não deve ser bloqueada
+// pela flag publicSchedulesEnabled. Escrita permanece em /api/admin/curriculum.
+// ==========================================
+app.get('/api/curriculum/:type', (req, res) => {
+  const { type } = req.params;
+  if (!['matrix', 'class'].includes(type)) return res.status(400).json({ error: 'Tipo inválido' });
+  db.all("SELECT id, payload FROM curriculum_data WHERE dataType = ?", [type], (err, rows) => {
+    if (err) return res.status(500).json({ error: err.message });
+    const records = (rows || []).map(r => {
+      try { return JSON.parse(r.payload); } catch (e) { return null; }
+    }).filter(Boolean);
+    res.json(records);
+  });
+});
+
 app.use('/api/academic-weeks', attachUserIfPresent, requirePublicScheduleAccess, configRoutes);
 app.use('/api/admin', attachUserIfPresent, requirePublicScheduleAccess, adminRoutes);
 app.use('/api/requests', requestsRoutes);

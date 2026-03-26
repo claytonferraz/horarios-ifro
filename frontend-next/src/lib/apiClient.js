@@ -288,7 +288,7 @@ export const apiClient = {
 
   async fetchCurriculum(type) {
     try {
-      const res = await fetch(`${API_URL}/admin/curriculum/${type}`);
+      const res = await fetch(`${API_URL}/curriculum/${type}`);
       if (!res.ok) throw new Error(`Falha ao carregar ${type}`);
       return await res.json();
     } catch (e) {
@@ -298,7 +298,7 @@ export const apiClient = {
 
   async saveCurriculum(type, data) {
     try {
-      const res = await fetch(`${API_URL}/admin/curriculum/${type}`, { method: 'PUT', headers: getHeaders(), body: JSON.stringify(data) });
+      const res = await fetch(`${API_URL}/admin/curriculum/${type}`, { method: 'PUT', headers: getHeaders(), credentials: 'same-origin', body: JSON.stringify(data) });
       if (!res.ok) throw new Error(`Falha ao salvar ${type}`);
       return await res.json();
     } catch (e) {
@@ -308,7 +308,7 @@ export const apiClient = {
 
   async deleteCurriculum(type, id) {
     try {
-      const res = await fetch(`${API_URL}/admin/curriculum/${type}/${id}`, { method: 'DELETE', headers: getHeaders() });
+      const res = await fetch(`${API_URL}/admin/curriculum/${type}/${id}`, { method: 'DELETE', headers: getHeaders(), credentials: 'same-origin' });
       if (!res.ok) throw new Error(`Falha ao remover ${type}`);
       return await res.json();
     } catch (e) {

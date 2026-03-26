@@ -38,7 +38,7 @@ import { isTeacherPending, getColorHash } from "@/lib/dates";
 // ==========================================
 export function HomeApp({ appMode }) {
   const { rawData, setRawData, disabledWeeks, setDisabledWeeks, disciplinesMeta, academicYearsMeta, subjectHoursMeta, loadAdminMetadata, refreshData, academicWeeks, activeDays, classTimes, bimesters, intervals } = useData();
-  const { isDarkMode } = useTheme();
+  const { isDarkMode, isDim } = useTheme();
   const { isUnlocked, userRole, siape, userName, isLoadingAuth, login, logout } = useAuth();
 
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -93,7 +93,13 @@ export function HomeApp({ appMode }) {
   }, [academicWeeks, appMode, scheduleState.selectedWeek, scheduleState.scheduleMode, scheduleState.viewMode, scheduleState.selectedClass, scheduleState.selectedDay, scheduleState.selectedTeacher]);
 
   return (
-    <div className={`min-h-screen font-sans flex flex-col transition-colors duration-300 ${isDarkMode ? 'bg-slate-950 text-slate-100' : 'bg-slate-50 text-slate-800'}`}>
+    <div className={`min-h-screen font-sans flex flex-col transition-colors duration-300 ${
+        isDarkMode
+          ? 'bg-slate-950 text-slate-100'
+          : isDim
+          ? 'bg-[var(--dim-bg)] text-[var(--dim-text)]'
+          : 'bg-slate-50 text-slate-800'
+      }`}>
       
       <input type="file" ref={adminActions.compareInputRef} className="hidden" accept=".csv" onChange={adminActions.handleCompareFileChange} />
 

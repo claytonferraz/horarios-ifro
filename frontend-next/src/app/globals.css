@@ -1,15 +1,66 @@
 @import "tailwindcss";
 @plugin "tailwindcss-animate";
 @custom-variant dark (&:where(.dark, .dark *));
+@custom-variant dim (&:where(.dim, .dim *));
 
+/* ================================================
+   TEMA CLARO (padrão)
+   ================================================ */
 :root {
   --background: #f8fafc;
   --foreground: #1e293b;
 }
 
+/* ================================================
+   TEMA ESCURO
+   ================================================ */
 .dark {
   --background: #020617;
   --foreground: #f1f5f9;
+}
+
+/* ================================================
+   TEMA IFRO — "Verde Institucional"
+   Base clara com identidade visual do IFRO.
+   Princípios UX:
+     • Fundo levemente esverdeado reduz fadiga vs. branco puro
+       (evita o deslumbramento do #fff sob luz ambiente)
+     • Verde IFRO #00813C com contraste AA sobre branco e creme
+     • Superfícies em camadas de claridade crescente
+     • Bordas verdes suavíssimas para coesão da identidade
+   ================================================ */
+.dim {
+  --background: #f0f7f3;
+  --foreground: #0f2d1f;
+
+  /* Superfícies */
+  --dim-bg:          #f0f7f3;   /* fundo de página — creme-esverdeado */
+  --dim-surface:     #ffffff;   /* cards e painéis — branco limpo */
+  --dim-surface-2:   #e8f5ee;   /* hover, linhas zebradas */
+  --dim-surface-3:   #d4edde;  /* selecionado / ativo */
+
+  /* Bordas */
+  --dim-border:      #c8e6d4;   /* separadores suaves */
+  --dim-border-2:    #8dc9a5;   /* bordas de ênfase / foco */
+
+  /* Texto */
+  --dim-text:        #0f2d1f;   /* primário — verde muito escuro (quase preto) */
+  --dim-text-2:      #3d6e52;   /* secundário / muted */
+  --dim-text-3:      #6fa384;   /* placeholders / desabilitado */
+
+  /* Verde IFRO — #00813C e variações */
+  --dim-accent:      #00813C;   /* verde principal IFRO */
+  --dim-accent-h:    #006830;   /* hover — 10% mais escuro */
+  --dim-accent-l:    #e6f4ec;   /* fundo suave de badge/chip */
+  --dim-accent-glow: rgba(0,129,60,0.15);
+
+  /* Status */
+  --dim-success:     #00813C;
+  --dim-warning:     #92600a;
+  --dim-danger:      #be1b1b;
+
+  background: var(--dim-bg);
+  color: var(--dim-text);
 }
 
 @theme inline {
@@ -19,7 +70,7 @@
 }
 
 @media (prefers-color-scheme: dark) {
-  :root:not(.light) {
+  :root:not(.light):not(.dim) {
     --background: #020617;
     --foreground: #f1f5f9;
   }
@@ -31,9 +82,65 @@ body {
   @apply font-sans;
 }
 
-#root {
-  max-width: 1280px;
-  margin: 0 auto;
-  padding: 2rem;
-  text-align: center;
-}
+/* Scrollbar elegante para o tema IFRO */
+.dim ::-webkit-scrollbar { width: 6px; height: 6px; }
+.dim ::-webkit-scrollbar-track { background: var(--dim-bg); }
+.dim ::-webkit-scrollbar-thumb { background: var(--dim-border-2); border-radius: 9999px; }
+.dim ::-webkit-scrollbar-thumb:hover { background: var(--dim-accent); }
+
+/* ================================================
+   OVERRIDES GLOBAIS — TEMA DIM (Verde IFRO)
+   Substitui as cores padrão do tema claro (slate)
+   pelos tokens verdes sem alterar componentes JSX.
+   Estratégia: is isDarkMode=false no dim, todos os
+   componentes usam o branch "light" do ternário.
+   Estes overrides adicionam a identidade verde IFRO
+   sobre o visual já claro.
+   ================================================ */
+
+/* --- Fundos --- */
+.dim .bg-slate-50  { background-color: var(--dim-bg) !important; }
+.dim .bg-slate-100 { background-color: #e8f5ee !important; }
+
+/* --- Bordas --- */
+.dim .border-slate-200 { border-color: var(--dim-border) !important; }
+.dim .border-slate-300 { border-color: var(--dim-border-2) !important; }
+
+/* --- Texto --- */
+.dim .text-slate-500 { color: var(--dim-text-2) !important; }
+.dim .text-slate-400 { color: var(--dim-text-3) !important; }
+.dim .text-slate-600 { color: var(--dim-text-2) !important; }
+.dim .text-slate-700 { color: var(--dim-text) !important; }
+.dim .text-slate-800 { color: var(--dim-text) !important; }
+.dim .text-slate-900 { color: var(--dim-text) !important; }
+
+/* --- Botões primários azuis/índigo → Verde IFRO --- */
+.dim .bg-blue-600        { background-color: var(--dim-accent) !important; }
+.dim .bg-blue-700        { background-color: var(--dim-accent-h) !important; }
+.dim .bg-indigo-600      { background-color: var(--dim-accent) !important; }
+.dim .bg-indigo-700      { background-color: var(--dim-accent-h) !important; }
+.dim .hover\:bg-blue-700:hover   { background-color: var(--dim-accent-h) !important; }
+.dim .hover\:bg-indigo-700:hover { background-color: var(--dim-accent-h) !important; }
+
+/* --- Fundos suaves azuis/índigo → verde suave --- */
+.dim .bg-blue-50   { background-color: var(--dim-accent-l) !important; }
+.dim .bg-indigo-50 { background-color: var(--dim-accent-l) !important; }
+
+/* --- Texto/ícone azul/índigo → verde --- */
+.dim .text-blue-600   { color: var(--dim-accent) !important; }
+.dim .text-blue-400   { color: var(--dim-accent) !important; }
+.dim .text-indigo-600 { color: var(--dim-accent) !important; }
+.dim .text-indigo-400 { color: var(--dim-accent) !important; }
+
+/* --- Bordas azuis/índigo → verde --- */
+.dim .border-blue-200   { border-color: var(--dim-border) !important; }
+.dim .border-indigo-200 { border-color: var(--dim-border) !important; }
+
+/* --- Sombras --- */
+.dim .shadow-blue-200   { box-shadow: 0 4px 14px var(--dim-accent-glow) !important; }
+.dim .shadow-indigo-200 { box-shadow: 0 4px 14px var(--dim-accent-glow) !important; }
+
+/* --- Cabeçalhos de tabela e thead --- */
+.dim thead tr { background-color: var(--dim-surface-2) !important; }
+.dim .divide-slate-100 > * + * { border-color: var(--dim-border) !important; }
+
