@@ -1312,66 +1312,101 @@ export function MasterGrid({ isDarkMode, ...props }) {
                                   draggable
                                   onDragStart={(e) => handleDragStart(e, aulaNesteSlot, slotKey)}
                                   onDragEnd={handleDragEnd}
-                                  className={`group/card w-[95%] sm:w-[90%] mx-auto min-h-[56px] rounded flex flex-col justify-between p-2 cursor-grab transition-all shadow-sm overflow-hidden relative border hover:ring-2 ring-emerald-500`}
-                                  style={getCardStyle(aulaNesteSlot.courseId, aulaNesteSlot.classId, aulaNesteSlot.disciplina, isDarkMode)}
+                                  className={`group/card w-[95%] sm:w-[90%] mx-auto min-h-[56px] rounded flex flex-col justify-between p-2 cursor-grab transition-all shadow-sm overflow-hidden relative border hover:ring-2 ${
+                                      isVaga
+                                        ? 'vacant-slot-card ring-orange-400 border-orange-400 border-2 ' + (isDarkMode ? 'bg-orange-950/60 ring-offset-slate-800' : 'bg-orange-50 ring-offset-white')
+                                        : 'ring-emerald-500'
+                                  }`}
+                                  style={isVaga ? undefined : getCardStyle(aulaNesteSlot.courseId, aulaNesteSlot.classId, aulaNesteSlot.disciplina, isDarkMode)}
                                 >
-                                  {isVaga && (
-                                     <div className="absolute top-0 left-0 z-10 print:hidden shadow-sm pointer-events-none">
-                                        <span title="Aula Vaga (Sem Docente)" className="text-[5px] font-black uppercase tracking-widest text-white px-1.5 py-[2px] rounded-br-md border-b border-r border-rose-500/50 bg-rose-600 block shadow-sm shadow-rose-900/40 relative z-10">AULA VAGA</span>
-                                     </div>
-                                  )}
-                                  <button onClick={(e) => { e.preventDefault(); e.stopPropagation(); setGrade(prev => { const n = {...prev}; delete n[slotKey]; return n; }); }} className="absolute top-0 right-0 bg-rose-500 hover:bg-rose-600 text-white font-bold p-1 rounded-bl-md z-20 opacity-0 group-hover/card:opacity-100 cursor-pointer transition-opacity shadow-sm" title="Remover Aula do Horário" >
-                                    <X size={8} strokeWidth={4} />
-                                  </button>
+                                  {isVaga ? (
+                                    // ════ AULA VAGA — Layout Especial de Alta Visibilidade ════
+                                    <>
+                                      <button onClick={(e) => { e.preventDefault(); e.stopPropagation(); setGrade(prev => { const n = {...prev}; delete n[slotKey]; return n; }); }} className="absolute top-0 right-0 bg-rose-500 hover:bg-rose-600 text-white font-bold p-1 rounded-bl-md z-20 opacity-0 group-hover/card:opacity-100 cursor-pointer transition-opacity shadow-sm" title="Remover Aula do Horário" >
+                                        <X size={8} strokeWidth={4} />
+                                      </button>
+                                      <div className="flex flex-col items-center justify-center h-full gap-1.5 py-1">
+                                        <div className={`flex items-center gap-1.5 px-2 py-1 rounded-full text-[9px] font-black uppercase tracking-widest border ${
+                                          isDarkMode
+                                            ? 'bg-orange-500/20 border-orange-500/50 text-orange-300'
+                                            : 'bg-orange-100 border-orange-400 text-orange-700'
+                                        }`}>
+                                          <AlertTriangle size={10} className="shrink-0" />
+                                          AULA VAGA
+                                        </div>
+                                        <span className={`text-[9px] font-black uppercase tracking-widest truncate max-w-full px-1 text-center ${
+                                          isDarkMode ? 'text-orange-200/80' : 'text-orange-800/80'
+                                        }`}>
+                                          {aulaNesteSlot.disciplina}
+                                        </span>
+                                        <span className={`text-[8px] font-bold uppercase tracking-wider truncate px-1.5 py-0.5 rounded ${
+                                          isDarkMode ? 'bg-orange-900/40 text-orange-400/70' : 'bg-orange-100/60 text-orange-600/80'
+                                        }`}>
+                                          {aulaNesteSlot.className}
+                                        </span>
+                                        <span className={`text-[7px] font-black uppercase tracking-widest opacity-60 ${
+                                          isDarkMode ? 'text-orange-300' : 'text-orange-700'
+                                        }`}>
+                                          Sem Docente
+                                        </span>
+                                      </div>
+                                    </>
+                                  ) : (
+                                    // ════ AULA NORMAL ════
+                                    <>
+                                      <button onClick={(e) => { e.preventDefault(); e.stopPropagation(); setGrade(prev => { const n = {...prev}; delete n[slotKey]; return n; }); }} className="absolute top-0 right-0 bg-rose-500 hover:bg-rose-600 text-white font-bold p-1 rounded-bl-md z-20 opacity-0 group-hover/card:opacity-100 cursor-pointer transition-opacity shadow-sm" title="Remover Aula do Horário" >
+                                        <X size={8} strokeWidth={4} />
+                                      </button>
 
-                                  <span className="absolute top-0 right-0 bg-slate-200 dark:bg-slate-600 text-slate-500 dark:text-slate-300 font-bold px-1 rounded-bl-md text-[7px] group-hover/card:opacity-0 transition-opacity" title={`Qtd Total desta Aula no Horário da Turma`}>
-                                     {Object.values(grade).filter(g => String(g.classId) === String(aulaNesteSlot.classId) && String(g.id) === String(aulaNesteSlot.id)).length}/{aulaNesteSlot.numAulas || 1}
-                                  </span>
-                                  {aulaNesteSlot.isDisponibilizada && (
-                                     <div className="absolute top-0 left-0 z-10 print:hidden shadow-sm pointer-events-none">
-                                        <span title="Aula Disponibilizada pelo Titular" className="text-[5px] font-black uppercase tracking-widest text-white px-1.5 py-[2px] rounded-br-md border-b border-r border-amber-500/50 bg-amber-600 block shadow-sm shadow-amber-900/40 relative z-10">Oferecida</span>
-                                     </div>
-                                  )}
-                                  {aulaNesteSlot.isPermuted && (
-                                     <div className="absolute top-0 left-0 z-10 print:hidden shadow-sm pointer-events-none">
-                                        <span title="Aula permutada por Acordo" className="text-[5px] font-black uppercase tracking-widest text-[#FFFBEB] px-1.5 py-[2px] rounded-br-md border-b border-r border-amber-500/50 bg-amber-600 block shadow-sm shadow-amber-900/40 relative z-10">PERMUTADA</span>
-                                     </div>
-                                  )}
-                                  {aulaNesteSlot.isSubstituted && !aulaNesteSlot.isDisponibilizada && !aulaNesteSlot.isPermuted && (
-                                     <div className="absolute top-0 left-0 z-10 print:hidden shadow-sm pointer-events-none">
-                                        <span title="Aula assumida via Vaga" className="text-[5px] font-black uppercase tracking-widest text-white px-1.5 py-[2px] rounded-br-md border-b border-r border-indigo-500/50 bg-indigo-600 block shadow-sm shadow-indigo-900/40 relative z-10">Substituição</span>
-                                     </div>
-                                  )}
-                                  {aulaNesteSlot.classType && aulaNesteSlot.classType !== 'Regular' && (
-                                     <div className="absolute top-0 right-0 z-10 print:hidden shadow-sm pointer-events-none">
-                                        <span className="text-[5px] font-black uppercase tracking-widest text-white px-1.5 py-[2px] rounded-bl-md border-b border-l border-emerald-500/50 bg-emerald-600 block shadow-sm shadow-emerald-900/40 relative z-10">{aulaNesteSlot.classType}</span>
-                                     </div>
-                                  )}
-                                  <div className={`flex flex-col flex-1 shrink-0 ${isVaga ? 'mt-4 mb-1' : 'mt-3.5 mb-1'}`} title={`${aulaNesteSlot.disciplina} - ${aulaNesteSlot.className}`}>
-                                     <span className="text-[10px] font-black uppercase tracking-widest leading-none drop-shadow-sm">{aulaNesteSlot.disciplina}</span>
-                                     {aulaNesteSlot.isSubstituted && aulaNesteSlot.originalSubject && !aulaNesteSlot.isDisponibilizada && <span className="text-[7.5px] opacity-90 uppercase mt-0.5 leading-tight text-white bg-indigo-900/60 border border-indigo-400/30 rounded px-1 py-[1px] w-fit shadow-sm">Era: {aulaNesteSlot.originalSubject}</span>}
-                                     {aulaNesteSlot.isDisponibilizada && aulaNesteSlot.originalSubject && <span className="text-[7.5px] opacity-90 uppercase mt-0.5 leading-tight text-white bg-amber-900/60 border border-amber-400/30 rounded px-1 py-[1px] w-fit shadow-sm">Disp: {aulaNesteSlot.originalSubject}</span>}
-                                     <span className="text-[7.5px] opacity-90 font-bold tracking-widest truncate mt-1 break-words">{aulaNesteSlot.className}</span>
-                                  </div>
-                                  <div className="flex justify-between items-center mt-auto pt-1 gap-1" title={temAlertaProf ? profMsgText : "Professor e Local"}>
-                                    <div className={`flex items-center gap-1 overflow-hidden flex-1 ${temAlertaProf ? 'text-red-500 dark:text-red-400 bg-red-500/10 px-0.5 rounded border border-red-500/20' : 'text-slate-500 dark:text-slate-300'}`}>
-                                       {temAlertaProf && !isVaga && <AlertTriangle size={8} className="shrink-0" />}
-                                       <span className="truncate text-[9px] font-bold" title={aulaNesteSlot.professores?.join(' + ')}>
-                                           {isVaga ? 'PRECISA-SE DE PROF.' : 
-                                              (aulaNesteSlot.professores && aulaNesteSlot.professores.length > 0
-                                               ? aulaNesteSlot.professores.map(p => p.split(' ')[0]).join(' + ')
-                                               : 'A Def.')}
-                                       </span>
-                                       {aulaNesteSlot.teacherChanged && !isVaga && (
-                                           <Clock size={11} className="text-amber-500 dark:text-amber-400 shrink-0" title="Registro Histórico: Professor diverge da matriz atual." />
-                                       )}
-                                    </div>
-                                    {aulaNesteSlot.sala && (
-                                      <span className={`text-[8px] font-bold flex items-center gap-0.5 truncate px-1 py-[1px] rounded ${temAlertaSala ? 'bg-amber-500/20 text-amber-600 border border-amber-500/30' : 'bg-black/5 dark:bg-white/5 text-slate-400'}`} title={temAlertaSala ? alertasObj.salaText : "Local da Aula"}>
-                                        {temAlertaSala ? <AlertTriangle size={6} className="shrink-0" /> : <MapPin size={6} className="shrink-0" />} {aulaNesteSlot.sala.slice(0, 8)}
+                                      <span className="absolute top-0 right-0 bg-slate-200 dark:bg-slate-600 text-slate-500 dark:text-slate-300 font-bold px-1 rounded-bl-md text-[7px] group-hover/card:opacity-0 transition-opacity" title={`Qtd Total desta Aula no Horário da Turma`}>
+                                         {Object.values(grade).filter(g => String(g.classId) === String(aulaNesteSlot.classId) && String(g.id) === String(aulaNesteSlot.id)).length}/{aulaNesteSlot.numAulas || 1}
                                       </span>
-                                    )}
-                                  </div>
+                                      {aulaNesteSlot.isDisponibilizada && (
+                                         <div className="absolute top-0 left-0 z-10 print:hidden shadow-sm pointer-events-none">
+                                            <span title="Aula Disponibilizada pelo Titular" className="text-[5px] font-black uppercase tracking-widest text-white px-1.5 py-[2px] rounded-br-md border-b border-r border-amber-500/50 bg-amber-600 block shadow-sm shadow-amber-900/40 relative z-10">Oferecida</span>
+                                         </div>
+                                      )}
+                                      {aulaNesteSlot.isPermuted && (
+                                         <div className="absolute top-0 left-0 z-10 print:hidden shadow-sm pointer-events-none">
+                                            <span title="Aula permutada por Acordo" className="text-[5px] font-black uppercase tracking-widest text-[#FFFBEB] px-1.5 py-[2px] rounded-br-md border-b border-r border-amber-500/50 bg-amber-600 block shadow-sm shadow-amber-900/40 relative z-10">PERMUTADA</span>
+                                         </div>
+                                      )}
+                                      {aulaNesteSlot.isSubstituted && !aulaNesteSlot.isDisponibilizada && !aulaNesteSlot.isPermuted && (
+                                         <div className="absolute top-0 left-0 z-10 print:hidden shadow-sm pointer-events-none">
+                                            <span title="Aula assumida via Vaga" className="text-[5px] font-black uppercase tracking-widest text-white px-1.5 py-[2px] rounded-br-md border-b border-r border-indigo-500/50 bg-indigo-600 block shadow-sm shadow-indigo-900/40 relative z-10">Substituição</span>
+                                         </div>
+                                      )}
+                                      {aulaNesteSlot.classType && aulaNesteSlot.classType !== 'Regular' && (
+                                         <div className="absolute top-0 right-0 z-10 print:hidden shadow-sm pointer-events-none">
+                                            <span className="text-[5px] font-black uppercase tracking-widest text-white px-1.5 py-[2px] rounded-bl-md border-b border-l border-emerald-500/50 bg-emerald-600 block shadow-sm shadow-emerald-900/40 relative z-10">{aulaNesteSlot.classType}</span>
+                                         </div>
+                                      )}
+                                      <div className={`flex flex-col flex-1 shrink-0 mt-3.5 mb-1`} title={`${aulaNesteSlot.disciplina} - ${aulaNesteSlot.className}`}>
+                                         <span className="text-[10px] font-black uppercase tracking-widest leading-none drop-shadow-sm">{aulaNesteSlot.disciplina}</span>
+                                         {aulaNesteSlot.isSubstituted && aulaNesteSlot.originalSubject && !aulaNesteSlot.isDisponibilizada && <span className="text-[7.5px] opacity-90 uppercase mt-0.5 leading-tight text-white bg-indigo-900/60 border border-indigo-400/30 rounded px-1 py-[1px] w-fit shadow-sm">Era: {aulaNesteSlot.originalSubject}</span>}
+                                         {aulaNesteSlot.isDisponibilizada && aulaNesteSlot.originalSubject && <span className="text-[7.5px] opacity-90 uppercase mt-0.5 leading-tight text-white bg-amber-900/60 border border-amber-400/30 rounded px-1 py-[1px] w-fit shadow-sm">Disp: {aulaNesteSlot.originalSubject}</span>}
+                                         <span className="text-[7.5px] opacity-90 font-bold tracking-widest truncate mt-1 break-words">{aulaNesteSlot.className}</span>
+                                      </div>
+                                      <div className="flex justify-between items-center mt-auto pt-1 gap-1" title={temAlertaProf ? profMsgText : "Professor e Local"}>
+                                        <div className={`flex items-center gap-1 overflow-hidden flex-1 ${temAlertaProf ? 'text-red-500 dark:text-red-400 bg-red-500/10 px-0.5 rounded border border-red-500/20' : 'text-slate-500 dark:text-slate-300'}`}>
+                                           {temAlertaProf && <AlertTriangle size={8} className="shrink-0" />}
+                                           <span className="truncate text-[9px] font-bold" title={aulaNesteSlot.professores?.join(' + ')}>
+                                               {aulaNesteSlot.professores && aulaNesteSlot.professores.length > 0
+                                                ? aulaNesteSlot.professores.map(p => p.split(' ')[0]).join(' + ')
+                                                : 'A Def.'}
+                                           </span>
+                                           {aulaNesteSlot.teacherChanged && (
+                                               <Clock size={11} className="text-amber-500 dark:text-amber-400 shrink-0" title="Registro Histórico: Professor diverge da matriz atual." />
+                                           )}
+                                        </div>
+                                        {aulaNesteSlot.sala && (
+                                          <span className={`text-[8px] font-bold flex items-center gap-0.5 truncate px-1 py-[1px] rounded ${temAlertaSala ? 'bg-amber-500/20 text-amber-600 border border-amber-500/30' : 'bg-black/5 dark:bg-white/5 text-slate-400'}`} title={temAlertaSala ? alertasObj.salaText : "Local da Aula"}>
+                                            {temAlertaSala ? <AlertTriangle size={6} className="shrink-0" /> : <MapPin size={6} className="shrink-0" />} {aulaNesteSlot.sala.slice(0, 8)}
+                                          </span>
+                                        )}
+                                      </div>
+                                    </>
+                                  )}
                                 </div>
                               ) : (
                                 <div className={`w-[95%] sm:w-[90%] mx-auto min-h-[56px] rounded border border-dashed flex items-center justify-center transition-colors ${isDarkMode ? 'border-slate-700/50 hover:bg-slate-700/30' : 'border-slate-200 hover:bg-slate-50'}`}>

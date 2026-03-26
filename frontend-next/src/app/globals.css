@@ -144,3 +144,96 @@ body {
 .dim thead tr { background-color: var(--dim-surface-2) !important; }
 .dim .divide-slate-100 > * + * { border-color: var(--dim-border) !important; }
 
+/* ================================================
+   ANIMAÇÕES GLOBAIS DE ÍCONES
+   Todos os ícones Lucide React (SVG) ganham micro-animações
+   no hover dos elementos interativos. A animação ativa
+   apenas quando o ícone está dentro de um botão, link ou 
+   elemento com cursor:pointer — nunca ícones decorativos estáticos.
+   ================================================ */
+
+/* Ícones dentro de botões e links interativos */
+button:not([disabled]) svg,
+a svg,
+[role="button"] svg,
+label[for] svg {
+  transition: transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1),
+              color 0.2s ease,
+              opacity 0.2s ease;
+}
+
+/* Hover padrão: leve escala + rotação suave */
+button:not([disabled]):hover svg,
+a:hover svg,
+[role="button"]:hover svg {
+  transform: scale(1.15) rotate(-4deg);
+}
+
+/* Ícones de ação destrutiva (lixeira, fechar): rotação maior */
+button[title*="emov"] svg,
+button[title*="xclu"] svg,
+button[title*="apag"] svg,
+button[title*="elete"] svg,
+button[title*="limpar"] svg,
+button[title*="fechar"] svg,
+button[title*="Fechar"] svg,
+button[aria-label*="fechar"] svg {
+  transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1), color 0.2s ease;
+}
+button[title*="emov"]:hover svg,
+button[title*="xclu"]:hover svg,
+button[title*="apag"]:hover svg,
+button[title*="elete"]:hover svg,
+button[title*="limpar"]:hover svg,
+button[title*="fechar"]:hover svg,
+button[title*="Fechar"]:hover svg {
+  transform: scale(1.2) rotate(90deg);
+}
+
+/* Ícones de navegação (setas): translação horizontal */
+button[title*="próxi"]:hover svg,
+button[title*="anterior"]:hover svg,
+a[aria-label*="next"]:hover svg,
+a[aria-label*="prev"]:hover svg {
+  transform: translateX(3px) scale(1.1);
+}
+
+/* Links rápidos do topo (grupo .group) */
+.group:hover .group-hover\:rotate-12 { transform: rotate(12deg) scale(1.1) !important; }
+.group:hover .group-hover\:-rotate-12 { transform: rotate(-12deg) scale(1.1) !important; }
+.group:hover .group-hover\:scale-110 { transform: scale(1.15) !important; }
+.group:hover .group-hover\:rotate-6 { transform: rotate(6deg) scale(1.1) !important; }
+
+/* Ícone de Impressão — rebatida para baixo */
+button:hover .lucide-printer { transform: translateY(2px) scale(1.12); }
+
+/* Ícone de Calendário — pequena oscilação */
+@keyframes calendarBounce {
+  0%,100% { transform: translateY(0) scale(1); }
+  40%      { transform: translateY(-3px) scale(1.08); }
+  60%      { transform: translateY(1px) scale(0.97); }
+}
+button:hover .lucide-calendar-days { animation: calendarBounce 0.5s ease; }
+
+/* ================================================
+   ANIMAÇÃO DE BORDA PULSANTE — AULAS VAGAS
+   Usada no MasterGrid e TeacherGrid para destacar vagas.
+   ================================================ */
+@keyframes vacantPulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(251,146,60,0.5), inset 0 0 0 0 rgba(251,146,60,0); }
+  50%       { box-shadow: 0 0 0 6px rgba(251,146,60,0), inset 0 0 0 2px rgba(251,146,60,0.2); }
+}
+
+@keyframes vacantPulseDark {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(251,146,60,0.6), inset 0 0 0 0 rgba(251,146,60,0); }
+  50%       { box-shadow: 0 0 0 8px rgba(251,146,60,0), inset 0 0 0 2px rgba(251,146,60,0.3); }
+}
+
+.vacant-slot-card {
+  animation: vacantPulse 2.5s ease-in-out infinite;
+}
+.dark .vacant-slot-card {
+  animation: vacantPulseDark 2.5s ease-in-out infinite;
+}
+
+

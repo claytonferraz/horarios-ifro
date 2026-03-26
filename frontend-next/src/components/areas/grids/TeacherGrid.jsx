@@ -356,17 +356,20 @@ export const TeacherGrid = React.memo(
                                                         const finalInert = isGridInert || isExtraPending;
                                                         
                                                         let cardStyle = "print-clean-card p-2 rounded-xl border shadow-sm flex flex-col justify-center min-h-[76px] transition-all relative ";
-                                                        if (isExtraPending) {
-                                                           cardStyle += isDarkMode ? `bg-slate-800 border-dashed border-slate-500 text-slate-400 ${finalInert ? 'cursor-default opacity-80' : ''}` : `bg-slate-100 border-dashed border-slate-400 text-slate-500 ${finalInert ? 'cursor-default opacity-80' : ''}`;
-                                                        } else if (isVagaReal) {
-                                                           cardStyle += isDarkMode ? `bg-red-900/30 border-red-800/50 ${finalInert ? 'cursor-default' : 'cursor-pointer hover:scale-[1.02]'}` : `bg-red-50 border-red-300 ${finalInert ? 'cursor-default' : 'cursor-pointer hover:scale-[1.02]'}`;
-                                                        } else if (hasPendingSwap) {
-                                                           cardStyle += isDarkMode ? `bg-amber-900/30 border-amber-800/50 ${finalInert ? 'cursor-default' : 'cursor-pointer hover:scale-[1.02]'} text-amber-200 shadow-[0_0_10px_rgba(251,191,36,0.2)]` : `bg-amber-100 border-amber-400 text-amber-900 ${finalInert ? 'cursor-default' : 'cursor-pointer hover:scale-[1.02]'} shadow-[0_0_10px_rgba(251,191,36,0.2)]`;
-                                                        } else if (isActive) {
-                                                           cardStyle += getColorHash(r.subject, isDarkMode) + ` ring-2 ring-indigo-500 shadow-md ${finalInert ? 'cursor-default z-10' : 'cursor-pointer hover:scale-[1.02] z-10'}`;
-                                                        } else {
-                                                           cardStyle += isDarkMode ? `bg-slate-800/30 border-slate-700/50 opacity-40 grayscale ${finalInert ? 'cursor-default' : 'hover:grayscale-0 hover:opacity-100 cursor-pointer'}` : `bg-slate-100 border-slate-200 opacity-40 grayscale ${finalInert ? 'cursor-default' : 'hover:grayscale-0 hover:opacity-100 cursor-pointer'}`;
-                                                        }
+                                                         if (isExtraPending) {
+                                                            cardStyle += isDarkMode ? `bg-slate-800 border-dashed border-slate-500 text-slate-400 ${finalInert ? 'cursor-default opacity-80' : ''}` : `bg-slate-100 border-dashed border-slate-400 text-slate-500 ${finalInert ? 'cursor-default opacity-80' : ''}`;
+                                                         } else if (isVagaReal) {
+                                                            // 🟠 AULA VAGA — laranja vibrante + borda pulsante
+                                                            cardStyle += `vacant-slot-card ${isDarkMode ? 'bg-orange-950/50 border-orange-500/70 text-orange-200' : 'bg-orange-50 border-orange-400 text-orange-900'} border-2 ${finalInert ? 'cursor-default' : 'cursor-pointer hover:scale-[1.03] hover:border-orange-500'}`;
+                                                         } else if (hasPendingSwap) {
+                                                            cardStyle += isDarkMode ? `bg-amber-900/30 border-amber-800/50 ${finalInert ? 'cursor-default' : 'cursor-pointer hover:scale-[1.02]'} text-amber-200 shadow-[0_0_10px_rgba(251,191,36,0.2)]` : `bg-amber-100 border-amber-400 text-amber-900 ${finalInert ? 'cursor-default' : 'cursor-pointer hover:scale-[1.02]'} shadow-[0_0_10px_rgba(251,191,36,0.2)]`;
+                                                         } else if (isActive) {
+                                                            // 🔵 MINHAS AULAS — azul-índigo com anel nítido
+                                                            cardStyle += `${isDarkMode ? 'bg-indigo-900/60 border-indigo-500 text-indigo-100 shadow-[0_0_14px_rgba(99,102,241,0.3)]' : 'bg-indigo-50 border-indigo-400 text-indigo-900 shadow-[0_4px_12px_rgba(99,102,241,0.15)]'} ring-2 ring-indigo-400/50 ${finalInert ? 'cursor-default z-10' : 'cursor-pointer hover:scale-[1.02] hover:ring-indigo-500 z-10'}`;
+                                                         } else {
+                                                            // 👥 COLEGA DE TURMA — glassmorphism sutil, não muito opaco
+                                                            cardStyle += isDarkMode ? `bg-slate-700/40 border-slate-600/50 backdrop-blur-sm ${finalInert ? 'cursor-default opacity-55' : 'hover:opacity-90 hover:bg-slate-700/70 cursor-pointer opacity-55'}` : `bg-slate-100/80 border-slate-300/80 backdrop-blur-sm ${finalInert ? 'cursor-default opacity-60' : 'hover:opacity-100 hover:bg-slate-200/90 cursor-pointer opacity-60'}`;
+                                                         }
 
                                                         return (
                                                           <div
@@ -438,11 +441,11 @@ export const TeacherGrid = React.memo(
                                                                 </div>
                                                             )}
                                                             <React.Fragment>
-                                                              <p className={"subject font-black text-xs sm:text-sm leading-snug text-center drop-shadow-sm mt-1 " + (!isActive ? "text-slate-500" : "")}>{r.subject || "Pendente"}</p>
-                                                              <span className={"details text-[10px] sm:text-xs font-black tracking-widest px-2 py-1 rounded mt-1 w-fit uppercase mx-auto shadow-sm " + (isActive ? (isDarkMode ? 'bg-white/25 text-white' : 'bg-black/10 text-slate-900') : (isDarkMode ? 'bg-slate-700 text-slate-400' : 'bg-slate-200 text-slate-500'))}>
-                                                                {!isActive ? resolveTeacherName(r.teacherId, globalTeachers).split(' ')[0] : (r.className || 'Sem Turma') + (r.room ? ' - ' + r.room : '')}
-                                                              </span>
-                                                            </React.Fragment>
+                                                               <p className={"subject font-black text-xs sm:text-sm leading-snug text-center drop-shadow-sm mt-1 " + (isVagaReal ? "text-orange-700 dark:text-orange-300" : !isActive ? "text-slate-500 dark:text-slate-400" : "")}>{r.subject || "Pendente"}</p>
+                                                               <span className={"details text-[10px] sm:text-xs font-black tracking-widest px-2 py-1 rounded mt-1 w-fit uppercase mx-auto shadow-sm " + (isVagaReal ? (isDarkMode ? 'bg-orange-900/40 text-orange-300 border border-orange-700/50' : 'bg-orange-100 text-orange-700 border border-orange-300') : isActive ? (isDarkMode ? 'bg-indigo-800/60 text-indigo-100 border border-indigo-600/50' : 'bg-indigo-100 text-indigo-800 border border-indigo-300') : (isDarkMode ? 'bg-slate-700 text-slate-400' : 'bg-slate-200 text-slate-500'))}>
+                                                                 {isVagaReal ? '⚠ Sem Professor' : !isActive ? resolveTeacherName(r.teacherId, globalTeachers).split(' ').slice(0,2).join(' ') : (r.className || 'Sem Turma') + (r.room ? ' · ' + r.room : '')}
+                                                               </span>
+                                                             </React.Fragment>
                                                           </div>
                                                         );
                                                       },
