@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { CalendarDays, GripVertical, AlertCircle, Save, Filter, MapPin, Loader2, Download, X, Check, Layers, Trash2, Eye, EyeOff, Target, CheckCircle2, AlertTriangle, Clock, Bell } from 'lucide-react';
 import { useData } from '@/contexts/DataContext';
-import { MAP_DAYS, getColorHash, resolveTeacherName } from '@/lib/dates';
+import { MAP_DAYS, getColorHash, resolveTeacherName, isTeacherPending } from '@/lib/dates';
 import { apiClient, getHeaders } from '@/lib/apiClient';
 import { FloatingRequestsWidget } from './FloatingRequestsWidget';
 import { SearchableSelect } from '../SearchableSelect';
@@ -506,21 +506,25 @@ export function MasterGrid({ isDarkMode, ...props }) {
 
   // === MOTOR DE PREVENÇÃO DE CONFLITOS (CHOQUE DE HORÁRIO) ===
   const verificarChoqueHorario = (teacherIdsArray, sala, diaId, hora, currentClassId) => {
-    let pMsg = null;
+    let pMsg = [];
     let sMsg = null;
+    let profDetails = []; // { tId, otherClassName }
+    let salaDetail = null; // { sala, otherClassName }
 
-    // 1. Verifica na grade que está sendo editada na tela agora (CORRIGIDO AQUI)
+    // 1. Verifica na grade que está sendo editada na tela agora
     for (const [key, aula] of Object.entries(grade)) {
       const [kClassId, kDiaId, kHora] = key.split('|');
       if (kDiaId === String(diaId) && kHora === hora && kClassId !== String(currentClassId)) {
          for (const tId of teacherIdsArray) {
-           if (tId && tId !== 'A Definir' && tId !== '-' && aula.teacherIds?.includes(tId)) {
-              if (!pMsg) pMsg = [];
-              pMsg.push(`O professor ${tId} já está na turma ${aula.className}.`);
+           if (tId && !isTeacherPending(tId) && aula.teacherIds?.includes(tId)) {
+              const msg = `O professor ${tId} já está na turma ${aula.className}.`;
+              if (!pMsg.includes(msg)) pMsg.push(msg);
+              profDetails.push({ tId, otherClassName: aula.className });
            }
          }
          if (sala && aula.sala && aula.sala === sala) {
             sMsg = `O ambiente "${sala}" já está alocado para a turma ${aula.className}.`;
+            salaDetail = { sala, otherClassName: aula.className };
          }
       }
     }
@@ -532,19 +536,28 @@ export function MasterGrid({ isDarkMode, ...props }) {
     }) || [];
     for (const row of relRows) {
        for (const tId of teacherIdsArray) {
-         if (tId && tId !== 'A Definir' && tId !== '-' && row.teacherId && String(row.teacherId).split(',').includes(String(tId))) {
+         if (tId && !isTeacherPending(tId) && row.teacherId && String(row.teacherId).split(',').includes(String(tId))) {
             const turmaConflito = classesList?.find(c => String(c.id) === String(row.classId));
-            if (!pMsg) pMsg = [];
-            pMsg.push(`Este professor ${tId} já está alocado na turma externa "${turmaConflito?.name || 'Desconhecida'}".`);
+            const msg = `Este professor ${tId} já está alocado na turma externa "${turmaConflito?.name || 'Desconhecida'}".`;
+            if (!pMsg.includes(msg)) pMsg.push(msg);
+            profDetails.push({ tId, otherClassName: turmaConflito?.name || 'Externa' });
          }
        }
        if (sala && row.room && row.room === sala) {
           const turmaConflito = classesList?.find(c => String(c.id) === String(row.classId));
           sMsg = `O espaço/sala "${sala}" já está sendo usado pela turma "${turmaConflito?.name || 'Externa'}".`;
+          salaDetail = { sala, otherClassName: turmaConflito?.name || 'Externa' };
        }
     }
     
-    if (pMsg || sMsg) return { profMsg: pMsg?.join(' '), salaMsg: sMsg };
+    if (pMsg.length > 0 || sMsg) {
+      return { 
+        profMsg: pMsg.join(' '), 
+        salaMsg: sMsg, 
+        profDetails, 
+        salaDetail 
+      };
+    }
     return null;
   };
 
@@ -759,39 +772,35 @@ export function MasterGrid({ isDarkMode, ...props }) {
       if (aula && aula.teacherIds && aula.teacherIds.length > 0 && aula.teacherIds[0] !== 'A Definir' && aula.teacherIds[0] !== '-') {
          const strConflito = verificarChoqueHorario(aula.teacherIds, aula.sala, diaId, hora, classId);
          if (strConflito) {
-            if (strConflito.profMsg) {
+            if (strConflito.profDetails && strConflito.profDetails.length > 0) {
                 cellAlerts[slotKey].profAlert = true;
                 cellAlerts[slotKey].profText = strConflito.profMsg;
                 
-                const profsList = aula.teacherIds || (aula.teacherId ? String(aula.teacherId).split(',') : []);
-                profsList.forEach(tId => {
-                    if (tId && tId !== 'A Definir' && tId !== '-') {
-                        const uniqueKey = `${tId}_${diaId}_${hora}`;
-                        if (!teacherConflictsTracker.has(uniqueKey)) {
-                            teacherConflictsTracker.add(uniqueKey);
-                            const profName = resolveTeacherName(tId, globalTeachersList).split(' ')[0] || tId;
-                            alerts.push(`[${diaId} às ${hora}] - Choque: Prof(a) ${profName} alocado(a) em múltiplas turmas simultaneamente.`);
-                        }
+                strConflito.profDetails.forEach(detail => {
+                    const uniqueKey = `${detail.tId}_${diaId}_${hora}_${classId}_${detail.otherClassName}`;
+                    if (!teacherConflictsTracker.has(uniqueKey)) {
+                        teacherConflictsTracker.add(uniqueKey);
+                        const profName = resolveTeacherName(detail.tId, globalTeachersList) || detail.tId;
+                        alerts.push(`[${diaId} às ${hora} | Turma: ${aula.className}] - Choque de Professor: ${profName} também está alocado(a) na turma ${detail.otherClassName}.`);
                     }
                 });
             }
 
-            if (strConflito.salaMsg) {
+            if (strConflito.salaDetail) {
                 cellAlerts[slotKey].salaAlert = true;
                 cellAlerts[slotKey].salaText = strConflito.salaMsg;
                 
-                if (aula.sala && aula.sala !== 'A Definir' && aula.sala !== '-') {
-                    const uniqueKey = `${aula.sala}_${diaId}_${hora}`;
-                    if (!roomConflictsTracker.has(uniqueKey)) {
-                        roomConflictsTracker.add(uniqueKey);
-                        alerts.push(`[${diaId} às ${hora}] - Choque: Ambiente '${aula.sala}' alocado para múltiplas turmas.`);
-                    }
+                const detail = strConflito.salaDetail;
+                const uniqueKey = `${detail.sala}_${diaId}_${hora}_${classId}_${detail.otherClassName}`;
+                if (!roomConflictsTracker.has(uniqueKey)) {
+                    roomConflictsTracker.add(uniqueKey);
+                    alerts.push(`[${diaId} às ${hora} | Turma: ${aula.className}] - Choque de Ambiente: '${detail.sala}' também está alocado para a turma ${detail.otherClassName}.`);
                 }
             }
          }
 
          aula.teacherIds.forEach(tId => {
-             if (tId === 'A Definir' || tId === '-') return;
+             if (isTeacherPending(tId)) return;
              const profSlots = new Set();
              for (const [k, dObj] of Object.entries(grade)) {
                  if (k.split('|')[1] === diaId && dObj.teacherIds?.includes(tId)) profSlots.add(k.split('|')[2]);
@@ -809,7 +818,7 @@ export function MasterGrid({ isDarkMode, ...props }) {
                  if (!cellAlerts[slotKey].profAlertMsg) cellAlerts[slotKey].profAlertMsg = [];
                  cellAlerts[slotKey].profAlertMsg.push(noRest);
                  cellAlerts[slotKey].profAlert = true;
-                 const pName = resolveTeacherName(tId, globalTeachersList).split(' ')[0];
+                 const pName = resolveTeacherName(tId, globalTeachersList);
                  if (!alerts.some(a => a.includes(`[${diaId}] Professor(a) ${pName} leciona sem descanso`))) {
                      alerts.push(`[${diaId}] Professor(a) ${pName} leciona sem descanso entre Turnos (M->T).`);
                  }
@@ -824,7 +833,7 @@ export function MasterGrid({ isDarkMode, ...props }) {
                 if (!cellAlerts[slotKey].profAlertMsg) cellAlerts[slotKey].profAlertMsg = [];
                 cellAlerts[slotKey].profAlertMsg.push(threeShifts);
                 cellAlerts[slotKey].profAlert = true;
-                const pName = resolveTeacherName(tId, globalTeachersList).split(' ')[0];
+                const pName = resolveTeacherName(tId, globalTeachersList);
                 if (!alerts.some(a => a.includes(`[${diaId}] Professor(a) ${pName} atua`))) {
                      alerts.push(`[${diaId}] Professor(a) ${pName} atua em 3 Turnos diferentes.`);
                 }
