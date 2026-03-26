@@ -317,13 +317,23 @@ export const apiClient = {
   },
 
   async fetchTeachers(userRole) {
-    if (!isAdminLikeRole(userRole)) return [];
+    // Admins get the full list (with email, status, etc.)
+    if (isAdminLikeRole(userRole)) {
+      try {
+        const res = await fetch(`${API_URL}/admin/teachers`, { headers: getHeaders(), credentials: 'same-origin' });
+        if (!res.ok) throw new Error('Falha ao buscar professores');
+        return await res.json();
+      } catch (e) {
+        throw e;
+      }
+    }
+    // Public/aluno/professor: use the public endpoint (only name + siape, no sensitive data)
     try {
-      const res = await fetch(`${API_URL}/admin/teachers`, { headers: getHeaders(), credentials: 'same-origin' });
-      if (!res.ok) throw new Error('Falha ao buscar professores');
+      const res = await fetch(`${API_URL}/teachers`);
+      if (!res.ok) throw new Error('Falha ao buscar lista pública de professores');
       return await res.json();
     } catch (e) {
-      throw e;
+      return [];
     }
   },
 

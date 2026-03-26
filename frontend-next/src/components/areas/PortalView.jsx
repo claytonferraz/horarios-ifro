@@ -936,7 +936,7 @@ export function PortalView({
                         <UserCircle size={14} /> Meu Horário
                       </button>
 
-                      <button onClick={() => setViewMode('curso')} 
+                      <button onClick={() => { setViewMode('curso'); if (siape) { setPadraoFilterTeacher(siape); setShowOnlyMyClasses(false); } }} 
                               className={"flex flex-1 sm:flex-none min-w-[130px] items-center justify-center gap-2 px-4 py-3 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all " + (viewMode === 'curso' ? 'bg-emerald-600 text-white shadow-lg ring-2 ring-emerald-400/50' : (isDarkMode ? 'bg-slate-800 text-slate-300 hover:text-white hover:bg-slate-700' : 'bg-white text-slate-600 border border-slate-200 hover:text-slate-900'))}>
                         <Layers size={14} /> Permutas e Reposições
                       </button>
@@ -981,6 +981,7 @@ export function PortalView({
 
               {viewMode !== 'solicitacoes' && (
                 <React.Fragment>
+
               {/* Filtros Específicos para renderização */}
               {viewMode !== 'curso' && viewMode !== 'sem_professor' && (
                 <div className={`grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 p-3 rounded-xl border no-print ${isDarkMode ? 'bg-slate-900/50 border-slate-800' : 'bg-slate-50 border-slate-100'}`}>

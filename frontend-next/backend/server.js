@@ -519,6 +519,21 @@ const requestsRoutes = require('./routes/requests.routes')(io);
 // em qualquer modo (público, aluno, professor) — não deve ser bloqueada
 // pela flag publicSchedulesEnabled. Escrita permanece em /api/admin/curriculum.
 // ==========================================
+// ==========================================
+// ROTA PÚBLICA DE LISTA DE PROFESSORES
+// Retorna apenas siape + nomes (sem dados sensíveis).
+// Necessário para o select de professor no painel do Aluno e acesso público.
+// ==========================================
+app.get('/api/teachers', attachUserIfPresent, requirePublicScheduleAccess, (req, res) => {
+  db.all(
+    "SELECT siape, nome_exibicao, nome_completo FROM users WHERE status = 'ativo' AND atua_como_docente = 1 ORDER BY COALESCE(NULLIF(nome_exibicao,''), nome_completo) ASC",
+    (err, rows) => {
+      if (err) return res.status(500).json({ error: err.message });
+      res.json(rows || []);
+    }
+  );
+});
+
 app.get('/api/curriculum/:type', (req, res) => {
   const { type } = req.params;
   if (!['matrix', 'class'].includes(type)) return res.status(400).json({ error: 'Tipo inválido' });

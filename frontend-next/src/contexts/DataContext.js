@@ -30,11 +30,22 @@ export function DataProvider({ children }) {
   const [globalTeachers, setGlobalTeachers] = useState([]);
   const loadMetadata = useCallback(async (role = userRole) => {
     const canLoadAdminData = ['admin', 'gestao'].includes(String(role || '').toLowerCase());
+
+    // Sempre carrega a lista de professores (endpoint público para roles básicos,
+    // endpoint completo para admins). Isso é necessário para o select de professor
+    // no painel do Aluno / acesso público.
+    try {
+      const teachers = await apiClient.fetchTeachers(role);
+      setGlobalTeachers(teachers || []);
+    } catch (err) {
+      console.warn("Falha ao carregar lista de professores:", err.message);
+      setGlobalTeachers([]);
+    }
+
     if (!canLoadAdminData) {
       setSubjectHoursMeta({});
       setDisciplinesMeta({});
       setAcademicYearsMeta({});
-      setGlobalTeachers([]);
       return;
     }
 
@@ -45,8 +56,6 @@ export function DataProvider({ children }) {
         setDisciplinesMeta(meta.disciplines || {});
         setAcademicYearsMeta(meta.academicYears || {});
       }
-      const teachers = await apiClient.fetchTeachers(role);
-      setGlobalTeachers(teachers || []);
     } catch (err) {
       console.warn("Falha ao carregar metadados administrativos:", err.message);
     }

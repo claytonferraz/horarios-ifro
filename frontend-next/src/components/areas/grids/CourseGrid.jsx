@@ -56,11 +56,19 @@ export const CourseGrid = React.memo(
     const activeTeacherFilter = showOnlyMyClasses ? siape : (padraoFilterTeacher && padraoFilterTeacher !== "Todos" ? padraoFilterTeacher : null);
 
     const availableCourses = useMemo(() => {
-      let schedulesToConsider = mappedSchedules;
+      let filteredSchedules = mappedSchedules;
+      
+      // Se houver filtro de professor, as abas de curso devem mostrar apenas 
+      // os cursos onde esse professor (ou aulas vagas) estão presentes.
       if (activeTeacherFilter) {
-          return ["Todas as Turmas do Professor"];
+        filteredSchedules = mappedSchedules.filter(r => {
+           const isMatch = r.teacherId && String(r.teacherId).split(',').includes(String(activeTeacherFilter));
+           const isVacant = isTeacherPending(r.teacherId || r.teacher);
+           return isMatch || isVacant;
+        });
       }
-      return [...new Set(schedulesToConsider.map((r) => r.course))]
+
+      return [...new Set(filteredSchedules.map((r) => r.course))]
         .filter(Boolean)
         .sort((a, b) => a.localeCompare(b));
     }, [mappedSchedules, activeTeacherFilter]);
@@ -141,13 +149,12 @@ export const CourseGrid = React.memo(
                     </div>
 
                     <div className="flex flex-col sm:flex-row items-start sm:items-center justify-end gap-3 mt-2 sm:mt-0 w-full sm:w-auto">
-                      {appMode === "professor" &&
-                        setPadraoFilterTeacher && (
+                      {setPadraoFilterTeacher && (
                           <div className="w-full sm:w-56 text-black">
                             <SearchableSelect
                               isDarkMode={false}
                               options={[
-                                { value: "Todos", label: "Todos os Colegas" },
+                                { value: "Todos", label: "Filtrar por Professor" },
                                 ...(globalTeachers || []).map((t) => ({
                                   value: String(t.siape || t.id),
                                   label:
@@ -178,7 +185,7 @@ export const CourseGrid = React.memo(
                             }}
                             className="accent-indigo-500 w-3.5 h-3.5"
                           />
-                          Apenas as Minhas
+                          Apenas Minhas
                         </label>
                       )}
                       <button
@@ -226,9 +233,17 @@ export const CourseGrid = React.memo(
                         activeCourseClasses.includes(c),
                       );
                     }
-                    const courseRecords = activeTeacherFilter 
-                       ? mappedSchedules
-                       : mappedSchedules.filter((r) => r.course === course);
+                    const courseRecords = mappedSchedules.filter((r) => {
+                      // O registro deve pertencer ao curso atual desta grade
+                      if (r.course !== course) return false;
+                      // Se houver filtro de professor, mostrar apenas as dele (+ vagas)
+                      if (activeTeacherFilter) {
+                        const isMatch = r.teacherId && String(r.teacherId).split(',').includes(String(activeTeacherFilter));
+                        const isVacant = isTeacherPending(r.teacherId || r.teacher);
+                        return isMatch || isVacant;
+                      }
+                      return true;
+                    });
 
                     const courseGlobalShifts = new Set(
                        courseRecords.map((r) => {
