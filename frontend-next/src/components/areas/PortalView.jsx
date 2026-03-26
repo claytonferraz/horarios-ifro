@@ -102,23 +102,33 @@ export function PortalView({
     }
   }, [appMode, selectedCourse, selectedClass]);
 
+  const canReadProtectedRequests = React.useMemo(() => {
+    if (appMode === 'professor') return !!siape;
+    return ['admin', 'gestao'].includes(String(userRole || '').toLowerCase());
+  }, [appMode, siape, userRole]);
+
   const loadPendingRequests = React.useCallback(() => {
-    if (selectedWeek) {
-      apiClient.fetchRequests().then(reqs => {
-        if (reqs) {
-          setPendingRequests(reqs.filter(r => (r.status === 'pendente' || r.status === 'pending' || r.status === 'aguardando_colega' || r.status === 'pronto_para_homologacao') && r.week_id === selectedWeek));
-        }
-      }).catch(e => console.error("Error fetching requests for alerts", e));
+    if (!selectedWeek || !canReadProtectedRequests) {
+      setPendingRequests([]);
+      return;
     }
-  }, [selectedWeek]);
+
+    apiClient.fetchRequests().then(reqs => {
+      if (reqs) {
+        setPendingRequests(reqs.filter(r => (r.status === 'pendente' || r.status === 'pending' || r.status === 'aguardando_colega' || r.status === 'pronto_para_homologacao') && r.week_id === selectedWeek));
+      }
+    }).catch(e => console.error("Error fetching requests for alerts", e));
+  }, [selectedWeek, canReadProtectedRequests]);
 
   React.useEffect(() => {
     loadPendingRequests();
+    if (!canReadProtectedRequests) return;
+
     const socket = getSocketClient();
     const onScheduleUpdated = () => loadPendingRequests();
     socket.on('schedule_updated', onScheduleUpdated);
     return () => socket.off('schedule_updated', onScheduleUpdated);
-  }, [loadPendingRequests, scheduleMode]);
+  }, [loadPendingRequests, scheduleMode, canReadProtectedRequests]);
 
   const [draggingRecord, setDraggingRecord] = useState(null);
   const [exchangeTarget, setExchangeTarget] = useState(null);
