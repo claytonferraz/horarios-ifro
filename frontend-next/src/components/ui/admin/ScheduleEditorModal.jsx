@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { X, Save, AlertCircle, Clock, Copy, Plus, Trash2 } from 'lucide-react';
 import { apiClient } from '@/lib/apiClient';
+import { useData } from '@/contexts/DataContext';
 
 export function ScheduleEditorModal({ 
   isOpen, onClose, isDarkMode, 
@@ -15,6 +16,17 @@ export function ScheduleEditorModal({
   const [matrixData, setMatrixData] = useState([]);
   const [classesData, setClassesData] = useState([]);
   const [usersList, setUsersList] = useState([]);
+  const { academicWeeks = [], selectedConfigYear } = useData();
+
+  const currentClassObj = classesData.find(c => c.name === className || String(c.id) === String(className));
+
+  const weekOptions = academicWeeks
+    .filter(w => String(w.academic_year) === String(selectedConfigYear))
+    .sort((a, b) => {
+      const aStart = new Date(a.start_date || 0).getTime();
+      const bStart = new Date(b.start_date || 0).getTime();
+      return aStart - bStart;
+    });
 
   useEffect(() => {
     if (isOpen) {
@@ -28,7 +40,7 @@ export function ScheduleEditorModal({
 
   useEffect(() => {
     if (isOpen) {
-      const recordsForSlot = courseRecords.filter(r => r.className === className && r.day === day && r.time === time);
+      const recordsForSlot = courseRecords.filter(r => (r.className === className || String(r.classId) === String(className)) && r.day === day && r.time === time);
       if (recordsForSlot.length > 0) {
         setLocalRecords(JSON.parse(JSON.stringify(recordsForSlot)));
       } else {
@@ -45,9 +57,25 @@ export function ScheduleEditorModal({
     }
   }, [isOpen, className, day, time, courseRecords]);
 
+  useEffect(() => {
+    if (!isOpen || scheduleMode !== 'padrao') return;
+    if (selectedWeek) {
+      setExtraWeek(String(selectedWeek));
+      return;
+    }
+    if (weekOptions.length > 0) {
+      setExtraWeek(String(weekOptions[0].id));
+    }
+  }, [isOpen, scheduleMode, selectedWeek, weekOptions]);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    checkInconsistencies();
+  }, [localRecords, classesData, matrixData, usersList, weekData, classTimes, isOpen]);
+
   const checkInconsistencies = () => {
      // Validate all slots for this class in the week against 'aulas_semanais' in matrix
-     const classInfo = classesData.find(c => c.name === className);
+     const classInfo = classesData.find(c => c.name === className || String(c.id) === String(className));
      if (!classInfo) return setInconsistencies([]);
      
      const matrix = matrixData.find(m => m.id === classInfo.matrixId);
@@ -56,7 +84,7 @@ export function ScheduleEditorModal({
      if (!serie) return setInconsistencies([]);
 
      const issues = [];
-     const classTotalRecords = courseRecords.filter(r => r.className === className);
+     const classTotalRecords = courseRecords.filter(r => r.className === className || String(r.classId) === String(className));
 
      // Check Turn Conflicts
      classTotalRecords.forEach(r => {
@@ -105,7 +133,6 @@ export function ScheduleEditorModal({
      setInconsistencies([...new Set(issues)]);
   };
 
-  const currentClassObj = classesData.find(c => c.name === className);
   let availableDisciplines = [];
   if (currentClassObj) {
      const matrix = matrixData.find(m => m.id === currentClassObj.matrixId);
@@ -113,11 +140,11 @@ export function ScheduleEditorModal({
         const serie = matrix.series.find(s => s.id === currentClassObj.serieId);
         if (serie) {
            availableDisciplines = serie.disciplines;
-           if (userRole === 'professor') {
-              availableDisciplines = availableDisciplines.filter(d => {
+          if (userRole === 'professor') {
+             availableDisciplines = availableDisciplines.filter(d => {
                  const mappedProfs = currentClassObj.professorAssignments?.[d.id] || [];
                  return mappedProfs.includes(String(siape));
-              });
+             });
            }
         }
      }
@@ -127,15 +154,14 @@ export function ScheduleEditorModal({
     setLocalRecords(prev => prev.map(r => r.id === id ? { ...r, [field]: val } : r));
     // Auto Suggest Teacher
     if (field === 'subject' && currentClassObj && currentClassObj.professorAssignments) {
-       const mappedProfs = currentClassObj.professorAssignments[
-         availableDisciplines.find(d => d.name === val)?.id
-       ];
+       const mappedDiscipline = availableDisciplines.find(d => d.name === val);
+       const mappedProfs = mappedDiscipline ? currentClassObj.professorAssignments?.[mappedDiscipline.id] : [];
        if (mappedProfs && mappedProfs.length > 0) {
-          setLocalRecords(prev => prev.map(r => r.id === id ? { ...r, subject: val, teacher: userRole === 'professor' ? String(siape) : mappedProfs[0] } : r));
+          setLocalRecords(prev => prev.map(r => r.id === id ? { ...r, subject: val, disciplineId: mappedDiscipline?.id || r.disciplineId, teacher: userRole === 'professor' ? String(siape) : mappedProfs[0] } : r));
        } else if (userRole === 'professor') {
-          setLocalRecords(prev => prev.map(r => r.id === id ? { ...r, subject: val, teacher: String(siape) } : r));
+          setLocalRecords(prev => prev.map(r => r.id === id ? { ...r, subject: val, disciplineId: mappedDiscipline?.id || r.disciplineId, teacher: String(siape) } : r));
        } else {
-          setLocalRecords(prev => prev.map(r => r.id === id ? { ...r, subject: val, teacher: 'A Definir' } : r));
+          setLocalRecords(prev => prev.map(r => r.id === id ? { ...r, subject: val, disciplineId: mappedDiscipline?.id || r.disciplineId, teacher: 'A Definir' } : r));
        }
     }
   };
@@ -173,24 +199,58 @@ export function ScheduleEditorModal({
          return;
       }
 
-      // Preparando os novos records pra substituir os antigos
+      // Prepara o novo estado do slot (modelo relacional por linha)
       const cleanedLocal = localRecords.filter(r => r.subject && r.teacher);
-      const otherRecords = weekData.records.filter(r => !(r.className === className && r.day === day && r.time === time));
-      
-      const newRecords = [...otherRecords, ...cleanedLocal];
-
       const targetWeek = scheduleMode === 'padrao' ? extraWeek : (weekData?.week || selectedWeek);
       const payloadId = weekData?.id || selectedWeek || `s_${Date.now()}`;
-      const targetType = scheduleMode === 'padrao' ? 'previa' : scheduleMode; // Aulas a mais no padrão viram prévia da semana escolhida
+      const targetType = scheduleMode === 'padrao' ? 'previa' : (scheduleMode === 'consolidado' ? 'oficial' : scheduleMode);
+      const targetAcademicYear = String(weekData?.academic_year || selectedConfigYear || new Date().getFullYear());
+
+      const existingSlotRecords = courseRecords.filter(r => (r.className === className || String(r.classId) === String(className)) && r.day === day && r.time === time);
+      const existingIds = existingSlotRecords
+        .map(r => String(r.id || ''))
+        .filter(id => id && !id.startsWith('n_'));
+
+      const nowSuffix = Date.now();
+      const mappedSchedules = cleanedLocal.map((rec, idx) => {
+        const mappedDiscipline = availableDisciplines.find(d => d.name === rec.subject);
+        const preferredDisciplineId = rec.disciplineId || mappedDiscipline?.id || rec.subject;
+        const preferredTeacherId = String(rec.teacher || '').trim();
+        const nextId = rec.id && !String(rec.id).startsWith('n_')
+          ? String(rec.id)
+          : `s_edit_${nowSuffix}_${idx}_${Math.random().toString(36).slice(2, 7)}`;
+
+        return {
+          id: nextId,
+          courseId: currentClassObj?.matrixId || rec.courseId || null,
+          classId: currentClassObj?.id || rec.classId || className,
+          dayOfWeek: day,
+          slotId: time,
+          teacherId: preferredTeacherId,
+          disciplineId: preferredDisciplineId,
+          room: rec.room || currentClassObj?.room || '',
+          classType: rec.classType || 'Regular'
+        };
+      });
+
+      const nextIds = new Set(mappedSchedules.map(s => String(s.id)));
+      const idsToDelete = existingIds.filter(id => !nextIds.has(String(id)));
+
+      if (idsToDelete.length > 0) {
+        await Promise.all(idsToDelete.map(id => apiClient.deleteSchedule(id)));
+      }
 
       const payload = {
-         id: String(payloadId),
-         week: String(targetWeek),
+         id: String(payloadId || targetWeek),
+         weekId: String(targetWeek),
          type: targetType,
-         records: JSON.stringify(newRecords)
+         academicYear: targetAcademicYear,
+         schedules: mappedSchedules
       };
 
-      await apiClient.saveSchedule(payloadId, payload);
+      if (mappedSchedules.length > 0) {
+        await apiClient.saveSingleSchedule(payload);
+      }
       // A atualização do front será reativa no próprio componente pai
       onClose(true); // true = refresh needed
     } catch(e) {
@@ -223,9 +283,11 @@ export function ScheduleEditorModal({
                  className={`w-full p-2.5 rounded-lg border font-bold text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 ${isDarkMode ? 'bg-slate-900 border-slate-700 text-white' : 'bg-white border-slate-300 text-slate-800'}`}
               >
                   <option value="">Selecione a semana alvo...</option>
-                  {Array.from({length: 40}, (_, i) => {
-                     const wName = `Semana ${String(i+1).padStart(2, '0')}`;
-                     return <option key={i} value={wName}>{wName}</option>;
+                  {weekOptions.map(w => {
+                     const start = w.start_date ? String(w.start_date).split('-').reverse().slice(0, 2).join('/') : '';
+                     const end = w.end_date ? String(w.end_date).split('-').reverse().slice(0, 2).join('/') : '';
+                     const label = start && end ? `${w.name} (${start} a ${end})` : w.name;
+                     return <option key={w.id} value={String(w.id)}>{label}</option>;
                   })}
               </select>
            </div>
@@ -258,6 +320,26 @@ export function ScheduleEditorModal({
                       {!availableDisciplines.find(d => d.name === r.subject) && r.subject && <option value={r.subject}>{r.subject} (Avulso)</option>}
                     </select>
                   </div>
+                  <div>
+                    <label className="text-[10px] font-black uppercase tracking-widest opacity-60 block mb-1">Professor(a)</label>
+                    <select
+                       value={r.teacher || ''}
+                       onChange={e => handleUpdate(r.id, 'teacher', e.target.value)}
+                       className={`w-full p-2.5 rounded-lg border font-bold text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 ${isDarkMode ? 'bg-slate-900 border-slate-700' : 'bg-white border-slate-300'}`}
+                    >
+                      <option value="">Selecione...</option>
+                      {usersList
+                        .filter(u => (u.status || 'ativo') === 'ativo')
+                        .map(u => (
+                          <option key={u.siape} value={String(u.siape)}>
+                            {u.nome_exibicao || u.nome_completo || u.siape}
+                          </option>
+                        ))}
+                      {!usersList.find(u => String(u.siape) === String(r.teacher)) && r.teacher && (
+                        <option value={r.teacher}>{r.teacher}</option>
+                      )}
+                    </select>
+                  </div>
                 </div>
                 <div className="mt-4">
                   <label className="text-[10px] font-black uppercase tracking-widest opacity-60 block mb-2">Tipo de Aula (Tipificação)</label>
@@ -280,7 +362,7 @@ export function ScheduleEditorModal({
                      ))}
                   </div>
                   <p className="text-[9px] mt-1.5 opacity-50 font-bold italic">
-                    * Somente aulas 'Regulares' abatem a carga horária da matriz.
+                    * Somente aulas &apos;Regulares&apos; abatem a carga horária da matriz.
                   </p>
                 </div>
                 <div className="flex justify-end mt-3 pt-3 border-t border-dashed border-slate-700/30">
