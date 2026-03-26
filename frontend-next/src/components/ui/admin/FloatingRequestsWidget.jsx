@@ -1,10 +1,19 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { MessageSquare, X, ChevronDown, CheckCircle2, XCircle, Bell, Maximize2, Loader2, Send, CalendarDays, RefreshCcw } from 'lucide-react';
 import { apiClient } from '@/lib/apiClient';
 import { useData } from '@/contexts/DataContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { resolveTeacherName } from '@/lib/dates';
 import { getSocketClient } from '@/lib/socketClient';
+
+const PENDING_REQUEST_STATUSES = new Set(['pendente', 'pending', 'pronto_para_homologacao', 'aguardando_colega']);
+
+const toTimestamp = (value) => {
+  const ts = new Date(value || 0).getTime();
+  return Number.isFinite(ts) ? ts : 0;
+};
+
+const normalizeStatus = (status) => String(status || '').toLowerCase().trim();
 
 export function FloatingRequestsWidget({ isDarkMode, userRole, appMode, controlledIsOpen, setControlledIsOpen, hideButton }) {
   const [localIsOpen, setLocalIsOpen] = useState(false);
@@ -23,8 +32,26 @@ export function FloatingRequestsWidget({ isDarkMode, userRole, appMode, controll
 
   const isAdmin = ['admin', 'gestao'].includes(userRole);
   const activeRole = userRole || appMode || 'aluno';
+  const [feedFilter, setFeedFilter] = useState('todos');
+  const readStorageKey = useMemo(() => `floating_feed_read_v2_${siape || 'anon'}_${activeRole}`, [siape, activeRole]);
+  const [readMap, setReadMap] = useState({});
 
-  const loadData = async () => {
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    try {
+      const raw = localStorage.getItem(readStorageKey);
+      setReadMap(raw ? JSON.parse(raw) : {});
+    } catch (_) {
+      setReadMap({});
+    }
+  }, [readStorageKey]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    localStorage.setItem(readStorageKey, JSON.stringify(readMap));
+  }, [readMap, readStorageKey]);
+
+  const loadData = React.useCallback(async () => {
     try {
       let fReqs = [];
       let fNotifs = [];
@@ -39,13 +66,12 @@ export function FloatingRequestsWidget({ isDarkMode, userRole, appMode, controll
       setRequests(fReqs);
       setNotifications(fNotifs);
       
-      const pendingCount = fReqs.filter(r => r.status === 'pendente' || r.status === 'pending' || r.status === 'pronto_para_homologacao').length;
-      const unreadNotifs = fNotifs.filter(n => !n.read).length; // Backend doesn't support read yet
-      const maxNotifId = fNotifs.length > 0 ? Math.max(...fNotifs.map(n => n.id)) : 0;
-      const totalNew = pendingCount + maxNotifId;
+      const latestRequestTs = fReqs.reduce((acc, req) => Math.max(acc, toTimestamp(req.updated_at || req.created_at || req.createdAt)), 0);
+      const latestNotifTs = fNotifs.reduce((acc, notif) => Math.max(acc, toTimestamp(notif.createdAt || notif.created_at)), 0);
+      const latestItemTs = Math.max(latestRequestTs, latestNotifTs);
       
       // Native Push Browser Alert if increased
-      if (typeof window !== 'undefined' && totalNew > prevCountRef.current && prevCountRef.current > 0) {
+      if (typeof window !== 'undefined' && latestItemTs > prevCountRef.current && prevCountRef.current > 0) {
          if ('Notification' in window && Notification.permission === 'granted') {
            if ('serviceWorker' in navigator && navigator.serviceWorker.ready) {
              navigator.serviceWorker.ready.then(reg => {
@@ -64,12 +90,12 @@ export function FloatingRequestsWidget({ isDarkMode, userRole, appMode, controll
          if (audioRef.current) audioRef.current.play().catch(e => {});
       }
       
-      prevCountRef.current = totalNew;
+      prevCountRef.current = latestItemTs;
 
     } catch (e) {
       console.error("Erro ao carregar avisos/widgets", e);
     }
-  };
+  }, [isAdmin, appMode, userRole, siape, activeRole]);
 
   useEffect(() => {
     
@@ -92,40 +118,84 @@ export function FloatingRequestsWidget({ isDarkMode, userRole, appMode, controll
       socket.off('schedule_updated', onScheduleUpdated);
       clearInterval(interval);
     };
-  }, [isOpen, userRole, appMode, siape]);
-
-  const [lastReadTimestamp, setLastReadTimestamp] = useState(0);
-
-  useEffect(() => {
-    if (typeof window !== 'undefined' && siape) {
-      const lr = localStorage.getItem('last_read_notifs_' + siape);
-      if (lr) setLastReadTimestamp(parseInt(lr));
-    }
-  }, [siape]);
-
-  useEffect(() => {
-    if (isOpen && typeof window !== 'undefined' && siape) {
-       const maxTime = Math.max(Date.now() - 60000, ...notifications.map(n => new Date(n.createdAt).getTime()));
-       setLastReadTimestamp(maxTime);
-       localStorage.setItem('last_read_notifs_' + siape, maxTime);
-    }
-  }, [isOpen, siape, notifications]);
+  }, [isOpen, userRole, appMode, siape, loadData]);
 
   // Hide entirely if it's external page and no notifications are actually present
   if (appMode === 'home') return null;
-  // If student and 0 notifications, don't show the bubble
-  if (!isAdmin && notifications.length === 0) return null;
+  // If non-admin and no items at all, don't show the bubble
+  if (!isAdmin && requests.length === 0 && notifications.length === 0) return null;
 
-  const pendingRequests = requests.filter(r => r.status === 'pendente' || r.status === 'pending' || r.status === 'pronto_para_homologacao');
-  const resolvedRequests = requests.filter(r => r.status !== 'pendente' && r.status !== 'pending' && r.status !== 'pronto_para_homologacao').slice(0, 10);
-  
-  // Mixed timeline Feed
-  const feed = [
-    ...notifications.map(n => ({...n, isNotif: true, time: new Date(n.createdAt).getTime()})),
-    ...resolvedRequests.map(r => ({...r, isReq: true, time: new Date(r.created_at || r.createdAt).getTime()}))
-  ].sort((a,b) => b.time - a.time).slice(0, 20);
+  const pendingRequests = requests.filter(r => PENDING_REQUEST_STATUSES.has(normalizeStatus(r.status)));
 
+  const requestFeed = requests.map((req) => {
+    const status = normalizeStatus(req.status);
+    const actionType = String(req.action_type || 'geral').toLowerCase();
+    return {
+      kind: 'request',
+      id: req.id,
+      data: req,
+      time: toTimestamp(req.updated_at || req.created_at || req.createdAt),
+      filterKey: `request:${actionType}`,
+      filterLabel: `Solicitação: ${actionType.replace(/_/g, ' ')}`,
+      isPending: PENDING_REQUEST_STATUSES.has(status),
+    };
+  });
 
+  const notifFeed = notifications.map((notif) => {
+    const notifType = String(notif.type || 'sistema').toLowerCase();
+    return {
+      kind: 'notification',
+      id: notif.id,
+      data: notif,
+      time: toTimestamp(notif.createdAt || notif.created_at),
+      filterKey: `notification:${notifType}`,
+      filterLabel: `Notificação: ${notifType.replace(/_/g, ' ')}`,
+      isPending: false,
+    };
+  });
+
+  const fullFeed = [...requestFeed, ...notifFeed]
+    .sort((a, b) => b.time - a.time)
+    .slice(0, 60);
+
+  const filterOptionsMap = new Map([
+    ['todos', 'Tudo'],
+    ['nao_lidas', 'Não lidas'],
+    ['pendentes', 'Solicitações pendentes'],
+  ]);
+  fullFeed.forEach((item) => {
+    if (!filterOptionsMap.has(item.filterKey)) filterOptionsMap.set(item.filterKey, item.filterLabel);
+  });
+  const filterOptions = Array.from(filterOptionsMap.entries()).map(([value, label]) => ({ value, label }));
+
+  const getReadKey = (item) => `${item.kind}:${item.id}`;
+  const isItemRead = (item) => Boolean(readMap[getReadKey(item)]);
+
+  const visibleFeed = fullFeed.filter((item) => {
+    if (feedFilter === 'todos') return true;
+    if (feedFilter === 'nao_lidas') return !isItemRead(item);
+    if (feedFilter === 'pendentes') return item.kind === 'request' && item.isPending;
+    return item.filterKey === feedFilter;
+  });
+
+  const unreadCount = fullFeed.filter((item) => !isItemRead(item)).length;
+  const bubbleCount = unreadCount;
+
+  const toggleReadState = (item) => {
+    const key = getReadKey(item);
+    setReadMap((prev) => ({ ...prev, [key]: !prev[key] }));
+  };
+
+  const markVisibleAsRead = () => {
+    if (visibleFeed.length === 0) return;
+    setReadMap((prev) => {
+      const next = { ...prev };
+      visibleFeed.forEach((item) => {
+        next[getReadKey(item)] = true;
+      });
+      return next;
+    });
+  };
 
   const handleUpdate = async (id, status, feedback) => {
     setLoadingId(id);
@@ -138,9 +208,6 @@ export function FloatingRequestsWidget({ isDarkMode, userRole, appMode, controll
       setLoadingId(null);
     }
   };
-
-  const unreadCount = notifications.filter(n => new Date(n.createdAt).getTime() > lastReadTimestamp).length;
-  const bubbleCount = pendingRequests.length + unreadCount;
 
   const toggleOpen = () => {
     if (typeof window !== 'undefined' && 'Notification' in window && Notification.permission === 'default') {
@@ -181,35 +248,62 @@ export function FloatingRequestsWidget({ isDarkMode, userRole, appMode, controll
 
           {/* Body */}
           <div className={`flex-1 overflow-y-auto p-3 space-y-4 scroll-smooth ${isDarkMode ? 'bg-slate-950/50' : 'bg-slate-50/50'}`}>
+             <div className={`sticky top-0 z-10 p-2 rounded-xl border backdrop-blur-sm flex items-center gap-2 ${isDarkMode ? 'bg-slate-900/90 border-slate-700' : 'bg-white/90 border-slate-200'}`}>
+                <select
+                  value={feedFilter}
+                  onChange={(e) => setFeedFilter(e.target.value)}
+                  className={`flex-1 px-2 py-1.5 rounded-lg border text-[10px] font-black uppercase tracking-widest outline-none ${isDarkMode ? 'bg-slate-950 border-slate-700 text-slate-200' : 'bg-white border-slate-200 text-slate-700'}`}
+                >
+                  {filterOptions.map((opt) => (
+                    <option key={opt.value} value={opt.value}>{opt.label}</option>
+                  ))}
+                </select>
+                <button
+                  onClick={markVisibleAsRead}
+                  className={`px-2.5 py-1.5 rounded-lg text-[9px] font-black uppercase tracking-widest border transition-colors ${isDarkMode ? 'border-slate-600 text-slate-300 hover:bg-slate-800' : 'border-slate-300 text-slate-600 hover:bg-slate-100'}`}
+                  title="Marcar itens visíveis como lidos"
+                >
+                  Marcar lidas
+                </button>
+             </div>
              
-             {requests.length === 0 && notifications.length === 0 && (
+             {visibleFeed.length === 0 && (
                <div className="flex flex-col items-center justify-center h-full text-center opacity-50 space-y-3">
                  <CheckCircle2 size={40} className={isDarkMode ? 'text-slate-600' : 'text-slate-400'} />
-                 <p className="text-[10px] font-black uppercase tracking-widest">Tudo tranquilo<br/>no momento</p>
+                 <p className="text-[10px] font-black uppercase tracking-widest">Sem itens neste filtro</p>
                </div>
              )}
 
-             {/* Pending First (Admins Only) */}
-             {isAdmin && pendingRequests.map(req => (
-               <ChatItem key={`req-${req.id}`} req={req} isDarkMode={isDarkMode} loadingId={loadingId} handleUpdate={handleUpdate} globalTeachers={globalTeachers} rawData={rawData} />
-             ))}
-
-             {/* Resolved/Alerts Separator */}
-             {feed.length > 0 && pendingRequests.length > 0 && (
-               <div className="flex items-center gap-2 py-2 opacity-30">
-                 <div className="flex-1 border-t border-slate-400"></div>
-                 <span className="text-[8px] font-black uppercase tracking-widest px-2">Histórico Recente</span>
-                 <div className="flex-1 border-t border-slate-400"></div>
-               </div>
-             )}
-
-             {/* Mixed Feed Array */}
-             {feed.map(item => {
-                if (item.isReq) {
-                  return <ChatItem key={`hist-${item.id}`} req={item} isDarkMode={isDarkMode} loadingId={loadingId} handleUpdate={handleUpdate} globalTeachers={globalTeachers} rawData={rawData} />;
-                } else if (item.isNotif) {
-                  return <AlertItem key={`notif-${item.id}`} notif={item} isDarkMode={isDarkMode} />;
+             {/* Timeline (cronológica) */}
+             {visibleFeed.map((item) => {
+                const read = isItemRead(item);
+                if (item.kind === 'request') {
+                  return (
+                    <ChatItem
+                      key={`req-${item.id}`}
+                      req={item.data}
+                      isDarkMode={isDarkMode}
+                      loadingId={loadingId}
+                      handleUpdate={handleUpdate}
+                      globalTeachers={globalTeachers}
+                      rawData={rawData}
+                      isRead={read}
+                      onToggleRead={() => toggleReadState(item)}
+                    />
+                  );
                 }
+                if (item.kind === 'notification') {
+                  return (
+                    <AlertItem
+                      key={`notif-${item.id}`}
+                      notif={item.data}
+                      isDarkMode={isDarkMode}
+                      isRead={read}
+                      onToggleRead={() => toggleReadState(item)}
+                    />
+                  );
+                }
+                return null;
              })}
           </div>
 
@@ -235,11 +329,11 @@ export function FloatingRequestsWidget({ isDarkMode, userRole, appMode, controll
   );
 }
 
-function ChatItem({ req, isDarkMode, loadingId, handleUpdate, globalTeachers, rawData = [] }) {
+function ChatItem({ req, isDarkMode, loadingId, handleUpdate, globalTeachers, rawData = [], isRead, onToggleRead }) {
   const [isRejecting, setIsRejecting] = useState(false);
   const teacherSiape = req.requester_id || req.siape;
   const teacherName = resolveTeacherName(teacherSiape, globalTeachers) || teacherSiape;
-  const isPending = req.status === 'pendente' || req.status === 'pending' || req.status === 'pronto_para_homologacao';
+  const isPending = PENDING_REQUEST_STATUSES.has(normalizeStatus(req.status));
   
   const resolveLabel = (slot) => {
       let subj = slot.subject || slot.classType || '';
@@ -295,8 +389,16 @@ function ChatItem({ req, isDarkMode, loadingId, handleUpdate, globalTeachers, ra
   } catch(e) {}
 
   return (
-    <div className={`flex flex-col text-[11px] font-medium leading-relaxed max-w-[95%] w-full items-start mx-auto mb-2`}>
-      <span className="text-[9px] font-black uppercase tracking-widest opacity-50 mb-1 ml-2">Solicitação de Troca - {teacherName}</span>
+    <div className={`flex flex-col text-[11px] font-medium leading-relaxed max-w-[95%] w-full items-start mx-auto mb-2 ${isRead ? 'opacity-70' : ''}`}>
+      <div className="w-full flex items-center justify-between mb-1 px-2">
+        <span className="text-[9px] font-black uppercase tracking-widest opacity-60">Solicitação de Troca - {teacherName}</span>
+        <button
+          onClick={onToggleRead}
+          className={`text-[8px] font-black uppercase tracking-widest px-2 py-0.5 rounded border transition-colors ${isDarkMode ? 'border-slate-600 text-slate-300 hover:bg-slate-800' : 'border-slate-300 text-slate-600 hover:bg-slate-100'}`}
+        >
+          {isRead ? 'Não lida' : 'Marcar lida'}
+        </button>
+      </div>
       
       <div className={`w-full p-3 rounded-2xl shadow-sm border flex gap-3 ${isPending ? (isDarkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200') : req.status === 'aprovado' || req.status === 'approved' ? (isDarkMode ? 'bg-emerald-900/30 border-emerald-800/50' : 'bg-emerald-50 border-emerald-200') : (isDarkMode ? 'bg-rose-900/10 border-rose-800/30 opacity-70' : 'bg-slate-50 border-slate-200 opacity-70')}`}>
         <div className={`p-2 rounded-full shrink-0 flex items-center justify-center self-start shadow-inner ${isDarkMode ? 'bg-indigo-900/50 border border-indigo-500/30' : 'bg-indigo-100/80 border border-indigo-200/50'}`}>
@@ -363,12 +465,20 @@ function ChatItem({ req, isDarkMode, loadingId, handleUpdate, globalTeachers, ra
   );
 }
 
-function AlertItem({ notif, isDarkMode }) {
+function AlertItem({ notif, isDarkMode, isRead, onToggleRead }) {
   const isPrevia = notif.type === 'previa' || notif.type === 'NEW_PREVIA';
   
   return (
-    <div className={`flex flex-col text-[11px] font-medium leading-relaxed max-w-[95%] w-full items-start mx-auto mb-2`}>
-      <span className="text-[9px] font-black uppercase tracking-widest opacity-50 mb-1 ml-2">{notif.title || 'ALERTA DO SISTEMA'}</span>
+    <div className={`flex flex-col text-[11px] font-medium leading-relaxed max-w-[95%] w-full items-start mx-auto mb-2 ${isRead ? 'opacity-70' : ''}`}>
+      <div className="w-full flex items-center justify-between mb-1 px-2">
+        <span className="text-[9px] font-black uppercase tracking-widest opacity-60">{notif.title || 'ALERTA DO SISTEMA'}</span>
+        <button
+          onClick={onToggleRead}
+          className={`text-[8px] font-black uppercase tracking-widest px-2 py-0.5 rounded border transition-colors ${isDarkMode ? 'border-slate-600 text-slate-300 hover:bg-slate-800' : 'border-slate-300 text-slate-600 hover:bg-slate-100'}`}
+        >
+          {isRead ? 'Não lida' : 'Marcar lida'}
+        </button>
+      </div>
       
       <div className={`w-full p-3 rounded-2xl shadow-sm border flex items-center gap-3 ${isPrevia ? (isDarkMode ? 'bg-indigo-900/40 border-indigo-800/50 text-indigo-100' : 'bg-indigo-50 border-indigo-200 text-indigo-900') : (isDarkMode ? 'bg-emerald-900/40 border-emerald-800/50 text-emerald-100' : 'bg-emerald-50 border-emerald-200 text-emerald-900')}`}>
          <div className={`p-2 rounded-full shrink-0 flex items-center justify-center shadow-lg ${isPrevia ? (isDarkMode ? 'bg-indigo-800 border border-indigo-500/50 text-indigo-100' : 'bg-indigo-500 text-white border border-indigo-600') : (isDarkMode ? 'bg-emerald-800 border border-emerald-500/50 text-emerald-100' : 'bg-emerald-600 text-white border border-emerald-700')}`}>

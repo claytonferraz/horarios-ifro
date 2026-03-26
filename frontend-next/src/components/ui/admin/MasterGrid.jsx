@@ -876,21 +876,30 @@ export function MasterGrid({ isDarkMode, ...props }) {
 
   const activeRequestsForWeek = useMemo(() => {
      if (selectedType === 'padrao' || !selectedWeek || changeRequests.length === 0) return [];
-     return changeRequests.filter(req => String(req.week_id) === String(selectedWeek));
+     return changeRequests
+       .filter(req => String(req.week_id) === String(selectedWeek))
+       .sort((a, b) => {
+         const ta = new Date(a.updated_at || a.created_at || a.createdAt || 0).getTime();
+         const tb = new Date(b.updated_at || b.created_at || b.createdAt || 0).getTime();
+         return tb - ta;
+       });
   }, [changeRequests, selectedWeek, selectedType]);
 
   const filteredRequests = activeRequestsForWeek.filter(req => !dismissedRequests.includes(req.id));
-  const totalAlerts = filteredRequests.length;
+  const requestAlertsCount = filteredRequests.length;
+  const gradeAlertsCount = dashboardAlerts.list.length;
+  const totalAlerts = requestAlertsCount + gradeAlertsCount;
+  const quickBadgeCount = (pendingRequests?.length || 0) + gradeAlertsCount;
 
   const [isAlertsMinimized, setIsAlertsMinimized] = useState(false);
   const [prevAlertCount, setPrevAlertCount] = useState(0);
 
   useEffect(() => {
-     if (dashboardAlerts.list.length > prevAlertCount) {
+     if (totalAlerts > prevAlertCount) {
          setIsAlertsMinimized(false);
      }
-     setPrevAlertCount(dashboardAlerts.list.length);
-  }, [dashboardAlerts.list.length, prevAlertCount]);
+     setPrevAlertCount(totalAlerts);
+  }, [totalAlerts, prevAlertCount]);
 
   return (
     <div className={`flex flex-col gap-4 animate-in fade-in duration-300 ${isDarkMode ? 'text-slate-200' : 'text-slate-800'}`}>
@@ -1549,6 +1558,26 @@ export function MasterGrid({ isDarkMode, ...props }) {
             </button>
          </div>
          <div className="flex-1 overflow-y-auto p-5 pb-20 space-y-6">
+            <div className={`p-3 rounded-xl border flex items-center justify-between text-[10px] font-black uppercase tracking-widest ${isDarkMode ? 'bg-slate-800/70 border-slate-700 text-slate-300' : 'bg-white border-slate-200 text-slate-600'}`}>
+               <span>Choques da Grade: {gradeAlertsCount}</span>
+               <span>Solicitações: {requestAlertsCount}</span>
+            </div>
+
+            {gradeAlertsCount > 0 && (
+               <div className={`p-4 rounded-xl border flex flex-col gap-3 shadow-sm ${isDarkMode ? 'bg-rose-950/20 border-rose-900/50' : 'bg-white border-rose-200'}`}>
+                  <h3 className={`text-[12px] font-black uppercase tracking-widest flex items-center gap-2 ${isDarkMode ? 'text-rose-400' : 'text-rose-600'}`}>
+                     <AlertTriangle size={16} /> Choques Operacionais ({gradeAlertsCount})
+                  </h3>
+                  <div className="flex-1 border-t border-rose-500/20"></div>
+                  <ul className="flex flex-col gap-2 mt-1">
+                     {dashboardAlerts.list.map((msg, idx) => (
+                        <li key={`grid-alert-${idx}`} className={`p-2.5 rounded-lg text-[11px] font-bold leading-relaxed border ${isDarkMode ? 'bg-rose-900/15 border-rose-900/40 text-rose-200' : 'bg-rose-50 border-rose-200 text-rose-800'}`}>
+                           {msg}
+                        </li>
+                     ))}
+                  </ul>
+               </div>
+            )}
 
             {filteredRequests.length > 0 && (
                <div className={`p-4 rounded-xl border flex flex-col gap-3 shadow-sm ${isDarkMode ? 'bg-indigo-950/20 border-indigo-900/50' : 'bg-white border-indigo-200'}`}>
@@ -1605,16 +1634,16 @@ export function MasterGrid({ isDarkMode, ...props }) {
                         {pendingRequests?.length > 0 && <span className="bg-red-500 text-white rounded-full px-2 py-0.5 text-[10px]">{pendingRequests.length}</span>}
                      </button>
                      <button onClick={() => { setIsRightPanelOpen(true); setIsWidgetMenuOpen(false); }} className={`flex items-center justify-between gap-4 px-4 py-3 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all ${isDarkMode ? 'bg-amber-900/40 text-amber-300 hover:bg-amber-500 hover:text-slate-900' : 'bg-amber-50 text-amber-700 hover:bg-amber-500 hover:text-white'}`}>
-                        <span>⚠️ Alertas da Grade {totalAlerts > 0 && `(${totalAlerts})`}</span>
-                        {totalAlerts > 0 && <span className="bg-red-500 text-white rounded-full px-2 py-0.5 text-[10px]">{totalAlerts}</span>}
+                        <span>⚠️ Alertas da Grade {gradeAlertsCount > 0 && `(${gradeAlertsCount})`}</span>
+                        {gradeAlertsCount > 0 && <span className="bg-red-500 text-white rounded-full px-2 py-0.5 text-[10px]">{gradeAlertsCount}</span>}
                      </button>
                   </div>
                ) : (
                   <button onClick={() => setIsWidgetMenuOpen(true)} className={`p-4 rounded-full text-white shadow-2xl hover:scale-110 transition-all flex items-center justify-center relative border-2 ${isDarkMode ? 'bg-slate-700 border-slate-500' : 'bg-slate-800 border-slate-600'}`}>
                      <Bell size={24} />
-                     {((pendingRequests?.length || 0) + (totalAlerts || 0)) > 0 && (
+                     {quickBadgeCount > 0 && (
                         <span className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full min-w-[20px] h-[20px] flex items-center justify-center text-[10px] font-bold shadow-lg px-1 border-2 border-slate-800">
-                           {(pendingRequests?.length || 0) + (totalAlerts || 0)}
+                           {quickBadgeCount}
                         </span>
                      )}
                   </button>
