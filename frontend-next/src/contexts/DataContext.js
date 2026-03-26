@@ -17,6 +17,7 @@ export function DataProvider({ children }) {
   const [bimesters, setBimesters] = useState(null);
   const [intervals, setIntervals] = useState([]);
   const [activeDefaultScheduleId, setActiveDefaultScheduleId] = useState(null);
+  const [publicSchedulesEnabled, setPublicSchedulesEnabled] = useState(true);
   const [academicWeeks, setAcademicWeeks] = useState([]);
   const [selectedConfigYear, setSelectedConfigYear] = useState(new Date().getFullYear().toString());
 
@@ -98,6 +99,7 @@ export function DataProvider({ children }) {
         setBimesters(config.bimesters !== undefined ? config.bimesters : null);
         setIntervals(config.intervals !== undefined ? config.intervals : []);
         setActiveDefaultScheduleId(config.activeDefaultScheduleId !== undefined ? config.activeDefaultScheduleId : null);
+        setPublicSchedulesEnabled(config.publicSchedulesEnabled !== false);
       }
       
       if (loadedWeeks) {
@@ -152,6 +154,8 @@ export function DataProvider({ children }) {
     setBimesters,
     activeDefaultScheduleId,
     setActiveDefaultScheduleId,
+    publicSchedulesEnabled,
+    setPublicSchedulesEnabled,
     academicWeeks,
     setAcademicWeeks,
     selectedConfigYear,
@@ -174,6 +178,7 @@ export function DataProvider({ children }) {
     intervals,
     bimesters,
     activeDefaultScheduleId,
+    publicSchedulesEnabled,
     academicWeeks,
     selectedConfigYear,
     isLoading,

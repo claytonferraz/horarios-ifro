@@ -36,7 +36,10 @@ export const apiClient = {
         fetch(configUrl),
         fetch(`${API_URL}/academic-weeks`)
       ]);
-      if (!schedRes.ok) throw new Error("API Offline");
+      if (!schedRes.ok) {
+        if (schedRes.status === 403) throw new Error("Acesso público aos horários desativado pelo administrador.");
+        throw new Error("API Offline");
+      }
       const schedules = await schedRes.json();
       const config = await confRes.json();
       const academicWeeks = weekRes.ok ? await weekRes.json() : [];

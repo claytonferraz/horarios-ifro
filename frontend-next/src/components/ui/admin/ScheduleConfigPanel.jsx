@@ -30,6 +30,7 @@ export function ScheduleConfigPanel({ isDarkMode }) {
     classTimes, setClassTimes,
     bimesters, setBimesters,
     intervals, setIntervals,
+    publicSchedulesEnabled, setPublicSchedulesEnabled,
     rawData, refreshData, setErrorMsg,
     selectedConfigYear, setSelectedConfigYear,
     academicYearsMeta
@@ -42,6 +43,7 @@ export function ScheduleConfigPanel({ isDarkMode }) {
   const [localTimes, setLocalTimes] = useState([]);
   const [localBimesters, setLocalBimesters] = useState([]);
   const [localIntervals, setLocalIntervals] = useState([]);
+  const [localPublicSchedulesEnabled, setLocalPublicSchedulesEnabled] = useState(true);
 
   // Sync state whenever the contextual data from useData changes (trigger by year switch)
   useEffect(() => {
@@ -49,7 +51,8 @@ export function ScheduleConfigPanel({ isDarkMode }) {
     setLocalTimes(classTimes || []);
     setLocalBimesters(bimesters || []);
     setLocalIntervals(intervals || []);
-  }, [activeDays, classTimes, bimesters, intervals, selectedConfigYear]);
+    setLocalPublicSchedulesEnabled(publicSchedulesEnabled !== false);
+  }, [activeDays, classTimes, bimesters, intervals, publicSchedulesEnabled, selectedConfigYear]);
 
   const [savingSection, setSavingSection] = useState(null);
   const [savedSection, setSavedSection] = useState(null);
@@ -92,7 +95,7 @@ export function ScheduleConfigPanel({ isDarkMode }) {
   const saveDays = async () => {
     setSavingSection('days');
     try {
-      await apiClient.updateConfig({ year: selectedConfigYear, activeDays: localDays, classTimes, bimesters, intervals });
+      await apiClient.updateConfig({ year: selectedConfigYear, activeDays: localDays, classTimes, bimesters, intervals, publicSchedulesEnabled: localPublicSchedulesEnabled });
       setActiveDays(localDays);
       flashSaved('days');
     } catch (e) { setErrorMsg(`Falha: ${e.message}`); }
@@ -122,7 +125,7 @@ export function ScheduleConfigPanel({ isDarkMode }) {
     setSavingSection('times');
     const sorted = sortTimes(localTimes);
     try {
-      await apiClient.updateConfig({ year: selectedConfigYear, activeDays, classTimes: sorted, bimesters, intervals: localIntervals });
+      await apiClient.updateConfig({ year: selectedConfigYear, activeDays, classTimes: sorted, bimesters, intervals: localIntervals, publicSchedulesEnabled: localPublicSchedulesEnabled });
       setLocalTimes(sorted);
       setClassTimes(sorted);
       setIntervals(localIntervals);
@@ -177,11 +180,31 @@ export function ScheduleConfigPanel({ isDarkMode }) {
   const saveBimesters = async () => {
     setSavingSection('bimesters');
     try {
-      await apiClient.updateConfig({ year: selectedConfigYear, activeDays, classTimes, bimesters: localBimesters, intervals });
+      await apiClient.updateConfig({ year: selectedConfigYear, activeDays, classTimes, bimesters: localBimesters, intervals, publicSchedulesEnabled: localPublicSchedulesEnabled });
       setBimesters(localBimesters);
       flashSaved('bimesters');
     } catch (e) { setErrorMsg(`Falha: ${e.message}`); }
     finally { setSavingSection(null); }
+  };
+
+  const savePublicAccess = async () => {
+    setSavingSection('publicAccess');
+    try {
+      await apiClient.updateConfig({
+        year: selectedConfigYear,
+        activeDays: localDays,
+        classTimes: localTimes,
+        bimesters: localBimesters,
+        intervals: localIntervals,
+        publicSchedulesEnabled: localPublicSchedulesEnabled
+      });
+      setPublicSchedulesEnabled(localPublicSchedulesEnabled);
+      flashSaved('publicAccess');
+    } catch (e) {
+      setErrorMsg(`Falha: ${e.message}`);
+    } finally {
+      setSavingSection(null);
+    }
   };
 
   const groupedTimes = SHIFTS.reduce((acc, s) => {
@@ -314,6 +337,32 @@ export function ScheduleConfigPanel({ isDarkMode }) {
               ))}
             </div>
             <p className="text-xs mt-4 opacity-50 italic">* Dias marcados aparecerão nas tabelas do portal do aluno e professor.</p>
+            <div className={`mt-6 p-4 rounded-2xl border ${isDarkMode ? 'bg-slate-800/40 border-slate-700' : 'bg-white border-slate-200'}`}>
+              <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+                <div>
+                  <h4 className="text-xs font-black uppercase tracking-widest flex items-center gap-2">
+                    <AlertCircle size={14} className={localPublicSchedulesEnabled ? 'text-emerald-500' : 'text-rose-500'} />
+                    Horários Públicos
+                  </h4>
+                  <p className="text-[11px] mt-1 opacity-70 font-medium">
+                    Quando desligado, apenas usuários autenticados conseguem visualizar horários e semanas letivas.
+                  </p>
+                </div>
+                <div className="flex items-center gap-3">
+                  <button
+                    onClick={() => setLocalPublicSchedulesEnabled((prev) => !prev)}
+                    className={`px-4 py-2 rounded-xl text-xs font-black uppercase tracking-widest transition-all ${
+                      localPublicSchedulesEnabled
+                        ? (isDarkMode ? 'bg-emerald-900/40 text-emerald-300 border border-emerald-700' : 'bg-emerald-50 text-emerald-700 border border-emerald-200')
+                        : (isDarkMode ? 'bg-rose-900/30 text-rose-300 border border-rose-800' : 'bg-rose-50 text-rose-700 border border-rose-200')
+                    }`}
+                  >
+                    {localPublicSchedulesEnabled ? 'Público Ativo' : 'Público Desativado'}
+                  </button>
+                  <SaveBtn section="publicAccess" onClick={savePublicAccess} />
+                </div>
+              </div>
+            </div>
           </div>
         )}
 

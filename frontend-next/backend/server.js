@@ -87,7 +87,7 @@ app.use(express.urlencoded({ limit: '50mb', extended: true }));
 const crypto = require('crypto');
 const path = require('path');
 const db = require('./db');
-const { verifyToken, JWT_SECRET, requireManager } = require('./middlewares/auth.middleware');
+const { verifyToken, JWT_SECRET, requireManager, buildAccessContext } = require('./middlewares/auth.middleware');
 
 let lastUpdateTimestamp = new Date().toISOString();
 
@@ -163,8 +163,10 @@ db.serialize(() => {
     activeDays TEXT,
     classTimes TEXT, -- Inclui durações e lógica de cadeia
     intervals TEXT,   -- Configuração de 20min/10min por turno
-    activeDefaultScheduleId TEXT
+    activeDefaultScheduleId TEXT,
+    publicSchedulesEnabled INTEGER DEFAULT 1
   )`);
+  db.run(`ALTER TABLE config ADD COLUMN publicSchedulesEnabled INTEGER DEFAULT 1`, () => { /* ignorar se já existe */ });
 
   db.run(`CREATE TABLE IF NOT EXISTS academic_weeks (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -280,6 +282,73 @@ app.get('/api/notifications', verifyToken, (req, res) => {
   });
 });
 
+function getTokenFromCookieHeader(cookieHeader = '') {
+  if (!cookieHeader) return null;
+  const entries = String(cookieHeader).split(';');
+  for (const entry of entries) {
+    const [rawKey, ...rawValue] = entry.split('=');
+    const key = String(rawKey || '').trim();
+    if (key !== 'admin_token') continue;
+    const value = rawValue.join('=').trim();
+    if (!value) return null;
+    try {
+      return decodeURIComponent(value);
+    } catch (_) {
+      return value;
+    }
+  }
+  return null;
+}
+
+function resolveYearFromRequest(req) {
+  return String(
+    req.query?.academicYear ||
+    req.query?.year ||
+    req.body?.academicYear ||
+    req.body?.year ||
+    new Date().getFullYear().toString()
+  );
+}
+
+function isPublicSchedulesEnabled(rawValue) {
+  if (rawValue === undefined || rawValue === null) return true;
+  return Number(rawValue) !== 0;
+}
+
+function attachUserIfPresent(req, _res, next) {
+  const auth = req.headers.authorization;
+  const bearerToken = auth?.startsWith('Bearer ') ? auth.slice(7).trim() : '';
+  const cookieToken = getTokenFromCookieHeader(req.headers.cookie);
+  const token = bearerToken || cookieToken;
+  if (!token) return next();
+
+  jwt.verify(token, JWT_SECRET, (jwtErr, decoded) => {
+    if (jwtErr || !decoded?.id) return next();
+    db.get(
+      "SELECT siape, nome_exibicao, email, status, perfis, is_admin FROM users WHERE siape = ?",
+      [decoded.id],
+      (dbErr, user) => {
+        if (dbErr || !user || user.status !== 'ativo') return next();
+        req.userId = user.siape;
+        req.user = buildAccessContext(user);
+        next();
+      }
+    );
+  });
+}
+
+function requirePublicScheduleAccess(req, res, next) {
+  if (req.user) return next();
+
+  const targetYear = resolveYearFromRequest(req);
+  const configId = `config_${targetYear}`;
+  db.get("SELECT publicSchedulesEnabled FROM config WHERE id = ?", [configId], (err, row) => {
+    if (err) return res.status(500).json({ error: err.message });
+    if (isPublicSchedulesEnabled(row?.publicSchedulesEnabled)) return next();
+    return res.status(403).json({ error: 'Acesso público aos horários está desativado pela administração.' });
+  });
+}
+
 // ==========================================
 // ROTAS DE AUTENTICAÇÃO (Login / Criação)
 // ==========================================
@@ -290,57 +359,69 @@ app.use('/api/auth', authRoutes);
 // ROTAS DE HORÁRIOS
 // ==========================================
 const schedulesRoutes = require('./routes/schedules.routes')(io);
-app.use('/api/schedules', schedulesRoutes);
+app.use('/api/schedules', attachUserIfPresent, requirePublicScheduleAccess, schedulesRoutes);
 
-app.get('/api/config', (req, res) => {
+app.get('/api/config', attachUserIfPresent, requirePublicScheduleAccess, (req, res) => {
   const year = req.query.year || new Date().getFullYear().toString();
   const configId = `config_${year}`;
 
-  db.get("SELECT disabledWeeks, activeDays, classTimes, bimesters, activeDefaultScheduleId FROM config WHERE id = ?", [configId], (err, row) => {
+  db.get("SELECT disabledWeeks, activeDays, classTimes, bimesters, intervals, activeDefaultScheduleId, publicSchedulesEnabled FROM config WHERE id = ?", [configId], (err, row) => {
     if (err) return res.status(500).json({ error: err.message });
     if (row) {
-      let dWeeks = [], aDays = null, cTimes = null, bimesters = null;
+      let dWeeks = [], aDays = null, cTimes = null, bimesters = null, intervals = [];
       try { dWeeks = row.disabledWeeks ? JSON.parse(row.disabledWeeks) : []; } catch(e) {}
       try { aDays = row.activeDays ? JSON.parse(row.activeDays) : null; } catch(e) {}
       try { cTimes = row.classTimes ? JSON.parse(row.classTimes) : null; } catch(e) {}
       try { bimesters = row.bimesters ? JSON.parse(row.bimesters) : null; } catch(e) {}
+      try { intervals = row.intervals ? JSON.parse(row.intervals) : []; } catch(e) {}
       res.json({
         disabledWeeks: dWeeks,
         activeDays: aDays,
         classTimes: cTimes,
         bimesters: bimesters,
-        activeDefaultScheduleId: row.activeDefaultScheduleId || null
+        intervals,
+        activeDefaultScheduleId: row.activeDefaultScheduleId || null,
+        publicSchedulesEnabled: isPublicSchedulesEnabled(row.publicSchedulesEnabled)
       });
     } else {
-      res.json({ disabledWeeks: [], activeDays: null, classTimes: null, bimesters: null, activeDefaultScheduleId: null });
+      res.json({ disabledWeeks: [], activeDays: null, classTimes: null, bimesters: null, intervals: [], activeDefaultScheduleId: null, publicSchedulesEnabled: true });
     }
   });
 });
 
 app.put('/api/config', verifyToken, requireManager, (req, res) => {
-  const { disabledWeeks, activeDays, classTimes, bimesters, activeDefaultScheduleId, intervals, year } = req.body;
+  const { disabledWeeks, activeDays, classTimes, bimesters, activeDefaultScheduleId, intervals, year, publicSchedulesEnabled } = req.body;
   const targetYear = year || new Date().getFullYear().toString();
   const configId = `config_${targetYear}`;
-  
-  db.run(
-    `INSERT OR REPLACE INTO config (id, disabledWeeks, activeDays, classTimes, bimesters, activeDefaultScheduleId, intervals) 
-     VALUES (?, ?, ?, ?, ?, ?, ?)`, 
-    [
-      configId,
-      disabledWeeks ? JSON.stringify(disabledWeeks) : '[]',
-      activeDays ? JSON.stringify(activeDays) : null,
-      classTimes ? JSON.stringify(classTimes) : null,
-      bimesters ? JSON.stringify(bimesters) : null,
-      activeDefaultScheduleId || null,
-      intervals ? JSON.stringify(intervals) : '[]'
-    ], 
-    (err) => {
-      if (err) return res.status(500).json({ error: err.message });
-      lastUpdateTimestamp = new Date().toISOString();
-      io.emit('schedule_updated');
-      res.json({ success: true });
-    }
-  );
+
+  db.get("SELECT publicSchedulesEnabled FROM config WHERE id = ?", [configId], (readErr, existing) => {
+    if (readErr) return res.status(500).json({ error: readErr.message });
+
+    const resolvedPublicFlag = typeof publicSchedulesEnabled === 'boolean'
+      ? (publicSchedulesEnabled ? 1 : 0)
+      : (existing?.publicSchedulesEnabled ?? 1);
+
+    db.run(
+      `INSERT OR REPLACE INTO config (id, disabledWeeks, activeDays, classTimes, bimesters, activeDefaultScheduleId, intervals, publicSchedulesEnabled) 
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`, 
+      [
+        configId,
+        disabledWeeks ? JSON.stringify(disabledWeeks) : '[]',
+        activeDays ? JSON.stringify(activeDays) : null,
+        classTimes ? JSON.stringify(classTimes) : null,
+        bimesters ? JSON.stringify(bimesters) : null,
+        activeDefaultScheduleId || null,
+        intervals ? JSON.stringify(intervals) : '[]',
+        resolvedPublicFlag
+      ], 
+      (err) => {
+        if (err) return res.status(500).json({ error: err.message });
+        lastUpdateTimestamp = new Date().toISOString();
+        io.emit('schedule_updated');
+        res.json({ success: true });
+      }
+    );
+  });
 });
 
 app.post('/api/config/import', verifyToken, requireManager, (req, res) => {
@@ -353,11 +434,11 @@ app.post('/api/config/import', verifyToken, requireManager, (req, res) => {
   const fromId = `config_${fromYear}`;
   const toId = `config_${toYear}`;
 
-  db.get("SELECT disabledWeeks, activeDays, classTimes, bimesters, activeDefaultScheduleId FROM config WHERE id = ?", [toId], (err, targetRow) => {
+  db.get("SELECT disabledWeeks, activeDays, classTimes, bimesters, intervals, activeDefaultScheduleId, publicSchedulesEnabled FROM config WHERE id = ?", [toId], (err, targetRow) => {
     if (err) return res.status(500).json({ error: err.message });
     const existing = targetRow || {};
     
-    db.get("SELECT disabledWeeks, activeDays, classTimes, bimesters, activeDefaultScheduleId FROM config WHERE id = ?", [fromId], (err, row) => {
+    db.get("SELECT disabledWeeks, activeDays, classTimes, bimesters, intervals, activeDefaultScheduleId, publicSchedulesEnabled FROM config WHERE id = ?", [fromId], (err, row) => {
       if (err) return res.status(500).json({ error: err.message });
       if (!row) return res.status(404).json({ error: "Nenhuma configuração encontrada no ano de origem." });
 
@@ -366,12 +447,14 @@ app.post('/api/config/import', verifyToken, requireManager, (req, res) => {
       const finalTimes    = ops.times     !== false ? row.classTimes : existing.classTimes;
       const finalBimester = ops.bimesters !== false ? row.bimesters  : existing.bimesters;
       const finalDefault  = ops.default   !== false ? row.activeDefaultScheduleId : existing.activeDefaultScheduleId;
+      const finalIntervals = ops.times !== false ? row.intervals : existing.intervals;
+      const finalPublicFlag = existing.publicSchedulesEnabled ?? row.publicSchedulesEnabled ?? 1;
       const finalDisabled = existing.disabledWeeks || '[]';
 
       db.run(
-        `INSERT OR REPLACE INTO config (id, disabledWeeks, activeDays, classTimes, bimesters, activeDefaultScheduleId) 
-         VALUES (?, ?, ?, ?, ?, ?)`, 
-        [toId, finalDisabled, finalDays, finalTimes, finalBimester, finalDefault], 
+        `INSERT OR REPLACE INTO config (id, disabledWeeks, activeDays, classTimes, bimesters, activeDefaultScheduleId, intervals, publicSchedulesEnabled) 
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`, 
+        [toId, finalDisabled, finalDays, finalTimes, finalBimester, finalDefault, finalIntervals || '[]', finalPublicFlag], 
         (err2) => {
           if (err2) return res.status(500).json({ error: err2.message });
 
@@ -430,8 +513,8 @@ const configRoutes = require('./routes/config.routes')(io);
 const adminRoutes = require('./routes/admin.routes')(io);
 const requestsRoutes = require('./routes/requests.routes')(io);
 
-app.use('/api/academic-weeks', configRoutes);
-app.use('/api/admin', adminRoutes);
+app.use('/api/academic-weeks', attachUserIfPresent, requirePublicScheduleAccess, configRoutes);
+app.use('/api/admin', attachUserIfPresent, requirePublicScheduleAccess, adminRoutes);
 app.use('/api/requests', requestsRoutes);
 
 const PORT = process.env.PORT || 3012;
