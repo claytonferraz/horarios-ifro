@@ -21,6 +21,13 @@ import { ClassGrid } from './grids/ClassGrid';
 import { VacantGrid } from './grids/VacantGrid';
 import { TeacherRequestsSection } from '../ui/teacher/TeacherRequestsSection';
 
+const PENDING_REQUEST_STATUSES = new Set([
+  'pendente',
+  'pending',
+  'aguardando_colega',
+  'pronto_para_homologacao',
+]);
+
 export function PortalView({
   appMode, isDarkMode, viewMode, setViewMode, scheduleMode, setScheduleMode, userRole, siape,
   selectedCourse, setSelectedCourse, selectedClass, setSelectedClass, selectedTeacher, setSelectedTeacher,
@@ -115,7 +122,12 @@ export function PortalView({
 
     apiClient.fetchRequests().then(reqs => {
       if (reqs) {
-        setPendingRequests(reqs.filter(r => (r.status === 'pendente' || r.status === 'pending' || r.status === 'aguardando_colega' || r.status === 'pronto_para_homologacao') && r.week_id === selectedWeek));
+        setPendingRequests(
+          reqs.filter((r) => {
+            const normalizedStatus = String(r?.status || '').toLowerCase().trim();
+            return PENDING_REQUEST_STATUSES.has(normalizedStatus) && String(r?.week_id || '') === String(selectedWeek);
+          }),
+        );
       }
     }).catch(e => console.error("Error fetching requests for alerts", e));
   }, [selectedWeek, canReadProtectedRequests]);
@@ -173,18 +185,33 @@ export function PortalView({
   const isSlotInvolvedInPendingRequest = React.useCallback((r) => {
       return pendingRequests.some(req => {
           try {
+              if (r?.requestId != null && String(req?.id) === String(r.requestId)) {
+                return true;
+              }
+
               let prop = req.proposed_slot;
-              if (typeof prop === 'string' && prop.startsWith('{')) prop = JSON.parse(prop);
-              if (typeof prop === 'string' && prop.startsWith('"')) prop = JSON.parse(prop);
-              if (typeof prop === 'string' && prop.startsWith('{')) prop = JSON.parse(prop);
+              for (let i = 0; i < 3; i += 1) {
+                if (typeof prop === 'string' && (prop.startsWith('{') || prop.startsWith('"'))) {
+                  prop = JSON.parse(prop);
+                }
+              }
               
               let orig = req.original_slot;
-              if (typeof orig === 'string' && orig.startsWith('{')) orig = JSON.parse(orig);
-              if (typeof orig === 'string' && orig.startsWith('"')) orig = JSON.parse(orig);
-              if (typeof orig === 'string' && orig.startsWith('{')) orig = JSON.parse(orig);
+              for (let i = 0; i < 3; i += 1) {
+                if (typeof orig === 'string' && (orig.startsWith('{') || orig.startsWith('"'))) {
+                  orig = JSON.parse(orig);
+                }
+              }
 
-              const isProp = prop && String(prop.day) === String(r.day) && String(prop.time) === String(r.time) && String(prop.className || prop.classId) === String(r.className || r.classId);
-              const isOrig = orig && String(orig.day) === String(r.day) && String(orig.time) === String(r.time) && String(orig.className || orig.classId) === String(r.className || r.classId);
+              const normalizedClass = String(r.classId || r.className || '').trim().toLowerCase();
+              const isProp = prop
+                && String(prop.day || '').trim() === String(r.day || '').trim()
+                && String(prop.time || '').trim() === String(r.time || '').trim()
+                && String(prop.classId || prop.className || '').trim().toLowerCase() === normalizedClass;
+              const isOrig = orig
+                && String(orig.day || '').trim() === String(r.day || '').trim()
+                && String(orig.time || '').trim() === String(r.time || '').trim()
+                && String(orig.classId || orig.className || '').trim().toLowerCase() === normalizedClass;
               
               return isProp || isOrig;
           } catch(e) { return false; }
@@ -1506,6 +1533,8 @@ export function PortalView({
                          setExchangeTarget(target); 
                          setExchangeAction('offer'); 
                       }}
+                      checkPendingSwapRequest={isSlotInvolvedInPendingRequest}
+                      siape={siape}
                     />
                   )}
 

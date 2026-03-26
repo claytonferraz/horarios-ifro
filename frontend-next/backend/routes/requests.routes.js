@@ -344,6 +344,24 @@ router.put('/:id/status', verifyToken, (req, res) => {
       }
       
       const now = new Date().toISOString();
+      const clearPendingStateForRequest = (done) => {
+        const requestId = Number.parseInt(String(req.params.id), 10);
+        if (!Number.isFinite(requestId)) {
+          if (typeof done === 'function') done();
+          return;
+        }
+
+        const clearPatch = JSON.stringify({ isPending: false, requestId: null });
+        const likePattern = `%"requestId":${requestId}%`;
+        const cleanupQ = "UPDATE schedules SET records = json_patch(COALESCE(records, '{}'), ?) WHERE records LIKE ?";
+
+        db.run(cleanupQ, [clearPatch, likePattern], (cleanupErr) => {
+          if (cleanupErr) {
+            console.warn('[REQUEST_STATUS] Falha ao limpar estado pendente:', cleanupErr.message);
+          }
+          if (typeof done === 'function') done();
+        });
+      };
 
       if (status === 'pronto_para_homologacao') {
         db.run("INSERT INTO notifications (type, target, title, message, createdAt) VALUES ('SYSTEM', 'ALL_ADMIN', 'Permuta Aceita pelo Colega', 'Um pedido de mudança acaba de receber o aceite do professor substituto. Aguardando sua homologação.', ?)", [now], function(){});
@@ -356,8 +374,10 @@ router.put('/:id/status', verifyToken, (req, res) => {
                const notifyRejection = () => {
                    const now = new Date().toISOString();
                    db.run("INSERT INTO notifications (type, target, title, message, createdAt) VALUES ('SYSTEM', ?, 'Solicitação Recusada', 'A sua solicitação foi recusada pela gestão. O horário foi libertado.', ?)", [row.requester_id, now], function(){
-                       io.emit('schedule_updated');
-                       return res.json({ success: true });
+                       clearPendingStateForRequest(() => {
+                         io.emit('schedule_updated');
+                         return res.json({ success: true });
+                       });
                    });
                };
 
@@ -443,9 +463,10 @@ router.put('/:id/status', verifyToken, (req, res) => {
                                      const notifyMsg = `A troca envolvendo suas aulas de ${orig.subject} (${orig.day}) e ${prop.subject} (${prop.day}) acaba de ser homologada oficialmente.`;
                                      db.run("INSERT INTO notifications (type, target, title, message, createdAt) VALUES ('SYSTEM', ?, ?, ?, ?)", [row.requester_id, notifyTitle, notifyMsg, now], function(){});
                                      db.run("INSERT INTO notifications (type, target, title, message, createdAt) VALUES ('SYSTEM', ?, ?, ?, ?)", [row.substitute_id, notifyTitle, notifyMsg, now], function(){});
-
-                                     io.emit('schedule_updated'); 
-                                     res.json({ success: true, homologacaoStatus: 'EXECUTADA' });
+                                     clearPendingStateForRequest(() => {
+                                       io.emit('schedule_updated');
+                                       res.json({ success: true, homologacaoStatus: 'EXECUTADA' });
+                                     });
                                  }
                              });
                          });
@@ -453,8 +474,10 @@ router.put('/:id/status', verifyToken, (req, res) => {
 
                  } catch(jsonErr) {
                      console.warn("[SWAP_ENGINE] Falha ao parsear JSON payload. Requisição Legada. Pulando motor.", jsonErr);
-                     io.emit('schedule_updated');
-                     res.json({ success: true, homologacaoStatus: 'MANUAL_LEGADO' });
+                     clearPendingStateForRequest(() => {
+                       io.emit('schedule_updated');
+                       res.json({ success: true, homologacaoStatus: 'MANUAL_LEGADO' });
+                     });
                   }
               } else if (!err3 && row && (row.action_type === 'vaga' || row.action_type === 'oferta_vaga')) {
                   const dayMap = { 'Domingo': '0', 'Segunda-feira': '1', 'Terça-feira': '2', 'Quarta-feira': '3', 'Quinta-feira': '4', 'Sexta-feira': '5', 'Sábado': '6' };
@@ -492,7 +515,12 @@ router.put('/:id/status', verifyToken, (req, res) => {
                           });
                           db.run('COMMIT;', (commitErr) => {
                               if (commitErr || hasError) { db.run('ROLLBACK;'); res.status(500).json({ error: 'Erro Transacional' }); }
-                              else { io.emit('schedule_updated'); res.json({ success: true, homologacaoStatus: 'EXECUTADA_VAGA_OFERTA' }); }
+                              else {
+                                clearPendingStateForRequest(() => {
+                                  io.emit('schedule_updated');
+                                  res.json({ success: true, homologacaoStatus: 'EXECUTADA_VAGA_OFERTA' });
+                                });
+                              }
                           });
                       });
                   } catch(errExtract) { console.error('[VAGA_ENGINE] Erro:', errExtract); res.json({ success: true, homologacaoStatus: 'FALHA_PARSE' }); }
@@ -582,8 +610,10 @@ router.put('/:id/status', verifyToken, (req, res) => {
                                      const notifyMsg = `Sua solicitação para inserir aula de ${classType} (${targetSubject}) em ${dayStr} foi homologada e está na grade.`;
                                      const now = new Date().toISOString();
                                      db.run("INSERT INTO notifications (type, target, title, message, createdAt) VALUES ('SYSTEM', ?, ?, ?, ?)", [row.requester_id, notifyTitle, notifyMsg, now], function(){});
-                                     io.emit('schedule_updated');
-                                     res.json({ success: true, homologacaoStatus: 'EXECUTADA_EXTRA' });
+                                     clearPendingStateForRequest(() => {
+                                       io.emit('schedule_updated');
+                                       res.json({ success: true, homologacaoStatus: 'EXECUTADA_EXTRA' });
+                                     });
                                  }
                              });
                          });
@@ -593,8 +623,10 @@ router.put('/:id/status', verifyToken, (req, res) => {
                      res.json({ success: true, homologacaoStatus: 'FALHA_PARSE' });
                  }
              } else {
-                 io.emit('schedule_updated');
-                 res.json({ success: true });
+                 clearPendingStateForRequest(() => {
+                   io.emit('schedule_updated');
+                   res.json({ success: true });
+                 });
              }
          });
       } else {
