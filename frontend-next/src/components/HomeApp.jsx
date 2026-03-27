@@ -64,9 +64,9 @@ export function HomeApp({ appMode }) {
   });
 
   useEffect(() => {
-    if (appMode === 'professor' && searchParams && searchParams.get('t')) {
+    if (['professor', 'aluno'].includes(appMode) && searchParams && searchParams.get('t')) {
        scheduleState.setViewMode('dashboard');
-       scheduleState.setScheduleMode('atual');
+       scheduleState.setScheduleMode(appMode === 'professor' ? 'atual' : 'oficial');
     }
   }, [searchParams, appMode, scheduleState.setViewMode, scheduleState.setScheduleMode]);
 

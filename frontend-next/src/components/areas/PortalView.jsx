@@ -1,7 +1,7 @@
 import React, { useState, useTransition } from 'react';
 import { 
   Calendar, UserCircle, Layers, AlertTriangle, BarChart3, ListTodo, CalendarDays, Settings, Bell, Sun, RefreshCcw, HandHeart, X, ExternalLink, Scissors, MapPin, Monitor, Mail, MessageCircle,
-  BookOpen, FileText, Users, CheckCircle, AlertCircle, XCircle, Eye, Clock, Check, Printer, Home
+  BookOpen, FileText, Users, CheckCircle, AlertCircle, XCircle, Eye, Clock, Check, Printer, Home, Globe, Book
 } from 'lucide-react';
 import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd';
 import { SearchableSelect } from '../ui/SearchableSelect';
@@ -41,6 +41,11 @@ export function PortalView({
 }) {
   const { globalTeachers, refreshData, subjectHoursMeta, intervals, selectedConfigYear, disciplinesMeta, schedules, academicWeeks, bimesters } = useData();
   const [isPending, startTransition] = useTransition();
+
+  // Constantes de mapeamento de dias (Escopo estável)
+  const dayFullLabels = React.useMemo(() => ({ 'seg': 'Segunda', 'ter': 'Terça', 'qua': 'Quarta', 'qui': 'Quinta', 'sex': 'Sexta', 'sab': 'Sábado', 'dom': 'Domingo' }), []);
+  const dayOrder = React.useMemo(() => ({ 'seg': 1, 'ter': 2, 'qua': 3, 'qui': 4, 'sex': 5, 'sab': 6, 'dom': 7 }), []);
+  const shortDayMap = React.useMemo(() => ({ 'Segunda-feira': 'seg', 'Terça-feira': 'ter', 'Quarta-feira': 'qua', 'Quinta-feira': 'qui', 'Sexta-feira': 'sex', 'Sábado': 'sab', 'Domingo': 'dom', 'seg': 'seg', 'ter': 'ter', 'qua': 'qua', 'qui': 'qui', 'sex': 'sex', 'sab': 'sab', 'dom': 'dom' }), []);
 
   const handleModeChange = (newMode) => {
     if (typeof setScheduleMode === 'function') {
@@ -480,9 +485,6 @@ export function PortalView({
   const teacherSummary = React.useMemo(() => {
     if (!siape || !mappedSchedules || !schedules || !selectedWeek || !academicWeeks) return { atual: [], previa: [], vagas: [] };
     
-    const dayFullLabels = { 'seg': 'Segunda', 'ter': 'Terça', 'qua': 'Quarta', 'qui': 'Quinta', 'sex': 'Sexta', 'sab': 'Sábado', 'dom': 'Domingo' };
-    const dayOrder = { 'seg': 1, 'ter': 2, 'qua': 3, 'qui': 4, 'sex': 5, 'sab': 6, 'dom': 7 };
-    const shortDayMap = { 'Segunda-feira': 'seg', 'Terça-feira': 'ter', 'Quarta-feira': 'qua', 'Quinta-feira': 'qui', 'Sexta-feira': 'sex', 'Sábado': 'sab', 'Domingo': 'dom', 'seg': 'seg', 'ter': 'ter', 'qua': 'qua', 'qui': 'qui', 'sex': 'sex', 'sab': 'sab', 'dom': 'dom' };
 
     // Cálculo de Datas para os Headers
     const weekData = academicWeeks.find(w => String(w.id) === String(selectedWeek));
@@ -618,7 +620,86 @@ export function PortalView({
     const vagas = groupByDay(vagasRaw);
 
     return { atual, previa, vagas };
-  }, [siape, mappedSchedules, schedules, dbClasses, selectedConfigYear, selectedWeek, academicWeeks]);
+  }, [siape, mappedSchedules, schedules, dbClasses, selectedConfigYear, selectedWeek, academicWeeks, matrixDisciplinesMap, disciplinesMeta, subjectHoursMeta, MAP_DAYS]);
+
+   const alunoSummary = React.useMemo(() => {
+    if (appMode !== 'aluno' || !selectedClass || !mappedSchedules || !selectedWeek || !academicWeeks || !dbClasses) return { atual: [], previa: [], vagas: [] };
+    
+    const targetClassObj = dbClasses.find(c => c.name === selectedClass);
+    const classIdRef = targetClassObj ? String(targetClassObj.id) : String(selectedClass);
+    
+
+    const getHeaderLabel = (itemDay, weekId) => {
+      const dayCode = shortDayMap[itemDay] || itemDay;
+      const DayLabel = dayFullLabels[dayCode] || dayCode;
+      const targetWeekData = academicWeeks.find(w => String(w.id) === String(weekId || selectedWeek));
+      if (!targetWeekData || !targetWeekData.start_date) return DayLabel;
+      const cleanDate = String(targetWeekData.start_date).split('T')[0];
+      const d = new Date(cleanDate + 'T12:00:00Z');
+      if (isNaN(d.getTime())) return DayLabel;
+      const offset = (dayOrder[dayCode] || 1) - 1;
+      d.setUTCDate(d.getUTCDate() + offset);
+      const day = String(d.getUTCDate()).padStart(2, '0');
+      const month = String(d.getUTCMonth() + 1).padStart(2, '0');
+      return `${DayLabel} ${day}/${month}`;
+    };
+
+    const groupByDay = (items, weekIdForHeader = null) => {
+      const groups = {};
+      items.forEach(item => {
+        const code = shortDayMap[item.day] || item.day;
+        if (!groups[code]) groups[code] = [];
+        groups[code].push({ ...item, dayCode: code });
+      });
+      return Object.entries(groups)
+        .sort((a,b) => (dayOrder[a[0]] || 99) - (dayOrder[b[0]] || 99))
+        .map(([code, items]) => ({
+          dayCode: code,
+          dayLabel: getHeaderLabel(code, weekIdForHeader || items[0]?.week_id || items[0]?.academic_week_id || items[0]?.weekId),
+          items: items.sort((a,b) => a.time.localeCompare(b.time))
+        }));
+    };
+
+    // 1. Atual (Minha Turma - oficiais da semana selecionada)
+    const atualRaw = mappedSchedules.filter(s => 
+      String(s.classId) === classIdRef
+    );
+    const atual = groupByDay(atualRaw);
+
+    // 2. Aulas Vagas (Minha Turma - oficiais sem professor)
+    const vagasRaw = atualRaw.filter(s => 
+      (!s.teacherId || s.teacherId === 'A Definir' || s.teacherId === '')
+    );
+    const vagas = groupByDay(vagasRaw);
+
+    // 3. Prévia (Minha Turma - previas)
+    const now = new Date();
+    const isAfterWedNoon = (now.getDay() === 3 && now.getHours() >= 12) || now.getDay() > 3 || now.getDay() === 0;
+    const currentWeekIdx = academicWeeks.findIndex(w => String(w.id) === String(selectedWeek));
+    const targetPreviewWeekId = isAfterWedNoon ? (academicWeeks[currentWeekIdx + 1]?.id || selectedWeek) : selectedWeek;
+
+    const previaRaw = schedules.filter(s => 
+      s.type === 'previa' && 
+      String(s.classId) === classIdRef && 
+      String(s.week_id) === String(targetPreviewWeekId)
+    ).map(s => {
+       const dCode = isNaN(s.dayOfWeek) ? String(s.dayOfWeek) : String(MAP_DAYS[s.dayOfWeek]);
+       const discName = matrixDisciplinesMap[s.disciplineId] || 
+                        disciplinesMeta?.[s.disciplineId]?.name || 
+                        subjectHoursMeta?.[s.disciplineId]?.name || 
+                        s.disciplineName || s.disciplineId;
+       return {
+         ...s,
+         day: dCode,
+         dayLabel: dayFullLabels[dCode] || dCode,
+         time: s.slotId,
+         subject: discName
+       };
+    });
+    const previa = groupByDay(previaRaw, targetPreviewWeekId);
+
+    return { atual, previa, vagas };
+  }, [appMode, selectedClass, mappedSchedules, schedules, selectedWeek, academicWeeks, matrixDisciplinesMap, disciplinesMeta, subjectHoursMeta, MAP_DAYS, dbClasses]);
 
   const lastAutoSelectContext = React.useRef({ week: null, role: null });
 
@@ -908,325 +989,359 @@ export function PortalView({
        return String(w.name).replace(/semana\s*/i, 'SEM ') + ' (' + fmtDate(w.start_date) + ' a ' + fmtDate(w.end_date) + ')';
    }, [academicWeeks, selectedWeek]);
 
-  return (
-    <>
-        {/* LINKS RÁPIDOS E FERRAMENTAS - SEMPRE VISÍVEL PARA PROFESSOR LOGADO NO TOPO */}
-        {/* DASHBOARD DOCENTE (VIEW PRINCIPAL) */}
-         {appMode === 'professor' && viewMode === 'dashboard' && (
-           <div className="flex flex-col lg:flex-row gap-8 animate-in fade-in zoom-in duration-700 no-print">
-              
-              {/* LADO ESQUERDO: RESUMO DO HORÁRIO (60% no Desktop) */}
-              <div className="w-full lg:w-[60%] flex flex-col order-1">
-                <div className={`group flex flex-col h-full min-h-[500px] p-10 rounded-[3rem] border text-left transition-all hover:scale-[1.01] ${isDarkMode ? 'bg-slate-900/50 border-slate-700 hover:border-blue-500/50 hover:shadow-2xl hover:shadow-blue-500/10' : 'bg-blue-50/20 border-slate-200 hover:border-blue-300 hover:shadow-2xl hover:shadow-blue-500/5'}`}>
-                  
-                  <div className="flex items-center justify-between mb-8">
-                    <div className="flex items-center gap-5">
-                      <div className={`w-16 h-16 rounded-[1.5rem] flex items-center justify-center transition-all duration-500 ${isDarkMode ? 'bg-blue-600 text-white' : 'bg-blue-600 text-white shadow-xl shadow-blue-500/20'}`}>
-                        <Clock size={32} />
-                      </div>
-                      <div>
-                        <h2 className={`text-2xl font-black ${isDarkMode ? 'text-white' : 'text-slate-800'}`}>Resumo do Horário</h2>
-                        <p className={`text-xs font-bold uppercase tracking-widest opacity-60 ${isDarkMode ? 'text-blue-400' : 'text-blue-600'}`}>Agenda do Docente</p>
-                      </div>
-                    </div>
+   return (
+     <>
+          {/* DASHBOARD (DOCENTE OU ALUNO) */}
+          {(appMode === "professor" || appMode === "aluno") && viewMode === "dashboard" && (
+            <div className="flex flex-col lg:flex-row gap-8 animate-in fade-in zoom-in duration-700 no-print">
+               
+               {/* LADO ESQUERDO: RESUMO DO HORÁRIO (60% no Desktop) */}
+               <div className="w-full lg:w-[60%] flex flex-col order-1">
+                 <div className={`group flex flex-col h-full min-h-[500px] p-5 sm:p-10 rounded-[2.5rem] sm:rounded-[3rem] border text-left transition-all hover:scale-[1.01] ${isDarkMode ? "bg-slate-900/50 border-slate-700 hover:border-blue-500/50 hover:shadow-2xl hover:shadow-blue-500/10" : "bg-blue-50/20 border-slate-200 hover:border-blue-300 hover:shadow-2xl hover:shadow-blue-500/5"}`}>
+                   
+                   <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-8 gap-4">
+                     <div className="flex items-center gap-5">
+                       <div className={`w-12 h-12 sm:w-16 sm:h-16 rounded-[1.2rem] sm:rounded-[1.5rem] flex items-center justify-center transition-all duration-500 ${isDarkMode ? (appMode === "aluno" ? "bg-emerald-600" : "bg-blue-600") : (appMode === "aluno" ? "bg-emerald-600 shadow-emerald-500/20" : "bg-blue-600 shadow-blue-500/20")} text-white shadow-xl`}>
+                         <Clock size={32} />
+                       </div>
+                       <div>
+                         <h2 className={`text-2xl font-black ${isDarkMode ? "text-white" : "text-slate-800"}`}>Resumo do Horário</h2>
+                         <p className={`text-xs font-bold uppercase tracking-widest opacity-60 ${isDarkMode ? (appMode === "aluno" ? "text-emerald-400" : "text-blue-400") : (appMode === "aluno" ? "text-emerald-600" : "text-blue-600")}`}>
+                           {appMode === "aluno" ? "Agenda da Turma" : "Agenda do Docente"}
+                         </p>
+                       </div>
+                     </div>
 
-                    {/* Switcher de Abas Interno (Estilo Pílula Premium) */}
-                    <div className={`flex p-1.5 rounded-2xl gap-1 ${isDarkMode ? 'bg-slate-800' : 'bg-slate-200/50'}`}>
-                        {['atual', 'vagas', 'previa'].map(tab => (
-                          <button 
-                            key={tab}
-                            onClick={() => setDashboardTab(tab)} 
-                            className={`px-5 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all duration-300 ${dashboardTab === tab ? 'bg-white dark:bg-slate-600 text-blue-600 shadow-xl' : 'text-slate-500 hover:text-slate-700'}`}>
-                            {tab === 'atual' ? 'Atual' : tab === 'vagas' ? 'Aulas Vagas' : 'Prévia Semanal'}
-                          </button>
-                        ))}
-                    </div>
-                  </div>
+                     <div className={`flex p-1.5 rounded-2xl gap-1 overflow-x-auto no-scrollbar max-w-full ${isDarkMode ? "bg-slate-800" : "bg-slate-200/50"}`}>
+                         {["atual", "vagas", "previa"].map(tab => (
+                           <button 
+                             key={tab}
+                             onClick={() => setDashboardTab(tab)} 
+                             className={`px-3 sm:px-5 py-2 sm:py-2.5 rounded-xl text-[9px] sm:text-[10px] font-black uppercase tracking-wider transition-all duration-300 whitespace-nowrap ${dashboardTab === tab ? (isDarkMode ? "bg-slate-700 text-white shadow-xl" : "bg-white text-blue-600 shadow-xl") : "text-slate-500 hover:text-slate-700"}`}>
+                             {tab === "atual" ? "Atual" : tab === "vagas" ? "Vagas" : "Prévia"}
+                           </button>
+                         ))}
+                     </div>
+                   </div>
 
-                  <div className="flex-1 overflow-y-auto pr-4 custom-scrollbar space-y-8">
+                    {/* Filtros rápidos no Portal do Aluno */}
+                    {appMode === "aluno" && (
+                      <div className={`grid grid-cols-1 sm:grid-cols-2 gap-4 p-4 mb-4 rounded-2xl border ${isDarkMode ? "bg-slate-900/50 border-slate-800" : "bg-white border-slate-100 shadow-sm"}`}>
+                        <div className="space-y-1.5">
+                          <label className={`text-[9px] font-black uppercase tracking-[0.2em] ml-1 block ${isDarkMode ? "text-slate-500" : "text-slate-400"}`}>Filtrar por Curso</label>
+                          <SearchableSelect 
+                            isDarkMode={isDarkMode} 
+                            options={dynamicCoursesList} 
+                            value={selectedCourse} 
+                            onChange={handleCourseChange} 
+                            colorClass={isDarkMode ? "bg-slate-800 border-slate-700 text-slate-200" : "bg-white border-slate-200 text-slate-700 shadow-sm"}
+                          />
+                        </div>
+                        <div className="space-y-1.5">
+                          <label className={`text-[9px] font-black uppercase tracking-[0.2em] ml-1 block ${isDarkMode ? "text-slate-500" : "text-slate-400"}`}>Visualizar Turma</label>
+                          <SearchableSelect 
+                            isDarkMode={isDarkMode} 
+                            options={filteredClassesList} 
+                            value={selectedClass} 
+                            onChange={handleClassChange} 
+                            colorClass={isDarkMode ? "bg-emerald-900/30 border-emerald-800/50 text-emerald-200" : "bg-emerald-50 border-emerald-100 text-emerald-900 shadow-sm"}
+                          />
+                        </div>
+                      </div>
+                    )}
+                     {/* Seletor de Dias (Abas) para Alunos */}
+                     {appMode === "aluno" && (
+                       <div className="flex overflow-x-auto p-1.5 mb-6 no-scrollbar no-print bg-black/5 dark:bg-white/5 rounded-2xl border border-black/5 dark:border-white/5 scroll-smooth">
+                          <div className="flex gap-1">
+                            {safeDays.map(d => {
+                               const isSelected = String(selectedDay) === String(d);
+                               return (
+                                 <button 
+                                   key={d} 
+                                   onClick={() => setSelectedDay(d)} 
+                                   className={`px-4 sm:px-5 py-2 sm:py-2.5 rounded-xl text-[9px] sm:text-[10px] font-black uppercase tracking-widest whitespace-nowrap transition-all duration-300 ${isSelected ? (isDarkMode ? 'bg-emerald-600 text-white shadow-lg' : 'bg-emerald-600 text-white shadow-lg shadow-emerald-500/30') : (isDarkMode ? 'text-slate-500 hover:text-slate-300 hover:bg-slate-800' : 'text-slate-500 hover:text-slate-700 hover:bg-slate-200')}`}>
+                                   {getFormattedDayLabel(d).split(' ')[0]}
+                                 </button>
+                               );
+                            })}
+                          </div>
+                       </div>
+                     )}
+
+                   <div className="flex-1 overflow-y-auto pr-4 custom-scrollbar space-y-8">
                     {(() => {
+                      const summary = appMode === "aluno" ? alunoSummary : teacherSummary;
+                      const activeItems = summary[dashboardTab] || [];
+                      
                       const today = new Date();
                       const currentDayIdx = today.getDay();
-                      const dayCodeMap = { 1: 'seg', 2: 'ter', 3: 'qua', 4: 'qui', 5: 'sex', 6: 'sab', 0: 'dom' };
+                      const dayCodeMap = { 1: "seg", 2: "ter", 3: "qua", 4: "qui", 5: "sex", 6: "sab", 0: "dom" };
                       const currentDayCode = dayCodeMap[currentDayIdx];
-                      const currentHour = today.getHours();
-                      const currentMin = today.getMinutes();
-                      const currentTimeVal = currentHour * 60 + currentMin;
+                      const currentTimeVal = today.getHours() * 60 + today.getMinutes();
 
-                      // Helper para encontrar a próxima aula (destaque estrito)
                       let firstFutureFound = false;
+                      let highlightedSubject = null;
+
+                      // Se for aluno, filtra pelo dia selecionado
+                      const filteredByDay = (appMode === "aluno" && activeItems.length > 0)
+                         ? activeItems.filter(g => g.dayCode === (shortDayMap[selectedDay] || selectedDay))
+                         : activeItems;
+
                       const dayColorMap = {
-                        'seg': { primary: 'indigo', light: 'bg-indigo-50/50', dark: 'bg-indigo-500/10', border: 'border-indigo-200/50', darkBorder: 'border-indigo-500/30' },
-                        'ter': { primary: 'emerald', light: 'bg-emerald-50/50', dark: 'bg-emerald-500/10', border: 'border-emerald-200/50', darkBorder: 'border-emerald-500/30' },
-                        'qua': { primary: 'orange', light: 'bg-orange-50/50', dark: 'bg-orange-500/10', border: 'border-orange-200/50', darkBorder: 'border-orange-500/30' },
-                        'qui': { primary: 'rose', light: 'bg-rose-50/50', dark: 'bg-rose-500/10', border: 'border-rose-200/50', darkBorder: 'border-rose-500/30' },
-                        'sex': { primary: 'violet', light: 'bg-violet-50/50', dark: 'bg-violet-500/10', border: 'border-violet-200/50', darkBorder: 'border-violet-500/30' },
-                        'sab': { primary: 'sky', light: 'bg-sky-50/50', dark: 'bg-sky-500/10', border: 'border-sky-200/50', darkBorder: 'border-sky-500/30' }
+                         "seg": { primary: "indigo" },
+                         "ter": { primary: "emerald" },
+                         "qua": { primary: "orange" },
+                         "qui": { primary: "rose" },
+                         "sex": { primary: "violet" },
+                         "sab": { primary: "sky" }
                       };
 
-                      if (!teacherSummary[dashboardTab] || teacherSummary[dashboardTab].length === 0) {
+                      if (filteredByDay.length === 0) {
                         return (
                           <div className="flex flex-col items-center justify-center h-full py-20 opacity-30">
-                             <AlertCircle size={48} className="mb-4" />
-                             <p className="text-sm font-black uppercase tracking-[0.3em] text-center">Nenhum registro encontrado</p>
+                             {appMode === "aluno" && !selectedClass ? (
+                               <>
+                                 <Users size={64} className="mb-4" />
+                                 <p className="text-sm font-black uppercase tracking-[0.3em] text-center">Nenhuma Turma Selecionada</p>
+                               </>
+                             ) : (
+                               <>
+                                 <AlertCircle size={48} className="mb-4" />
+                                 <p className="text-sm font-black uppercase tracking-[0.3em] text-center">Nenhum registro encontrado</p>
+                               </>
+                             )}
                           </div>
                         );
                       }
 
-                      return teacherSummary[dashboardTab].map((grupo, gIdx) => {
-                        const colors = dayColorMap[grupo.dayCode] || dayColorMap['seg'];
+                      return filteredByDay.map((grupo, gIdx) => {
+                        const colors = dayColorMap[grupo.dayCode] || { primary: "blue" };
+                        const isDayToday = grupo.dayCode === currentDayCode;
                         
                         return (
                           <div key={grupo.dayCode + gIdx} className="space-y-4">
-                            {/* Cabeçalho do Dia Colorido */}
                             <div className="flex items-center gap-3">
-                              <div className={`h-px flex-1 ${isDarkMode ? 'bg-slate-800' : 'bg-slate-100'}`} />
-                              <span className={`text-[10px] font-black uppercase tracking-[0.4em] ${isDarkMode ? 'text-slate-500' : 'text-slate-400'}`}>
+                              <div className={`h-px flex-1 ${isDarkMode ? "bg-slate-800" : "bg-slate-100"}`} />
+                              <span className={`text-[10px] font-black uppercase tracking-[0.4em] ${isDarkMode ? "text-slate-500" : "text-slate-400"}`}>
                                 {grupo.dayLabel}
                               </span>
-                              <div className={`h-px flex-1 ${isDarkMode ? 'bg-slate-800' : 'bg-slate-100'}`} />
+                              <div className={`h-px flex-1 ${isDarkMode ? "bg-slate-800" : "bg-slate-100"}`} />
                             </div>
 
-                            <div className="grid grid-cols-1 gap-3">
-                              {grupo.items.map((aula, idx) => {
-                                // Reprocess logic to keep it clean - determine IF THIS IS THE ONE to highlight
-                                const processTarget = () => {
-                                  if (!firstFutureFound && (dashboardTab === 'atual')) {
-                                    const parts = String(aula.time).split('-');
-                                    if (parts.length === 2) {
-                                      const startParts = parts[0].trim().split(':');
-                                      const endParts = parts[1].trim().split(':');
-                                      const startVal = parseInt(startParts[0]) * 60 + parseInt(startParts[1]);
-                                      const endVal = parseInt(endParts[0]) * 60 + parseInt(endParts[1]);
-                                      if (grupo.dayCode === currentDayCode) {
-                                        if (currentTimeVal < endVal) { firstFutureFound = true; return true; }
-                                      } else if ((Object.keys(dayCodeMap).find(k => dayCodeMap[k] === grupo.dayCode) > currentDayIdx) || (currentDayIdx === 6 && grupo.dayCode === 'seg')) {
-                                        firstFutureFound = true; return true;
-                                      }
-                                    }
-                                  }
-                                  return false;
-                                };
-                                const isTarget = processTarget();
-                                
-                                // Explicit class selection to avoid dynamic tailwind issues
-                                let containerClasses = isDarkMode ? 'bg-slate-900 border-slate-800 hover:bg-slate-800/80' : 'bg-white border-slate-100 hover:shadow-md';
-                                let markerColor = '';
-                                let timeColor = isDarkMode ? 'text-slate-200' : 'text-slate-900';
-                                let badgeClasses = isDarkMode ? 'bg-slate-950 text-slate-400 group-hover/item:text-blue-400' : 'bg-slate-50 text-slate-800';
-                                
-                                if (isTarget) {
-                                  const c = colors.primary;
-                                  markerColor = `bg-${c}-500`;
-                                  if (c === 'indigo') {
-                                    containerClasses = isDarkMode ? 'bg-indigo-500/10 border-indigo-500/50 shadow-2xl shadow-indigo-500/20 scale-[1.02]' : 'bg-indigo-50 border-indigo-200 shadow-xl shadow-indigo-100 scale-[1.02]';
-                                    timeColor = isDarkMode ? 'text-indigo-400' : 'text-indigo-700';
-                                    badgeClasses = 'bg-indigo-600 text-white shadow-lg shadow-indigo-500/30';
-                                  } else if (c === 'emerald') {
-                                    containerClasses = isDarkMode ? 'bg-emerald-500/10 border-emerald-500/50 shadow-2xl shadow-emerald-500/20 scale-[1.02]' : 'bg-emerald-50 border-emerald-200 shadow-xl shadow-emerald-100 scale-[1.02]';
-                                    timeColor = isDarkMode ? 'text-emerald-400' : 'text-emerald-700';
-                                    badgeClasses = 'bg-emerald-600 text-white shadow-lg shadow-emerald-500/30';
-                                  } else if (c === 'amber') {
-                                    containerClasses = isDarkMode ? 'bg-amber-500/10 border-amber-500/50 shadow-2xl shadow-amber-500/20 scale-[1.02]' : 'bg-amber-50 border-amber-200 shadow-xl shadow-amber-100 scale-[1.02]';
-                                    timeColor = isDarkMode ? 'text-amber-400' : 'text-amber-700';
-                                    badgeClasses = 'bg-amber-600 text-white shadow-lg shadow-amber-500/30';
-                                  } else if (c === 'rose') {
-                                    containerClasses = isDarkMode ? 'bg-rose-500/10 border-rose-500/50 shadow-2xl shadow-rose-500/20 scale-[1.02]' : 'bg-rose-50 border-rose-200 shadow-xl shadow-rose-100 scale-[1.02]';
-                                    timeColor = isDarkMode ? 'text-rose-400' : 'text-rose-700';
-                                    badgeClasses = 'bg-rose-600 text-white shadow-lg shadow-rose-500/30';
-                                  } else if (c === 'violet') {
-                                    containerClasses = isDarkMode ? 'bg-violet-500/10 border-violet-500/50 shadow-2xl shadow-violet-500/20 scale-[1.02]' : 'bg-violet-50 border-violet-200 shadow-xl shadow-violet-100 scale-[1.02]';
-                                    timeColor = isDarkMode ? 'text-violet-400' : 'text-violet-700';
-                                    badgeClasses = 'bg-violet-600 text-white shadow-lg shadow-violet-500/30';
-                                  } else {
-                                    containerClasses = isDarkMode ? 'bg-slate-700 border-slate-600 shadow-2xl scale-[1.02]' : 'bg-slate-50 border-slate-200 shadow-xl scale-[1.02]';
-                                    badgeClasses = 'bg-slate-600 text-white shadow-lg';
-                                  }
-                                }
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                               {grupo.items.map((aula, idx) => {
+                                 const isTarget = (() => {
+                                   if (dashboardTab !== "atual") return false;
+                                   
+                                   // Regra: Se a próxima for igual à destacada, também destaca
+                                   if (firstFutureFound && highlightedSubject && (String(aula.subject) === String(highlightedSubject))) {
+                                      return true;
+                                   }
 
-                                return (
-                                  <div key={aula.id || idx} className={`group/item relative flex items-center justify-between p-5 rounded-3xl border transition-all duration-500 ${containerClasses}`}>
-                                    
-                                    {isTarget && (
-                                      <div className={`absolute -left-1 top-1/2 -translate-y-1/2 w-1.5 h-10 ${markerColor} rounded-full animate-pulse`} />
-                                    )}
+                                   if (!firstFutureFound) {
+                                     const parts = String(aula.time).split("-");
+                                     if (parts.length === 2) {
+                                       const endParts = parts[1].trim().split(":");
+                                       const endVal = parseInt(endParts[0]) * 60 + parseInt(endParts[1]);
+                                       if (grupo.dayCode === currentDayCode) {
+                                         if (currentTimeVal < endVal) { 
+                                           firstFutureFound = true; 
+                                           highlightedSubject = aula.subject;
+                                           return true; 
+                                         }
+                                       } else {
+                                          const dayOrderMap = { "seg": 1, "ter": 2, "qua": 3, "qui": 4, "sex": 5, "sab": 6, "dom": 0 };
+                                          const itemDayIdx = dayOrderMap[grupo.dayCode];
+                                          if (itemDayIdx > currentDayIdx || (currentDayIdx === 6 && itemDayIdx === 1)) {
+                                             firstFutureFound = true; 
+                                             highlightedSubject = aula.subject;
+                                             return true;
+                                          }
+                                       }
+                                     }
+                                   }
+                                   return false;
+                                 })();
+                                 
+                                 let containerClasses = isDarkMode ? "bg-slate-900 border-slate-800 hover:bg-slate-800/80" : "bg-white border-slate-100 hover:shadow-lg shadow-slate-200/50";
+                                 let timeColor = isDarkMode ? "text-slate-200" : "text-slate-900";
+                                 let badgeClasses = isDarkMode ? "bg-slate-950 text-slate-400 group-hover/item:text-blue-400" : "bg-slate-50 text-slate-800";
+                                 
+                                 if (isTarget) {
+                                    containerClasses = isDarkMode ? "bg-blue-500/10 border-blue-500/50 shadow-2xl shadow-blue-500/20 scale-[1.03] ring-2 ring-blue-500/50" : "bg-blue-50 border-blue-200 shadow-xl shadow-blue-100 scale-[1.03] ring-2 ring-blue-500/30";
+                                    timeColor = isDarkMode ? "text-blue-400" : "text-blue-700";
+                                    badgeClasses = "bg-blue-600 text-white shadow-lg shadow-blue-500/30";
+                                 }
 
-                                    <div className="flex flex-col">
-                                      <span className={`text-[13px] font-black tracking-tighter ${timeColor}`}>
-                                        {aula.time}
-                                      </span>
-                                      {(() => {
-                                        const subjectColorMap = {
-                                          0: 'text-blue-500 dark:text-blue-400',
-                                          1: 'text-emerald-500 dark:text-emerald-400',
-                                          2: 'text-indigo-500 dark:text-indigo-400',
-                                          3: 'text-rose-500 dark:text-rose-400',
-                                          4: 'text-amber-500 dark:text-amber-400',
-                                          5: 'text-sky-500 dark:text-sky-400'
-                                        };
-                                        const hash = aula.subject ? aula.subject.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0) : 0;
-                                        const colorClass = subjectColorMap[hash % 6];
-                                        
-                                        return (
-                                          <span className={`text-[10px] font-bold uppercase tracking-widest leading-tight transition-colors duration-500 ${isTarget ? (isDarkMode ? `text-${colors.primary}-400` : `text-${colors.primary}-700`) : colorClass}`}>
-                                            {aula.subject || (isTarget ? 'Próximo compromisso' : 'Horário Agendado')}
-                                          </span>
-                                        );
-                                      })()}
-                                    </div>
+                                 return (
+                                   <div key={aula.id || idx} className={`group/item relative flex items-center justify-between p-5 rounded-[2.5rem] border transition-all duration-500 m-1.5 ${containerClasses}`}>
+                                     <div className="flex flex-col">
+                                       <span className={`text-[13px] font-black tracking-tighter ${timeColor}`}>
+                                         {aula.time}
+                                       </span>
+                                       {(() => {
+                                         const subjectColorMap = {
+                                           0: "text-blue-500 dark:text-blue-400",
+                                           1: "text-emerald-500 dark:text-emerald-400",
+                                           2: "text-indigo-500 dark:text-indigo-400",
+                                           3: "text-rose-500 dark:text-rose-400",
+                                           4: "text-amber-500 dark:text-amber-400",
+                                           5: "text-sky-500 dark:text-sky-400"
+                                         };
+                                         const hash = aula.subject ? aula.subject.split("").reduce((acc, char) => acc + char.charCodeAt(0), 0) : 0;
+                                         const colorClass = subjectColorMap[hash % 6] || "text-slate-500";
+                                         return (
+                                           <span className={`text-[10px] font-bold uppercase tracking-widest leading-tight transition-colors duration-500 ${isTarget ? "text-blue-600 dark:text-blue-400" : colorClass}`}>
+                                             {aula.subject || "Horário Agendado"}
+                                           </span>
+                                         );
+                                       })()}
+                                     </div>
 
-                                    <div className="flex flex-col items-end">
-                                      <span className={`px-4 py-2 rounded-2xl text-[9px] font-black uppercase tracking-widest ${badgeClasses}`}>
-                                        {aula.className}
-                                      </span>
-                                    </div>
-                                  </div>
-                                );
-                              })}
+                                     <div className="flex flex-col items-end">
+                                       <span className={`px-4 py-2 rounded-2xl text-[9px] font-black uppercase tracking-widest border transition-all ${badgeClasses}`}>
+                                         {appMode === "aluno" ? (aula.teacher || "A Definir") : (aula.className)}
+                                       </span>
+                                     </div>
+                                   </div>
+                                 );
+                               })}
                             </div>
                           </div>
                         );
                       });
                     })()}
-                  </div>
-                </div>
-              </div>
+                   </div>
+                 </div>
+               </div>
 
-              {/* LADO DIREITO: FUNCIONALIDADES E LINKS (40% no Desktop) */}
-              <div className="w-full lg:w-[40%] flex flex-col gap-10 order-2">
-                
-                {/* Linha Superior: Funcionalidades Core */}
-                <div className="space-y-6">
-                  <h3 className={`text-[10px] font-black uppercase tracking-[0.3em] ml-4 ${isDarkMode ? 'text-slate-500' : 'text-slate-400'}`}>Atalhos de Gestão</h3>
-                  <div className="grid grid-cols-2 gap-4">
-                    
-                    {/* Meu Horário */}
-                    <button onClick={() => { setViewMode('professor'); if(typeof setSelectedTeacher === 'function') setSelectedTeacher(siape); }} 
-                            className={`group p-6 rounded-3xl border text-left transition-all hover:scale-[1.02] ${isDarkMode ? 'bg-slate-800 border-slate-700 hover:border-indigo-500/50' : 'bg-white border-slate-100 hover:border-indigo-200 shadow-sm hover:shadow-xl'}`}>
-                      <div className={`w-10 h-10 rounded-xl flex items-center justify-center mb-4 transition-colors ${isDarkMode ? 'bg-indigo-950 text-indigo-400 group-hover:bg-indigo-600 group-hover:text-white' : 'bg-indigo-50 text-indigo-600 group-hover:bg-indigo-600 group-hover:text-white'}`}>
-                        <UserCircle size={20} />
-                      </div>
-                      <h3 className={`text-sm font-black mb-1 ${isDarkMode ? 'text-white' : 'text-slate-800'}`}>Painel Completo</h3>
-                      <p className="text-[10px] font-medium text-slate-500 leading-tight">Gestão total da grade horária.</p>
-                    </button>
-
-                    {/* Permutas */}
-                    <button onClick={() => { setViewMode('curso'); if (siape) { setPadraoFilterTeacher(siape); setShowOnlyMyClasses(false); } }} 
-                            className={`group p-6 rounded-3xl border text-left transition-all hover:scale-[1.02] ${isDarkMode ? 'bg-slate-800 border-slate-700 hover:border-emerald-500/50' : 'bg-white border-slate-100 hover:border-emerald-200 shadow-sm hover:shadow-xl'}`}>
-                      <div className={`w-10 h-10 rounded-xl flex items-center justify-center mb-4 transition-colors ${isDarkMode ? 'bg-emerald-950 text-emerald-400 group-hover:bg-emerald-600 group-hover:text-white' : 'bg-emerald-50 text-emerald-600 group-hover:bg-emerald-600 group-hover:text-white'}`}>
-                        <Layers size={20} />
-                      </div>
-                      <h3 className={`text-sm font-black mb-1 ${isDarkMode ? 'text-white' : 'text-slate-800'}`}>Trocas de Aula</h3>
-                      <p className="text-[10px] font-medium text-slate-500 leading-tight">Solicite ou aceite permutas.</p>
-                    </button>
-
-                    {/* Solicitações */}
-                    <button onClick={() => setViewMode('solicitacoes')} 
-                            className={`group p-6 rounded-3xl border text-left transition-all hover:scale-[1.02] ${isDarkMode ? 'bg-slate-800 border-slate-700 hover:border-amber-500/50' : 'bg-white border-slate-100 hover:border-amber-200 shadow-sm hover:shadow-xl'}`}>
-                      <div className={`w-10 h-10 rounded-xl flex items-center justify-center mb-4 transition-colors ${isDarkMode ? 'bg-amber-950 text-amber-400 group-hover:bg-amber-600 group-hover:text-white' : 'bg-amber-50 text-amber-600 group-hover:bg-amber-600 group-hover:text-white'}`}>
-                        <Bell size={20} />
-                      </div>
-                      <h3 className={`text-sm font-black mb-1 ${isDarkMode ? 'text-white' : 'text-slate-800'}`}>Notificações</h3>
-                      <p className="text-[10px] font-medium text-slate-500 leading-tight">Alertas e pedidos da DAPE.</p>
-                    </button>
-
-                    {/* Controle */}
-                    <button onClick={() => setViewMode('total')} 
-                            className={`group p-6 rounded-3xl border text-left transition-all hover:scale-[1.02] ${isDarkMode ? 'bg-slate-800 border-slate-700 hover:border-rose-500/50' : 'bg-white border-slate-100 hover:border-rose-200 shadow-sm hover:shadow-xl'}`}>
-                      <div className={`w-10 h-10 rounded-xl flex items-center justify-center mb-4 transition-colors ${isDarkMode ? 'bg-rose-950 text-rose-400 group-hover:bg-rose-600 group-hover:text-white' : 'bg-rose-50 text-rose-600 group-hover:bg-rose-600 group-hover:text-white'}`}>
-                        <BarChart3 size={20} />
-                      </div>
-                      <h3 className={`text-sm font-black mb-1 ${isDarkMode ? 'text-white' : 'text-slate-800'}`}>Relatórios</h3>
-                      <p className="text-[10px] font-medium text-slate-500 leading-tight">Controle de aulas e faltas.</p>
-                    </button>
-
-                  </div>
-                </div>
-
-                {/* Linha Inferior: Sistemas Externos */}
-                <div className="space-y-6">
-                  <h3 className={`text-[10px] font-black uppercase tracking-[0.3em] ml-4 ${isDarkMode ? 'text-slate-500' : 'text-slate-400'}`}>Links Externos</h3>
-                  <div className="grid grid-cols-1 gap-3">
-                    
-                    {[
-                      { name: 'SUAP IFRO', sub: 'Portal do Servidor', icon: Users, color: 'emerald', url: 'https://suap.ifro.edu.br/' },
-                      { name: 'AVA Moodle', sub: 'Ambiente Virtual', icon: BookOpen, color: 'indigo', url: 'https://virtual.ifro.edu.br/jiparana/' },
-                      { name: 'Processos SEI', sub: 'Documentos Oficiais', icon: FileText, color: 'blue', url: 'https://sei.ifro.edu.br/' },
-                    ].map((link, i) => (
-                      <a key={i} href={link.url} target="_blank" rel="noopener noreferrer" 
-                         className={`group flex items-center justify-between p-4 rounded-2xl border transition-all ${isDarkMode ? 'bg-slate-900 border-slate-800 hover:bg-slate-800' : 'bg-white border-slate-100 shadow-sm hover:shadow-md'}`}>
-                        <div className="flex items-center gap-4">
-                           <div className={`w-8 h-8 rounded-lg flex items-center justify-center transition-colors ${isDarkMode ? `bg-${link.color}-950 text-${link.color}-400` : `bg-${link.color}-50 text-${link.color}-600`}`}>
-                              <link.icon size={16} />
+               <div className="w-full lg:w-[40%] flex flex-col gap-10 order-2">
+                 
+                 <div className="space-y-6">
+                   <h3 className={`text-[10px] font-black uppercase tracking-[0.3em] ml-4 ${isDarkMode ? "text-slate-500" : "text-slate-400"}`}>Atalhos e Ações</h3>
+                   <div className="grid grid-cols-2 gap-4">
+                     {appMode === "professor" ? (
+                       <>
+                         <button onClick={() => { setViewMode("professor"); if(typeof setSelectedTeacher === "function") setSelectedTeacher(siape); }} 
+                                 className={`group p-6 rounded-3xl border text-left transition-all hover:scale-[1.02] ${isDarkMode ? "bg-slate-800 border-slate-700 hover:border-indigo-500/50" : "bg-white border-slate-100 hover:border-indigo-200 shadow-sm hover:shadow-xl"}`}>
+                           <div className={`w-10 h-10 rounded-xl flex items-center justify-center mb-4 transition-colors ${isDarkMode ? "bg-indigo-950 text-indigo-400 group-hover:bg-indigo-600 group-hover:text-white" : "bg-indigo-50 text-indigo-600 group-hover:bg-indigo-600 group-hover:text-white"}`}>
+                             <UserCircle size={20} />
                            </div>
-                           <div className="flex flex-col">
-                             <span className={`text-[10px] font-black uppercase tracking-widest ${isDarkMode ? 'text-slate-200' : 'text-slate-900'}`}>{link.name}</span>
-                             <span className="text-[8px] font-bold text-slate-500 uppercase tracking-tighter">{link.sub}</span>
+                           <h3 className={`text-sm font-black mb-1 ${isDarkMode ? "text-white" : "text-slate-800"}`}>Meu Horário</h3>
+                           <p className="text-[10px] font-medium text-slate-500 leading-tight">Painel completo da grade.</p>
+                         </button>
+
+                         <button onClick={() => { setViewMode("curso"); if (siape) { setPadraoFilterTeacher(siape); setShowOnlyMyClasses(false); } }} 
+                                 className={`group p-6 rounded-3xl border text-left transition-all hover:scale-[1.02] ${isDarkMode ? "bg-slate-800 border-slate-700 hover:border-emerald-500/50" : "bg-white border-slate-100 hover:border-emerald-200 shadow-sm hover:shadow-xl"}`}>
+                           <div className={`w-10 h-10 rounded-xl flex items-center justify-center mb-4 transition-colors ${isDarkMode ? "bg-emerald-950 text-emerald-400 group-hover:bg-emerald-600 group-hover:text-white" : "bg-emerald-50 text-emerald-600 group-hover:bg-emerald-600 group-hover:text-white"}`}>
+                             <Layers size={20} />
                            </div>
-                        </div>
-                        <ExternalLink size={12} className="opacity-0 group-hover:opacity-100 transition-opacity text-slate-400" />
-                      </a>
-                    ))}
+                           <h3 className={`text-sm font-black mb-1 ${isDarkMode ? "text-white" : "text-slate-800"}`}>Permutas</h3>
+                           <p className="text-[10px] font-medium text-slate-500 leading-tight">Trocas de aula e vagas.</p>
+                         </button>
 
-                  </div>
-                </div>
+                         <button onClick={() => setViewMode("solicitacoes")} 
+                                 className={`group p-6 rounded-3xl border text-left transition-all hover:scale-[1.02] ${isDarkMode ? "bg-slate-800 border-slate-700 hover:border-amber-500/50" : "bg-white border-slate-100 hover:border-amber-200 shadow-sm hover:shadow-xl"}`}>
+                           <div className={`w-10 h-10 rounded-xl flex items-center justify-center mb-4 transition-colors ${isDarkMode ? "bg-amber-950 text-amber-400 group-hover:bg-amber-600 group-hover:text-white" : "bg-amber-50 text-amber-600 group-hover:bg-amber-600 group-hover:text-white"}`}>
+                             <Bell size={20} />
+                           </div>
+                           <h3 className={`text-sm font-black mb-1 ${isDarkMode ? "text-white" : "text-slate-800"}`}>Solicitações</h3>
+                           <p className="text-[10px] font-medium text-slate-500 leading-tight">Trocas pendentes e alertas.</p>
+                         </button>
 
-              </div>
+                         <button onClick={() => setViewMode("total")} 
+                                 className={`group p-6 rounded-3xl border text-left transition-all hover:scale-[1.02] ${isDarkMode ? "bg-slate-800 border-slate-700 hover:border-orange-500/50" : "bg-white border-slate-100 hover:border-orange-200 shadow-sm hover:shadow-xl"}`}>
+                           <div className={`w-10 h-10 rounded-xl flex items-center justify-center mb-4 transition-colors ${isDarkMode ? "bg-orange-950 text-orange-400 group-hover:bg-orange-600 group-hover:text-white" : "bg-orange-50 text-orange-600 group-hover:bg-orange-600 group-hover:text-white"}`}>
+                             <BarChart3 size={20} />
+                           </div>
+                           <h3 className={`text-sm font-black mb-1 ${isDarkMode ? "text-white" : "text-slate-800"}`}>Controle</h3>
+                           <p className="text-[10px] font-medium text-slate-500 leading-tight">Controle de carga horária.</p>
+                         </button>
+                       </>
+                     ) : (
+                       <>
+                         <button onClick={() => setViewMode("hoje")} 
+                                 className={`group p-6 rounded-3xl border text-left transition-all hover:scale-[1.02] ${isDarkMode ? "bg-slate-800 border-slate-700 hover:border-blue-500/50" : "bg-white border-slate-100 hover:border-blue-200 shadow-sm hover:shadow-xl"}`}>
+                           <div className={`w-10 h-10 rounded-xl flex items-center justify-center mb-4 transition-colors ${isDarkMode ? "bg-blue-950 text-blue-400 group-hover:bg-blue-600 group-hover:text-white" : "bg-blue-50 text-blue-600 group-hover:bg-blue-600 group-hover:text-white"}`}>
+                             <ListTodo size={20} />
+                           </div>
+                           <h3 className={`text-sm font-black mb-1 ${isDarkMode ? "text-white" : "text-slate-800"}`}>Painel Diário</h3>
+                           <p className="text-[10px] font-medium text-slate-500 leading-tight">O que temos para hoje?</p>
+                         </button>
 
-           </div>
-        )}
+                         <button onClick={() => setViewMode("turma")} 
+                                 className={`group p-6 rounded-3xl border text-left transition-all hover:scale-[1.02] ${isDarkMode ? "bg-slate-800 border-slate-700 hover:border-emerald-500/50" : "bg-white border-slate-100 hover:border-emerald-200 shadow-sm hover:shadow-xl"}`}>
+                           <div className={`w-10 h-10 rounded-xl flex items-center justify-center mb-4 transition-colors ${isDarkMode ? "bg-emerald-950 text-emerald-400 group-hover:bg-emerald-600 group-hover:text-white" : "bg-emerald-50 text-emerald-600 group-hover:bg-emerald-600 group-hover:text-white"}`}>
+                             <Calendar size={20} />
+                           </div>
+                           <h3 className={`text-sm font-black mb-1 ${isDarkMode ? "text-white" : "text-slate-800"}`}>Minha Turma</h3>
+                           <p className="text-[10px] font-medium text-slate-500 leading-tight">Visualizar horário completo.</p>
+                         </button>
 
+                         <button onClick={() => setViewMode("professor")} 
+                                 className={`group p-6 rounded-3xl border text-left transition-all hover:scale-[1.02] ${isDarkMode ? "bg-slate-800 border-slate-700 hover:border-indigo-500/50" : "bg-white border-slate-100 hover:border-indigo-200 shadow-sm hover:shadow-xl"}`}>
+                           <div className={`w-10 h-10 rounded-xl flex items-center justify-center mb-4 transition-colors ${isDarkMode ? "bg-indigo-950 text-indigo-400 group-hover:bg-indigo-600 group-hover:text-white" : "bg-indigo-50 text-indigo-600 group-hover:bg-indigo-600 group-hover:text-white"}`}>
+                             <UserCircle size={20} />
+                           </div>
+                           <h3 className={`text-sm font-black mb-1 ${isDarkMode ? "text-white" : "text-slate-800"}`}>Professor</h3>
+                           <p className="text-[10px] font-medium text-slate-500 leading-tight">Buscar por docente.</p>
+                         </button>
 
+                         <button onClick={() => { setViewMode('historico'); setScheduleMode('oficial'); }} 
+                                 className={`group p-6 rounded-3xl border text-left transition-all hover:scale-[1.02] ${isDarkMode ? "bg-slate-800 border-slate-700 hover:border-orange-500/50" : "bg-white border-slate-100 hover:border-orange-200 shadow-sm hover:shadow-xl"}`}>
+                           <div className={`w-10 h-10 rounded-xl flex items-center justify-center mb-4 transition-colors ${isDarkMode ? "bg-orange-950 text-orange-400 group-hover:bg-orange-600 group-hover:text-white" : "bg-orange-50 text-orange-600 group-hover:bg-orange-600 group-hover:text-white"}`}>
+                             <Clock size={20} />
+                           </div>
+                           <h3 className={`text-sm font-black mb-1 ${isDarkMode ? "text-white" : "text-slate-800"}`}>Aulas Passadas</h3>
+                           <p className="text-[10px] font-medium text-slate-500 leading-tight">Histórico de aulas.</p>
+                         </button>
+                       </>
+                     )}
+                   </div>
+                 </div>
+
+                 <div className="space-y-6">
+                    <h3 className={`text-[10px] font-black uppercase tracking-[0.3em] ml-4 ${isDarkMode ? "text-slate-500" : "text-slate-400"}`}>Sistemas IFRO</h3>
+                    <div className="flex flex-col gap-4">
+                       <a href="https://suap.ifro.edu.br/" target="_blank" rel="noopener noreferrer" 
+                          className={`group flex items-center gap-5 px-8 py-6 rounded-[2.5rem] border transition-all hover:scale-[1.02] ${isDarkMode ? "bg-slate-900 border-slate-800 hover:border-emerald-500/50" : "bg-white border-slate-100 shadow-xl shadow-slate-200/50 hover:border-emerald-200"}`}>
+                          <div className={`w-12 h-12 rounded-2xl flex items-center justify-center transition-all ${isDarkMode ? "bg-emerald-500/10 text-emerald-400 group-hover:bg-emerald-500 group-hover:text-white" : "bg-emerald-50 text-emerald-600 group-hover:bg-emerald-600 group-hover:text-white"}`}>
+                            <Globe size={24} />
+                          </div>
+                          <div className="text-left">
+                            <h4 className={`text-sm font-black ${isDarkMode ? "text-white" : "text-slate-900"}`}>Portal SUAP</h4>
+                            <p className="text-[10px] font-bold text-slate-500 tracking-wider uppercase">Notas</p>
+                          </div>
+                       </a>
+
+                       <a href="https://virtual.ifro.edu.br/jiparana/" target="_blank" rel="noopener noreferrer" 
+                          className={`group flex items-center gap-5 px-8 py-6 rounded-[2.5rem] border transition-all hover:scale-[1.02] ${isDarkMode ? "bg-slate-900 border-slate-800 hover:border-indigo-500/50" : "bg-white border-slate-100 shadow-xl shadow-slate-200/50 hover:border-indigo-200"}`}>
+                          <div className={`w-12 h-12 rounded-2xl flex items-center justify-center transition-all ${isDarkMode ? "bg-indigo-500/10 text-indigo-400 group-hover:bg-indigo-500 group-hover:text-white" : "bg-indigo-50 text-indigo-600 group-hover:bg-indigo-600 group-hover:text-white"}`}>
+                            <Book size={24} />
+                          </div>
+                          <div className="text-left">
+                            <h4 className={`text-sm font-black ${isDarkMode ? "text-white" : "text-slate-900"}`}>AVA IFRO</h4>
+                            <p className="text-[10px] font-bold text-slate-500 tracking-wider uppercase">Virtual</p>
+                          </div>
+                       </a>
+
+                       <a href="https://wa.me/5569999047804" target="_blank" rel="noopener noreferrer" 
+                          className={`group flex items-center gap-5 px-8 py-6 rounded-[2.5rem] border transition-all hover:scale-[1.02] ${isDarkMode ? "bg-slate-900 border-slate-800 hover:border-green-500/50" : "bg-white border-slate-100 shadow-xl shadow-slate-200/50 hover:border-green-200"}`}>
+                          <div className={`w-12 h-12 rounded-2xl flex items-center justify-center transition-all ${isDarkMode ? "bg-green-500/10 text-green-400 group-hover:bg-green-500 group-hover:text-white" : "bg-green-50 text-green-600 group-hover:bg-green-600 group-hover:text-white"}`}>
+                            <MessageCircle size={24} />
+                          </div>
+                          <div className="text-left">
+                            <h4 className={`text-sm font-black ${isDarkMode ? "text-white" : "text-slate-900"}`}>WhatsApp</h4>
+                            <p className="text-[10px] font-bold text-slate-500 tracking-wider uppercase">CAED</p>
+                          </div>
+                       </a>
+                    </div>
+                 </div>
+               </div>
+            </div>
+           )}
         {/* DASHBOARD HEADER: LINKS ALUNO (UX PREMIUM - MOBILE OPTIMIZED) */}
-        {appMode === 'aluno' && (
-          <div className="flex flex-row overflow-x-auto lg:grid lg:grid-cols-3 gap-4 mb-8 no-print animate-in duration-1000 slide-in-from-top-4 pb-2 scrollbar-hide">
-            
-            {/* AVA IFRO */}
-            <a href="https://virtual.ifro.edu.br/jiparana/" target="_blank" rel="noopener noreferrer" 
-               className={`flex-none w-[140px] sm:w-auto group relative flex flex-col sm:flex-row items-center sm:items-center gap-2 sm:gap-4 p-4 rounded-2xl border transition-all duration-500 overflow-hidden ${isDarkMode ? 'bg-slate-900 border-slate-800 hover:bg-slate-800/80 hover:scale-[1.02] hover:shadow-2xl shadow-indigo-900/10' : 'bg-white border-slate-100 shadow-xl shadow-slate-200/50 hover:shadow-2xl hover:scale-[1.02]'}`}>
-               <div className={`p-2.5 rounded-xl transition-all duration-500 ${isDarkMode ? 'bg-indigo-950 text-indigo-400 group-hover:bg-indigo-600 group-hover:text-white group-hover:shadow-[0_0_20px_rgba(79,70,229,0.4)]' : 'bg-indigo-50 text-indigo-600 group-hover:bg-indigo-600 group-hover:text-white group-hover:shadow-[0_0_20px_rgba(79,70,229,0.2)]'}`}>
-                  <BookOpen size={18} className="transition-transform duration-500 group-hover:-rotate-12" />
-               </div>
-               <div className="flex flex-col text-center sm:text-left">
-                 <h4 className={`text-[10px] font-black uppercase tracking-widest leading-none ${isDarkMode ? 'text-slate-200' : 'text-slate-900'}`}>AVA IFRO</h4>
-                 <p className="text-[8px] font-bold text-slate-500 mt-1 uppercase tracking-tighter opacity-80 hidden sm:block">Virtual</p>
-               </div>
-               <div className="absolute -bottom-2 -right-2 opacity-[0.03] group-hover:opacity-[0.06] group-hover:scale-110 transition-all duration-700 pointer-events-none">
-                  <BookOpen size={60} />
-               </div>
-            </a>
 
-            {/* SUAP ALUNO */}
-            <a href="https://suap.ifro.edu.br/" target="_blank" rel="noopener noreferrer" 
-               className={`flex-none w-[140px] sm:w-auto group relative flex flex-col sm:flex-row items-center sm:items-center gap-2 sm:gap-4 p-4 rounded-2xl border transition-all duration-500 overflow-hidden ${isDarkMode ? 'bg-slate-900 border-slate-800 hover:bg-slate-800/80 hover:scale-[1.02] hover:shadow-2xl shadow-emerald-900/10' : 'bg-white border-slate-100 shadow-xl shadow-slate-200/50 hover:shadow-2xl hover:scale-[1.02]'}`}>
-               <div className={`p-2.5 rounded-xl transition-all duration-500 ${isDarkMode ? 'bg-emerald-950 text-emerald-400 group-hover:bg-emerald-600 group-hover:text-white group-hover:shadow-[0_0_20px_rgba(16,185,129,0.4)]' : 'bg-emerald-50 text-emerald-600 group-hover:bg-emerald-600 group-hover:text-white group-hover:shadow-[0_0_20px_rgba(16,185,129,0.2)]'}`}>
-                  <Users size={18} className="transition-transform duration-500 group-hover:scale-110" />
-               </div>
-               <div className="flex flex-col text-center sm:text-left">
-                 <h4 className={`text-[10px] font-black uppercase tracking-widest leading-none ${isDarkMode ? 'text-slate-200' : 'text-slate-900'}`}>Portal SUAP</h4>
-                 <p className="text-[8px] font-bold text-slate-500 mt-1 uppercase tracking-tighter opacity-80 hidden sm:block">Notas</p>
-               </div>
-               <div className="absolute -bottom-2 -right-2 opacity-[0.03] group-hover:opacity-[0.06] group-hover:scale-110 transition-all duration-700 pointer-events-none">
-                  <Users size={60} />
-               </div>
-            </a>
-
-            {/* WHATSAPP CAED */}
-            <a href="https://wa.me/5569999047804" target="_blank" rel="noopener noreferrer" 
-               className={`flex-none w-[140px] sm:w-auto group relative flex flex-col sm:flex-row items-center sm:items-center gap-2 sm:gap-4 p-4 rounded-2xl border transition-all duration-500 overflow-hidden ${isDarkMode ? 'bg-slate-900 border-slate-800 hover:bg-green-900/20 hover:scale-[1.02] hover:shadow-2xl shadow-green-900/10' : 'bg-white border-slate-100 shadow-xl shadow-slate-200/50 hover:shadow-2xl hover:scale-[1.02]'}`}>
-               <div className={`p-2.5 rounded-xl transition-all duration-500 ${isDarkMode ? 'bg-green-950 text-green-400 group-hover:bg-green-600 group-hover:text-white group-hover:shadow-[0_0_20px_rgba(22,163,74,0.4)]' : 'bg-green-50 text-green-600 group-hover:bg-green-600 group-hover:text-white group-hover:shadow-[0_0_20px_rgba(22,163,74,0.2)]'}`}>
-                  <MessageCircle size={18} className="transition-transform duration-500 group-hover:rotate-6" />
-               </div>
-               <div className="flex flex-col text-center sm:text-left">
-                 <h4 className={`text-[10px] font-black uppercase tracking-widest leading-none ${isDarkMode ? 'text-slate-200' : 'text-slate-900'}`}>WhatsApp</h4>
-                 <p className="text-[8px] font-bold text-slate-500 mt-1 uppercase tracking-tighter opacity-80 hidden sm:block">CAED</p>
-               </div>
-               <div className="absolute -bottom-2 -right-2 opacity-[0.03] group-hover:opacity-[0.06] group-hover:scale-110 transition-all duration-700 pointer-events-none">
-                  <MessageCircle size={60} />
-               </div>
-            </a>
-          </div>
-        )}
 
         {(!schedules || schedules.length === 0) ? (
             <div className={`rounded-2xl border p-12 text-center shadow-sm animate-in fade-in ${isDarkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'}`}>
@@ -1240,7 +1355,7 @@ export function PortalView({
           <div className="space-y-4 animate-in fade-in duration-700">
             
             {/* ABAS E FILTROS */}
-            <div className={`rounded-2xl shadow-sm border p-4 space-y-4 no-print print:hidden ${viewMode === 'dashboard' && appMode === 'professor' ? 'hidden' : ''} ${isDarkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'}`}>
+            <div className={`rounded-2xl shadow-sm border p-4 space-y-4 no-print print:hidden ${viewMode === 'dashboard' ? 'hidden' : ''} ${isDarkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'}`}>
               
               {/* Nível 1: Tipos de Visão (Adaptável por Perfil) */}
               <div className={`flex items-center justify-between border-b pb-3 ${isDarkMode ? 'border-slate-700' : 'border-slate-100'}`}>
@@ -1572,6 +1687,7 @@ export function PortalView({
                       </div>
                     </div>
                   )}
+
 
 
                   {/* TABELA DE CONTROLE (TOTAIS) E ESTATÍSTICAS DIÁRIO */}
