@@ -1150,21 +1150,21 @@ export function PortalView({
                         </div>
                       </div>
                     )}
-                     {/* Seletor de Dias (Abas) para Alunos */}
+                     {/* Seletor de Dias (Abas) para Alunos - Empilhado no Mobile, Linha no Desktop */}
                      {appMode === "aluno" && (
-                       <div className="flex overflow-x-auto p-1.5 mb-6 no-scrollbar no-print bg-black/5 dark:bg-white/5 rounded-2xl border border-black/5 dark:border-white/5 scroll-smooth">
-                          <div className="flex gap-1">
-                            {safeDays.map(d => {
-                               const isSelected = String(selectedDay) === String(d);
-                               return (
-                                 <button 
-                                   key={d} 
-                                   onClick={() => setSelectedDay(d)} 
-                                   className={`px-4 sm:px-5 py-2 sm:py-2.5 rounded-xl text-[9px] sm:text-[10px] font-black uppercase tracking-widest whitespace-nowrap transition-all duration-300 ${isSelected ? (isDarkMode ? 'bg-emerald-600 text-white shadow-lg' : 'bg-emerald-600 text-white shadow-lg shadow-emerald-500/30') : (isDarkMode ? 'text-slate-500 hover:text-slate-300 hover:bg-slate-800' : 'text-slate-500 hover:text-slate-700 hover:bg-slate-200')}`}>
-                                   {getFormattedDayLabel(d).split(' ')[0]}
-                                 </button>
-                               );
-                            })}
+                       <div className="p-1.5 mb-6 no-print bg-black/5 dark:bg-white/5 rounded-2xl border border-black/5 dark:border-white/5">
+                          <div className="flex flex-wrap sm:flex-nowrap gap-1.5 justify-center sm:justify-start sm:overflow-x-auto no-scrollbar scroll-smooth">
+                             {safeDays.map(d => {
+                                const isSelected = String(selectedDay) === String(d);
+                                return (
+                                  <button 
+                                    key={d} 
+                                    onClick={() => setSelectedDay(d)} 
+                                    className={`flex-1 sm:flex-none px-4 sm:px-5 py-2.5 rounded-xl text-[9px] sm:text-[10px] font-black uppercase tracking-widest whitespace-nowrap transition-all duration-300 ${isSelected ? (isDarkMode ? 'bg-emerald-600 text-white shadow-lg' : 'bg-emerald-600 text-white shadow-lg shadow-emerald-500/30') : (isDarkMode ? 'text-slate-500 hover:text-slate-300 hover:bg-slate-800' : 'text-slate-500 hover:text-slate-700 hover:bg-slate-200')}`}>
+                                    {getFormattedDayLabel(d).split(' ')[0]}
+                                  </button>
+                                );
+                             })}
                           </div>
                        </div>
                      )}
@@ -1417,6 +1417,14 @@ export function PortalView({
                        </>
                      ) : (
                        <>
+                         <button onClick={() => setViewMode("dashboard")} 
+                                 className={`group p-6 rounded-3xl border text-left transition-all hover:scale-[1.02] ${isDarkMode ? "bg-slate-800 border-slate-700 hover:border-slate-500/50" : "bg-white border-slate-100 hover:border-slate-200 shadow-sm hover:shadow-xl"}`}>
+                            <div className={`w-10 h-10 rounded-xl flex items-center justify-center mb-4 transition-colors ${isDarkMode ? "bg-slate-950 text-slate-400 group-hover:bg-slate-600 group-hover:text-white" : "bg-slate-50 text-slate-600 group-hover:bg-slate-600 group-hover:text-white"}`}>
+                              <Home size={20} />
+                            </div>
+                            <h3 className={`text-sm font-black mb-1 ${isDarkMode ? "text-white" : "text-slate-800"}`}>Início</h3>
+                            <p className="text-[10px] font-medium text-slate-500 leading-tight">Painel principal e avisos.</p>
+                          </button>
                          <button onClick={() => setViewMode("hoje")} 
                                  className={`group p-6 rounded-3xl border text-left transition-all hover:scale-[1.02] ${isDarkMode ? "bg-slate-800 border-slate-700 hover:border-blue-500/50" : "bg-white border-slate-100 hover:border-blue-200 shadow-sm hover:shadow-xl"}`}>
                            <div className={`w-10 h-10 rounded-xl flex items-center justify-center mb-4 transition-colors ${isDarkMode ? "bg-blue-950 text-blue-400 group-hover:bg-blue-600 group-hover:text-white" : "bg-blue-50 text-blue-600 group-hover:bg-blue-600 group-hover:text-white"}`}>

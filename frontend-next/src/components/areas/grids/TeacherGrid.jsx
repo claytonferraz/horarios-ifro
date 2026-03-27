@@ -35,6 +35,7 @@ export const TeacherGrid = React.memo(
     activeDays,
     classTimes,
     setShowEmptySlots,
+    profClassesMemo,
   }) => {
     const activeTeacher = selectedColleague || selectedTeacher;
     const isGridInert = appMode === 'aluno' || scheduleMode === 'consolidado' || scheduleMode === 'oficial';
