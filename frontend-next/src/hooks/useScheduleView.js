@@ -24,17 +24,6 @@ export function useScheduleView({ appMode, rawData, disabledWeeks, targetData, d
   const [totalFilterClass, setTotalFilterClass] = useState('Todas');
   const [totalFilterSubject, setTotalFilterSubject] = useState('Todas');
 
-  useEffect(() => {
-    if (appMode === 'professor' && siape && !selectedTeacher) {
-      setSelectedTeacher(String(siape));
-    }
-  }, [appMode, siape, selectedTeacher]);
-
-  useEffect(() => {
-    if (appMode === 'professor' && siape && totalFilterTeacher !== String(siape)) {
-      setTotalFilterTeacher(String(siape));
-    }
-  }, [appMode, siape, totalFilterTeacher]);
 
   const activeData = useMemo(() => rawData.filter(r => !disabledWeeks.includes(`${r.week}-${r.type}`)), [rawData, disabledWeeks]);
 
@@ -155,10 +144,6 @@ export function useScheduleView({ appMode, rawData, disabledWeeks, targetData, d
     return ['Todas', ...[...new Set(valid.map(r => r.subject))].sort((a,b) => a.localeCompare(b))];
   }, [officialDataForTotal, totalFilterYear, totalFilterTeacher, totalFilterClass]);
 
-  useEffect(() => { if (!availableYearsForTotal.includes(totalFilterYear)) setTotalFilterYear('Todos'); }, [availableYearsForTotal, totalFilterYear]);
-  useEffect(() => { if (!availableTeachersForTotal.includes(totalFilterTeacher)) setTotalFilterTeacher('Todos'); }, [availableTeachersForTotal, totalFilterTeacher]);
-  useEffect(() => { if (!availableClassesForTotal.includes(totalFilterClass)) setTotalFilterClass('Todas'); }, [availableClassesForTotal, totalFilterClass]);
-  useEffect(() => { if (!availableSubjectsForTotal.includes(totalFilterSubject)) setTotalFilterSubject('Todas'); }, [availableSubjectsForTotal, totalFilterSubject]);
 
   const sortedBimesters = useMemo(() => {
     const list = (bimesters && bimesters.length > 0) ? bimesters : [
@@ -211,6 +196,35 @@ export function useScheduleView({ appMode, rawData, disabledWeeks, targetData, d
     return bims;
   }, [finalFilteredTotalData]);
 
+
+  const { dbSummary, adminStats, alunoStats, profStats, diarioStats } = useScheduleStats({
+    rawData, activeData, targetData: resolvedTargetData, finalFilteredTotalData,
+    disciplinesMeta, subjectHoursMeta, disabledWeeks, selectedClass, selectedTeacher,
+    isFutureWeek, isCurrentWeek, isDatePastOrToday, isTeacherPending
+  });
+
+  // ==========================================
+  // EFEITOS DE SINCRONIZAÇÃO E RESET
+  // ==========================================
+  
+  useEffect(() => {
+    if (appMode === 'professor' && siape && !selectedTeacher) {
+      setSelectedTeacher(String(siape));
+    }
+  }, [appMode, siape, selectedTeacher]);
+
+  useEffect(() => {
+    // Evita loop infinito: só força o filtro se o SIAPE estiver na lista disponível para o contexto atual
+    if (appMode === 'professor' && siape && totalFilterTeacher !== String(siape) && availableTeachersForTotal.includes(String(siape))) {
+      setTotalFilterTeacher(String(siape));
+    }
+  }, [appMode, siape, totalFilterTeacher, availableTeachersForTotal]);
+
+  useEffect(() => { if (!availableYearsForTotal.includes(totalFilterYear)) setTotalFilterYear('Todos'); }, [availableYearsForTotal, totalFilterYear]);
+  useEffect(() => { if (!availableTeachersForTotal.includes(totalFilterTeacher)) setTotalFilterTeacher('Todos'); }, [availableTeachersForTotal, totalFilterTeacher]);
+  useEffect(() => { if (!availableClassesForTotal.includes(totalFilterClass)) setTotalFilterClass('Todas'); }, [availableClassesForTotal, totalFilterClass]);
+  useEffect(() => { if (!availableSubjectsForTotal.includes(totalFilterSubject)) setTotalFilterSubject('Todas'); }, [availableSubjectsForTotal, totalFilterSubject]);
+
   useEffect(() => {
     if (viewMode === 'curso' && selectedCourse === 'Todos') {
       const actualCourses = courses.filter(c => c !== 'Todos');
@@ -221,12 +235,6 @@ export function useScheduleView({ appMode, rawData, disabledWeeks, targetData, d
   useEffect(() => {
     if (classesList.length > 0 && (!selectedClass || !classesList.includes(selectedClass))) setSelectedClass(classesList[0]);
   }, [classesList, selectedClass]);
-
-  const { dbSummary, adminStats, alunoStats, profStats, diarioStats } = useScheduleStats({
-    rawData, activeData, targetData: resolvedTargetData, finalFilteredTotalData,
-    disciplinesMeta, subjectHoursMeta, disabledWeeks, selectedClass, selectedTeacher,
-    isFutureWeek, isCurrentWeek, isDatePastOrToday, isTeacherPending
-  });
 
   return {
     viewMode, setViewMode,
