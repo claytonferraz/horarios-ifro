@@ -109,7 +109,8 @@ export function PortalView({
     if (scheduleMode === 'atual' || scheduleMode === 'consolidado') {
         const dedupMap = new Map();
         filtered.forEach(s => {
-           const key = `${s.week_id || s.weekId}-${s.day || s.dayOfWeek}-${s.time || s.slotId}-${s.className || s.classId}-${s.subject}`;
+           // Chave robusta usando campos garantidos pela API (dayOfWeek, slotId, classId)
+           const key = `${s.week_id || s.weekId}-${s.dayOfWeek || s.day}-${s.slotId || s.time}-${s.classId || s.className}-${s.subjectName || s.subject}`;
            if (!dedupMap.has(key) || s.type === 'atual') {
                dedupMap.set(key, s);
            }
@@ -577,19 +578,33 @@ export function PortalView({
     const now = new Date();
     const todayIdx = now.getDay(); // 0 (Dom) a 6 (Sab)
     
-    // Identificar semana atual e próxima
-    const currentWeekIdx = academicWeeks.findIndex(w => String(w.id) === String(selectedWeek));
-    const nextWeekId = currentWeekIdx !== -1 && currentWeekIdx < academicWeeks.length - 1 
-      ? academicWeeks[currentWeekIdx + 1].id 
+    // 0. Identificar a semana REAL de hoje (sem influência do seletor global)
+    const nowRef = new Date();
+    const refDate = new Date(nowRef);
+    if (nowRef.getDay() === 6) refDate.setDate(refDate.getDate() + 2);
+    else if (nowRef.getDay() === 0) refDate.setDate(refDate.getDate() + 1);
+    refDate.setHours(0,0,0,0);
+
+    const actualCurrentWeek = academicWeeks.find(w => {
+       const s = new Date(w.start_date + 'T00:00:00'); 
+       const e = new Date(w.end_date + 'T23:59:59');
+       return refDate >= s && refDate <= e;
+    });
+    const actualCurrentWeekId = actualCurrentWeek ? String(actualCurrentWeek.id) : null;
+    
+    const dashboardBaseWeekId = actualCurrentWeekId || selectedWeek; // Fallback se não achar por data
+    const actualCurrentWeekIdx = academicWeeks.findIndex(w => String(w.id) === String(dashboardBaseWeekId));
+    const nextWeekId = (actualCurrentWeekIdx !== -1 && actualCurrentWeekIdx < academicWeeks.length - 1)
+      ? String(academicWeeks[actualCurrentWeekIdx + 1].id)
       : null;
 
     // Lógica de "Agora": Agrupa a semana atual. Se for Sexta/Sáb/Dom, TAMBÉM inclui a próxima semana.
-    const validWeekIds = [selectedWeek];
+    const validWeekIds = [dashboardBaseWeekId];
     if ((todayIdx === 5 || todayIdx === 6 || todayIdx === 0) && nextWeekId) {
         validWeekIds.push(nextWeekId);
     }
 
-    // 1. Atual (Minha Turma - filtra as semanas válidas e o SIAPE)
+    // 1. Atual (Minha Turma - filtra as semanas válidas e o SIAPE fixo do usuário logado)
     const rawItemsFiltered = (schedules || []).filter(s => 
       (s.type === 'oficial' || s.type === 'atual') && 
       validWeekIds.includes(String(s.week_id)) &&
@@ -599,7 +614,9 @@ export function PortalView({
     // De-duplicação: Preferimos 'atual' sobre 'oficial'
     const dedupMap = new Map();
     rawItemsFiltered.forEach(s => {
-       const key = `${s.week_id}-${s.day}-${s.time}-${s.className}-${s.subject}`;
+       // BUG FIX: O uso dos nomes de campos originais da tabela 'schedules' no banco (dayOfWeek, slotId, disciplineId) 
+       // é crucial aqui pois estamos operando sobre o array 'schedules' bruto antes do enriquecimento.
+       const key = `${s.week_id}-${s.dayOfWeek || s.day}-${s.slotId || s.time}-${s.classId || s.className}-${s.disciplineId || s.subject}`;
        if (!dedupMap.has(key) || s.type === 'atual') {
            dedupMap.set(key, s);
        }
@@ -611,7 +628,7 @@ export function PortalView({
 
     // Removemos os dias que já passaram da semana ATUAL, para limpar o dashboard
     const atualRaw = rawItemsForAtual.filter(s => {
-       if (String(s.week_id) !== String(selectedWeek)) return true; // Mostra tudo da próxima semana
+       if (String(s.week_id) !== String(dashboardBaseWeekId)) return true; // Mostra tudo da próxima semana
        const dayOrderMap = { "seg": 1, "ter": 2, "qua": 3, "qui": 4, "sex": 5, "sab": 6, "dom": 0 };
        const sDayCode = shortDayMap[s.day] || s.day;
        const sDayIdx = dayOrderMap[sDayCode];
@@ -621,8 +638,8 @@ export function PortalView({
     const atual = groupByDay(atualRaw);
 
     // 2. Prévia (Lógica: Quarta 12:00 -> Mostrar Prévia da Próxima Semana)
-    const isAfterWedNoon = (now.getDay() === 3 && now.getHours() >= 12) || now.getDay() > 3 || now.getDay() === 0;
-    const targetPreviewWeekId = isAfterWedNoon ? nextWeekId : selectedWeek;
+    const isAfterWedNoon = (nowRef.getDay() === 3 && nowRef.getHours() >= 12) || nowRef.getDay() > 3 || nowRef.getDay() === 0;
+    const targetPreviewWeekId = isAfterWedNoon ? nextWeekId : dashboardBaseWeekId;
 
     const previaRaw = targetPreviewWeekId ? (schedules || []).filter(s => 
       s.type === 'previa' && 
@@ -632,16 +649,27 @@ export function PortalView({
 
     const previa = groupByDay(previaRaw, targetPreviewWeekId);
 
-    // 3. Vagas (Busca todas as vagas das turmas que este professor atende)
-    const myClassIds = new Set(rawItemsForAtual.map(s => String(s.classId)));
-    const vagasRaw = (mappedSchedules || []).filter(s => 
-      (!s.teacherId || s.teacherId === "A Definir" || s.teacherId === "" || isTeacherPending(s.teacherId)) && 
-      myClassIds.has(String(s.classId))
+    // 3. Vagas (Busca todas as vagas das turmas que este professor atende - Independente de filtros externos)
+    // Precisamos de uma lista de 'classIds' que o professor realmente atende na produção
+    const myProdClasses = new Set((schedules || [])
+      .filter(s => (s.type === 'oficial' || s.type === 'atual') && String(s.teacherId).split(',').includes(String(siape)))
+      .map(s => String(s.classId))
     );
+
+    const vagasRaw = (schedules || [])
+      .filter(s => 
+        (s.type === 'oficial' || s.type === 'atual') && 
+        String(s.week_id) === String(dashboardBaseWeekId) &&
+        (!s.teacherId || s.teacherId === "0000001" || isTeacherPending(s.teacherId)) && 
+        myProdClasses.has(String(s.classId))
+      )
+      .map(s => enrichScheduleItem(s))
+      .filter(Boolean);
+
     const vagas = groupByDay(vagasRaw);
 
     return { atual, previa, vagas };
-  }, [siape, mappedSchedules, schedules, dbClasses, selectedConfigYear, selectedWeek, academicWeeks, matrixDisciplinesMap, disciplinesMeta, subjectHoursMeta, MAP_DAYS, globalTeachers]);
+  }, [siape, schedules, dbClasses, selectedConfigYear, selectedWeek, academicWeeks, matrixDisciplinesMap, disciplinesMeta, subjectHoursMeta, MAP_DAYS, globalTeachers, isTeacherPending]);
 
    const alunoSummary = React.useMemo(() => {
     if (appMode !== 'aluno' || !selectedClass || !mappedSchedules || !selectedWeek || !academicWeeks || !dbClasses) return { atual: [], previa: [], vagas: [] };
@@ -912,13 +940,44 @@ export function PortalView({
    }, [schedules, scheduleMode, selectedConfigYear, academicWeeks, appMode]);
 
    React.useEffect(() => {
-     if (dynamicWeeksList.length > 0) {
-        const validValues = dynamicWeeksList.map(w => w.value);
-        if (!selectedWeek || !validValues.includes(selectedWeek)) {
-           if (typeof setSelectedWeek === 'function') setSelectedWeek(validValues[0]);
-        }
-     }
-   }, [dynamicWeeksList, selectedWeek, setSelectedWeek]);
+      if (dynamicWeeksList.length > 0) {
+         const validValues = dynamicWeeksList.map(w => w.value);
+         if (!selectedWeek || !validValues.includes(selectedWeek)) {
+            // Tenta achar a semana atual por data no portal principal
+            const now = new Date();
+            const refDate = new Date(now);
+            if (now.getDay() === 6) refDate.setDate(refDate.getDate() + 2);
+            else if (now.getDay() === 0) refDate.setDate(refDate.getDate() + 1);
+            refDate.setHours(0,0,0,0);
+
+            const bestWeek = academicWeeks.find(w => {
+                const s = new Date(w.start_date + 'T00:00:00'); 
+                const e = new Date(w.end_date + 'T23:59:59');
+                return refDate >= s && refDate <= e;
+            });
+
+            if (bestWeek && validValues.includes(String(bestWeek.id))) {
+               if (typeof setSelectedWeek === 'function') setSelectedWeek(String(bestWeek.id));
+            } else if (typeof setSelectedWeek === 'function') {
+               setSelectedWeek(validValues[0]);
+            }
+         }
+      } else if (!selectedWeek && academicWeeks.length > 0) {
+          // Fallback se dynamicWeeksList ainda está carregando mas temos academicWeeks
+          const now = new Date();
+          const refDate = new Date(now);
+          if (now.getDay() === 6) refDate.setDate(refDate.getDate() + 2);
+          else if (now.getDay() === 0) refDate.setDate(refDate.getDate() + 1);
+          refDate.setHours(0,0,0,0);
+
+          const bestWeek = academicWeeks.find(w => {
+              const s = new Date(w.start_date + 'T00:00:00'); 
+              const e = new Date(w.end_date + 'T23:59:59');
+              return refDate >= s && refDate <= e;
+          });
+          if (bestWeek && typeof setSelectedWeek === 'function') setSelectedWeek(String(bestWeek.id));
+      }
+    }, [dynamicWeeksList, academicWeeks, selectedWeek, setSelectedWeek]);
 
    React.useEffect(() => {
      if (!selectedClass && filteredClassesList.length > 0 && typeof setSelectedClass === 'function') {
@@ -1416,7 +1475,7 @@ export function PortalView({
                         <UserCircle size={14} /> Meu Horário
                       </button>
 
-                      <button onClick={() => { setViewMode('curso'); if (siape) { setPadraoFilterTeacher(siape); setShowOnlyMyClasses(false); } }} 
+                      <button onClick={() => { setViewMode('curso'); setPadraoFilterTeacher('Todos'); setShowOnlyMyClasses(false); }} 
                               className={"flex flex-1 sm:flex-none min-w-[130px] items-center justify-center gap-2 px-4 py-3 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all " + (viewMode === 'curso' ? 'bg-emerald-600 text-white shadow-lg ring-2 ring-emerald-400/50' : (isDarkMode ? 'bg-slate-800 text-slate-300 hover:text-white hover:bg-slate-700' : 'bg-white text-slate-600 border border-slate-200 hover:text-slate-900'))}>
                         <Layers size={14} /> Permutas
                       </button>

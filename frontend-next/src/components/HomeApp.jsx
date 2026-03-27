@@ -424,7 +424,7 @@ export function HomeApp({ appMode }) {
       </main>
       
       {/* HUB WIDGET FLUTUANTE GLOBAL (NOTIFICAÇÕES E SOLICITAÇÕES) */}
-      {isUnlocked && !(appMode === 'admin' && adminTab === 'master_grid') && (
+      {isUnlocked && !(appMode === 'admin' && adminTab === 'master_grid') && appMode !== 'gestao_dape' && (
         <div className="fixed bottom-6 right-6 z-[9999] flex flex-col-reverse items-end print:hidden">
            <div className="pointer-events-auto">
              <FloatingRequestsWidget isDarkMode={isDarkMode} userRole={userRole} appMode={appMode} />
