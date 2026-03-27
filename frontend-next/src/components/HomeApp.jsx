@@ -28,7 +28,7 @@ import { GestaoDape } from './areas/GestaoDape';
 import { UsersManager } from './ui/admin/UsersManager';
 
 // Utility for fetching status data internally inside the generic view
-import { Calendar, Upload, Clock, BookOpen, Users, ChevronDown, FileText, AlertCircle, Trash2, UserCircle, BarChart3, Lock, Unlock, X, AlertTriangle, Settings, ShieldCheck, Power, Database, Edit3, Check, Download, Eye, Layers, Home, GraduationCap, UserCheck, Printer, ListTodo, KeyRound, CheckCircle, Link as LinkIcon, Loader2, Sun, Moon, Menu, UserPlus, ClipboardList, CalendarDays } from 'lucide-react';
+import { Calendar, Upload, Clock, BookOpen, Users, ChevronDown, FileText, AlertCircle, Trash2, UserCircle, BarChart3, Lock, Cpu, Unlock, X, AlertTriangle, Settings, ShieldCheck, Power, Database, Edit3, Check, Download, Eye, Layers, Home, GraduationCap, UserCheck, Printer, ListTodo, KeyRound, CheckCircle, Link as LinkIcon, Loader2, Sun, Moon, Menu, UserPlus, ClipboardList, CalendarDays } from 'lucide-react';
 
 
 // ==========================================
