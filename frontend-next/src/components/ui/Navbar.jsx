@@ -17,7 +17,8 @@ export function Navbar() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   const navigateTo = (path) => {
-    router.push(path);
+    const finalPath = path === "/professor" ? `/professor?t=${Date.now()}` : path;
+    router.push(finalPath);
     setMobileMenuOpen(false);
   };
 

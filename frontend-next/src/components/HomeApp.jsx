@@ -11,7 +11,7 @@ import { InlineInput } from "./ui/InlineInput";
 import { AdminStatsPanel } from "./ui/AdminStatsPanel";
 import { apiClient } from "@/lib/apiClient";
 import React, { useState, useEffect, useMemo, useRef } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { useAdminActions } from '../hooks/useAdminActions';
 import { useSecurityActions } from '../hooks/useSecurityActions';
 import { useScheduleView } from '../hooks/useScheduleView';
@@ -45,6 +45,7 @@ export function HomeApp({ appMode }) {
 
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const router = useRouter();
+  const searchParams = useSearchParams();
   
   const rawDataRef = useRef(rawData);
   const [uploadType, setUploadType] = useState('padrao'); 
@@ -61,6 +62,13 @@ export function HomeApp({ appMode }) {
   const scheduleState = useScheduleView({
     appMode, rawData, disabledWeeks, targetData: null, disciplinesMeta, subjectHoursMeta, adminFilterCourses, adminFilterClasses, setAdminFilterClasses, activeDays, classTimes, bimesters, siape, userRole, academicWeeks
   });
+
+  useEffect(() => {
+    if (appMode === 'professor' && searchParams && searchParams.get('t')) {
+       scheduleState.setViewMode('dashboard');
+       scheduleState.setScheduleMode('atual');
+    }
+  }, [searchParams, appMode, scheduleState.setViewMode, scheduleState.setScheduleMode]);
 
   const navigateTo = (mode) => {
     if (mode === 'home') { router.push('/'); setMobileMenuOpen(false); }

@@ -478,44 +478,147 @@ export function PortalView({
    }, [horariosFiltrados, dbClasses, dbCourses, disciplinesMeta, subjectHoursMeta, globalTeachers, matrixDisciplinesMap]);
 
   const teacherSummary = React.useMemo(() => {
-    if (!siape || !mappedSchedules || !schedules) return { atual: [], previa: [], vagas: [] };
+    if (!siape || !mappedSchedules || !schedules || !selectedWeek || !academicWeeks) return { atual: [], previa: [], vagas: [] };
     
     const dayFullLabels = { 'seg': 'Segunda', 'ter': 'Terça', 'qua': 'Quarta', 'qui': 'Quinta', 'sex': 'Sexta', 'sab': 'Sábado', 'dom': 'Domingo' };
     const dayOrder = { 'seg': 1, 'ter': 2, 'qua': 3, 'qui': 4, 'sex': 5, 'sab': 6, 'dom': 7 };
+    const shortDayMap = { 'Segunda-feira': 'seg', 'Terça-feira': 'ter', 'Quarta-feira': 'qua', 'Quinta-feira': 'qui', 'Sexta-feira': 'sex', 'Sábado': 'sab', 'Domingo': 'dom', 'seg': 'seg', 'ter': 'ter', 'qua': 'qua', 'qui': 'qui', 'sex': 'sex', 'sab': 'sab', 'dom': 'dom' };
 
-    // 1. Atual: Current week context
-    const atual = mappedSchedules.filter(s => 
+    // Cálculo de Datas para os Headers
+    const weekData = academicWeeks.find(w => String(w.id) === String(selectedWeek));
+    
+    const getHeaderLabel = (itemDay, weekId) => {
+      const dayCode = shortDayMap[itemDay] || itemDay;
+      const DayLabel = dayFullLabels[dayCode] || dayCode;
+      
+      const targetWeekData = academicWeeks.find(w => String(w.id) === String(weekId || selectedWeek));
+      if (!targetWeekData || !targetWeekData.start_date) return DayLabel;
+      
+      const cleanDate = String(targetWeekData.start_date).split('T')[0];
+      const d = new Date(cleanDate + 'T12:00:00Z');
+      
+      if (isNaN(d.getTime())) return DayLabel;
+      
+      const offset = (dayOrder[dayCode] || 1) - 1;
+      d.setUTCDate(d.getUTCDate() + offset);
+      
+      const day = String(d.getUTCDate()).padStart(2, '0');
+      const month = String(d.getUTCMonth() + 1).padStart(2, '0');
+      return `${DayLabel} ${day}/${month}`;
+    };
+
+    const groupByDay = (items, weekIdForHeader = null) => {
+      const groups = {};
+      items.forEach(item => {
+        const code = shortDayMap[item.day] || item.day;
+        if (!groups[code]) groups[code] = [];
+        groups[code].push({ ...item, dayCode: code });
+      });
+      return Object.entries(groups)
+        .sort((a,b) => (dayOrder[a[0]] || 99) - (dayOrder[b[0]] || 99))
+        .map(([code, items]) => ({
+          dayCode: code,
+          dayLabel: getHeaderLabel(code, weekIdForHeader || items[0]?.week_id || items[0]?.academic_week_id || items[0]?.weekId),
+          items: items.sort((a,b) => a.time.localeCompare(b.time))
+        }));
+    };
+
+    // 1. Atual (Lógica de "Agora": Esconder passado, transição no penúltimo dia)
+    const now = new Date();
+    const todayIdx = now.getDay(); // 0 (Dom) a 6 (Sab)
+    
+    // Identificar semana atual e próxima
+    const currentWeekIdx = academicWeeks.findIndex(w => String(w.id) === String(selectedWeek));
+    const nextWeekId = currentWeekIdx !== -1 && currentWeekIdx < academicWeeks.length - 1 
+      ? academicWeeks[currentWeekIdx + 1].id 
+      : null;
+
+    // Se hoje é Sexta (5) ou Sábado (6) ou Domingo (0), e temos uma próxima semana, transicionamos o "Agora"
+    const isTransitioning = todayIdx === 5 || todayIdx === 6 || todayIdx === 0;
+    const targetAtualWeekId = (isTransitioning && nextWeekId) ? nextWeekId : selectedWeek;
+
+    // Buscar as aulas desejadas diretamente do store de schedules (para não ficar restrito a horariosFiltrados do selectedWeek)
+    const rawItemsForAtual = schedules.filter(s => 
+      s.type === 'oficial' && 
+      String(s.week_id) === String(targetAtualWeekId) &&
       s.teacherId && String(s.teacherId).split(',').includes(String(siape))
-    ).sort((a,b) => {
-      if (dayOrder[a.day] !== dayOrder[b.day]) return dayOrder[a.day] - dayOrder[b.day];
-      return a.time.localeCompare(b.time);
-    }).map(a => ({...a, dayLabel: dayFullLabels[a.day] || a.day}));
-
-    // 2. Prévia: Next weeks (using raw schedules to avoid current week filtering)
-    const previa = schedules.filter(s => 
-      s.type === 'previa' && s.teacherId && String(s.teacherId).split(',').includes(String(siape)) && String(s.academic_year) === String(selectedConfigYear)
     ).map(s => {
+       // Mapeamento idêntico ao mappedSchedules para consistência
        const classObj = dbClasses.find(c => String(c.id) === String(s.classId));
        const dCode = isNaN(s.dayOfWeek) ? String(s.dayOfWeek) : String(MAP_DAYS[s.dayOfWeek]);
+       const discName = matrixDisciplinesMap[s.disciplineId] || 
+                        disciplinesMeta?.[s.disciplineId]?.name || 
+                        subjectHoursMeta?.[s.disciplineId]?.name || 
+                        s.disciplineName || s.disciplineId;
        return {
+         ...s,
+         day: dCode,
          dayLabel: dayFullLabels[dCode] || dCode,
          time: s.slotId,
          className: classObj ? classObj.name : s.classId,
-         day: dCode
+         subject: discName
        };
-    }).sort((a,b) => {
-      if (dayOrder[a.day] !== dayOrder[b.day]) return dayOrder[a.day] - dayOrder[b.day];
-      return a.time.localeCompare(b.time);
     });
 
-    // 3. Vagas: In classes where teacher teaches
-    const myClassIds = new Set(atual.map(s => String(s.classId)));
-    const vagas = mappedSchedules.filter(s => 
+    // Filtrar aulas passadas se ainda estivermos na semana atual
+    const atualRaw = rawItemsForAtual.filter(item => {
+      if (!targetAtualWeekId || targetAtualWeekId !== selectedWeek) return true; // Se for próxima semana, mostra tudo
+      
+      const dayIdx = dayOrder[shortDayMap[item.day]] || 0;
+      // Se o dia da aula já passou
+      if (dayIdx < todayIdx) return false;
+      // Se é o dia de hoje, futuramente poderíamos filtrar por hora do slot, 
+      // mas por enquanto mantemos o dia de hoje completo para segurança do professor.
+      return true;
+    });
+
+    const atual = groupByDay(atualRaw);
+
+    // 2. Prévia (Lógica: Quarta 12:00 -> Mostrar Prévia da Próxima Semana)
+    const isAfterWedNoon = (now.getDay() === 3 && now.getHours() >= 12) || now.getDay() > 3 || now.getDay() === 0;
+    const targetPreviewWeekId = isAfterWedNoon ? nextWeekId : selectedWeek;
+
+    const previaRaw = targetPreviewWeekId ? schedules.filter(s => 
+      s.type === 'previa' && 
+      s.teacherId && String(s.teacherId).split(',').includes(String(siape)) && 
+      String(s.week_id) === String(targetPreviewWeekId)
+    ).map(s => {
+       const classObj = dbClasses.find(c => String(c.id) === String(s.classId));
+       const dCode = isNaN(s.dayOfWeek) ? String(s.dayOfWeek) : String(MAP_DAYS[s.dayOfWeek]);
+       
+       const discName = matrixDisciplinesMap[s.disciplineId] || 
+                        disciplinesMeta?.[s.disciplineId]?.name || 
+                        subjectHoursMeta?.[s.disciplineId]?.name || 
+                        s.disciplineName || s.disciplineId;
+
+       return {
+         ...s, // Manter week_id original
+         day: dCode,
+         dayLabel: dayFullLabels[dCode] || dCode,
+         time: s.slotId,
+         className: classObj ? classObj.name : s.classId,
+         subject: discName
+       };
+    }) : [];
+
+    const previa = groupByDay(previaRaw, targetPreviewWeekId);
+
+    // 3. Vagas
+    const myClassIds = new Set(atualRaw.map(s => String(s.classId)));
+    const vagasRaw = mappedSchedules.filter(s => 
       (!s.teacherId || s.teacherId === 'A Definir' || s.teacherId === '') && myClassIds.has(String(s.classId))
-    ).map(a => ({...a, dayLabel: dayFullLabels[a.day] || a.day}));
+    ).map(s => {
+       // Resolver disciplina para vagas com fallback para o que já estava em s.subject
+       const discName = matrixDisciplinesMap[s.disciplineId] || 
+                        disciplinesMeta?.[s.disciplineId]?.name || 
+                        subjectHoursMeta?.[s.disciplineId]?.name || 
+                        s.subject || s.disciplineId;
+       return { ...s, subject: discName };
+    });
+    const vagas = groupByDay(vagasRaw);
 
     return { atual, previa, vagas };
-  }, [siape, mappedSchedules, schedules, dbClasses, selectedConfigYear]);
+  }, [siape, mappedSchedules, schedules, dbClasses, selectedConfigYear, selectedWeek, academicWeeks]);
 
   const lastAutoSelectContext = React.useRef({ week: null, role: null });
 
@@ -809,169 +912,270 @@ export function PortalView({
     <>
         {/* LINKS RÁPIDOS E FERRAMENTAS - SEMPRE VISÍVEL PARA PROFESSOR LOGADO NO TOPO */}
         {/* DASHBOARD DOCENTE (VIEW PRINCIPAL) */}
-        {appMode === 'professor' && viewMode === 'dashboard' && (
-           <div className="space-y-12 animate-in fade-in zoom-in duration-700 no-print">
+         {appMode === 'professor' && viewMode === 'dashboard' && (
+           <div className="flex flex-col lg:flex-row gap-8 animate-in fade-in zoom-in duration-700 no-print">
               
-              {/* Grid de Funcionalidades Principais */}
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-6">
-                
-                {/* 1. Meu Horário */}
-                <button onClick={() => { setViewMode('professor'); if(typeof setSelectedTeacher === 'function') setSelectedTeacher(siape); }} 
-                        className={`group p-8 rounded-[2.5rem] border text-left transition-all hover:scale-[1.02] active:scale-95 ${isDarkMode ? 'bg-slate-800 border-slate-700 hover:border-indigo-500/50 hover:shadow-2xl hover:shadow-indigo-500/10' : 'bg-white border-slate-200 hover:border-indigo-300 hover:shadow-2xl hover:shadow-indigo-500/5'}`}>
-                  <div className={`w-14 h-14 rounded-2xl flex items-center justify-center mb-6 transition-colors ${isDarkMode ? 'bg-indigo-950 text-indigo-400 group-hover:bg-indigo-600 group-hover:text-white' : 'bg-indigo-50 text-indigo-600 group-hover:bg-indigo-600 group-hover:text-white'}`}>
-                    <UserCircle size={28} />
-                  </div>
-                  <h3 className={`text-xl font-black mb-2 ${isDarkMode ? 'text-white' : 'text-slate-800'}`}>Meu Horário</h3>
-                  <p className={`text-sm font-medium ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>Visualize sua grade individual, acompanhe aulas dadas e horários previstos.</p>
-                </button>
-
-                {/* 2. Resumo do Horário (Abas Dinâmicas) */}
-                <div className={`group flex flex-col p-8 rounded-[2.5rem] border text-left transition-all hover:scale-[1.01] ${isDarkMode ? 'bg-slate-900/50 border-slate-700 hover:border-blue-500/50 hover:shadow-2xl' : 'bg-blue-50/20 border-slate-200 hover:border-blue-300 hover:shadow-2xl'}`}>
-                  <div className="flex items-center justify-between mb-6">
-                    <div className={`w-12 h-12 rounded-2xl flex items-center justify-center transition-colors ${isDarkMode ? 'bg-blue-950 text-blue-400' : 'bg-white text-blue-600 shadow-sm'}`}>
-                      <Clock size={24} />
-                    </div>
-                    {/* Switcher de Abas Interno */}
-                    <div className={`flex p-1 rounded-xl gap-1 ${isDarkMode ? 'bg-slate-800' : 'bg-slate-100'}`}>
-                       <button onClick={() => setDashboardTab('atual')} className={`px-3 py-1.5 rounded-lg text-[8px] font-black uppercase tracking-tight transition-all ${dashboardTab === 'atual' ? 'bg-white dark:bg-slate-600 text-blue-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>Agora</button>
-                       <button onClick={() => setDashboardTab('previa')} className={`px-3 py-1.5 rounded-lg text-[8px] font-black uppercase tracking-tight transition-all ${dashboardTab === 'previa' ? 'bg-white dark:bg-slate-600 text-blue-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>Prévia</button>
-                       <button onClick={() => setDashboardTab('vagas')} className={`px-3 py-1.5 rounded-lg text-[8px] font-black uppercase tracking-tight transition-all ${dashboardTab === 'vagas' ? 'bg-white dark:bg-slate-600 text-blue-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>Vagas</button>
-                    </div>
-                  </div>
+              {/* LADO ESQUERDO: RESUMO DO HORÁRIO (60% no Desktop) */}
+              <div className="w-full lg:w-[60%] flex flex-col order-1">
+                <div className={`group flex flex-col h-full min-h-[500px] p-10 rounded-[3rem] border text-left transition-all hover:scale-[1.01] ${isDarkMode ? 'bg-slate-900/50 border-slate-700 hover:border-blue-500/50 hover:shadow-2xl hover:shadow-blue-500/10' : 'bg-blue-50/20 border-slate-200 hover:border-blue-300 hover:shadow-2xl hover:shadow-blue-500/5'}`}>
                   
-                  <h3 className={`text-lg font-black mb-4 ${isDarkMode ? 'text-white' : 'text-slate-800'}`}>
-                    {dashboardTab === 'atual' ? 'Semana Atual' : dashboardTab === 'previa' ? 'Próximas Semanas' : 'Vagas nas Turmas'}
-                  </h3>
-
-                  <div className="flex-1 max-h-[180px] overflow-y-auto pr-2 custom-scrollbar space-y-2">
-                    {teacherSummary[dashboardTab] && teacherSummary[dashboardTab].length > 0 ? (
-                      teacherSummary[dashboardTab].map((aula, idx) => (
-                        <div key={idx} className={`flex items-center justify-between p-3 rounded-2xl border transition-all ${isDarkMode ? 'bg-slate-800/40 border-slate-700/50 hover:bg-slate-800' : 'bg-white/80 border-blue-50 hover:bg-white shadow-sm'}`}>
-                          <div className="flex flex-col">
-                            <span className={`text-[9px] font-black uppercase tracking-wider ${isDarkMode ? 'text-blue-400' : 'text-blue-600'}`}>{aula.dayLabel}</span>
-                            <span className={`text-[11px] font-black tracking-tight ${isDarkMode ? 'text-slate-200' : 'text-slate-900'}`}>{aula.time}</span>
-                          </div>
-                          <div className="flex flex-col items-end">
-                            <span className={`px-2.5 py-1 rounded-lg text-[8px] font-black uppercase tracking-widest ${isDarkMode ? 'bg-slate-900 text-slate-400' : 'bg-blue-50 text-blue-800'}`}>
-                              {aula.className}
-                            </span>
-                            {dashboardTab === 'vagas' && (
-                              <span className="text-[7px] font-bold text-emerald-500 mt-0.5 uppercase tracking-tighter">Disponível</span>
-                            )}
-                          </div>
-                        </div>
-                      ))
-                    ) : (
-                      <div className="flex flex-col items-center justify-center py-8 opacity-40">
-                         <AlertCircle size={24} className="mb-2" />
-                         <p className="text-[10px] font-black uppercase tracking-widest text-center">Nenhum registro para esta categoria</p>
+                  <div className="flex items-center justify-between mb-8">
+                    <div className="flex items-center gap-5">
+                      <div className={`w-16 h-16 rounded-[1.5rem] flex items-center justify-center transition-all duration-500 ${isDarkMode ? 'bg-blue-600 text-white' : 'bg-blue-600 text-white shadow-xl shadow-blue-500/20'}`}>
+                        <Clock size={32} />
                       </div>
-                    )}
+                      <div>
+                        <h2 className={`text-2xl font-black ${isDarkMode ? 'text-white' : 'text-slate-800'}`}>Resumo do Horário</h2>
+                        <p className={`text-xs font-bold uppercase tracking-widest opacity-60 ${isDarkMode ? 'text-blue-400' : 'text-blue-600'}`}>Agenda do Docente</p>
+                      </div>
+                    </div>
+
+                    {/* Switcher de Abas Interno (Estilo Pílula Premium) */}
+                    <div className={`flex p-1.5 rounded-2xl gap-1 ${isDarkMode ? 'bg-slate-800' : 'bg-slate-200/50'}`}>
+                        {['atual', 'vagas', 'previa'].map(tab => (
+                          <button 
+                            key={tab}
+                            onClick={() => setDashboardTab(tab)} 
+                            className={`px-5 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all duration-300 ${dashboardTab === tab ? 'bg-white dark:bg-slate-600 text-blue-600 shadow-xl' : 'text-slate-500 hover:text-slate-700'}`}>
+                            {tab === 'atual' ? 'Atual' : tab === 'vagas' ? 'Aulas Vagas' : 'Prévia Semanal'}
+                          </button>
+                        ))}
+                    </div>
+                  </div>
+
+                  <div className="flex-1 overflow-y-auto pr-4 custom-scrollbar space-y-8">
+                    {(() => {
+                      const today = new Date();
+                      const currentDayIdx = today.getDay();
+                      const dayCodeMap = { 1: 'seg', 2: 'ter', 3: 'qua', 4: 'qui', 5: 'sex', 6: 'sab', 0: 'dom' };
+                      const currentDayCode = dayCodeMap[currentDayIdx];
+                      const currentHour = today.getHours();
+                      const currentMin = today.getMinutes();
+                      const currentTimeVal = currentHour * 60 + currentMin;
+
+                      // Helper para encontrar a próxima aula (destaque estrito)
+                      let firstFutureFound = false;
+                      const dayColorMap = {
+                        'seg': { primary: 'indigo', light: 'bg-indigo-50/50', dark: 'bg-indigo-500/10', border: 'border-indigo-200/50', darkBorder: 'border-indigo-500/30' },
+                        'ter': { primary: 'emerald', light: 'bg-emerald-50/50', dark: 'bg-emerald-500/10', border: 'border-emerald-200/50', darkBorder: 'border-emerald-500/30' },
+                        'qua': { primary: 'orange', light: 'bg-orange-50/50', dark: 'bg-orange-500/10', border: 'border-orange-200/50', darkBorder: 'border-orange-500/30' },
+                        'qui': { primary: 'rose', light: 'bg-rose-50/50', dark: 'bg-rose-500/10', border: 'border-rose-200/50', darkBorder: 'border-rose-500/30' },
+                        'sex': { primary: 'violet', light: 'bg-violet-50/50', dark: 'bg-violet-500/10', border: 'border-violet-200/50', darkBorder: 'border-violet-500/30' },
+                        'sab': { primary: 'sky', light: 'bg-sky-50/50', dark: 'bg-sky-500/10', border: 'border-sky-200/50', darkBorder: 'border-sky-500/30' }
+                      };
+
+                      if (!teacherSummary[dashboardTab] || teacherSummary[dashboardTab].length === 0) {
+                        return (
+                          <div className="flex flex-col items-center justify-center h-full py-20 opacity-30">
+                             <AlertCircle size={48} className="mb-4" />
+                             <p className="text-sm font-black uppercase tracking-[0.3em] text-center">Nenhum registro encontrado</p>
+                          </div>
+                        );
+                      }
+
+                      return teacherSummary[dashboardTab].map((grupo, gIdx) => {
+                        const colors = dayColorMap[grupo.dayCode] || dayColorMap['seg'];
+                        
+                        return (
+                          <div key={grupo.dayCode + gIdx} className="space-y-4">
+                            {/* Cabeçalho do Dia Colorido */}
+                            <div className="flex items-center gap-3">
+                              <div className={`h-px flex-1 ${isDarkMode ? 'bg-slate-800' : 'bg-slate-100'}`} />
+                              <span className={`text-[10px] font-black uppercase tracking-[0.4em] ${isDarkMode ? 'text-slate-500' : 'text-slate-400'}`}>
+                                {grupo.dayLabel}
+                              </span>
+                              <div className={`h-px flex-1 ${isDarkMode ? 'bg-slate-800' : 'bg-slate-100'}`} />
+                            </div>
+
+                            <div className="grid grid-cols-1 gap-3">
+                              {grupo.items.map((aula, idx) => {
+                                // Reprocess logic to keep it clean - determine IF THIS IS THE ONE to highlight
+                                const processTarget = () => {
+                                  if (!firstFutureFound && (dashboardTab === 'atual')) {
+                                    const parts = String(aula.time).split('-');
+                                    if (parts.length === 2) {
+                                      const startParts = parts[0].trim().split(':');
+                                      const endParts = parts[1].trim().split(':');
+                                      const startVal = parseInt(startParts[0]) * 60 + parseInt(startParts[1]);
+                                      const endVal = parseInt(endParts[0]) * 60 + parseInt(endParts[1]);
+                                      if (grupo.dayCode === currentDayCode) {
+                                        if (currentTimeVal < endVal) { firstFutureFound = true; return true; }
+                                      } else if ((Object.keys(dayCodeMap).find(k => dayCodeMap[k] === grupo.dayCode) > currentDayIdx) || (currentDayIdx === 6 && grupo.dayCode === 'seg')) {
+                                        firstFutureFound = true; return true;
+                                      }
+                                    }
+                                  }
+                                  return false;
+                                };
+                                const isTarget = processTarget();
+                                
+                                // Explicit class selection to avoid dynamic tailwind issues
+                                let containerClasses = isDarkMode ? 'bg-slate-900 border-slate-800 hover:bg-slate-800/80' : 'bg-white border-slate-100 hover:shadow-md';
+                                let markerColor = '';
+                                let timeColor = isDarkMode ? 'text-slate-200' : 'text-slate-900';
+                                let badgeClasses = isDarkMode ? 'bg-slate-950 text-slate-400 group-hover/item:text-blue-400' : 'bg-slate-50 text-slate-800';
+                                
+                                if (isTarget) {
+                                  const c = colors.primary;
+                                  markerColor = `bg-${c}-500`;
+                                  if (c === 'indigo') {
+                                    containerClasses = isDarkMode ? 'bg-indigo-500/10 border-indigo-500/50 shadow-2xl shadow-indigo-500/20 scale-[1.02]' : 'bg-indigo-50 border-indigo-200 shadow-xl shadow-indigo-100 scale-[1.02]';
+                                    timeColor = isDarkMode ? 'text-indigo-400' : 'text-indigo-700';
+                                    badgeClasses = 'bg-indigo-600 text-white shadow-lg shadow-indigo-500/30';
+                                  } else if (c === 'emerald') {
+                                    containerClasses = isDarkMode ? 'bg-emerald-500/10 border-emerald-500/50 shadow-2xl shadow-emerald-500/20 scale-[1.02]' : 'bg-emerald-50 border-emerald-200 shadow-xl shadow-emerald-100 scale-[1.02]';
+                                    timeColor = isDarkMode ? 'text-emerald-400' : 'text-emerald-700';
+                                    badgeClasses = 'bg-emerald-600 text-white shadow-lg shadow-emerald-500/30';
+                                  } else if (c === 'amber') {
+                                    containerClasses = isDarkMode ? 'bg-amber-500/10 border-amber-500/50 shadow-2xl shadow-amber-500/20 scale-[1.02]' : 'bg-amber-50 border-amber-200 shadow-xl shadow-amber-100 scale-[1.02]';
+                                    timeColor = isDarkMode ? 'text-amber-400' : 'text-amber-700';
+                                    badgeClasses = 'bg-amber-600 text-white shadow-lg shadow-amber-500/30';
+                                  } else if (c === 'rose') {
+                                    containerClasses = isDarkMode ? 'bg-rose-500/10 border-rose-500/50 shadow-2xl shadow-rose-500/20 scale-[1.02]' : 'bg-rose-50 border-rose-200 shadow-xl shadow-rose-100 scale-[1.02]';
+                                    timeColor = isDarkMode ? 'text-rose-400' : 'text-rose-700';
+                                    badgeClasses = 'bg-rose-600 text-white shadow-lg shadow-rose-500/30';
+                                  } else if (c === 'violet') {
+                                    containerClasses = isDarkMode ? 'bg-violet-500/10 border-violet-500/50 shadow-2xl shadow-violet-500/20 scale-[1.02]' : 'bg-violet-50 border-violet-200 shadow-xl shadow-violet-100 scale-[1.02]';
+                                    timeColor = isDarkMode ? 'text-violet-400' : 'text-violet-700';
+                                    badgeClasses = 'bg-violet-600 text-white shadow-lg shadow-violet-500/30';
+                                  } else {
+                                    containerClasses = isDarkMode ? 'bg-slate-700 border-slate-600 shadow-2xl scale-[1.02]' : 'bg-slate-50 border-slate-200 shadow-xl scale-[1.02]';
+                                    badgeClasses = 'bg-slate-600 text-white shadow-lg';
+                                  }
+                                }
+
+                                return (
+                                  <div key={aula.id || idx} className={`group/item relative flex items-center justify-between p-5 rounded-3xl border transition-all duration-500 ${containerClasses}`}>
+                                    
+                                    {isTarget && (
+                                      <div className={`absolute -left-1 top-1/2 -translate-y-1/2 w-1.5 h-10 ${markerColor} rounded-full animate-pulse`} />
+                                    )}
+
+                                    <div className="flex flex-col">
+                                      <span className={`text-[13px] font-black tracking-tighter ${timeColor}`}>
+                                        {aula.time}
+                                      </span>
+                                      {(() => {
+                                        const subjectColorMap = {
+                                          0: 'text-blue-500 dark:text-blue-400',
+                                          1: 'text-emerald-500 dark:text-emerald-400',
+                                          2: 'text-indigo-500 dark:text-indigo-400',
+                                          3: 'text-rose-500 dark:text-rose-400',
+                                          4: 'text-amber-500 dark:text-amber-400',
+                                          5: 'text-sky-500 dark:text-sky-400'
+                                        };
+                                        const hash = aula.subject ? aula.subject.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0) : 0;
+                                        const colorClass = subjectColorMap[hash % 6];
+                                        
+                                        return (
+                                          <span className={`text-[10px] font-bold uppercase tracking-widest leading-tight transition-colors duration-500 ${isTarget ? (isDarkMode ? `text-${colors.primary}-400` : `text-${colors.primary}-700`) : colorClass}`}>
+                                            {aula.subject || (isTarget ? 'Próximo compromisso' : 'Horário Agendado')}
+                                          </span>
+                                        );
+                                      })()}
+                                    </div>
+
+                                    <div className="flex flex-col items-end">
+                                      <span className={`px-4 py-2 rounded-2xl text-[9px] font-black uppercase tracking-widest ${badgeClasses}`}>
+                                        {aula.className}
+                                      </span>
+                                    </div>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        );
+                      });
+                    })()}
                   </div>
                 </div>
-
-                {/* 2. Permutas e Reposições */}
-                <button onClick={() => { setViewMode('curso'); if (siape) { setPadraoFilterTeacher(siape); setShowOnlyMyClasses(false); } }} 
-                        className={`group p-8 rounded-[2.5rem] border text-left transition-all hover:scale-[1.02] active:scale-95 ${isDarkMode ? 'bg-slate-800 border-slate-700 hover:border-emerald-500/50 hover:shadow-2xl hover:shadow-emerald-500/10' : 'bg-white border-slate-200 hover:border-emerald-300 hover:shadow-2xl hover:shadow-emerald-500/5'}`}>
-                  <div className={`w-14 h-14 rounded-2xl flex items-center justify-center mb-6 transition-colors ${isDarkMode ? 'bg-emerald-950 text-emerald-400 group-hover:bg-emerald-600 group-hover:text-white' : 'bg-emerald-50 text-emerald-600 group-hover:bg-emerald-600 group-hover:text-white'}`}>
-                    <Layers size={28} />
-                  </div>
-                  <h3 className={`text-xl font-black mb-2 ${isDarkMode ? 'text-white' : 'text-slate-800'}`}>Permutas</h3>
-                  <p className={`text-sm font-medium ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>Solicite trocas de horários com colegas ou assuma aulas vagas publicadas.</p>
-                </button>
-
-                {/* 3. Solicitações */}
-                <button onClick={() => setViewMode('solicitacoes')} 
-                        className={`group p-8 rounded-[2.5rem] border text-left transition-all hover:scale-[1.02] active:scale-95 ${isDarkMode ? 'bg-slate-800 border-slate-700 hover:border-amber-500/50 hover:shadow-2xl hover:shadow-amber-500/10' : 'bg-white border-slate-200 hover:border-amber-300 hover:shadow-2xl hover:shadow-amber-500/5'}`}>
-                  <div className={`w-14 h-14 rounded-2xl flex items-center justify-center mb-6 transition-colors ${isDarkMode ? 'bg-amber-950 text-amber-400 group-hover:bg-amber-600 group-hover:text-white' : 'bg-amber-50 text-amber-600 group-hover:bg-amber-600 group-hover:text-white'}`}>
-                    <Bell size={28} />
-                  </div>
-                  <h3 className={`text-xl font-black mb-2 ${isDarkMode ? 'text-white' : 'text-slate-800'}`}>Solicitações</h3>
-                  <p className={`text-sm font-medium ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>Gerencie seus pedidos de permutas enviados e recebidos, e notificações da DAPE.</p>
-                </button>
-
-                {/* 4. Controle de Aulas */}
-                <button onClick={() => setViewMode('total')} 
-                        className={`group p-8 rounded-[2.5rem] border text-left transition-all hover:scale-[1.02] active:scale-95 ${isDarkMode ? 'bg-slate-800 border-slate-700 hover:border-rose-500/50 hover:shadow-2xl hover:shadow-rose-500/10' : 'bg-white border-slate-200 hover:border-rose-300 hover:shadow-2xl hover:shadow-rose-500/5'}`}>
-                  <div className={`w-14 h-14 rounded-2xl flex items-center justify-center mb-6 transition-colors ${isDarkMode ? 'bg-rose-950 text-rose-400 group-hover:bg-rose-600 group-hover:text-white' : 'bg-rose-50 text-rose-600 group-hover:bg-rose-600 group-hover:text-white'}`}>
-                    <BarChart3 size={28} />
-                  </div>
-                  <h3 className={`text-xl font-black mb-2 ${isDarkMode ? 'text-white' : 'text-slate-800'}`}>Controle</h3>
-                  <p className={`text-sm font-medium ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>Relatório consolidado de horas-aula, faltas e reposições pendentes no semestre.</p>
-                </button>
-
               </div>
 
-              {/* Links Externos e Institucionais (Cards Menores) */}
-              <div className="space-y-6">
-                <h3 className={`text-xs font-black uppercase tracking-[0.2em] opacity-50 ml-4 ${isDarkMode ? 'text-white' : 'text-slate-800'}`}>Sistemas Institucionais</h3>
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4">
-                  
-                  {/* SUAP */}
-                  <a href="https://suap.ifro.edu.br/" target="_blank" rel="noopener noreferrer" 
-                     className={`group relative flex items-center gap-4 p-5 rounded-3xl border transition-all duration-500 overflow-hidden ${isDarkMode ? 'bg-slate-900 border-slate-800 hover:bg-emerald-900/20 hover:scale-[1.02] hover:shadow-2xl' : 'bg-white border-slate-100 shadow-xl shadow-slate-200/50 hover:shadow-2xl hover:scale-[1.02]'}`}>
-                     <div className={`p-3 rounded-2xl transition-all duration-500 ${isDarkMode ? 'bg-emerald-950 text-emerald-400 group-hover:bg-emerald-600 group-hover:text-white' : 'bg-emerald-50 text-emerald-600 group-hover:bg-emerald-600 group-hover:text-white'}`}>
-                        <Users size={20} />
-                     </div>
-                     <div className="flex flex-col">
-                       <h4 className={`text-[10px] font-black uppercase tracking-widest leading-none ${isDarkMode ? 'text-slate-200' : 'text-slate-900'}`}>SUAP IFRO</h4>
-                       <p className="text-[8px] font-bold text-slate-500 mt-1 uppercase tracking-tighter opacity-80">Portal do Servidor</p>
-                     </div>
-                  </a>
+              {/* LADO DIREITO: FUNCIONALIDADES E LINKS (40% no Desktop) */}
+              <div className="w-full lg:w-[40%] flex flex-col gap-10 order-2">
+                
+                {/* Linha Superior: Funcionalidades Core */}
+                <div className="space-y-6">
+                  <h3 className={`text-[10px] font-black uppercase tracking-[0.3em] ml-4 ${isDarkMode ? 'text-slate-500' : 'text-slate-400'}`}>Atalhos de Gestão</h3>
+                  <div className="grid grid-cols-2 gap-4">
+                    
+                    {/* Meu Horário */}
+                    <button onClick={() => { setViewMode('professor'); if(typeof setSelectedTeacher === 'function') setSelectedTeacher(siape); }} 
+                            className={`group p-6 rounded-3xl border text-left transition-all hover:scale-[1.02] ${isDarkMode ? 'bg-slate-800 border-slate-700 hover:border-indigo-500/50' : 'bg-white border-slate-100 hover:border-indigo-200 shadow-sm hover:shadow-xl'}`}>
+                      <div className={`w-10 h-10 rounded-xl flex items-center justify-center mb-4 transition-colors ${isDarkMode ? 'bg-indigo-950 text-indigo-400 group-hover:bg-indigo-600 group-hover:text-white' : 'bg-indigo-50 text-indigo-600 group-hover:bg-indigo-600 group-hover:text-white'}`}>
+                        <UserCircle size={20} />
+                      </div>
+                      <h3 className={`text-sm font-black mb-1 ${isDarkMode ? 'text-white' : 'text-slate-800'}`}>Painel Completo</h3>
+                      <p className="text-[10px] font-medium text-slate-500 leading-tight">Gestão total da grade horária.</p>
+                    </button>
 
-                  {/* AVA */}
-                  <a href="https://virtual.ifro.edu.br/jiparana/" target="_blank" rel="noopener noreferrer" 
-                     className={`group relative flex items-center gap-4 p-5 rounded-3xl border transition-all duration-500 overflow-hidden ${isDarkMode ? 'bg-slate-900 border-slate-800 hover:bg-indigo-900/20 hover:scale-[1.02] hover:shadow-2xl' : 'bg-white border-slate-100 shadow-xl shadow-slate-200/50 hover:shadow-2xl hover:scale-[1.02]'}`}>
-                     <div className={`p-3 rounded-2xl transition-all duration-500 ${isDarkMode ? 'bg-indigo-950 text-indigo-400 group-hover:bg-indigo-600 group-hover:text-white' : 'bg-indigo-50 text-indigo-600 group-hover:bg-indigo-600 group-hover:text-white'}`}>
-                        <BookOpen size={20} />
-                     </div>
-                     <div className="flex flex-col">
-                       <h4 className={`text-[10px] font-black uppercase tracking-widest leading-none ${isDarkMode ? 'text-slate-200' : 'text-slate-900'}`}>Ambiente Virtual</h4>
-                       <p className="text-[8px] font-bold text-slate-500 mt-1 uppercase tracking-tighter opacity-80">AVA / Moodle</p>
-                     </div>
-                  </a>
+                    {/* Permutas */}
+                    <button onClick={() => { setViewMode('curso'); if (siape) { setPadraoFilterTeacher(siape); setShowOnlyMyClasses(false); } }} 
+                            className={`group p-6 rounded-3xl border text-left transition-all hover:scale-[1.02] ${isDarkMode ? 'bg-slate-800 border-slate-700 hover:border-emerald-500/50' : 'bg-white border-slate-100 hover:border-emerald-200 shadow-sm hover:shadow-xl'}`}>
+                      <div className={`w-10 h-10 rounded-xl flex items-center justify-center mb-4 transition-colors ${isDarkMode ? 'bg-emerald-950 text-emerald-400 group-hover:bg-emerald-600 group-hover:text-white' : 'bg-emerald-50 text-emerald-600 group-hover:bg-emerald-600 group-hover:text-white'}`}>
+                        <Layers size={20} />
+                      </div>
+                      <h3 className={`text-sm font-black mb-1 ${isDarkMode ? 'text-white' : 'text-slate-800'}`}>Trocas de Aula</h3>
+                      <p className="text-[10px] font-medium text-slate-500 leading-tight">Solicite ou aceite permutas.</p>
+                    </button>
 
-                  {/* SEI */}
-                  <a href="https://sei.ifro.edu.br/" target="_blank" rel="noopener noreferrer" 
-                     className={`group relative flex items-center gap-4 p-5 rounded-3xl border transition-all duration-500 overflow-hidden ${isDarkMode ? 'bg-slate-900 border-slate-800 hover:bg-blue-900/20 hover:scale-[1.02] hover:shadow-2xl' : 'bg-white border-slate-100 shadow-xl shadow-slate-200/50 hover:shadow-2xl hover:scale-[1.02]'}`}>
-                     <div className={`p-3 rounded-2xl transition-all duration-500 ${isDarkMode ? 'bg-blue-950 text-blue-400 group-hover:bg-blue-600 group-hover:text-white' : 'bg-blue-50 text-blue-600 group-hover:bg-blue-600 group-hover:text-white'}`}>
-                        <FileText size={20} />
-                     </div>
-                     <div className="flex flex-col">
-                       <h4 className={`text-[10px] font-black uppercase tracking-widest leading-none ${isDarkMode ? 'text-slate-200' : 'text-slate-900'}`}>Processos SEI</h4>
-                       <p className="text-[8px] font-bold text-slate-500 mt-1 uppercase tracking-tighter opacity-80">Documentos Oficiais</p>
-                     </div>
-                  </a>
+                    {/* Solicitações */}
+                    <button onClick={() => setViewMode('solicitacoes')} 
+                            className={`group p-6 rounded-3xl border text-left transition-all hover:scale-[1.02] ${isDarkMode ? 'bg-slate-800 border-slate-700 hover:border-amber-500/50' : 'bg-white border-slate-100 hover:border-amber-200 shadow-sm hover:shadow-xl'}`}>
+                      <div className={`w-10 h-10 rounded-xl flex items-center justify-center mb-4 transition-colors ${isDarkMode ? 'bg-amber-950 text-amber-400 group-hover:bg-amber-600 group-hover:text-white' : 'bg-amber-50 text-amber-600 group-hover:bg-amber-600 group-hover:text-white'}`}>
+                        <Bell size={20} />
+                      </div>
+                      <h3 className={`text-sm font-black mb-1 ${isDarkMode ? 'text-white' : 'text-slate-800'}`}>Notificações</h3>
+                      <p className="text-[10px] font-medium text-slate-500 leading-tight">Alertas e pedidos da DAPE.</p>
+                    </button>
 
-                  {/* GMAIL */}
-                  <a href="https://mail.google.com/" target="_blank" rel="noopener noreferrer" 
-                     className={`group relative flex items-center gap-4 p-5 rounded-3xl border transition-all duration-500 overflow-hidden ${isDarkMode ? 'bg-slate-900 border-slate-800 hover:bg-rose-900/20 hover:scale-[1.02] hover:shadow-2xl' : 'bg-white border-slate-100 shadow-xl shadow-slate-200/50 hover:shadow-2xl hover:scale-[1.02]'}`}>
-                     <div className={`p-3 rounded-2xl transition-all duration-500 ${isDarkMode ? 'bg-rose-950 text-rose-400 group-hover:bg-rose-600 group-hover:text-white' : 'bg-rose-50 text-rose-600 group-hover:bg-rose-600 group-hover:text-white'}`}>
-                        <Mail size={20} />
-                     </div>
-                     <div className="flex flex-col">
-                       <h4 className={`text-[10px] font-black uppercase tracking-widest leading-none ${isDarkMode ? 'text-slate-200' : 'text-slate-900'}`}>E-mail Gov</h4>
-                       <p className="text-[8px] font-bold text-slate-500 mt-1 uppercase tracking-tighter opacity-80">Gmail Institucional</p>
-                     </div>
-                  </a>
+                    {/* Controle */}
+                    <button onClick={() => setViewMode('total')} 
+                            className={`group p-6 rounded-3xl border text-left transition-all hover:scale-[1.02] ${isDarkMode ? 'bg-slate-800 border-slate-700 hover:border-rose-500/50' : 'bg-white border-slate-100 hover:border-rose-200 shadow-sm hover:shadow-xl'}`}>
+                      <div className={`w-10 h-10 rounded-xl flex items-center justify-center mb-4 transition-colors ${isDarkMode ? 'bg-rose-950 text-rose-400 group-hover:bg-rose-600 group-hover:text-white' : 'bg-rose-50 text-rose-600 group-hover:bg-rose-600 group-hover:text-white'}`}>
+                        <BarChart3 size={20} />
+                      </div>
+                      <h3 className={`text-sm font-black mb-1 ${isDarkMode ? 'text-white' : 'text-slate-800'}`}>Relatórios</h3>
+                      <p className="text-[10px] font-medium text-slate-500 leading-tight">Controle de aulas e faltas.</p>
+                    </button>
 
-                  {/* WHATSAPP */}
-                  <a href="https://wa.me/556921836926" target="_blank" rel="noopener noreferrer" 
-                     className={`group relative flex items-center gap-4 p-5 rounded-3xl border transition-all duration-500 overflow-hidden ${isDarkMode ? 'bg-slate-900 border-slate-800 hover:bg-green-900/20 hover:scale-[1.02] hover:shadow-2xl' : 'bg-white border-slate-100 shadow-xl shadow-slate-200/50 hover:shadow-2xl hover:scale-[1.02]'}`}>
-                     <div className={`p-3 rounded-2xl transition-all duration-500 ${isDarkMode ? 'bg-green-950 text-green-400 group-hover:bg-green-600 group-hover:text-white' : 'bg-green-50 text-green-600 group-hover:bg-green-600 group-hover:text-white'}`}>
-                        <MessageCircle size={20} />
-                     </div>
-                     <div className="flex flex-col">
-                       <h4 className={`text-[10px] font-black uppercase tracking-widest leading-none ${isDarkMode ? 'text-slate-200' : 'text-slate-900'}`}>Suporte DAPE</h4>
-                       <p className="text-[8px] font-bold text-slate-500 mt-1 uppercase tracking-tighter opacity-80">Atendimento 24h</p>
-                     </div>
-                  </a>
-
+                  </div>
                 </div>
+
+                {/* Linha Inferior: Sistemas Externos */}
+                <div className="space-y-6">
+                  <h3 className={`text-[10px] font-black uppercase tracking-[0.3em] ml-4 ${isDarkMode ? 'text-slate-500' : 'text-slate-400'}`}>Links Externos</h3>
+                  <div className="grid grid-cols-1 gap-3">
+                    
+                    {[
+                      { name: 'SUAP IFRO', sub: 'Portal do Servidor', icon: Users, color: 'emerald', url: 'https://suap.ifro.edu.br/' },
+                      { name: 'AVA Moodle', sub: 'Ambiente Virtual', icon: BookOpen, color: 'indigo', url: 'https://virtual.ifro.edu.br/jiparana/' },
+                      { name: 'Processos SEI', sub: 'Documentos Oficiais', icon: FileText, color: 'blue', url: 'https://sei.ifro.edu.br/' },
+                    ].map((link, i) => (
+                      <a key={i} href={link.url} target="_blank" rel="noopener noreferrer" 
+                         className={`group flex items-center justify-between p-4 rounded-2xl border transition-all ${isDarkMode ? 'bg-slate-900 border-slate-800 hover:bg-slate-800' : 'bg-white border-slate-100 shadow-sm hover:shadow-md'}`}>
+                        <div className="flex items-center gap-4">
+                           <div className={`w-8 h-8 rounded-lg flex items-center justify-center transition-colors ${isDarkMode ? `bg-${link.color}-950 text-${link.color}-400` : `bg-${link.color}-50 text-${link.color}-600`}`}>
+                              <link.icon size={16} />
+                           </div>
+                           <div className="flex flex-col">
+                             <span className={`text-[10px] font-black uppercase tracking-widest ${isDarkMode ? 'text-slate-200' : 'text-slate-900'}`}>{link.name}</span>
+                             <span className="text-[8px] font-bold text-slate-500 uppercase tracking-tighter">{link.sub}</span>
+                           </div>
+                        </div>
+                        <ExternalLink size={12} className="opacity-0 group-hover:opacity-100 transition-opacity text-slate-400" />
+                      </a>
+                    ))}
+
+                  </div>
+                </div>
+
               </div>
 
            </div>
         )}
+
 
         {/* DASHBOARD HEADER: LINKS ALUNO (UX PREMIUM - MOBILE OPTIMIZED) */}
         {appMode === 'aluno' && (

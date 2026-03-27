@@ -6,7 +6,7 @@ import { useScheduleDataTransform } from './useScheduleDataTransform';
 import { DAYS, MAP_DAYS, isFutureWeek, isCurrentWeek, isDatePastOrToday, isTeacherPending } from "@/lib/dates";
 
 export function useScheduleView({ appMode, rawData, disabledWeeks, targetData, disciplinesMeta, subjectHoursMeta, adminFilterCourses, adminFilterClasses, setAdminFilterClasses, activeDays, classTimes, bimesters = [], siape = null, userRole = null, academicWeeks = [] }) {
-  const [viewMode, setViewMode] = useState(appMode === 'professor' ? 'professor' : 'hoje');
+  const [viewMode, setViewMode] = useState(appMode === 'professor' ? 'dashboard' : 'hoje');
   const [scheduleMode, setScheduleMode] = useState(appMode === 'professor' ? 'atual' : 'oficial'); 
 
   const todayIndex = new Date().getDay();
