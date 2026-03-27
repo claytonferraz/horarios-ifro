@@ -630,83 +630,76 @@ export const CourseGrid = React.memo(
                                                                                     onReverseSwapClick(r);
                                                                                 }
                                                                              }}
-                                                                             className={`print-clean-card p-1.5 print:p-1 rounded-xl print:rounded-none border-b-[3px] print:border-b-[1px] print:border-slate-400 shadow-sm print:shadow-none flex flex-col justify-center min-h-[46px] print:min-h-0 transition-all mb-1 print:mb-0 last:mb-0 relative overflow-visible ${snap2.isDragging ? "shadow-xl scale-105 z-50 hover:scale-105" : (isGridInert ? "cursor-default" : "hover:scale-[1.02] cursor-pointer")} ${hasPendingSwap ? (isDarkMode ? "bg-amber-900/30 border-amber-800/50 hover:bg-amber-900/40 text-amber-200" : "bg-amber-100 hover:bg-amber-200 border-amber-400 text-amber-900") : isVagaReal ? (isDarkMode ? "bg-red-900/30 border-red-800/50 text-red-300" : "bg-red-50 border-red-300 text-red-800") : getColorHash(r.subject, isDarkMode)} ${!isActiveTeacherInCard ? "opacity-50 saturate-50 hover:opacity-100 hover:saturate-100 transition-all" : ""}`}
-                                                                           >
-                                                                             {isVagaReal && (
-                                                                                <div className="absolute top-0 left-0 z-10 pointer-events-none print:hidden">
-                                                                                   <span className="text-[6px] font-black uppercase tracking-wide text-white px-1.5 py-0.5 rounded-br-[8px] bg-rose-600 border-r border-b border-rose-700 block animate-pulse shadow-sm shadow-rose-900/30">AULA VAGA</span>
-                                                                                </div>
-                                                                             )}
-                                                                             {hasPendingSwap && !isVagaReal && (
-                                                                               <div className="absolute -top-1.5 -left-1 z-10 print:hidden shadow-sm pointer-events-none">
-                                                                                 <span
-                                                                                   title="Há uma solicitação de troca envolvendo esta aula"
-                                                                                   className="text-[5px] font-black uppercase tracking-widest text-amber-900 px-1.5 py-[2px] rounded border border-amber-400 bg-amber-400 block animate-pulse shadow-sm"
-                                                                                 >
-                                                                                   SOLICITADO
-                                                                                 </span>
-                                                                               </div>
-                                                                            )}
-                                                                            {r.isPermuted && (
-                                                                              <div className="absolute -top-1.5 -right-1 z-10 print:hidden shadow-sm pointer-events-none delay-100">
-                                                                                <span
-                                                                                  title="Aula permutada por Acordo"
-                                                                                  className="text-[5px] font-black uppercase tracking-widest text-[#FFFBEB] px-1.5 py-[2px] rounded border border-amber-500 bg-amber-600 block shadow-sm shadow-amber-900/40"
-                                                                                >
-                                                                                  PERMUTADA
-                                                                                </span>
-                                                                              </div>
-                                                                            )}
-                                                                            {r.isSubstituted && !r.isPermuted && !hasPendingSwap && (
-                                                                              <div className="absolute -top-1.5 -right-1 z-10 print:hidden shadow-sm pointer-events-none">
-                                                                                <span
-                                                                                  title="Aula assumida de Vaga via Troca"
-                                                                                  className="text-[5px] font-black uppercase tracking-widest text-white px-1.5 py-[2px] rounded border border-indigo-400 bg-indigo-600 block shadow-sm shadow-indigo-900/40"
-                                                                                >
-                                                                                  Substituição
-                                                                                </span>
-                                                                              </div>
-                                                                            )}
-                                                                            {r.classType && r.classType !== 'Regular' && (
-                                                                              <div className="absolute -top-1.5 -left-1 z-10 print:hidden shadow-sm pointer-events-none">
-                                                                                <span className="text-[5px] font-black uppercase tracking-widest text-white px-1.5 py-[2px] rounded border border-emerald-400 bg-emerald-600 block shadow-sm shadow-emerald-900/40">
-                                                                                  {r.classType}
-                                                                                </span>
-                                                                              </div>
-                                                                            )}
-                                                                            <p
-                                                                              className={`subject font-bold text-[10px] print:text-[8.5px] leading-tight print:leading-[1.1] mb-1 print:mb-0.5 text-center flex flex-col items-center gap-0.5 ${isDarkMode ? "text-slate-200" : "text-slate-800"}`}
-                                                                            >
-                                                                              <span>{r.subject}</span>
-                                                                              {r.isPermuted && !isPending && (
-                                                                                <span className={`px-1.5 py-0.5 rounded text-[7px] uppercase tracking-widest font-black ${isDarkMode ? "bg-amber-900/40 text-amber-400 border border-amber-800/50" : "bg-amber-100 text-amber-700 border border-amber-300"}`}>PERMUTA</span>
-                                                                              )}
-                                                                              {r.isSubstituted && !r.isPermuted && r.originalSubject && (
-                                                                                  <span className="block text-[8px] sm:text-[9px] opacity-80 mt-1 uppercase">
-                                                                                    Era: {r.originalSubject}
-                                                                                  </span>
-                                                                              )}
-                                                                            </p>
-                                                                            <p
-                                                                              className={`text-[8.5px] print:text-[7.5px] font-medium leading-none text-center opacity-90 ${isPending ? (isDarkMode ? "text-red-400 font-bold" : "text-red-600 font-bold") : ""}`}
-                                                                            >
-                                                                              {resolveTeacherName(
-                                                                                r.teacher,
-                                                                                globalTeachers,
-                                                                              )}{" "}
-                                                                              {r.room && (
-                                                                                <span className="font-black opacity-80 print:opacity-100">
-                                                                                  |
-                                                                                  S:{" "}
-                                                                                  {
-                                                                                    r.room
-                                                                                  }
-                                                                                </span>
-                                                                              )}
-                                                                            </p>
-                                                                          </div>
+                                                                              className={`print-clean-card p-3 print:p-1 rounded-[1.8rem] print:rounded-none border-b-[3px] print:border-b-[1px] print:border-slate-400 shadow-sm print:shadow-none flex flex-col justify-center min-h-[58px] print:min-h-0 transition-all mb-1 print:mb-0 last:mb-0 relative overflow-visible ${snap2.isDragging ? "shadow-xl scale-105 z-50 hover:scale-105" : (isGridInert ? "cursor-default" : "hover:scale-[1.02] cursor-pointer")} ${hasPendingSwap ? (isDarkMode ? "bg-amber-900/30 border-amber-800/50 hover:bg-amber-900/40 text-amber-200" : "bg-amber-100 hover:bg-amber-200 border-amber-400 text-amber-900") : isVagaReal ? (isDarkMode ? "bg-orange-500/10 border-orange-500/50 text-orange-200" : "bg-orange-50 border-orange-200 text-orange-800 shadow-orange-100") : getColorHash(r.subject, isDarkMode)} ${!isActiveTeacherInCard ? "opacity-50 saturate-50 hover:opacity-100 hover:saturate-100 transition-all" : ""}`}
+                                                             >
+                                                               {isVagaReal && (
+                                                                  <div className="absolute top-0 left-0 z-10 pointer-events-none print:hidden">
+                                                                     <span className="text-[6px] font-black uppercase tracking-wide text-white px-1.5 py-0.5 rounded-br-[8px] bg-rose-600 border-r border-b border-rose-700 block animate-pulse shadow-sm shadow-rose-900/30">AULA VAGA</span>
+                                                                  </div>
+                                                               )}
+                                                               {hasPendingSwap && !isVagaReal && (
+                                                                 <div className="absolute -top-1.5 -left-1 z-10 print:hidden shadow-sm pointer-events-none">
+                                                                   <span
+                                                                     title="Há uma solicitação de troca envolvendo esta aula"
+                                                                     className="text-[5px] font-black uppercase tracking-widest text-amber-900 px-1.5 py-[2px] rounded border border-amber-400 bg-amber-400 block animate-pulse shadow-sm"
+                                                                   >
+                                                                     SOLICITADO
+                                                                   </span>
+                                                                 </div>
+                                                               )}
+                                                               {r.isPermuted && (
+                                                                 <div className="absolute -top-1.5 -right-1 z-10 print:hidden shadow-sm pointer-events-none delay-100">
+                                                                   <span
+                                                                     title="Aula permutada por Acordo"
+                                                                     className="text-[5px] font-black uppercase tracking-widest text-[#FFFBEB] px-1.5 py-[2px] rounded border border-amber-500 bg-amber-600 block shadow-sm shadow-amber-900/40"
+                                                                   >
+                                                                     PERMUTADA
+                                                                   </span>
+                                                                 </div>
+                                                               )}
+                                                               {r.isSubstituted && !r.isPermuted && !hasPendingSwap && (
+                                                                 <div className="absolute -top-1.5 -right-1 z-10 print:hidden shadow-sm pointer-events-none">
+                                                                   <span
+                                                                     title="Aula assumida de Vaga via Troca"
+                                                                     className="text-[5px] font-black uppercase tracking-widest text-white px-1.5 py-[2px] rounded border border-indigo-400 bg-indigo-600 block shadow-sm shadow-indigo-900/40"
+                                                                   >
+                                                                     Substituição
+                                                                   </span>
+                                                                 </div>
+                                                               )}
+                                                               {r.classType && r.classType !== 'Regular' && (
+                                                                 <div className="absolute -top-1.5 -left-1 z-10 print:hidden shadow-sm pointer-events-none">
+                                                                   <span className="text-[5px] font-black uppercase tracking-widest text-white px-1.5 py-[2px] rounded border border-emerald-400 bg-emerald-600 block shadow-sm shadow-emerald-900/40">
+                                                                     {r.classType}
+                                                                   </span>
+                                                                 </div>
+                                                               )}
+                                                               <p
+                                                                 className={`subject font-black text-[11px] print:text-[8.5px] tracking-tighter uppercase leading-tight print:leading-[1.1] mb-1 print:mb-0.5 text-center flex flex-col items-center gap-0.5 ${isDarkMode ? "text-slate-200" : "text-slate-800"}`}
+                                                               >
+                                                                 <span>{r.subject}</span>
+                                                                 {r.isPermuted && !isPending && (
+                                                                   <span className={`px-1.5 py-0.5 rounded text-[7px] uppercase tracking-widest font-black ${isDarkMode ? "bg-amber-900/40 text-amber-400 border border-amber-800/50" : "bg-amber-100 text-amber-700 border border-amber-300"}`}>PERMUTA</span>
+                                                                 )}
+                                                                 {r.isSubstituted && !r.isPermuted && r.originalSubject && (
+                                                                     <span className="block text-[8px] sm:text-[9px] opacity-80 mt-1 uppercase">
+                                                                       Era: {r.originalSubject}
+                                                                     </span>
+                                                                 )}
+                                                               </p>
+                                                               <div className="flex justify-center">
+                                                                  <span
+                                                                    className={`text-[8.5px] font-black tracking-widest px-3 py-1 rounded-full border shadow-sm uppercase ${isVagaReal ? (isDarkMode ? "bg-orange-950 text-orange-400 border-orange-800" : "bg-orange-50 text-orange-700 border-orange-200") : !isActiveTeacherInCard ? (isDarkMode ? "bg-slate-900 text-slate-500 border-slate-700" : "bg-slate-100 text-slate-400 border-slate-200") : (isDarkMode ? "bg-indigo-950 text-indigo-400 border-indigo-700" : "bg-indigo-600 text-white border-indigo-400 shadow-indigo-100")}`}
+                                                                  >
+                                                                    {isVagaReal 
+                                                                      ? '⚠ Vaga' 
+                                                                      : resolveTeacherName(r.teacher, globalTeachers)}
+                                                                    {r.room && ` | ${r.room}`}
+                                                                  </span>
+                                                               </div>
+                                                             </div>
                                                                         )}
-                                                                      </Draggable>
+                                                                       </Draggable>
                                                                     );
                                                                   },
                                                                 )
