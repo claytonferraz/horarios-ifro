@@ -95,7 +95,12 @@ export function PortalView({
 
     return schedules.filter(schedule => {
       if (String(schedule.academic_year) !== String(selectedConfigYear)) return false;
-      if (schedule.type !== dbType) return false;
+      const isProductionType = (schedule.type === 'oficial' || schedule.type === 'atual');
+      if (scheduleMode === 'atual' || scheduleMode === 'consolidado') {
+        if (!isProductionType) return false;
+      } else {
+        if (schedule.type !== dbType) return false;
+      }
       if (scheduleMode !== 'padrao' && String(schedule.week_id) !== String(selectedWeek)) return false;
       return true;
     });
@@ -564,18 +569,28 @@ export function PortalView({
       ? academicWeeks[currentWeekIdx + 1].id 
       : null;
 
-    // Se hoje é Sexta (5) ou Sábado (6) ou Domingo (0), e temos uma próxima semana, transicionamos o "Agora"
-    const isTransitioning = todayIdx === 5 || todayIdx === 6 || todayIdx === 0;
-    const targetAtualWeekId = (isTransitioning && nextWeekId) ? nextWeekId : selectedWeek;
+    // Lógica de "Agora": Agrupa a semana atual. Se for Sexta/Sáb/Dom, TAMBÉM inclui a próxima semana.
+    const validWeekIds = [selectedWeek];
+    if ((todayIdx === 5 || todayIdx === 6 || todayIdx === 0) && nextWeekId) {
+        validWeekIds.push(nextWeekId);
+    }
 
-    // 1. Atual (Minha Turma - oficiais da semana selecionada ou transição para a próxima)
+    // 1. Atual (Minha Turma - filtra as semanas válidas e o SIAPE)
     const rawItemsForAtual = (schedules || []).filter(s => 
-      s.type === 'oficial' && 
-      String(s.week_id) === String(targetAtualWeekId) &&
+      (s.type === 'oficial' || s.type === 'atual') && 
+      validWeekIds.includes(String(s.week_id)) &&
       s.teacherId && String(s.teacherId).split(',').includes(String(siape))
     ).map(s => enrichScheduleItem(s)).filter(Boolean);
 
-    const atualRaw = rawItemsForAtual;
+    // Removemos os dias que já passaram da semana ATUAL, para limpar o dashboard
+    const atualRaw = rawItemsForAtual.filter(s => {
+       if (String(s.week_id) !== String(selectedWeek)) return true; // Mostra tudo da próxima semana
+       const dayOrderMap = { "seg": 1, "ter": 2, "qua": 3, "qui": 4, "sex": 5, "sab": 6, "dom": 0 };
+       const sDayCode = shortDayMap[s.day] || s.day;
+       const sDayIdx = dayOrderMap[sDayCode];
+       if (todayIdx === 0) return true; // Se for domingo, a semana letiva já acabou, mostra o que sobrou
+       return sDayIdx >= todayIdx; // Oculta dias passados
+    });
     const atual = groupByDay(atualRaw);
 
     // 2. Prévia (Lógica: Quarta 12:00 -> Mostrar Prévia da Próxima Semana)
@@ -1175,8 +1190,10 @@ export function PortalView({
                                                 {isVaga && <span className="px-2 py-0.5 rounded-md text-[7px] font-black bg-rose-600 text-white uppercase tracking-tighter">Aula Vaga</span>}
                                                 {aula.isSubstituted && <span className="px-2 py-0.5 rounded-md text-[7px] font-black bg-indigo-600 text-white uppercase tracking-tighter">Substituição</span>}
                                                 {aula.isSwap && <span className="px-2 py-0.5 rounded-md text-[7px] font-black bg-emerald-600 text-white uppercase tracking-tighter">Permuta</span>}
-                                                {["Recuperação", "Exame final", "Atendimento"].includes(aula.classType) && (
-                                                  <span className="px-2 py-0.5 rounded-md text-[7px] font-black bg-amber-500 text-white uppercase tracking-tighter">{aula.classType === 'Atendimento' ? 'Atendimento ao Aluno' : aula.classType}</span>
+                                                {aula.classType && !['regular', 'normal', ''].includes(String(aula.classType).toLowerCase().trim()) && (
+                                                  <span className="px-2 py-0.5 rounded-md text-[7px] font-black bg-amber-500 text-white uppercase tracking-tighter">
+                                                    {String(aula.classType).toLowerCase().trim() === 'atendimento' ? 'Atendimento ao Aluno' : aula.classType}
+                                                  </span>
                                                 )}
                                               </div>
                                             </div>

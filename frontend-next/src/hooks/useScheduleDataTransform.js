@@ -16,12 +16,12 @@ export function useScheduleDataTransform({
 }) {
   const adminAvailableCourses = useMemo(() => {
     if (appMode !== 'admin') return [];
-    return [...new Set(activeData.filter(r => r.type === 'oficial').map(r => r.course))].sort();
+    return [...new Set(activeData.filter(r => r.type === 'oficial' || r.type === 'atual').map(r => r.course))].sort();
   }, [activeData, appMode]);
 
   const adminAvailableClasses = useMemo(() => {
     if (appMode !== 'admin') return [];
-    let filtered = activeData.filter(r => r.type === 'oficial');
+    let filtered = activeData.filter(r => r.type === 'oficial' || r.type === 'atual');
     if (adminFilterCourses.length > 0) {
       filtered = filtered.filter(r => adminFilterCourses.includes(r.course));
     }
@@ -39,7 +39,7 @@ export function useScheduleDataTransform({
 
   const groupedDisciplinesBySerie = useMemo(() => {
     if (appMode !== 'admin') return {};
-    let officialRecords = activeData.filter(r => r.type === 'oficial');
+    let officialRecords = activeData.filter(r => r.type === 'oficial' || r.type === 'atual');
 
     if (adminFilterCourses.length > 0) {
       officialRecords = officialRecords.filter(r => adminFilterCourses.includes(r.course));
@@ -90,7 +90,7 @@ export function useScheduleDataTransform({
 
   const uniqueYearsData = useMemo(() => {
     if (appMode !== 'admin') return [];
-    return [...new Set(activeData.filter(r => r.type === 'oficial').map(r => r.year))].sort().reverse();
+    return [...new Set(activeData.filter(r => r.type === 'oficial' || r.type === 'atual').map(r => r.year))].sort().reverse();
   }, [activeData, appMode]);
 
   const globalTeachersList = useMemo(() => {
@@ -118,7 +118,7 @@ export function useScheduleDataTransform({
   }, [appMode, viewMode, globalTeachersList, selectedTeacher, setSelectedTeacher, siape, userRole]);
 
   const pendingWeeks = useMemo(() => {
-    const officialDates = activeData.filter(r => r.type === 'oficial');
+    const officialDates = activeData.filter(r => r.type === 'oficial' || r.type === 'atual');
     const getVal = (s) => { const m = s.match(/(\d{2})\/(\d{2})/); return m ? parseInt(m[2])*100 + parseInt(m[1]) : 9999; };
     const officialWeeksList = [...new Set(officialDates.map(r => r.week))].sort((a,b) => getVal(a) - getVal(b));
     
@@ -134,11 +134,11 @@ export function useScheduleDataTransform({
 
   const targetData = useMemo(() => {
     let data = activeData;
-    if (viewMode === 'total') return data.filter(r => r.type === 'oficial');
+    if (viewMode === 'total') return data.filter(r => r.type === 'oficial' || r.type === 'atual');
     if (scheduleMode === 'previa') return data.filter(r => r.type === 'previa');
     if (scheduleMode === 'padrao') return data.filter(r => r.type === 'padrao');
 
-    const dbType = (scheduleMode === 'consolidado' || scheduleMode === 'atual') ? 'oficial' : scheduleMode;
+    const dbType = scheduleMode === 'consolidado' ? 'oficial' : scheduleMode;
     return data.filter(r => r.type === dbType);
   }, [activeData, viewMode, scheduleMode]);
 

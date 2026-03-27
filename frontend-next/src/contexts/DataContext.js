@@ -73,6 +73,7 @@ export function DataProvider({ children }) {
             // New Flat Array model from relational DB
             let extra = {};
             try { if (d.records) extra = JSON.parse(d.records); } catch(e){}
+
             combinedData.push({
               id: d.id,
               course: d.courseName || d.courseId,
@@ -88,6 +89,9 @@ export function DataProvider({ children }) {
               week: String(d.week_id || ''),
               year: String(d.academic_year || ''),
               updatedAt: d.updatedAt,
+              date: extra.date || d.date || null, // Garante a data
+              classType: extra.classType || 'Regular', // Garante o label
+              isExtra: extra.isExtra || false, // Flag para Atendimento
               ...extra
             });
           } else if (d.records) {
