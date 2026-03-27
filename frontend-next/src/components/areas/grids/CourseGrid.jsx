@@ -51,7 +51,9 @@ export const CourseGrid = React.memo(
     const [activeCourseTab, setActiveCourseTab] = useState("Todos");
     const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
     
-    const isGridInert = appMode === 'aluno' || (appMode === 'professor' && userRole !== 'admin' && userRole !== 'gestao') || (scheduleMode === 'consolidado' || scheduleMode === 'oficial');
+    // Nesta aba do Dashboard, o CourseGrid funciona apenas como um visualizador de consulta.
+    // Edições e gestões de grade devem ser feitas através do painel MasterGrid (Administração).
+    const isGridInert = true; 
 
     const activeTeacherFilter = showOnlyMyClasses ? siape : (padraoFilterTeacher && padraoFilterTeacher !== "Todos" ? padraoFilterTeacher : null);
 
@@ -597,18 +599,7 @@ export const CourseGrid = React.memo(
                                                                          index={
                                                                            rIndex
                                                                          }
-                                                                         isDragDisabled={
-                                                                           !(
-                                                                             scheduleMode ===
-                                                                               "previa" &&
-                                                                             [
-                                                                               "admin",
-                                                                               "gestao",
-                                                                             ].includes(
-                                                                               userRole,
-                                                                             )
-                                                                           ) || !isActiveTeacherInCard
-                                                                         }
+                                                                         isDragDisabled={true}
                                                                        >
                                                                          {(
                                                                            prov2,
@@ -1034,8 +1025,8 @@ export const CourseGrid = React.memo(
             })()}
           </div>
 
-          {/* Sidebar de Elementos Nao Alocados e Notificacoes */}
-          {appMode !== 'professor' && ["admin", "gestao"].includes(userRole) && scheduleMode === "previa" && (
+          {/* Sidebar de Elementos Nao Alocados e Notificacoes (OCULTA NO MODO CONSULTA) */}
+          {false && (
               <div className="w-full lg:w-72 shrink-0 space-y-4 sticky top-20 flex flex-col items-end no-print">
                 <div
                   className={`w-full rounded-2xl border shadow-sm p-4 ${isDarkMode ? "bg-slate-800 border-slate-700" : "bg-white border-slate-200"}`}
@@ -1122,8 +1113,8 @@ export const CourseGrid = React.memo(
         </div>
       </DragDropContext>
 
-      {/* HUB GLOBAL DE NOTIFICAÇÕES - WIDGET FLUTUANTE (Exclusivo para Gestores) */}
-      {["admin", "gestao"].includes(userRole) && scheduleMode === "previa" && (
+      {/* HUB GLOBAL DE NOTIFICAÇÕES (OCULTO NO MODO CONSULTA) */}
+      {false && (
         <div className="fixed bottom-6 right-6 z-[99] flex flex-col-reverse items-end gap-3 print:hidden">
            {!isNotificationsOpen ? (
               <div className="group relative flex items-center justify-end">
