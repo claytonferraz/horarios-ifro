@@ -30,6 +30,12 @@ export function useScheduleView({ appMode, rawData, disabledWeeks, targetData, d
     }
   }, [appMode, siape, selectedTeacher]);
 
+  useEffect(() => {
+    if (appMode === 'professor' && siape && totalFilterTeacher !== String(siape)) {
+      setTotalFilterTeacher(String(siape));
+    }
+  }, [appMode, siape, totalFilterTeacher]);
+
   const activeData = useMemo(() => rawData.filter(r => !disabledWeeks.includes(`${r.week}-${r.type}`)), [rawData, disabledWeeks]);
 
   const {
@@ -116,7 +122,7 @@ export function useScheduleView({ appMode, rawData, disabledWeeks, targetData, d
         (isNoneOrAll(totalFilterClass) || r.className === totalFilterClass) &&
         (isNoneOrAll(totalFilterSubject) || r.subject === totalFilterSubject)
     );
-    return ['Todos', 'Nenhum', ...[...new Set(valid.map(r => r.year))].sort().reverse()];
+    return ['Todos', ...[...new Set(valid.map(r => r.year))].sort().reverse()];
   }, [officialDataForTotal, totalFilterTeacher, totalFilterClass, totalFilterSubject]);
 
   const availableTeachersForTotal = useMemo(() => {
@@ -126,7 +132,7 @@ export function useScheduleView({ appMode, rawData, disabledWeeks, targetData, d
         (isNoneOrAll(totalFilterClass) || r.className === totalFilterClass) &&
         (isNoneOrAll(totalFilterSubject) || r.subject === totalFilterSubject)
     );
-    return ['Todos', 'Nenhum', ...[...new Set(valid.map(r => r.teacher))].sort()];
+    return ['Todos', ...[...new Set(valid.map(r => r.teacher))].sort()];
   }, [officialDataForTotal, totalFilterYear, totalFilterClass, totalFilterSubject]);
 
   const availableClassesForTotal = useMemo(() => {
@@ -136,7 +142,7 @@ export function useScheduleView({ appMode, rawData, disabledWeeks, targetData, d
         (isNoneOrAll(totalFilterTeacher) || r.teacher === totalFilterTeacher) &&
         (isNoneOrAll(totalFilterSubject) || r.subject === totalFilterSubject)
     );
-    return ['Todas', 'Nenhum', ...[...new Set(valid.map(r => r.className))].sort()];
+    return ['Todas', ...[...new Set(valid.map(r => r.className))].sort()];
   }, [officialDataForTotal, totalFilterYear, totalFilterTeacher, totalFilterSubject]);
 
   const availableSubjectsForTotal = useMemo(() => {
@@ -146,7 +152,7 @@ export function useScheduleView({ appMode, rawData, disabledWeeks, targetData, d
         (isNoneOrAll(totalFilterTeacher) || r.teacher === totalFilterTeacher) &&
         (isNoneOrAll(totalFilterClass) || r.className === totalFilterClass)
     );
-    return ['Todas', 'Nenhum', ...[...new Set(valid.map(r => r.subject))].sort((a,b) => a.localeCompare(b))];
+    return ['Todas', ...[...new Set(valid.map(r => r.subject))].sort((a,b) => a.localeCompare(b))];
   }, [officialDataForTotal, totalFilterYear, totalFilterTeacher, totalFilterClass]);
 
   useEffect(() => { if (!availableYearsForTotal.includes(totalFilterYear)) setTotalFilterYear('Todos'); }, [availableYearsForTotal, totalFilterYear]);

@@ -1,7 +1,10 @@
 "use client";
 
 import React, { useState } from "react";
-import { Calendar, Sun, Moon, Contrast, Power, Menu } from "lucide-react";
+import { 
+  Calendar, Sun, Moon, Contrast, Power, Menu, 
+  Home, GraduationCap, UserCheck, LayoutDashboard, Settings 
+} from "lucide-react";
 import { useRouter, usePathname } from "next/navigation";
 import { useTheme } from "@/contexts/ThemeContext";
 import { useAuth } from "@/contexts/AuthContext";
@@ -20,15 +23,25 @@ export function Navbar() {
 
   const getLinkClass = (path) => {
     const isActive = pathname === path || (path === "/" && pathname === "/");
+    
+    const baseStyles = "px-4 py-2 rounded-xl text-sm font-bold transition-all flex items-center gap-2";
+    
     if (isDim) {
-      return `text-sm font-bold transition-colors ${
-        isActive ? "text-[var(--dim-accent)]" : "text-[var(--dim-text-2)] hover:text-[var(--dim-text)]"
+      return `${baseStyles} ${
+        isActive 
+          ? "text-[var(--dim-accent)] bg-[var(--dim-surface-2)] shadow-sm" 
+          : "text-[var(--dim-text-2)] hover:text-[var(--dim-text)] hover:bg-[var(--dim-surface-2)]/50"
       }`;
     }
-    return `text-sm font-bold transition-colors ${
+    
+    return `${baseStyles} ${
       isActive
-        ? isDarkMode ? "text-blue-400" : "text-blue-600"
-        : isDarkMode ? "text-slate-400 hover:text-white" : "text-slate-500 hover:text-slate-900"
+        ? isDarkMode 
+          ? "text-blue-400 bg-blue-950/30 border border-blue-900/40 shadow-sm" 
+          : "text-blue-600 bg-blue-50 border border-blue-100 shadow-sm"
+        : isDarkMode 
+          ? "text-slate-400 hover:text-white hover:bg-slate-800" 
+          : "text-slate-500 hover:text-slate-900 hover:bg-slate-100"
     }`;
   };
 
@@ -80,17 +93,22 @@ export function Navbar() {
         {/* Links Desktop */}
         <nav className="hidden md:flex items-center gap-6 z-10">
           <button onClick={() => navigateTo("/")} className={getLinkClass("/")}>
-            Início
+            <Home size={16} /> Início
           </button>
           <button onClick={() => navigateTo("/aluno")} className={getLinkClass("/aluno")}>
-            Área do Aluno
+            <GraduationCap size={16} /> Horários
           </button>
           <button onClick={() => navigateTo("/professor")} className={getLinkClass("/professor")}>
-            Área do Professor
+            <UserCheck size={16} /> Docente
           </button>
+          {isUnlocked && ['admin', 'gestao'].includes(userRole) && (
+            <button onClick={() => navigateTo("/gestao-dape")} className={getLinkClass("/gestao-dape")}>
+              <LayoutDashboard size={16} /> Gestão
+            </button>
+          )}
           {isUnlocked && userRole === 'admin' && (
             <button onClick={() => navigateTo("/admin")} className={getLinkClass("/admin")}>
-              Administração
+              <Settings size={16} /> Sistema
             </button>
           )}
         </nav>
@@ -169,33 +187,51 @@ export function Navbar() {
               : "bg-white border-slate-200"
           }`}
         >
-          {[['/', 'Início'], ['/aluno', 'Área do Aluno'], ['/professor', 'Área do Professor']].map(([path, label]) => (
+          {[
+            ['/', 'Início', <Home size={18} key="h" />], 
+            ['/aluno', 'Horários', <GraduationCap size={18} key="g" />], 
+            ['/professor', 'Docente', <UserCheck size={18} key="u" />]
+          ].map(([path, label, icon]) => (
             <button
               key={path}
               onClick={() => navigateTo(path)}
-              className={`text-left px-4 py-3 rounded-lg text-sm font-bold ${
+              className={`text-left px-4 py-3 rounded-lg text-sm font-bold flex items-center gap-3 ${
                 isDim
-                  ? "text-[var(--dim-text)] hover:bg-[var(--dim-surface-2)]"
+                  ? "text-[var(--dim-accent)] hover:bg-[var(--dim-surface-2)]"
                   : isDarkMode
                   ? "text-slate-300 hover:bg-slate-800"
                   : "text-slate-700 hover:bg-slate-100"
               }`}
             >
-              {label}
+              {icon} {label}
             </button>
           ))}
+          {isUnlocked && ['admin', 'gestao'].includes(userRole) && (
+            <button
+              onClick={() => navigateTo("/gestao-dape")}
+              className={`text-left px-4 py-3 rounded-lg text-sm font-bold flex items-center gap-3 ${
+                isDim
+                  ? "text-[var(--dim-accent)] hover:bg-[var(--dim-surface-2)]"
+                  : isDarkMode
+                  ? "text-slate-300 hover:bg-slate-800"
+                  : "text-slate-700 hover:bg-slate-100"
+              }`}
+            >
+              <LayoutDashboard size={18} /> Gestão
+            </button>
+          )}
           {isUnlocked && userRole === 'admin' && (
             <button
               onClick={() => navigateTo("/admin")}
-              className={`text-left px-4 py-3 rounded-lg text-sm font-bold ${
+              className={`text-left px-4 py-3 rounded-lg text-sm font-bold flex items-center gap-3 ${
                 isDim
-                  ? "text-[var(--dim-text)] hover:bg-[var(--dim-surface-2)]"
+                  ? "text-[var(--dim-accent)] hover:bg-[var(--dim-surface-2)]"
                   : isDarkMode
                   ? "text-slate-300 hover:bg-slate-800"
                   : "text-slate-700 hover:bg-slate-100"
               }`}
             >
-              Administração
+              <Settings size={18} /> Sistema
             </button>
           )}
         </div>

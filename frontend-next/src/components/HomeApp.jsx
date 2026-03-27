@@ -24,6 +24,8 @@ import { PublicHome } from './areas/PublicHome';
 import { AlunoView } from './areas/AlunoView';
 import { ProfessorView } from './areas/ProfessorView';
 import { GestaoHorarios } from './areas/GestaoHorarios';
+import { GestaoDape } from './areas/GestaoDape';
+import { UsersManager } from './ui/admin/UsersManager';
 
 // Utility for fetching status data internally inside the generic view
 import { Calendar, Upload, Clock, BookOpen, Users, ChevronDown, FileText, AlertCircle, Trash2, UserCircle, BarChart3, Lock, Unlock, X, AlertTriangle, Settings, ShieldCheck, Power, Database, Edit3, Check, Download, Eye, Layers, Home, GraduationCap, UserCheck, Printer, ListTodo, KeyRound, CheckCircle, Link as LinkIcon, Loader2, Sun, Moon, Menu, UserPlus, ClipboardList, CalendarDays } from 'lucide-react';
@@ -65,6 +67,9 @@ export function HomeApp({ appMode }) {
     else if (mode === 'aluno') { scheduleState.setViewMode('hoje'); scheduleState.setScheduleMode('oficial'); router.push('/aluno'); setMobileMenuOpen(false); } 
     else if (mode === 'professor') { scheduleState.setViewMode('professor'); scheduleState.setScheduleMode('oficial'); router.push('/professor'); setMobileMenuOpen(false); } 
     else if (mode === 'admin') { router.push('/admin'); setAdminTab('dashboard'); setMobileMenuOpen(false); }
+    else if (mode === 'gestao_dape') { router.push('/gestao-dape'); setMobileMenuOpen(false); }
+    else if (mode === 'servidores') { router.push('/admin/servidores'); setMobileMenuOpen(false); }
+    else if (mode === 'dados') { router.push('/admin/dados'); setMobileMenuOpen(false); }
   };
 
   const executePrint = React.useCallback(() => {
@@ -153,6 +158,149 @@ export function HomeApp({ appMode }) {
           </div>
         )}
 
+        {appMode === 'gestao_dape' && (!isUnlocked || !['admin', 'gestao'].includes(userRole)) && (
+          <div className="flex-1 flex flex-col items-center justify-center p-6 mt-10 mb-20 animate-in zoom-in">
+             {isLoadingAuth ? (
+               <div className="flex flex-col items-center justify-center opacity-50 py-10">
+                 <Loader2 size={48} className="animate-spin mb-4" />
+                 <p className="font-bold uppercase tracking-widest text-xs">Verificando Credenciais...</p>
+               </div>
+             ) : (
+               <>
+                 <div className={`p-8 rounded-full mb-6 ${isDarkMode ? 'bg-slate-800 text-slate-400' : 'bg-slate-100 text-slate-500'}`}>
+                    <Lock size={64} />
+                 </div>
+                 <h2 className={`text-2xl md:text-3xl font-black uppercase tracking-widest mb-4 text-center ${isDarkMode ? 'text-white' : 'text-slate-800'}`}>Acesso Restrito</h2>
+                 <p className={`mb-8 font-medium text-center max-w-md ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>Você precisa ser um <b>Gestor DAPE</b> para acessar este portal operacional.</p>
+                 {!isUnlocked ? (
+                   <button onClick={() => security.setAuthModal({ show: true, pendingAction: null, mode: 'login' })} className="px-8 py-4 bg-emerald-600 hover:bg-emerald-700 text-white font-black rounded-xl shadow-lg transition-all flex items-center justify-center gap-3 active:scale-95 w-full max-w-xs">
+                     <Unlock size={20}/> Fazer Login
+                   </button>
+                 ) : (
+                   <button onClick={logout} className="px-8 py-4 bg-slate-600 hover:bg-slate-700 text-white font-black rounded-xl shadow-lg transition-all flex items-center justify-center gap-3 active:scale-95 w-full max-w-xs">
+                     Sair
+                   </button>
+                 )}
+               </>
+             )}
+          </div>
+        )}
+
+        {['servidores', 'dados'].includes(appMode) && (!isUnlocked || userRole !== 'admin') && (
+          <div className="flex-1 flex flex-col items-center justify-center p-6 mt-10 mb-20 animate-in zoom-in">
+             {isLoadingAuth ? (
+               <div className="flex flex-col items-center justify-center opacity-50 py-10">
+                 <Loader2 size={48} className="animate-spin mb-4" />
+                 <p className="font-bold uppercase tracking-widest text-xs">Verificando Credenciais...</p>
+               </div>
+             ) : (
+               <>
+                 <div className={`p-8 rounded-full mb-6 ${isDarkMode ? 'bg-slate-800 text-slate-400' : 'bg-slate-100 text-slate-500'}`}>
+                    <Lock size={64} />
+                 </div>
+                 <h2 className={`text-2xl md:text-3xl font-black uppercase tracking-widest mb-4 text-center ${isDarkMode ? 'text-white' : 'text-slate-800'}`}>Acesso Restrito</h2>
+                 <p className={`mb-8 font-medium text-center max-w-md ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>Você precisa ser um <b>Administrador</b> para acessar estas configurações avançadas.</p>
+                 {!isUnlocked ? (
+                   <button onClick={() => security.setAuthModal({ show: true, pendingAction: null, mode: 'login' })} className="px-8 py-4 bg-emerald-600 hover:bg-emerald-700 text-white font-black rounded-xl shadow-lg transition-all flex items-center justify-center gap-3 active:scale-95 w-full max-w-xs">
+                     <Unlock size={20}/> Fazer Login
+                   </button>
+                 ) : (
+                   <button onClick={logout} className="px-8 py-4 bg-slate-600 hover:bg-slate-700 text-white font-black rounded-xl shadow-lg transition-all flex items-center justify-center gap-3 active:scale-95 w-full max-w-xs">
+                     Sair
+                   </button>
+                 )}
+               </>
+             )}
+          </div>
+        )}
+
+        {appMode === 'servidores' && isUnlocked && userRole === 'admin' && (
+           <div className="space-y-6">
+              <div className="mb-6 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 no-print print:hidden">
+                  <div className="flex items-center gap-4">
+                      <button onClick={() => navigateTo('admin')} className={`p-3 rounded-xl text-white shadow-md transition-all bg-slate-800 rotate-3 hover:rotate-0 hover:scale-110 active:scale-95`}>
+                          <Users size={24}/>
+                      </button>
+                      <div>
+                          <h1 className={`text-lg md:text-xl font-black leading-tight uppercase tracking-tight ${isDarkMode ? 'text-white' : 'text-slate-900'}`}>
+                              Gestão de Servidores
+                          </h1>
+                          <button 
+                            onClick={() => navigateTo('admin')}
+                            className={`text-[10px] md:text-xs font-bold mt-0.5 uppercase tracking-widest transition-all hover:translate-x-1 ${isDarkMode ? 'text-indigo-400 hover:text-indigo-300' : 'text-indigo-600 hover:text-indigo-700'}`}
+                          >
+                             Painel Administrador ➔
+                          </button>
+                      </div>
+                  </div>
+              
+                  <div className="flex items-center gap-2">
+                      <button onClick={() => navigateTo('professor')} className={`px-4 py-2.5 border rounded-lg font-black text-[10px] uppercase tracking-widest flex items-center gap-2 shadow-sm transition-all ${isDarkMode ? 'bg-indigo-900/20 text-indigo-400 border-indigo-800/50 hover:bg-indigo-900/40' : 'bg-indigo-50 text-indigo-600 border-indigo-200 hover:bg-indigo-100'}`}>
+                          <UserCheck size={14} /> Portal do Professor
+                      </button>
+                      <button onClick={() => logout()} className={`px-4 py-2.5 border rounded-lg font-black text-[10px] uppercase tracking-widest flex items-center gap-2 shadow-sm transition-all ${isDarkMode ? 'bg-rose-950/20 text-rose-500 border-rose-800/50 hover:bg-rose-900/40' : 'bg-rose-50 text-rose-600 border-rose-200 hover:bg-rose-100'}`}>
+                      <Power size={14} /> Sair
+                      </button>
+                  </div>
+              </div>
+
+              <AdminStatsPanel adminStats={scheduleState.adminStats} isDarkMode={isDarkMode} />
+
+              <UsersManager 
+                isDarkMode={isDarkMode} 
+                showConfirm={security.showConfirm} 
+                refreshGlobalTeachers={refreshData} 
+              />
+           </div>
+        )}
+
+        {appMode === 'dados' && isUnlocked && userRole === 'admin' && (
+           <div className="space-y-6">
+              <div className="mb-6 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 no-print print:hidden">
+                  <div className="flex items-center gap-4">
+                      <button onClick={() => navigateTo('admin')} className={`p-3 rounded-xl text-white shadow-md transition-all bg-slate-800 rotate-3 hover:rotate-0 hover:scale-110 active:scale-95`}>
+                          <Cpu size={24}/>
+                      </button>
+                      <div>
+                          <h1 className={`text-lg md:text-xl font-black leading-tight uppercase tracking-tight ${isDarkMode ? 'text-white' : 'text-slate-900'}`}>
+                              Fonte de Dados
+                          </h1>
+                          <button 
+                            onClick={() => navigateTo('admin')}
+                            className={`text-[10px] md:text-xs font-bold mt-0.5 uppercase tracking-widest transition-all hover:translate-x-1 ${isDarkMode ? 'text-rose-400 hover:text-rose-300' : 'text-rose-600 hover:text-rose-700'}`}
+                          >
+                             Painel Administrador ➔
+                          </button>
+                      </div>
+                  </div>
+              
+                  <div className="flex items-center gap-2">
+                      <button onClick={() => navigateTo('professor')} className={`px-4 py-2.5 border rounded-lg font-black text-[10px] uppercase tracking-widest flex items-center gap-2 shadow-sm transition-all ${isDarkMode ? 'bg-indigo-900/20 text-indigo-400 border-indigo-800/50 hover:bg-indigo-900/40' : 'bg-indigo-50 text-indigo-600 border-indigo-200 hover:bg-indigo-100'}`}>
+                          <UserCheck size={14} /> Portal do Professor
+                      </button>
+                      <button onClick={() => logout()} className={`px-4 py-2.5 border rounded-lg font-black text-[10px] uppercase tracking-widest flex items-center gap-2 shadow-sm transition-all ${isDarkMode ? 'bg-rose-950/20 text-rose-500 border-rose-800/50 hover:bg-rose-900/40' : 'bg-rose-50 text-rose-600 border-rose-200 hover:bg-rose-100'}`}>
+                      <Power size={14} /> Sair
+                      </button>
+                  </div>
+              </div>
+
+              <AdminStatsPanel adminStats={scheduleState.adminStats} isDarkMode={isDarkMode} />
+
+              <div className={`p-12 rounded-[2.5rem] border flex flex-col items-center justify-center text-center gap-6 ${isDarkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200 shadow-xl'}`}>
+                  <div className={`p-8 rounded-full ${isDarkMode ? 'bg-indigo-900/30 text-indigo-400' : 'bg-indigo-50 text-indigo-600'}`}>
+                      <Database size={64} />
+                  </div>
+                  <div>
+                    <h3 className="text-2xl font-black uppercase tracking-widest mb-2">Integração SUAP API</h3>
+                    <p className="max-w-md opacity-60 font-medium">Esta funcionalidade está sendo preparada para sincronização automática de diários, horários e turmas via API oficial do SUAP/IFRO.</p>
+                  </div>
+                  <div className="px-4 py-2 rounded-full text-[10px] font-black tracking-widest uppercase bg-amber-500/10 text-amber-500 border border-amber-500/30 animate-pulse">
+                      Em desenvolvimento
+                  </div>
+              </div>
+           </div>
+        )}
+
         {appMode === 'admin' && isUnlocked && userRole === 'admin' && (
             <>
                 <div className="mb-6 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 no-print print:hidden">
@@ -165,17 +313,16 @@ export function HomeApp({ appMode }) {
                                 Gestão de Banco de Dados
                             </h1>
                             <p className={`text-[10px] md:text-xs font-bold mt-0.5 uppercase tracking-widest opacity-80 ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>
-                                Painel Administrativo
+                                Painel Administrador
                             </p>
                         </div>
                     </div>
                 
                     <div className="flex items-center gap-2">
-                        {/* Removed Segurança Button as requested */}
-                        <button onClick={() => { router.push('/professor'); }} className={`px-4 py-2.5 border rounded-lg font-black text-[10px] uppercase tracking-widest flex items-center gap-2 shadow-sm transition-all ${isDarkMode ? 'bg-indigo-900/20 text-indigo-400 border-indigo-800/50 hover:bg-indigo-900/40' : 'bg-indigo-50 text-indigo-600 border-indigo-200 hover:bg-indigo-100'}`}>
+                        <button onClick={() => navigateTo('professor')} className={`px-4 py-2.5 border rounded-lg font-black text-[10px] uppercase tracking-widest flex items-center gap-2 shadow-sm transition-all ${isDarkMode ? 'bg-indigo-900/20 text-indigo-400 border-indigo-800/50 hover:bg-indigo-900/40' : 'bg-indigo-50 text-indigo-600 border-indigo-200 hover:bg-indigo-100'}`}>
                             <UserCheck size={14} /> Portal do Professor
                         </button>
-                        <button onClick={() => logout()} className={`px-4 py-2.5 border rounded-lg font-black text-[10px] uppercase tracking-widest flex items-center gap-2 shadow-sm transition-all ${isDarkMode ? 'bg-rose-900/20 text-rose-400 border-rose-800/50 hover:bg-rose-900/40' : 'bg-rose-50 text-rose-600 border-rose-200 hover:bg-rose-100'}`}>
+                        <button onClick={() => logout()} className={`px-4 py-2.5 border rounded-lg font-black text-[10px] uppercase tracking-widest flex items-center gap-2 shadow-sm transition-all ${isDarkMode ? 'bg-rose-950/20 text-rose-500 border-rose-800/50 hover:bg-rose-900/40' : 'bg-rose-50 text-rose-600 border-rose-200 hover:bg-rose-100'}`}>
                         <Power size={14} /> Sair
                         </button>
                     </div>
@@ -193,8 +340,18 @@ export function HomeApp({ appMode }) {
                     adminFilterCourses={adminFilterCourses} setAdminFilterCourses={setAdminFilterCourses}
                     adminFilterClasses={adminFilterClasses} setAdminFilterClasses={setAdminFilterClasses}
                     handlePrint={executePrint} getColorHash={getColorHash} isTeacherPending={isTeacherPending}
+                    navigateTo={navigateTo}
                 />
             </>
+        )}
+
+        {appMode === 'gestao_dape' && isUnlocked && ['admin', 'gestao'].includes(userRole) && (
+          <GestaoDape 
+            {...scheduleState}
+            isDarkMode={isDarkMode}
+            userRole={userRole}
+            handlePrint={executePrint}
+          />
         )}
 
         {appMode === 'aluno' && (

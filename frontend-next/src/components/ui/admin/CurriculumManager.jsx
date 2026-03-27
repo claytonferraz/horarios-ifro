@@ -2,7 +2,6 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { BookOpen, Users, Plus, Trash2, Edit2, Save, X, Settings2, CalendarDays, CheckCircle, User as UserIcon, AlertTriangle } from 'lucide-react';
 import { apiClient } from '@/lib/apiClient';
 import { useAuth } from '@/contexts/AuthContext';
-import { UsersManager } from './UsersManager';
 import { MultiSelect } from '../MultiSelect';
 
 export function CurriculumManager({ isDarkMode, academicYearsMeta, groupedDisciplinesBySerie = {} }) {
@@ -102,16 +101,6 @@ export function CurriculumManager({ isDarkMode, academicYearsMeta, groupedDiscip
         >
           <div className="flex items-center justify-center gap-2"><Users size={14} /> 2. Cadastro de Turma</div>
         </button>
-        <button
-          onClick={() => setActiveTab('teachers')}
-          className={`flex-1 py-3 px-4 font-black text-xs uppercase tracking-widest transition-colors whitespace-nowrap ${
-            activeTab === 'teachers'
-              ? (isDarkMode ? 'bg-slate-800 text-green-400 border-b-2 border-green-500' : 'bg-white text-green-600 border-b-2 border-green-600')
-              : (isDarkMode ? 'bg-slate-900/50 text-slate-400 hover:text-slate-200' : 'bg-slate-50 text-slate-500 hover:text-slate-800')
-          }`}
-        >
-          <div className="flex items-center justify-center gap-2"><UserIcon size={14} /> 3. Gestão de Servidores</div>
-        </button>
       </div>
 
       <div className="p-6">
@@ -121,7 +110,6 @@ export function CurriculumManager({ isDarkMode, academicYearsMeta, groupedDiscip
           <>
             {activeTab === 'matrices' && <MatricesTab isDarkMode={isDarkMode} matrices={matrices} setMatrices={setMatrices} generateId={generateId} groupedDisciplinesBySerie={groupedDisciplinesBySerie} academicYearsMeta={academicYearsMeta} showConfirm={showConfirm} refreshGlobalTeachers={refreshGlobalTeachers} />}
             {activeTab === 'classes' && <ClassesTab isDarkMode={isDarkMode} matrices={matrices} classes={classes} setClasses={setClasses} generateId={generateId} academicYearsMeta={academicYearsMeta} globalTeachers={globalTeachers} showConfirm={showConfirm} refreshGlobalTeachers={refreshGlobalTeachers} />}
-            {activeTab === 'teachers' && <UsersManager isDarkMode={isDarkMode} showConfirm={showConfirm} refreshGlobalTeachers={refreshGlobalTeachers} />}
           </>
         )}
       </div>

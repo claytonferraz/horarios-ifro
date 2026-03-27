@@ -1,9 +1,9 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { User, Users, Search, Plus, Trash2, RotateCcw, Save, ShieldCheck, ShieldAlert, FileText, Upload, Shield } from 'lucide-react';
+import { User, Users, Search, Plus, Trash2, RotateCcw, Save, ShieldCheck, ShieldAlert, FileText, Upload, Shield, AlertTriangle, X } from 'lucide-react';
 import { apiClient } from '@/lib/apiClient';
 import { useAuth } from '@/contexts/AuthContext';
 
-export function UsersManager({ isDarkMode, showConfirm, refreshGlobalTeachers }) {
+export function UsersManager({ isDarkMode, refreshGlobalTeachers }) {
   const { userRole } = useAuth();
   const isAdminLogado = userRole === 'admin';
   const [teachers, setTeachers] = useState([]);
@@ -16,15 +16,29 @@ export function UsersManager({ isDarkMode, showConfirm, refreshGlobalTeachers })
   const [showImport, setShowImport] = useState(false);
   const [importText, setImportText] = useState('');
 
+  // Control for local confirmation modal
+  const [modalConfig, setModalConfig] = useState(null); 
+  const showConfirm = (title, message, onConfirm, type = 'danger') => {
+    setModalConfig({ title, message, onConfirm, type });
+  };
+
   const load = async () => {
     setLoading(true);
     try {
       let dbTeachers = await refreshGlobalTeachers();
-      dbTeachers.sort((a,b) => a.nome_completo.localeCompare(b.nome_completo));
-      // Add a client-only id for new unsaved objects tracking
-      const mapped = dbTeachers.map(t => ({ ...t, oldSiape: t.siape, _clientId: t.siape }));
-      setTeachers(mapped);
-      setOriginalTeachers(JSON.parse(JSON.stringify(mapped)));
+      
+      // Fallback if the refresh function doesn't return the list directly (typical for refreshData)
+      if (!dbTeachers || !Array.isArray(dbTeachers)) {
+         dbTeachers = await apiClient.fetchTeachers(userRole);
+      }
+
+      if (dbTeachers && Array.isArray(dbTeachers)) {
+        dbTeachers.sort((a,b) => (a.nome_completo || '').localeCompare(b.nome_completo || ''));
+        // Add a client-only id for new unsaved objects tracking
+        const mapped = dbTeachers.map(t => ({ ...t, oldSiape: t.siape, _clientId: t.siape }));
+        setTeachers(mapped);
+        setOriginalTeachers(JSON.parse(JSON.stringify(mapped)));
+      }
     } catch (e) {
       console.error("Erro ao carregar professores:", e);
     }
@@ -282,6 +296,25 @@ export function UsersManager({ isDarkMode, showConfirm, refreshGlobalTeachers })
 
   return (
     <div className={`rounded-2xl border shadow-sm p-6 space-y-6 ${isDarkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'}`}>
+      
+      {/* LOCAL CONFIRMATION MODAL */}
+      {modalConfig && (
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className={`w-full max-w-sm rounded-[2rem] shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200 ${isDarkMode ? 'bg-slate-900 border border-slate-700' : 'bg-white'}`}>
+            <div className={`p-8 text-center ${modalConfig.type === 'danger' ? 'text-rose-500' : 'text-blue-500'}`}>
+              <div className={`w-20 h-20 rounded-full mx-auto flex items-center justify-center mb-6 ${modalConfig.type === 'danger' ? 'bg-rose-500/10' : 'bg-blue-500/10'}`}>
+                <AlertTriangle size={40} />
+              </div>
+              <h3 className="font-black text-xl uppercase tracking-widest mb-3">{modalConfig.title}</h3>
+              <p className={`text-sm font-medium leading-relaxed px-2 ${isDarkMode ? 'text-slate-400' : 'text-slate-600'}`}>{modalConfig.message}</p>
+            </div>
+            <div className={`p-6 flex gap-3 border-t ${isDarkMode ? 'bg-slate-950/50 border-slate-800' : 'bg-slate-50 border-slate-100'}`}>
+               <button onClick={() => setModalConfig(null)} className={`flex-1 py-4 rounded-2xl text-[11px] font-black uppercase tracking-widest transition-all ${isDarkMode ? 'bg-slate-800 text-slate-400 hover:bg-slate-700' : 'bg-white text-slate-500 hover:bg-slate-100'}`}>Voltar</button>
+               <button onClick={() => { modalConfig.onConfirm(); setModalConfig(null); }} className={`flex-1 py-4 rounded-2xl text-[11px] font-black uppercase tracking-widest transition-all text-white shadow-lg shadow-current/20 ${modalConfig.type === 'danger' ? 'bg-rose-600 hover:bg-rose-500' : 'bg-blue-600 hover:bg-blue-500'}`}>Confirmar</button>
+            </div>
+          </div>
+        </div>
+      )}
       
       {/* HEADER */}
       <div className="flex flex-col lg:flex-row justify-between lg:items-center gap-4 border-b border-slate-200 dark:border-slate-800 pb-4">
