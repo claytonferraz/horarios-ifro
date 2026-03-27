@@ -2021,6 +2021,8 @@ export function PortalView({
                          recordsForWeek={recordsForWeek}
                          activeDays={activeDays}
                          classTimes={classTimes}
+                          showOnlyMyClasses={showOnlyMyClasses}
+                          setShowOnlyMyClasses={setShowOnlyMyClasses}
                        />
                    )}
 
@@ -2101,6 +2103,8 @@ export function PortalView({
             selectedWeek={selectedWeek}
             activeDays={activeDays}
             classTimes={classTimes}
+                          showOnlyMyClasses={showOnlyMyClasses}
+                          setShowOnlyMyClasses={setShowOnlyMyClasses}
             weekData={recordsForWeek ? recordsForWeek.filter(r => String(r.teacherId).includes(String(siape))) : []}
             scheduleMode={scheduleMode}
             isFloating={false}

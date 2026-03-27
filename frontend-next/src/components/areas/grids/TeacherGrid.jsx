@@ -36,6 +36,8 @@ export const TeacherGrid = React.memo(
     classTimes,
     setShowEmptySlots,
     profClassesMemo,
+    showOnlyMyClasses,
+    setShowOnlyMyClasses
   }) => {
     const activeTeacher = selectedColleague || selectedTeacher;
     const isGridInert = appMode === 'aluno' || scheduleMode === 'consolidado' || scheduleMode === 'oficial';
@@ -47,7 +49,10 @@ export const TeacherGrid = React.memo(
     const targetClasses = new Set(directRecords.map(r => r.className));
     
     // Exibe as aulas do professor, as AULAS VAGAS e as aulas de OUTROS PROFESSORES nas turmas onde ele leciona
-    let profRecords = mappedSchedules.filter(r => targetClasses.has(r.className));
+    // Se 'Apenas Minhas' estiver ativo, exibe somente directRecords
+    let profRecords = showOnlyMyClasses 
+        ? directRecords 
+        : mappedSchedules.filter(r => targetClasses.has(r.className));
 
     const profCourses = [...new Set(profRecords.map((r) => r.course))].sort(
       (a, b) => String(a).localeCompare(String(b)),
@@ -108,6 +113,17 @@ export const TeacherGrid = React.memo(
                         </div>
                         <span className="text-[9px] font-black uppercase tracking-widest text-white/90 group-hover:text-white transition-colors">Horários Livres</span>
                         <input type="checkbox" checked={showEmptySlots} onChange={e => typeof setShowEmptySlots === 'function' && setShowEmptySlots(e.target.checked)} className="peer sr-only" />
+                    </label>
+                  )}
+                  {appMode === 'professor' && setShowOnlyMyClasses && (
+                    <label className="flex items-center gap-2 cursor-pointer bg-white/10 hover:bg-white/20 px-3 py-2 rounded-xl transition-colors text-white text-[9px] uppercase font-black tracking-widest shadow-sm ring-1 ring-white/10 whitespace-nowrap">
+                      <input
+                        type="checkbox"
+                        checked={showOnlyMyClasses}
+                        onChange={(e) => setShowOnlyMyClasses(e.target.checked)}
+                        className="accent-indigo-500 w-3 h-3"
+                      />
+                      Apenas Minhas
                     </label>
                   )}
 
