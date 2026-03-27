@@ -1417,14 +1417,6 @@ export function PortalView({
                        </>
                      ) : (
                        <>
-                         <button onClick={() => setViewMode("dashboard")} 
-                                 className={`group p-6 rounded-3xl border text-left transition-all hover:scale-[1.02] ${isDarkMode ? "bg-slate-800 border-slate-700 hover:border-slate-500/50" : "bg-white border-slate-100 hover:border-slate-200 shadow-sm hover:shadow-xl"}`}>
-                            <div className={`w-10 h-10 rounded-xl flex items-center justify-center mb-4 transition-colors ${isDarkMode ? "bg-slate-950 text-slate-400 group-hover:bg-slate-600 group-hover:text-white" : "bg-slate-50 text-slate-600 group-hover:bg-slate-600 group-hover:text-white"}`}>
-                              <Home size={20} />
-                            </div>
-                            <h3 className={`text-sm font-black mb-1 ${isDarkMode ? "text-white" : "text-slate-800"}`}>Início</h3>
-                            <p className="text-[10px] font-medium text-slate-500 leading-tight">Painel principal e avisos.</p>
-                          </button>
                          <button onClick={() => setViewMode("hoje")} 
                                  className={`group p-6 rounded-3xl border text-left transition-all hover:scale-[1.02] ${isDarkMode ? "bg-slate-800 border-slate-700 hover:border-blue-500/50" : "bg-white border-slate-100 hover:border-blue-200 shadow-sm hover:shadow-xl"}`}>
                            <div className={`w-10 h-10 rounded-xl flex items-center justify-center mb-4 transition-colors ${isDarkMode ? "bg-blue-950 text-blue-400 group-hover:bg-blue-600 group-hover:text-white" : "bg-blue-50 text-blue-600 group-hover:bg-blue-600 group-hover:text-white"}`}>
@@ -1558,6 +1550,10 @@ export function PortalView({
                   {appMode === 'aluno' && (
                     <>
                       {/* Destaques Aluno */}
+                      <button onClick={() => setViewMode('dashboard')} 
+                              className={`flex-1 sm:flex-none min-w-[130px] flex items-center justify-center gap-2 px-4 py-3 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all ${viewMode === 'dashboard' ? (isDarkMode ? 'bg-slate-700 text-white' : 'bg-slate-600 text-white shadow-lg ring-2 ring-slate-400/30') : (isDarkMode ? 'bg-slate-800 text-slate-300 hover:text-white hover:bg-slate-700' : 'bg-white text-slate-600 hover:text-slate-900 border border-slate-200 shadow-sm')}`}>
+                        <Home size={14} /> Início
+                      </button>
                       <button onClick={() => { setViewMode('hoje'); if (scheduleMode === 'oficial') handleAlunoScheduleTab('atual'); }} 
                               className={`flex-1 sm:flex-none min-w-[130px] flex items-center justify-center gap-2 px-4 py-3 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all ${viewMode === 'hoje' ? 'bg-blue-600 text-white shadow-lg shadow-blue-900/40 ring-2 ring-blue-400/50' : (isDarkMode ? 'bg-slate-800 text-slate-300 hover:text-white hover:bg-slate-700' : 'bg-white text-slate-600 hover:text-slate-900 border border-slate-200')}`}>
                         <ListTodo size={14} /> Painel Diário
