@@ -438,49 +438,78 @@ export function PortalView({
     });
   }, []);
 
-   const matrixDisciplinesMap = React.useMemo(() => {
-     const map = {};
-     (dbCourses || []).forEach(course => {
-        if (course.series && Array.isArray(course.series)) {
-           course.series.forEach(serie => {
-              if (serie.disciplines && Array.isArray(serie.disciplines)) {
-                 serie.disciplines.forEach(d => {
-                    if (d.id && d.name) map[d.id] = d.name;
-                 });
-              }
-           });
-        }
-     });
-     return map;
-   }, [dbCourses]);
+  const matrixDisciplinesMap = React.useMemo(() => {
+    const map = {};
+    (dbCourses || []).forEach(course => {
+       if (course.series && Array.isArray(course.series)) {
+          course.series.forEach(serie => {
+             if (serie.disciplines && Array.isArray(serie.disciplines)) {
+                serie.disciplines.forEach(d => {
+                   if (d.id && d.name) map[d.id] = d.name;
+                });
+             }
+          });
+       }
+    });
+    return map;
+  }, [dbCourses]);
+
+  /**
+   * Função Central de Enriquecimento: Garante que cada item de horário possua 
+   * todas as propriedades resolvidas (Professor, Disciplina, Metadata JSON).
+   */
+  const enrichScheduleItem = React.useCallback((s) => {
+    if (!s) return null;
+    
+    // 1. Resolver Nomes Base
+    const classObj = dbClasses.find(c => String(c.id) === String(s.classId));
+    const courseObj = (dbCourses || []).find(c => String(c.id) === String(s.courseId));
+    
+    // 2. Resolver Nome da Disciplina (Prioridade: Matrix -> Metadata -> Raw)
+    const discName = matrixDisciplinesMap[s.disciplineId] || 
+                     disciplinesMeta?.[s.disciplineId]?.name || 
+                     subjectHoursMeta?.[s.disciplineId]?.name || 
+                     s.subjectName || s.subject || s.disciplineId || 'Disciplina';
+
+    // 3. Resolver Professor (Suporta múltiplos SIAPE/ID separados por vírgula)
+    const teacherName = s.teacherId 
+      ? String(s.teacherId).split(',').map(id => resolveTeacherName(id, globalTeachers)).join(' / ')
+      : 'A Definir';
+
+    // 4. Processar Metadados JSON (Labels: Recuperação, Substituição, etc)
+    let extraRecs = {};
+    try {
+      if (s.records) {
+        extraRecs = (typeof s.records === 'string') ? JSON.parse(s.records) : s.records;
+        // Caso esteja duplamente codificado como string persistida
+        if (typeof extraRecs === 'string') extraRecs = JSON.parse(extraRecs);
+      }
+    } catch (e) {
+      console.warn("Falha no parse de records p/ ID:", s.id, e);
+    }
+
+    // 5. Normalizar campos de data/hora
+    const dCode = isNaN(s.dayOfWeek) ? String(s.dayOfWeek) : String(MAP_DAYS[s.dayOfWeek]);
+
+    return {
+      ...s,
+      ...extraRecs,
+      className: classObj?.name || s.className || s.classId,
+      course: courseObj?.course || s.courseName || s.courseId,
+      day: dCode,
+      dayLabel: dayFullLabels[dCode] || dCode,
+      time: s.slotId || s.time,
+      subject: discName,
+      teacher: teacherName,
+      teacherId: s.teacherId || ''
+    };
+  }, [dbClasses, dbCourses, matrixDisciplinesMap, disciplinesMeta, subjectHoursMeta, globalTeachers, dayFullLabels]);
+
+
 
    const mappedSchedules = React.useMemo(() => {
-       return horariosFiltrados.map(s => {
-           const classObj = dbClasses.find(c => String(c.id) === String(s.classId));
-           const courseObj = dbCourses.find(c => String(c.id) === String(s.courseId));
-           // Use local dictionary mapping, then backend JOINed name, then raw string just passing through
-           const discName = matrixDisciplinesMap[s.disciplineId] || disciplinesMeta?.[s.disciplineId]?.name || subjectHoursMeta?.[s.disciplineId]?.name || s.subjectName || (s.disciplineId && s.disciplineId.length > 20 ? 'Disciplina Desconhecida' : s.disciplineId) || 'Disciplina Desconhecida';
-           
-           let extraRecs = {};
-           try { if(s.records) extraRecs = JSON.parse(s.records); } catch(e){}
-
-           return {
-               id: s.id,
-               course: courseObj ? courseObj.course : (s.courseName || s.courseId),
-               className: classObj ? classObj.name : (s.className || s.classId),
-               classId: s.classId,
-               day: isNaN(s.dayOfWeek) ? String(s.dayOfWeek) : String(MAP_DAYS[s.dayOfWeek]),
-               time: s.slotId,
-               subject: discName,
-               disciplineId: s.disciplineId,
-               teacher: s.teacherId ? String(s.teacherId).split(',').map(id => resolveTeacherName(id, globalTeachers)).join(',') : 'A Definir',
-               teacherId: s.teacherId || '',
-               room: s.room || '',
-               ...extraRecs,
-               raw: s
-           };
-       });
-   }, [horariosFiltrados, dbClasses, dbCourses, disciplinesMeta, subjectHoursMeta, globalTeachers, matrixDisciplinesMap]);
+       return (horariosFiltrados || []).map(s => enrichScheduleItem(s)).filter(Boolean);
+   }, [horariosFiltrados, enrichScheduleItem]);
 
   const teacherSummary = React.useMemo(() => {
     if (!siape || !mappedSchedules || !schedules || !selectedWeek || !academicWeeks) return { atual: [], previa: [], vagas: [] };
@@ -539,88 +568,38 @@ export function PortalView({
     const isTransitioning = todayIdx === 5 || todayIdx === 6 || todayIdx === 0;
     const targetAtualWeekId = (isTransitioning && nextWeekId) ? nextWeekId : selectedWeek;
 
-    // Buscar as aulas desejadas diretamente do store de schedules (para não ficar restrito a horariosFiltrados do selectedWeek)
-    const rawItemsForAtual = schedules.filter(s => 
+    // 1. Atual (Minha Turma - oficiais da semana selecionada ou transição para a próxima)
+    const rawItemsForAtual = (schedules || []).filter(s => 
       s.type === 'oficial' && 
       String(s.week_id) === String(targetAtualWeekId) &&
       s.teacherId && String(s.teacherId).split(',').includes(String(siape))
-    ).map(s => {
-       // Mapeamento idêntico ao mappedSchedules para consistência
-       const classObj = dbClasses.find(c => String(c.id) === String(s.classId));
-       const dCode = isNaN(s.dayOfWeek) ? String(s.dayOfWeek) : String(MAP_DAYS[s.dayOfWeek]);
-       const discName = matrixDisciplinesMap[s.disciplineId] || 
-                        disciplinesMeta?.[s.disciplineId]?.name || 
-                        subjectHoursMeta?.[s.disciplineId]?.name || 
-                        s.disciplineName || s.disciplineId;
-       return {
-         ...s,
-         day: dCode,
-         dayLabel: dayFullLabels[dCode] || dCode,
-         time: s.slotId,
-         className: classObj ? classObj.name : s.classId,
-         subject: discName
-       };
-    });
+    ).map(s => enrichScheduleItem(s)).filter(Boolean);
 
-    // Filtrar aulas passadas se ainda estivermos na semana atual
-    const atualRaw = rawItemsForAtual.filter(item => {
-      if (!targetAtualWeekId || targetAtualWeekId !== selectedWeek) return true; // Se for próxima semana, mostra tudo
-      
-      const dayIdx = dayOrder[shortDayMap[item.day]] || 0;
-      // Se o dia da aula já passou
-      if (dayIdx < todayIdx) return false;
-      // Se é o dia de hoje, futuramente poderíamos filtrar por hora do slot, 
-      // mas por enquanto mantemos o dia de hoje completo para segurança do professor.
-      return true;
-    });
-
+    const atualRaw = rawItemsForAtual;
     const atual = groupByDay(atualRaw);
 
     // 2. Prévia (Lógica: Quarta 12:00 -> Mostrar Prévia da Próxima Semana)
     const isAfterWedNoon = (now.getDay() === 3 && now.getHours() >= 12) || now.getDay() > 3 || now.getDay() === 0;
     const targetPreviewWeekId = isAfterWedNoon ? nextWeekId : selectedWeek;
 
-    const previaRaw = targetPreviewWeekId ? schedules.filter(s => 
+    const previaRaw = targetPreviewWeekId ? (schedules || []).filter(s => 
       s.type === 'previa' && 
       s.teacherId && String(s.teacherId).split(',').includes(String(siape)) && 
       String(s.week_id) === String(targetPreviewWeekId)
-    ).map(s => {
-       const classObj = dbClasses.find(c => String(c.id) === String(s.classId));
-       const dCode = isNaN(s.dayOfWeek) ? String(s.dayOfWeek) : String(MAP_DAYS[s.dayOfWeek]);
-       
-       const discName = matrixDisciplinesMap[s.disciplineId] || 
-                        disciplinesMeta?.[s.disciplineId]?.name || 
-                        subjectHoursMeta?.[s.disciplineId]?.name || 
-                        s.disciplineName || s.disciplineId;
-
-       return {
-         ...s, // Manter week_id original
-         day: dCode,
-         dayLabel: dayFullLabels[dCode] || dCode,
-         time: s.slotId,
-         className: classObj ? classObj.name : s.classId,
-         subject: discName
-       };
-    }) : [];
+    ).map(s => enrichScheduleItem(s)).filter(Boolean) : [];
 
     const previa = groupByDay(previaRaw, targetPreviewWeekId);
 
-    // 3. Vagas
-    const myClassIds = new Set(atualRaw.map(s => String(s.classId)));
-    const vagasRaw = mappedSchedules.filter(s => 
-      (!s.teacherId || s.teacherId === 'A Definir' || s.teacherId === '') && myClassIds.has(String(s.classId))
-    ).map(s => {
-       // Resolver disciplina para vagas com fallback para o que já estava em s.subject
-       const discName = matrixDisciplinesMap[s.disciplineId] || 
-                        disciplinesMeta?.[s.disciplineId]?.name || 
-                        subjectHoursMeta?.[s.disciplineId]?.name || 
-                        s.subject || s.disciplineId;
-       return { ...s, subject: discName };
-    });
+    // 3. Vagas (Busca todas as vagas das turmas que este professor atende)
+    const myClassIds = new Set(rawItemsForAtual.map(s => String(s.classId)));
+    const vagasRaw = (mappedSchedules || []).filter(s => 
+      (!s.teacherId || s.teacherId === "A Definir" || s.teacherId === "" || isTeacherPending(s.teacherId)) && 
+      myClassIds.has(String(s.classId))
+    );
     const vagas = groupByDay(vagasRaw);
 
     return { atual, previa, vagas };
-  }, [siape, mappedSchedules, schedules, dbClasses, selectedConfigYear, selectedWeek, academicWeeks, matrixDisciplinesMap, disciplinesMeta, subjectHoursMeta, MAP_DAYS]);
+  }, [siape, mappedSchedules, schedules, dbClasses, selectedConfigYear, selectedWeek, academicWeeks, matrixDisciplinesMap, disciplinesMeta, subjectHoursMeta, MAP_DAYS, globalTeachers]);
 
    const alunoSummary = React.useMemo(() => {
     if (appMode !== 'aluno' || !selectedClass || !mappedSchedules || !selectedWeek || !academicWeeks || !dbClasses) return { atual: [], previa: [], vagas: [] };
@@ -678,28 +657,15 @@ export function PortalView({
     const currentWeekIdx = academicWeeks.findIndex(w => String(w.id) === String(selectedWeek));
     const targetPreviewWeekId = isAfterWedNoon ? (academicWeeks[currentWeekIdx + 1]?.id || selectedWeek) : selectedWeek;
 
-    const previaRaw = schedules.filter(s => 
+    const previaRaw = targetPreviewWeekId ? (schedules || []).filter(s => 
       s.type === 'previa' && 
       String(s.classId) === classIdRef && 
       String(s.week_id) === String(targetPreviewWeekId)
-    ).map(s => {
-       const dCode = isNaN(s.dayOfWeek) ? String(s.dayOfWeek) : String(MAP_DAYS[s.dayOfWeek]);
-       const discName = matrixDisciplinesMap[s.disciplineId] || 
-                        disciplinesMeta?.[s.disciplineId]?.name || 
-                        subjectHoursMeta?.[s.disciplineId]?.name || 
-                        s.disciplineName || s.disciplineId;
-       return {
-         ...s,
-         day: dCode,
-         dayLabel: dayFullLabels[dCode] || dCode,
-         time: s.slotId,
-         subject: discName
-       };
-    });
+    ).map(s => enrichScheduleItem(s)).filter(Boolean) : [];
     const previa = groupByDay(previaRaw, targetPreviewWeekId);
 
     return { atual, previa, vagas };
-  }, [appMode, selectedClass, mappedSchedules, schedules, selectedWeek, academicWeeks, matrixDisciplinesMap, disciplinesMeta, subjectHoursMeta, MAP_DAYS, dbClasses]);
+  }, [appMode, selectedClass, mappedSchedules, schedules, selectedWeek, academicWeeks, enrichScheduleItem]);
 
   const lastAutoSelectContext = React.useRef({ week: null, role: null });
 
@@ -1068,7 +1034,7 @@ export function PortalView({
                        </div>
                      )}
 
-                   <div className="flex-1 overflow-y-auto pr-4 custom-scrollbar space-y-8">
+                   <div className="flex-1 overflow-y-auto px-4 overflow-x-visible custom-scrollbar space-y-8">
                     {(() => {
                       const summary = appMode === "aluno" ? alunoSummary : teacherSummary;
                       const activeItems = summary[dashboardTab] || [];
@@ -1163,14 +1129,20 @@ export function PortalView({
                                    return false;
                                  })();
                                  
+                                 const isVaga = isTeacherPending(aula.teacher);
                                  let containerClasses = isDarkMode ? "bg-slate-900 border-slate-800 hover:bg-slate-800/80" : "bg-white border-slate-100 hover:shadow-lg shadow-slate-200/50";
                                  let timeColor = isDarkMode ? "text-slate-200" : "text-slate-900";
-                                 let badgeClasses = isDarkMode ? "bg-slate-950 text-slate-400 group-hover/item:text-blue-400" : "bg-slate-50 text-slate-800";
+                                 let badgeClasses = isDarkMode ? "bg-slate-950 text-slate-400 border-slate-800" : "bg-slate-50 text-slate-800 border-slate-100";
                                  
+                                 if (isVaga) {
+                                    containerClasses = isDarkMode ? "bg-orange-500/10 border-orange-500/50" : "bg-orange-50 border-orange-200 shadow-sm";
+                                    timeColor = isDarkMode ? "text-orange-400" : "text-orange-700";
+                                 }
+
                                  if (isTarget) {
                                     containerClasses = isDarkMode ? "bg-blue-500/10 border-blue-500/50 shadow-2xl shadow-blue-500/20 scale-[1.03] ring-2 ring-blue-500/50" : "bg-blue-50 border-blue-200 shadow-xl shadow-blue-100 scale-[1.03] ring-2 ring-blue-500/30";
                                     timeColor = isDarkMode ? "text-blue-400" : "text-blue-700";
-                                    badgeClasses = "bg-blue-600 text-white shadow-lg shadow-blue-500/30";
+                                    badgeClasses = "bg-blue-600 text-white shadow-lg shadow-blue-500/30 border-blue-400";
                                  }
 
                                  return (
@@ -1187,22 +1159,49 @@ export function PortalView({
                                            3: "text-rose-500 dark:text-rose-400",
                                            4: "text-amber-500 dark:text-amber-400",
                                            5: "text-sky-500 dark:text-sky-400"
-                                         };
-                                         const hash = aula.subject ? aula.subject.split("").reduce((acc, char) => acc + char.charCodeAt(0), 0) : 0;
-                                         const colorClass = subjectColorMap[hash % 6] || "text-slate-500";
-                                         return (
-                                           <span className={`text-[10px] font-bold uppercase tracking-widest leading-tight transition-colors duration-500 ${isTarget ? "text-blue-600 dark:text-blue-400" : colorClass}`}>
-                                             {aula.subject || "Horário Agendado"}
-                                           </span>
-                                         );
-                                       })()}
-                                     </div>
+                                          };
+                                          const hash = aula.subject ? aula.subject.split("").reduce((acc, char) => acc + char.charCodeAt(0), 0) : 0;
+                                          const colorClass = subjectColorMap[hash % 6] || "text-slate-500";
+                                          const colorBg = colorClass.replace('text-', 'bg-');
 
-                                     <div className="flex flex-col items-end">
-                                       <span className={`px-4 py-2 rounded-2xl text-[9px] font-black uppercase tracking-widest border transition-all ${badgeClasses}`}>
-                                         {appMode === "aluno" ? (aula.teacher || "A Definir") : (aula.className)}
-                                       </span>
-                                     </div>
+                                          return (
+                                            <div className="flex flex-col gap-1">
+                                              <span className={`text-[10px] font-bold uppercase tracking-widest leading-tight transition-colors duration-500 ${isTarget ? "text-blue-600 dark:text-blue-400" : colorClass}`}>
+                                                {aula.subject || "Horário Agendado"}
+                                              </span>
+                                              
+                                              {/* LABELS DE TIPO / STATUS */}
+                                              <div className="flex flex-wrap gap-1">
+                                                {isVaga && <span className="px-2 py-0.5 rounded-md text-[7px] font-black bg-rose-600 text-white uppercase tracking-tighter">Aula Vaga</span>}
+                                                {aula.isSubstituted && <span className="px-2 py-0.5 rounded-md text-[7px] font-black bg-indigo-600 text-white uppercase tracking-tighter">Substituição</span>}
+                                                {aula.isSwap && <span className="px-2 py-0.5 rounded-md text-[7px] font-black bg-emerald-600 text-white uppercase tracking-tighter">Permuta</span>}
+                                                {["Recuperação", "Exame final", "Atendimento"].includes(aula.classType) && (
+                                                  <span className="px-2 py-0.5 rounded-md text-[7px] font-black bg-amber-500 text-white uppercase tracking-tighter">{aula.classType === 'Atendimento' ? 'Atendimento ao Aluno' : aula.classType}</span>
+                                                )}
+                                              </div>
+                                            </div>
+                                          );
+                                        })()}
+                                      </div>
+
+                                      <div className="flex flex-col items-end">
+                                        <div className="flex items-center gap-2">
+                                          {(() => {
+                                            const hash = aula.subject ? aula.subject.split("").reduce((acc, char) => acc + char.charCodeAt(0), 0) : 0;
+                                            const colorClass = (isTarget || isVaga) ? "" : ({0:"text-blue-500 dark:text-blue-400", 1:"text-emerald-500 dark:text-emerald-400", 2:"text-indigo-500 dark:text-indigo-400", 3:"text-rose-500 dark:text-rose-400", 4:"text-amber-500 dark:text-amber-400", 5:"text-sky-500 dark:text-sky-400"}[hash % 6] || "text-slate-500");
+                                            const colorBg = colorClass ? colorClass.replace('text-', 'bg-') : (isTarget ? "bg-blue-500" : (isVaga ? "bg-orange-500" : (isDarkMode ? "bg-slate-400" : "bg-slate-500")));
+                                            
+                                            return (
+                                              <>
+                                                <div className={`w-1.5 h-1.5 rounded-full ${colorBg}`} />
+                                                <span className={`px-4 py-2 rounded-2xl text-[9px] font-black uppercase tracking-widest border transition-all ${badgeClasses} ${colorClass}`}>
+                                                  {appMode === "aluno" ? (aula.teacher || "A Definir") : (aula.className)}
+                                                </span>
+                                              </>
+                                            );
+                                          })()}
+                                        </div>
+                                      </div>
                                    </div>
                                  );
                                })}

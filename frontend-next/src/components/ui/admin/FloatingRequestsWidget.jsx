@@ -308,6 +308,7 @@ export function FloatingRequestsWidget({ isDarkMode, userRole, appMode, controll
                       key={`req-${item.id}`}
                       req={item.data}
                       isDarkMode={isDarkMode}
+                       isAdmin={isAdmin}
                       loadingId={loadingId}
                       handleUpdate={handleUpdate}
                       globalTeachers={globalTeachers}
@@ -323,6 +324,7 @@ export function FloatingRequestsWidget({ isDarkMode, userRole, appMode, controll
                       key={`notif-${item.id}`}
                       notif={item.data}
                       isDarkMode={isDarkMode}
+                       isAdmin={isAdmin}
                       isRead={read}
                       onToggleRead={() => toggleReadState(item)}
                     />
@@ -354,7 +356,7 @@ export function FloatingRequestsWidget({ isDarkMode, userRole, appMode, controll
   );
 }
 
-function ChatItem({ req, isDarkMode, loadingId, handleUpdate, globalTeachers, rawData = [], isRead, onToggleRead }) {
+function ChatItem({ req, isDarkMode, isAdmin, loadingId, handleUpdate, globalTeachers, rawData = [], isRead, onToggleRead }) {
   const [isRejecting, setIsRejecting] = useState(false);
   const teacherSiape = req.requester_id || req.siape;
   const teacherName = resolveTeacherName(teacherSiape, globalTeachers) || teacherSiape;
@@ -445,7 +447,7 @@ function ChatItem({ req, isDarkMode, loadingId, handleUpdate, globalTeachers, ra
               </div>
             )}
 
-            {isPending && !isRejecting && (
+            {isPending && isAdmin && !isRejecting && (
               <div className="flex flex-col sm:flex-row gap-2 mt-1">
                <button 
                  onClick={() => handleUpdate(req.id, 'aprovado', 'Aprovado')}
