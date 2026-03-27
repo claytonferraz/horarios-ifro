@@ -139,8 +139,8 @@ export function PortalView({
 
   const previousViewMode = React.useRef(viewMode);
   React.useEffect(() => {
-    if (viewMode === 'curso' && previousViewMode.current !== 'curso') {
-       if (typeof setScheduleMode === 'function') setScheduleMode('consolidado');
+    if (appMode === 'professor' && viewMode === 'curso' && previousViewMode.current !== 'curso') {
+       if (typeof setScheduleMode === 'function') setScheduleMode('atual');
     }
     previousViewMode.current = viewMode;
   }, [viewMode, appMode, setScheduleMode]);
@@ -1405,10 +1405,10 @@ export function PortalView({
                           <button onClick={() => setViewMode("curso")} 
                                   className={`group p-6 rounded-3xl border text-left transition-all hover:scale-[1.02] ${isDarkMode ? "bg-slate-800 border-slate-700 hover:border-indigo-500/50" : "bg-white border-slate-100 hover:border-indigo-200 shadow-sm hover:shadow-xl"}`}>
                             <div className={`w-10 h-10 rounded-xl flex items-center justify-center mb-4 transition-colors ${isDarkMode ? "bg-indigo-950 text-indigo-400 group-hover:bg-indigo-600 group-hover:text-white" : "bg-indigo-50 text-indigo-600 group-hover:bg-indigo-600 group-hover:text-white"}`}>
-                              <Layers size={20} />
-                             </div>
-                             <h3 className={`text-sm font-black mb-1 ${isDarkMode ? "text-white" : "text-slate-800"}`}>Grade de Horários</h3>
-                             <p className="text-[10px] font-medium text-slate-500 leading-tight">Visualização global por curso.</p>
+                              <Shuffle size={20} />
+                            </div>
+                            <h3 className={`text-sm font-black mb-1 ${isDarkMode ? "text-white" : "text-slate-800"}`}>Grade de Horários</h3>
+                            <p className="text-[10px] font-medium text-slate-500 leading-tight">Consulta ao quadro global.</p>
                           </button>
 
                           <button onClick={() => setViewMode("solicitacoes")} 
@@ -1735,7 +1735,7 @@ export function PortalView({
                     </>
                   ) : (
                     <>
-                      {(appMode === 'professor' || appMode === 'gestao' || appMode === 'admin') && viewMode !== 'curso' ? (
+                      {appMode === 'professor' || appMode === 'gestao' || appMode === 'admin' ? (
                         <>
                           <button onClick={() => handleModeChange('atual')} className={`flex-1 md:flex-none flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all ${scheduleMode === 'atual' ? 'bg-teal-500 text-white shadow-md' : (isDarkMode ? 'text-slate-400 hover:bg-slate-800 hover:text-white' : 'text-slate-500 hover:bg-slate-100 hover:text-slate-800')}`}>
                             <Sun size={14} /> Semana Atual
@@ -1750,10 +1750,6 @@ export function PortalView({
                             <Calendar size={14} /> Consolidado
                           </button>
                         </>
-                      ) : viewMode === 'curso' ? (
-                          <div className={`flex-1 md:flex-none flex items-center justify-center gap-1.5 px-6 py-2.5 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all bg-emerald-500 text-white shadow-md cursor-default`}>
-                            <Calendar size={14} /> Horário Consolidado
-                          </div>
                       ) : (
                         <button onClick={() => handleModeChange('consolidado')} className={`flex-1 md:flex-none flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all ${scheduleMode === 'consolidado' || scheduleMode === 'oficial' ? 'bg-emerald-500 text-white shadow-md' : (isDarkMode ? 'text-slate-400 hover:bg-slate-800 hover:text-white' : 'text-slate-500 hover:bg-slate-100 hover:text-slate-800')}`}>
                           <Calendar size={14} /> Horário Oficial
@@ -2087,38 +2083,7 @@ export function PortalView({
        )}
         
       {/* Editor Interativo */}
-      {false && editorModal && (
-         <ScheduleEditorModal 
-            isOpen={true}
-            onClose={(shouldRefresh) => {
-               setEditorModal(null);
-               if (shouldRefresh === true && typeof loadAdminMetadata === 'function') {
-                  loadAdminMetadata(true);
-               }
-            }}
-            isDarkMode={isDarkMode}
-            scheduleMode={scheduleMode}
-            selectedWeek={selectedWeek}
-            className={editorModal.cls}
-            day={editorModal.day}
-            time={editorModal.time}
-            timeObj={editorModal.tObj}
-            courseRecords={getCellRecords ? getCellRecords(editorModal.cls, editorModal.day, editorModal.time) : []} 
-            weekData={{
-                id: String(selectedWeek),
-                week: String(selectedWeek),
-                academic_year: String(selectedConfigYear),
-                type: scheduleMode === 'consolidado' ? 'oficial' : scheduleMode,
-                records: rawData.filter(r => String(r.week) === String(selectedWeek) && r.type === (scheduleMode === 'consolidado' ? 'oficial' : scheduleMode))
-            }} 
-            matrixData={[]}
-            classesData={classesList || []}
-            usersList={globalTeachersList || []}
-            classTimes={classTimes}
-            userRole={userRole}
-            siape={siape}
-         />
-      )}
+      {/* Editor Modal Disabled in Dashboard */}
 
       {/* SISTEMA DE SOLICITAÇÕES PARA O PROFESSOR (Apenas Fullscreen, Hub Flutuante movido globalmente para HomeApp) */}
       {appMode === 'professor' && viewMode === 'solicitacoes' && (
