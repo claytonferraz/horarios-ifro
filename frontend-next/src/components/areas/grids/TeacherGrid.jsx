@@ -62,10 +62,10 @@ export const TeacherGrid = React.memo(
     }, [profCourses, activeCourseTab]);
 
     return (
-      <div className="flex flex-col xl:flex-row gap-6 items-start animate-in zoom-in-95 duration-500">
+      <div className="flex flex-col xl:flex-row gap-6 items-start animate-in zoom-in-95 duration-500 print:w-full print:max-w-none print:m-0 print:p-0 print:block">
         {/* Lado Principal: Grade */}
-        <div className={`w-full space-y-6`}>
-            <div className="flex flex-col gap-4 w-full">
+        <div className={`w-full space-y-6 print:w-full print:max-w-none`}>
+            <div className="flex flex-col gap-4 w-full print:w-full">
               {/* O CABEÇALHO GLOBAL DO PROFESSOR */}
               <div
                 className={`text-white px-6 py-4 flex flex-col md:flex-row items-start md:items-center justify-between gap-4 rounded-2xl shadow-md no-print ${scheduleMode === "padrao" ? (isDarkMode ? "bg-blue-950" : "bg-blue-900") : scheduleMode === "previa" ? (isDarkMode ? "bg-violet-950" : "bg-violet-900") : isDarkMode ? "bg-indigo-950" : "bg-indigo-900"}`}
@@ -157,7 +157,7 @@ export const TeacherGrid = React.memo(
                   return (
                     <div
                       key={`prof-course-${course}`}
-                      className={`rounded-2xl shadow-sm border overflow-hidden mb-6 animate-in fade-in zoom-in-95 duration-300 ${isDarkMode ? "bg-slate-800 border-slate-700" : "bg-white border-slate-200"}`}
+                      className={`rounded-2xl shadow-sm border overflow-hidden mb-6 animate-in fade-in zoom-in-95 duration-300 print:mb-0 print:border-none print:shadow-none print:w-full print:p-0 ${isDarkMode ? "bg-slate-800 border-slate-700" : "bg-white border-slate-200"}`}
                     >
                       <div className="hidden print:block font-black text-[14px] uppercase border-b-[3px] border-black pb-2 tracking-widest mt-4 mb-4 text-black">
                         PROFESSOR:{" "}

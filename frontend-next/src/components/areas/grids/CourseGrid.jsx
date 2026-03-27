@@ -87,8 +87,8 @@ export const CourseGrid = React.memo(
     return (
       <React.Fragment>
       <DragDropContext onDragStart={onDragStart} onDragEnd={onDragEnd}>
-        <div className={`flex flex-col lg:flex-row gap-6 w-full ${appMode === 'professor' ? 'max-w-full' : 'max-w-7xl'} mx-auto px-2 sm:px-6 mt-6 transition-all duration-500`}>
-          <div className="flex-1 space-y-6">
+        <div className={`flex flex-col lg:flex-row gap-6 w-full ${appMode === 'professor' ? 'max-w-full' : 'max-w-7xl'} mx-auto px-2 sm:px-6 mt-6 transition-all duration-500 print:w-full print:max-w-none print:m-0 print:p-0 print:block`}>
+          <div className="flex-1 space-y-6 print:w-full print:max-w-none">
             {(() => {
               if (availableCourses.length === 0) {
                 return (
@@ -293,7 +293,7 @@ export const CourseGrid = React.memo(
                         ) : (
                           <div
                             key={course}
-                            className={`print:break-inside-avoid print:break-after-page rounded-2xl shadow-sm print:shadow-none border print:border-none overflow-hidden print:overflow-visible mb-6 print:mb-0 animate-in fade-in zoom-in-95 duration-300 ${isDarkMode ? "bg-slate-800 border-slate-700" : "bg-white border-slate-200"}`}
+                            className={`print:break-inside-avoid print:break-after-page rounded-2xl shadow-sm print:shadow-none border print:border-none overflow-hidden print:overflow-visible mb-6 print:mb-0 print:w-full print:max-w-none print:p-0 animate-in fade-in zoom-in-95 duration-300 ${isDarkMode ? "bg-slate-800 border-slate-700" : "bg-white border-slate-200"}`}
                           >
                             <div className="hidden print:block font-black text-[14px] uppercase mb-2 border-b-[3px] border-black pb-2 tracking-widest mt-4 text-black">
                               {course}{" "}

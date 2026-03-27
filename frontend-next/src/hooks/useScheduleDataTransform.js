@@ -139,7 +139,26 @@ export function useScheduleDataTransform({
     if (scheduleMode === 'padrao') return data.filter(r => r.type === 'padrao');
 
     const dbType = scheduleMode === 'consolidado' ? 'oficial' : scheduleMode;
-    return data.filter(r => r.type === dbType);
+    const filtered = data.filter(r => {
+        if (scheduleMode === 'atual' || scheduleMode === 'consolidado') {
+            return r.type === 'oficial' || r.type === 'atual';
+        }
+        return r.type === dbType;
+    });
+
+    if (scheduleMode === 'atual' || scheduleMode === 'consolidado') { // De-duplicação: Preferimos 'atual' sobre 'oficial'
+        const dedupMap = new Map();
+        filtered.forEach(s => {
+           // Use all relevant identifiers for a robust key
+           const key = `${s.week_id || s.weekId}-${s.day || s.dayOfWeek}-${s.time || s.slotId}-${s.className || s.classId}-${s.subject}`;
+           if (!dedupMap.has(key) || s.type === 'atual') { // If key not present, or if current item is 'atual', set it
+               dedupMap.set(key, s);
+           }
+        });
+        return Array.from(dedupMap.values());
+    }
+
+    return filtered;
   }, [activeData, viewMode, scheduleMode]);
 
   return {

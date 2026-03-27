@@ -93,7 +93,7 @@ export function PortalView({
     
     const dbType = scheduleMode === 'consolidado' ? 'oficial' : scheduleMode;
 
-    return schedules.filter(schedule => {
+    const filtered = schedules.filter(schedule => {
       if (String(schedule.academic_year) !== String(selectedConfigYear)) return false;
       const isProductionType = (schedule.type === 'oficial' || schedule.type === 'atual');
       if (scheduleMode === 'atual' || scheduleMode === 'consolidado') {
@@ -104,6 +104,20 @@ export function PortalView({
       if (scheduleMode !== 'padrao' && String(schedule.week_id) !== String(selectedWeek)) return false;
       return true;
     });
+
+    // De-duplicação: Se temos 'oficial' e 'atual' no mesmo slot, preferimos 'atual'
+    if (scheduleMode === 'atual' || scheduleMode === 'consolidado') {
+        const dedupMap = new Map();
+        filtered.forEach(s => {
+           const key = `${s.week_id || s.weekId}-${s.day || s.dayOfWeek}-${s.time || s.slotId}-${s.className || s.classId}-${s.subject}`;
+           if (!dedupMap.has(key) || s.type === 'atual') {
+               dedupMap.set(key, s);
+           }
+        });
+        return Array.from(dedupMap.values());
+    }
+
+    return filtered;
   }, [schedules, selectedConfigYear, scheduleMode, selectedWeek]);
 
   const [editorModal, setEditorModal] = useState(null);
@@ -576,11 +590,24 @@ export function PortalView({
     }
 
     // 1. Atual (Minha Turma - filtra as semanas válidas e o SIAPE)
-    const rawItemsForAtual = (schedules || []).filter(s => 
+    const rawItemsFiltered = (schedules || []).filter(s => 
       (s.type === 'oficial' || s.type === 'atual') && 
       validWeekIds.includes(String(s.week_id)) &&
       s.teacherId && String(s.teacherId).split(',').includes(String(siape))
-    ).map(s => enrichScheduleItem(s)).filter(Boolean);
+    );
+
+    // De-duplicação: Preferimos 'atual' sobre 'oficial'
+    const dedupMap = new Map();
+    rawItemsFiltered.forEach(s => {
+       const key = `${s.week_id}-${s.day}-${s.time}-${s.className}-${s.subject}`;
+       if (!dedupMap.has(key) || s.type === 'atual') {
+           dedupMap.set(key, s);
+       }
+    });
+
+    const rawItemsForAtual = Array.from(dedupMap.values())
+      .map(s => enrichScheduleItem(s))
+      .filter(Boolean);
 
     // Removemos os dias que já passaram da semana ATUAL, para limpar o dashboard
     const atualRaw = rawItemsForAtual.filter(s => {
