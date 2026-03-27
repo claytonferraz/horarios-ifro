@@ -1,7 +1,7 @@
 import React, { useState, useTransition } from 'react';
 import { 
   Calendar, UserCircle, Layers, AlertTriangle, BarChart3, ListTodo, CalendarDays, Settings, Bell, Sun, RefreshCcw, HandHeart, X, ExternalLink, Scissors, MapPin, Monitor, Mail, MessageCircle,
-  BookOpen, FileText, Users, CheckCircle, AlertCircle, XCircle, Eye, Clock, Check, Printer
+  BookOpen, FileText, Users, CheckCircle, AlertCircle, XCircle, Eye, Clock, Check, Printer, Home
 } from 'lucide-react';
 import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd';
 import { SearchableSelect } from '../ui/SearchableSelect';
@@ -95,6 +95,7 @@ export function PortalView({
       return true;
     });
   }, [schedules, selectedConfigYear, scheduleMode, selectedWeek]);
+
   const [editorModal, setEditorModal] = useState(null);
   const [showOnlyMyClasses, setShowOnlyMyClasses] = useState(true);
   const [showEmptySlots, setShowEmptySlots] = useState(false);
@@ -123,6 +124,7 @@ export function PortalView({
   }, [appMode]);
 
   const [showVacantInMyClasses, setShowVacantInMyClasses] = useState(false);
+  const [dashboardTab, setDashboardTab] = useState('atual');
   const [vacantRequestModal, setVacantRequestModal] = useState(null);
   const [teacherDirectModal, setTeacherDirectModal] = useState(null);
   const [alertModal, setAlertModal] = useState(null);
@@ -475,7 +477,47 @@ export function PortalView({
        });
    }, [horariosFiltrados, dbClasses, dbCourses, disciplinesMeta, subjectHoursMeta, globalTeachers, matrixDisciplinesMap]);
 
-   const lastAutoSelectContext = React.useRef({ week: null, role: null });
+  const teacherSummary = React.useMemo(() => {
+    if (!siape || !mappedSchedules || !schedules) return { atual: [], previa: [], vagas: [] };
+    
+    const dayFullLabels = { 'seg': 'Segunda', 'ter': 'Terça', 'qua': 'Quarta', 'qui': 'Quinta', 'sex': 'Sexta', 'sab': 'Sábado', 'dom': 'Domingo' };
+    const dayOrder = { 'seg': 1, 'ter': 2, 'qua': 3, 'qui': 4, 'sex': 5, 'sab': 6, 'dom': 7 };
+
+    // 1. Atual: Current week context
+    const atual = mappedSchedules.filter(s => 
+      s.teacherId && String(s.teacherId).split(',').includes(String(siape))
+    ).sort((a,b) => {
+      if (dayOrder[a.day] !== dayOrder[b.day]) return dayOrder[a.day] - dayOrder[b.day];
+      return a.time.localeCompare(b.time);
+    }).map(a => ({...a, dayLabel: dayFullLabels[a.day] || a.day}));
+
+    // 2. Prévia: Next weeks (using raw schedules to avoid current week filtering)
+    const previa = schedules.filter(s => 
+      s.type === 'previa' && s.teacherId && String(s.teacherId).split(',').includes(String(siape)) && String(s.academic_year) === String(selectedConfigYear)
+    ).map(s => {
+       const classObj = dbClasses.find(c => String(c.id) === String(s.classId));
+       const dCode = isNaN(s.dayOfWeek) ? String(s.dayOfWeek) : String(MAP_DAYS[s.dayOfWeek]);
+       return {
+         dayLabel: dayFullLabels[dCode] || dCode,
+         time: s.slotId,
+         className: classObj ? classObj.name : s.classId,
+         day: dCode
+       };
+    }).sort((a,b) => {
+      if (dayOrder[a.day] !== dayOrder[b.day]) return dayOrder[a.day] - dayOrder[b.day];
+      return a.time.localeCompare(b.time);
+    });
+
+    // 3. Vagas: In classes where teacher teaches
+    const myClassIds = new Set(atual.map(s => String(s.classId)));
+    const vagas = mappedSchedules.filter(s => 
+      (!s.teacherId || s.teacherId === 'A Definir' || s.teacherId === '') && myClassIds.has(String(s.classId))
+    ).map(a => ({...a, dayLabel: dayFullLabels[a.day] || a.day}));
+
+    return { atual, previa, vagas };
+  }, [siape, mappedSchedules, schedules, dbClasses, selectedConfigYear]);
+
+  const lastAutoSelectContext = React.useRef({ week: null, role: null });
 
    React.useEffect(() => {
      if (!mappedSchedules || mappedSchedules.length === 0) return;
@@ -766,99 +808,169 @@ export function PortalView({
   return (
     <>
         {/* LINKS RÁPIDOS E FERRAMENTAS - SEMPRE VISÍVEL PARA PROFESSOR LOGADO NO TOPO */}
-        {appMode === 'professor' && !selectedColleague && (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4 mb-10 no-print animate-in duration-1000 slide-in-from-top-4">
-            
-            {/* SEI */}
-            <a href="https://sip.ifro.edu.br/sip/login.php?sigla_orgao_sistema=IFRO&sigla_sistema=SEI&infra_url=L3NlaS8=" target="_blank" rel="noopener noreferrer" 
-               className={`group relative flex items-center gap-4 p-4 rounded-3xl border transition-all duration-500 overflow-hidden ${isDarkMode ? 'bg-slate-900 border-slate-800 hover:bg-slate-800/80 hover:scale-[1.02] hover:shadow-2xl shadow-indigo-900/10' : 'bg-white border-slate-100 shadow-xl shadow-slate-200/50 hover:shadow-2xl hover:scale-[1.02]'}`}>
-               <div className={`p-3 rounded-2xl transition-all duration-500 ${isDarkMode ? 'bg-indigo-950 text-indigo-400 group-hover:bg-indigo-600 group-hover:text-white group-hover:shadow-[0_0_20px_rgba(79,70,229,0.4)]' : 'bg-indigo-50 text-indigo-600 group-hover:bg-indigo-600 group-hover:text-white group-hover:shadow-[0_0_20px_rgba(79,70,229,0.2)]'}`}>
-                  <FileText size={20} className="transition-transform duration-500 group-hover:rotate-12" />
-               </div>
-               <div className="flex flex-col">
-                 <h4 className={`text-[10px] font-black uppercase tracking-widest leading-none ${isDarkMode ? 'text-slate-200' : 'text-slate-900'}`}>Acesso ao SEI</h4>
-                 <p className="text-[8px] font-bold text-slate-500 mt-1 uppercase tracking-tighter opacity-80">Documentos</p>
-               </div>
-               <div className="absolute -bottom-3 -right-3 opacity-[0.03] group-hover:opacity-[0.08] group-hover:scale-110 transition-all duration-700 pointer-events-none">
-                  <FileText size={70} />
-               </div>
-            </a>
+        {/* DASHBOARD DOCENTE (VIEW PRINCIPAL) */}
+        {appMode === 'professor' && viewMode === 'dashboard' && (
+           <div className="space-y-12 animate-in fade-in zoom-in duration-700 no-print">
+              
+              {/* Grid de Funcionalidades Principais */}
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-6">
+                
+                {/* 1. Meu Horário */}
+                <button onClick={() => { setViewMode('professor'); if(typeof setSelectedTeacher === 'function') setSelectedTeacher(siape); }} 
+                        className={`group p-8 rounded-[2.5rem] border text-left transition-all hover:scale-[1.02] active:scale-95 ${isDarkMode ? 'bg-slate-800 border-slate-700 hover:border-indigo-500/50 hover:shadow-2xl hover:shadow-indigo-500/10' : 'bg-white border-slate-200 hover:border-indigo-300 hover:shadow-2xl hover:shadow-indigo-500/5'}`}>
+                  <div className={`w-14 h-14 rounded-2xl flex items-center justify-center mb-6 transition-colors ${isDarkMode ? 'bg-indigo-950 text-indigo-400 group-hover:bg-indigo-600 group-hover:text-white' : 'bg-indigo-50 text-indigo-600 group-hover:bg-indigo-600 group-hover:text-white'}`}>
+                    <UserCircle size={28} />
+                  </div>
+                  <h3 className={`text-xl font-black mb-2 ${isDarkMode ? 'text-white' : 'text-slate-800'}`}>Meu Horário</h3>
+                  <p className={`text-sm font-medium ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>Visualize sua grade individual, acompanhe aulas dadas e horários previstos.</p>
+                </button>
 
-            {/* MEUS DIÁRIOS (SUAP) */}
-            <a href="https://suap.ifro.edu.br/edu/meus_diarios/" target="_blank" rel="noopener noreferrer" 
-               className={`group relative flex items-center gap-4 p-4 rounded-3xl border transition-all duration-500 overflow-hidden ${isDarkMode ? 'bg-slate-900 border-slate-800 hover:bg-slate-800/80 hover:scale-[1.02] hover:shadow-2xl shadow-emerald-900/10' : 'bg-white border-slate-100 shadow-xl shadow-slate-200/50 hover:shadow-2xl hover:scale-[1.02]'}`}>
-               <div className={`p-3 rounded-2xl transition-all duration-500 ${isDarkMode ? 'bg-emerald-950 text-emerald-400 group-hover:bg-emerald-600 group-hover:text-white group-hover:shadow-[0_0_20px_rgba(16,185,129,0.4)]' : 'bg-emerald-50 text-emerald-600 group-hover:bg-emerald-600 group-hover:text-white group-hover:shadow-[0_0_20px_rgba(16,185,129,0.2)]'}`}>
-                  <BookOpen size={20} className="transition-transform duration-500 group-hover:-rotate-12" />
-               </div>
-               <div className="flex flex-col">
-                 <h4 className={`text-[10px] font-black uppercase tracking-widest leading-none ${isDarkMode ? 'text-slate-200' : 'text-slate-900'}`}>Meus Diários</h4>
-                 <p className="text-[8px] font-bold text-slate-500 mt-1 uppercase tracking-tighter opacity-80">SUAP Diários</p>
-               </div>
-               <div className="absolute -bottom-3 -right-3 opacity-[0.03] group-hover:opacity-[0.08] group-hover:scale-110 transition-all duration-700 pointer-events-none">
-                  <BookOpen size={70} />
-               </div>
-            </a>
+                {/* 2. Resumo do Horário (Abas Dinâmicas) */}
+                <div className={`group flex flex-col p-8 rounded-[2.5rem] border text-left transition-all hover:scale-[1.01] ${isDarkMode ? 'bg-slate-900/50 border-slate-700 hover:border-blue-500/50 hover:shadow-2xl' : 'bg-blue-50/20 border-slate-200 hover:border-blue-300 hover:shadow-2xl'}`}>
+                  <div className="flex items-center justify-between mb-6">
+                    <div className={`w-12 h-12 rounded-2xl flex items-center justify-center transition-colors ${isDarkMode ? 'bg-blue-950 text-blue-400' : 'bg-white text-blue-600 shadow-sm'}`}>
+                      <Clock size={24} />
+                    </div>
+                    {/* Switcher de Abas Interno */}
+                    <div className={`flex p-1 rounded-xl gap-1 ${isDarkMode ? 'bg-slate-800' : 'bg-slate-100'}`}>
+                       <button onClick={() => setDashboardTab('atual')} className={`px-3 py-1.5 rounded-lg text-[8px] font-black uppercase tracking-tight transition-all ${dashboardTab === 'atual' ? 'bg-white dark:bg-slate-600 text-blue-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>Agora</button>
+                       <button onClick={() => setDashboardTab('previa')} className={`px-3 py-1.5 rounded-lg text-[8px] font-black uppercase tracking-tight transition-all ${dashboardTab === 'previa' ? 'bg-white dark:bg-slate-600 text-blue-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>Prévia</button>
+                       <button onClick={() => setDashboardTab('vagas')} className={`px-3 py-1.5 rounded-lg text-[8px] font-black uppercase tracking-tight transition-all ${dashboardTab === 'vagas' ? 'bg-white dark:bg-slate-600 text-blue-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>Vagas</button>
+                    </div>
+                  </div>
+                  
+                  <h3 className={`text-lg font-black mb-4 ${isDarkMode ? 'text-white' : 'text-slate-800'}`}>
+                    {dashboardTab === 'atual' ? 'Semana Atual' : dashboardTab === 'previa' ? 'Próximas Semanas' : 'Vagas nas Turmas'}
+                  </h3>
 
-            {/* GMAIL */}
-            <a href="https://mail.google.com/" target="_blank" rel="noopener noreferrer" 
-               className={`group relative flex items-center gap-4 p-4 rounded-3xl border transition-all duration-500 overflow-hidden ${isDarkMode ? 'bg-slate-900 border-slate-800 hover:bg-rose-900/20 hover:scale-[1.02] hover:shadow-2xl shadow-rose-900/10' : 'bg-white border-slate-100 shadow-xl shadow-slate-200/50 hover:shadow-2xl hover:scale-[1.02]'}`}>
-               <div className={`p-3 rounded-2xl transition-all duration-500 ${isDarkMode ? 'bg-rose-950 text-rose-400 group-hover:bg-rose-600 group-hover:text-white group-hover:shadow-[0_0_20px_rgba(225,29,72,0.4)]' : 'bg-rose-50 text-rose-600 group-hover:bg-rose-600 group-hover:text-white group-hover:shadow-[0_0_20px_rgba(225,29,72,0.2)]'}`}>
-                  <Mail size={20} className="transition-transform duration-500 group-hover:scale-110" />
-               </div>
-               <div className="flex flex-col">
-                 <h4 className={`text-[10px] font-black uppercase tracking-widest leading-none ${isDarkMode ? 'text-slate-200' : 'text-slate-900'}`}>Gmail IFRO</h4>
-                 <p className="text-[8px] font-bold text-slate-500 mt-1 uppercase tracking-tighter opacity-80">E-mail Institucional</p>
-               </div>
-               <div className="absolute -bottom-3 -right-3 opacity-[0.03] group-hover:opacity-[0.08] group-hover:scale-110 transition-all duration-700 pointer-events-none">
-                  <Mail size={70} />
-               </div>
-            </a>
+                  <div className="flex-1 max-h-[180px] overflow-y-auto pr-2 custom-scrollbar space-y-2">
+                    {teacherSummary[dashboardTab] && teacherSummary[dashboardTab].length > 0 ? (
+                      teacherSummary[dashboardTab].map((aula, idx) => (
+                        <div key={idx} className={`flex items-center justify-between p-3 rounded-2xl border transition-all ${isDarkMode ? 'bg-slate-800/40 border-slate-700/50 hover:bg-slate-800' : 'bg-white/80 border-blue-50 hover:bg-white shadow-sm'}`}>
+                          <div className="flex flex-col">
+                            <span className={`text-[9px] font-black uppercase tracking-wider ${isDarkMode ? 'text-blue-400' : 'text-blue-600'}`}>{aula.dayLabel}</span>
+                            <span className={`text-[11px] font-black tracking-tight ${isDarkMode ? 'text-slate-200' : 'text-slate-900'}`}>{aula.time}</span>
+                          </div>
+                          <div className="flex flex-col items-end">
+                            <span className={`px-2.5 py-1 rounded-lg text-[8px] font-black uppercase tracking-widest ${isDarkMode ? 'bg-slate-900 text-slate-400' : 'bg-blue-50 text-blue-800'}`}>
+                              {aula.className}
+                            </span>
+                            {dashboardTab === 'vagas' && (
+                              <span className="text-[7px] font-bold text-emerald-500 mt-0.5 uppercase tracking-tighter">Disponível</span>
+                            )}
+                          </div>
+                        </div>
+                      ))
+                    ) : (
+                      <div className="flex flex-col items-center justify-center py-8 opacity-40">
+                         <AlertCircle size={24} className="mb-2" />
+                         <p className="text-[10px] font-black uppercase tracking-widest text-center">Nenhum registro para esta categoria</p>
+                      </div>
+                    )}
+                  </div>
+                </div>
 
-            {/* WHATSAPP DAPE */}
-            <a href="https://wa.me/556921836926" target="_blank" rel="noopener noreferrer" 
-               className={`group relative flex items-center gap-4 p-4 rounded-3xl border transition-all duration-500 overflow-hidden ${isDarkMode ? 'bg-slate-900 border-slate-800 hover:bg-green-900/20 hover:scale-[1.02] hover:shadow-2xl shadow-green-900/10' : 'bg-white border-slate-100 shadow-xl shadow-slate-200/50 hover:shadow-2xl hover:scale-[1.02]'}`}>
-               <div className={`p-3 rounded-2xl transition-all duration-500 ${isDarkMode ? 'bg-green-950 text-green-400 group-hover:bg-green-600 group-hover:text-white group-hover:shadow-[0_0_20px_rgba(22,163,74,0.4)]' : 'bg-green-50 text-green-600 group-hover:bg-green-600 group-hover:text-white group-hover:shadow-[0_0_20px_rgba(22,163,74,0.2)]'}`}>
-                  <MessageCircle size={20} className="transition-transform duration-500 group-hover:rotate-6" />
-               </div>
-               <div className="flex flex-col">
-                 <h4 className={`text-[10px] font-black uppercase tracking-widest leading-none ${isDarkMode ? 'text-slate-200' : 'text-slate-900'}`}>WhatsApp DAPE</h4>
-                 <p className="text-[8px] font-bold text-slate-500 mt-1 uppercase tracking-tighter opacity-80">(69) 2183-6926</p>
-               </div>
-               <div className="absolute -bottom-3 -right-3 opacity-[0.03] group-hover:opacity-[0.08] group-hover:scale-110 transition-all duration-700 pointer-events-none">
-                  <MessageCircle size={70} />
-               </div>
-            </a>
+                {/* 2. Permutas e Reposições */}
+                <button onClick={() => { setViewMode('curso'); if (siape) { setPadraoFilterTeacher(siape); setShowOnlyMyClasses(false); } }} 
+                        className={`group p-8 rounded-[2.5rem] border text-left transition-all hover:scale-[1.02] active:scale-95 ${isDarkMode ? 'bg-slate-800 border-slate-700 hover:border-emerald-500/50 hover:shadow-2xl hover:shadow-emerald-500/10' : 'bg-white border-slate-200 hover:border-emerald-300 hover:shadow-2xl hover:shadow-emerald-500/5'}`}>
+                  <div className={`w-14 h-14 rounded-2xl flex items-center justify-center mb-6 transition-colors ${isDarkMode ? 'bg-emerald-950 text-emerald-400 group-hover:bg-emerald-600 group-hover:text-white' : 'bg-emerald-50 text-emerald-600 group-hover:bg-emerald-600 group-hover:text-white'}`}>
+                    <Layers size={28} />
+                  </div>
+                  <h3 className={`text-xl font-black mb-2 ${isDarkMode ? 'text-white' : 'text-slate-800'}`}>Permutas</h3>
+                  <p className={`text-sm font-medium ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>Solicite trocas de horários com colegas ou assuma aulas vagas publicadas.</p>
+                </button>
 
-            {/* AGENDAR SALAS */}
-            <a href="https://suap.ifro.edu.br/admin/comum/sala/?agendavel__exact=1&all=&predio__uo=7&tab=tab_any_data" target="_blank" rel="noopener noreferrer" 
-               className={`group relative flex items-center gap-4 p-4 rounded-3xl border transition-all duration-500 overflow-hidden ${isDarkMode ? 'bg-slate-900 border-slate-800 hover:bg-slate-800/80 hover:scale-[1.02] hover:shadow-2xl shadow-blue-900/10' : 'bg-white border-slate-100 shadow-xl shadow-slate-200/50 hover:shadow-2xl hover:scale-[1.02]'}`}>
-               <div className={`p-3 rounded-2xl transition-all duration-500 ${isDarkMode ? 'bg-blue-950 text-blue-400 group-hover:bg-blue-600 group-hover:text-white group-hover:shadow-[0_0_20px_rgba(37,99,235,0.4)]' : 'bg-blue-50 text-blue-600 group-hover:bg-blue-600 group-hover:text-white group-hover:shadow-[0_0_20px_rgba(37,99,235,0.2)]'}`}>
-                  <MapPin size={20} className="transition-transform duration-500 group-hover:translate-y-[-2px]" />
-               </div>
-               <div className="flex flex-col">
-                 <h4 className={`text-[10px] font-black uppercase tracking-widest leading-none ${isDarkMode ? 'text-slate-200' : 'text-slate-900'}`}>Agendar Salas</h4>
-                 <p className="text-[8px] font-bold text-slate-500 mt-1 uppercase tracking-tighter opacity-80">Ambientes SUAP</p>
-               </div>
-               <div className="absolute -bottom-3 -right-3 opacity-[0.03] group-hover:opacity-[0.08] group-hover:scale-110 transition-all duration-700 pointer-events-none">
-                  <MapPin size={70} />
-               </div>
-            </a>
+                {/* 3. Solicitações */}
+                <button onClick={() => setViewMode('solicitacoes')} 
+                        className={`group p-8 rounded-[2.5rem] border text-left transition-all hover:scale-[1.02] active:scale-95 ${isDarkMode ? 'bg-slate-800 border-slate-700 hover:border-amber-500/50 hover:shadow-2xl hover:shadow-amber-500/10' : 'bg-white border-slate-200 hover:border-amber-300 hover:shadow-2xl hover:shadow-amber-500/5'}`}>
+                  <div className={`w-14 h-14 rounded-2xl flex items-center justify-center mb-6 transition-colors ${isDarkMode ? 'bg-amber-950 text-amber-400 group-hover:bg-amber-600 group-hover:text-white' : 'bg-amber-50 text-amber-600 group-hover:bg-amber-600 group-hover:text-white'}`}>
+                    <Bell size={28} />
+                  </div>
+                  <h3 className={`text-xl font-black mb-2 ${isDarkMode ? 'text-white' : 'text-slate-800'}`}>Solicitações</h3>
+                  <p className={`text-sm font-medium ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>Gerencie seus pedidos de permutas enviados e recebidos, e notificações da DAPE.</p>
+                </button>
 
-            {/* LABORATORIOS */}
-            <a href="https://docs.google.com/spreadsheets/d/1k9Tyy_2pYsJyRKeSq3NpSpXHzUoPigyweyRUHGiAbW4/edit?gid=176889928#gid=176889928" target="_blank" rel="noopener noreferrer" 
-               className={`group relative flex items-center gap-4 p-4 rounded-3xl border transition-all duration-500 overflow-hidden ${isDarkMode ? 'bg-slate-900 border-slate-800 hover:bg-slate-800/80 hover:scale-[1.02] hover:shadow-2xl shadow-amber-900/10' : 'bg-white border-slate-100 shadow-xl shadow-slate-200/50 hover:shadow-2xl hover:scale-[1.02]'}`}>
-               <div className={`p-3 rounded-2xl transition-all duration-500 ${isDarkMode ? 'bg-amber-950 text-amber-400 group-hover:bg-amber-600 group-hover:text-white group-hover:shadow-[0_0_20px_rgba(217,119,6,0.4)]' : 'bg-amber-50 text-amber-600 group-hover:bg-amber-600 group-hover:text-white group-hover:shadow-[0_0_20px_rgba(217,119,6,0.2)]'}`}>
-                  <Monitor size={20} className="transition-transform duration-500 group-hover:scale-110" />
-               </div>
-               <div className="flex flex-col">
-                 <h4 className={`text-[10px] font-black uppercase tracking-widest leading-none ${isDarkMode ? 'text-slate-200' : 'text-slate-900'}`}>Laboratórios</h4>
-                 <p className="text-[8px] font-bold text-slate-500 mt-1 uppercase tracking-tighter opacity-80">Reserva de Labs</p>
-               </div>
-               <div className="absolute -bottom-3 -right-3 opacity-[0.03] group-hover:opacity-[0.08] group-hover:scale-110 transition-all duration-700 pointer-events-none">
-                  <Monitor size={70} />
-               </div>
-            </a>
-          </div>
+                {/* 4. Controle de Aulas */}
+                <button onClick={() => setViewMode('total')} 
+                        className={`group p-8 rounded-[2.5rem] border text-left transition-all hover:scale-[1.02] active:scale-95 ${isDarkMode ? 'bg-slate-800 border-slate-700 hover:border-rose-500/50 hover:shadow-2xl hover:shadow-rose-500/10' : 'bg-white border-slate-200 hover:border-rose-300 hover:shadow-2xl hover:shadow-rose-500/5'}`}>
+                  <div className={`w-14 h-14 rounded-2xl flex items-center justify-center mb-6 transition-colors ${isDarkMode ? 'bg-rose-950 text-rose-400 group-hover:bg-rose-600 group-hover:text-white' : 'bg-rose-50 text-rose-600 group-hover:bg-rose-600 group-hover:text-white'}`}>
+                    <BarChart3 size={28} />
+                  </div>
+                  <h3 className={`text-xl font-black mb-2 ${isDarkMode ? 'text-white' : 'text-slate-800'}`}>Controle</h3>
+                  <p className={`text-sm font-medium ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>Relatório consolidado de horas-aula, faltas e reposições pendentes no semestre.</p>
+                </button>
+
+              </div>
+
+              {/* Links Externos e Institucionais (Cards Menores) */}
+              <div className="space-y-6">
+                <h3 className={`text-xs font-black uppercase tracking-[0.2em] opacity-50 ml-4 ${isDarkMode ? 'text-white' : 'text-slate-800'}`}>Sistemas Institucionais</h3>
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4">
+                  
+                  {/* SUAP */}
+                  <a href="https://suap.ifro.edu.br/" target="_blank" rel="noopener noreferrer" 
+                     className={`group relative flex items-center gap-4 p-5 rounded-3xl border transition-all duration-500 overflow-hidden ${isDarkMode ? 'bg-slate-900 border-slate-800 hover:bg-emerald-900/20 hover:scale-[1.02] hover:shadow-2xl' : 'bg-white border-slate-100 shadow-xl shadow-slate-200/50 hover:shadow-2xl hover:scale-[1.02]'}`}>
+                     <div className={`p-3 rounded-2xl transition-all duration-500 ${isDarkMode ? 'bg-emerald-950 text-emerald-400 group-hover:bg-emerald-600 group-hover:text-white' : 'bg-emerald-50 text-emerald-600 group-hover:bg-emerald-600 group-hover:text-white'}`}>
+                        <Users size={20} />
+                     </div>
+                     <div className="flex flex-col">
+                       <h4 className={`text-[10px] font-black uppercase tracking-widest leading-none ${isDarkMode ? 'text-slate-200' : 'text-slate-900'}`}>SUAP IFRO</h4>
+                       <p className="text-[8px] font-bold text-slate-500 mt-1 uppercase tracking-tighter opacity-80">Portal do Servidor</p>
+                     </div>
+                  </a>
+
+                  {/* AVA */}
+                  <a href="https://virtual.ifro.edu.br/jiparana/" target="_blank" rel="noopener noreferrer" 
+                     className={`group relative flex items-center gap-4 p-5 rounded-3xl border transition-all duration-500 overflow-hidden ${isDarkMode ? 'bg-slate-900 border-slate-800 hover:bg-indigo-900/20 hover:scale-[1.02] hover:shadow-2xl' : 'bg-white border-slate-100 shadow-xl shadow-slate-200/50 hover:shadow-2xl hover:scale-[1.02]'}`}>
+                     <div className={`p-3 rounded-2xl transition-all duration-500 ${isDarkMode ? 'bg-indigo-950 text-indigo-400 group-hover:bg-indigo-600 group-hover:text-white' : 'bg-indigo-50 text-indigo-600 group-hover:bg-indigo-600 group-hover:text-white'}`}>
+                        <BookOpen size={20} />
+                     </div>
+                     <div className="flex flex-col">
+                       <h4 className={`text-[10px] font-black uppercase tracking-widest leading-none ${isDarkMode ? 'text-slate-200' : 'text-slate-900'}`}>Ambiente Virtual</h4>
+                       <p className="text-[8px] font-bold text-slate-500 mt-1 uppercase tracking-tighter opacity-80">AVA / Moodle</p>
+                     </div>
+                  </a>
+
+                  {/* SEI */}
+                  <a href="https://sei.ifro.edu.br/" target="_blank" rel="noopener noreferrer" 
+                     className={`group relative flex items-center gap-4 p-5 rounded-3xl border transition-all duration-500 overflow-hidden ${isDarkMode ? 'bg-slate-900 border-slate-800 hover:bg-blue-900/20 hover:scale-[1.02] hover:shadow-2xl' : 'bg-white border-slate-100 shadow-xl shadow-slate-200/50 hover:shadow-2xl hover:scale-[1.02]'}`}>
+                     <div className={`p-3 rounded-2xl transition-all duration-500 ${isDarkMode ? 'bg-blue-950 text-blue-400 group-hover:bg-blue-600 group-hover:text-white' : 'bg-blue-50 text-blue-600 group-hover:bg-blue-600 group-hover:text-white'}`}>
+                        <FileText size={20} />
+                     </div>
+                     <div className="flex flex-col">
+                       <h4 className={`text-[10px] font-black uppercase tracking-widest leading-none ${isDarkMode ? 'text-slate-200' : 'text-slate-900'}`}>Processos SEI</h4>
+                       <p className="text-[8px] font-bold text-slate-500 mt-1 uppercase tracking-tighter opacity-80">Documentos Oficiais</p>
+                     </div>
+                  </a>
+
+                  {/* GMAIL */}
+                  <a href="https://mail.google.com/" target="_blank" rel="noopener noreferrer" 
+                     className={`group relative flex items-center gap-4 p-5 rounded-3xl border transition-all duration-500 overflow-hidden ${isDarkMode ? 'bg-slate-900 border-slate-800 hover:bg-rose-900/20 hover:scale-[1.02] hover:shadow-2xl' : 'bg-white border-slate-100 shadow-xl shadow-slate-200/50 hover:shadow-2xl hover:scale-[1.02]'}`}>
+                     <div className={`p-3 rounded-2xl transition-all duration-500 ${isDarkMode ? 'bg-rose-950 text-rose-400 group-hover:bg-rose-600 group-hover:text-white' : 'bg-rose-50 text-rose-600 group-hover:bg-rose-600 group-hover:text-white'}`}>
+                        <Mail size={20} />
+                     </div>
+                     <div className="flex flex-col">
+                       <h4 className={`text-[10px] font-black uppercase tracking-widest leading-none ${isDarkMode ? 'text-slate-200' : 'text-slate-900'}`}>E-mail Gov</h4>
+                       <p className="text-[8px] font-bold text-slate-500 mt-1 uppercase tracking-tighter opacity-80">Gmail Institucional</p>
+                     </div>
+                  </a>
+
+                  {/* WHATSAPP */}
+                  <a href="https://wa.me/556921836926" target="_blank" rel="noopener noreferrer" 
+                     className={`group relative flex items-center gap-4 p-5 rounded-3xl border transition-all duration-500 overflow-hidden ${isDarkMode ? 'bg-slate-900 border-slate-800 hover:bg-green-900/20 hover:scale-[1.02] hover:shadow-2xl' : 'bg-white border-slate-100 shadow-xl shadow-slate-200/50 hover:shadow-2xl hover:scale-[1.02]'}`}>
+                     <div className={`p-3 rounded-2xl transition-all duration-500 ${isDarkMode ? 'bg-green-950 text-green-400 group-hover:bg-green-600 group-hover:text-white' : 'bg-green-50 text-green-600 group-hover:bg-green-600 group-hover:text-white'}`}>
+                        <MessageCircle size={20} />
+                     </div>
+                     <div className="flex flex-col">
+                       <h4 className={`text-[10px] font-black uppercase tracking-widest leading-none ${isDarkMode ? 'text-slate-200' : 'text-slate-900'}`}>Suporte DAPE</h4>
+                       <p className="text-[8px] font-bold text-slate-500 mt-1 uppercase tracking-tighter opacity-80">Atendimento 24h</p>
+                     </div>
+                  </a>
+
+                </div>
+              </div>
+
+           </div>
         )}
 
         {/* DASHBOARD HEADER: LINKS ALUNO (UX PREMIUM - MOBILE OPTIMIZED) */}
@@ -924,7 +1036,7 @@ export function PortalView({
           <div className="space-y-4 animate-in fade-in duration-700">
             
             {/* ABAS E FILTROS */}
-            <div className={`rounded-2xl shadow-sm border p-4 space-y-4 no-print print:hidden ${isDarkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'}`}>
+            <div className={`rounded-2xl shadow-sm border p-4 space-y-4 no-print print:hidden ${viewMode === 'dashboard' && appMode === 'professor' ? 'hidden' : ''} ${isDarkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'}`}>
               
               {/* Nível 1: Tipos de Visão (Adaptável por Perfil) */}
               <div className={`flex items-center justify-between border-b pb-3 ${isDarkMode ? 'border-slate-700' : 'border-slate-100'}`}>
@@ -932,6 +1044,11 @@ export function PortalView({
                   
                   {appMode === 'professor' && (
                     <>
+                      <button onClick={() => setViewMode('dashboard')} 
+                              className={"flex flex-1 sm:flex-none min-w-[130px] items-center justify-center gap-2 px-4 py-3 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all " + (viewMode === 'dashboard' ? 'bg-slate-700 text-white shadow-lg' : (isDarkMode ? 'bg-slate-800 text-slate-300 hover:text-white hover:bg-slate-700' : 'bg-white text-slate-600 border border-slate-200 hover:text-slate-900'))}>
+                        <Home size={14} /> Dashboard
+                      </button>
+
                       <button onClick={() => { setViewMode('professor'); if(['servidor', 'admin', 'gestao'].includes(userRole) && typeof setSelectedTeacher === 'function') setSelectedTeacher(siape); setSelectedColleague(''); }} 
                               className={"flex flex-1 sm:flex-none min-w-[130px] items-center justify-center gap-2 px-4 py-3 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all " + (viewMode === 'professor' && !selectedColleague ? 'bg-indigo-600 text-white shadow-lg ring-2 ring-indigo-400/50' : (isDarkMode ? 'bg-slate-800 text-slate-300 hover:text-white hover:bg-slate-700' : 'bg-white text-slate-600 border border-slate-200 hover:text-slate-900'))}>
                         <UserCircle size={14} /> Meu Horário
@@ -939,7 +1056,7 @@ export function PortalView({
 
                       <button onClick={() => { setViewMode('curso'); if (siape) { setPadraoFilterTeacher(siape); setShowOnlyMyClasses(false); } }} 
                               className={"flex flex-1 sm:flex-none min-w-[130px] items-center justify-center gap-2 px-4 py-3 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all " + (viewMode === 'curso' ? 'bg-emerald-600 text-white shadow-lg ring-2 ring-emerald-400/50' : (isDarkMode ? 'bg-slate-800 text-slate-300 hover:text-white hover:bg-slate-700' : 'bg-white text-slate-600 border border-slate-200 hover:text-slate-900'))}>
-                        <Layers size={14} /> Permutas e Reposições
+                        <Layers size={14} /> Permutas
                       </button>
 
                       <button onClick={() => setViewMode('solicitacoes')} 
@@ -949,9 +1066,8 @@ export function PortalView({
                       
                       <button onClick={() => setViewMode('total')} 
                               className={"flex flex-1 sm:flex-none min-w-[130px] items-center justify-center gap-2 px-4 py-3 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all " + (viewMode === 'total' ? 'bg-orange-600 text-white shadow-lg ring-2 ring-orange-400/50' : (isDarkMode ? 'bg-slate-800 text-slate-300 hover:text-white hover:bg-slate-700' : 'bg-white text-slate-600 border border-slate-200 hover:text-slate-900'))}>
-                        <BarChart3 size={14} /> Controle de Aulas
+                        <BarChart3 size={14} /> Controle
                       </button>
-
                     </>
                   )}
 
@@ -1073,7 +1189,7 @@ export function PortalView({
           )}
             </div>
 
-            {viewMode !== 'solicitacoes' && (
+            {viewMode !== 'solicitacoes' && viewMode !== 'dashboard' && (
               <React.Fragment>
             {/* OPÇÕES DE BASE DE DADOS (Movido para perto da tabela) */}
             {viewMode !== 'total' && (

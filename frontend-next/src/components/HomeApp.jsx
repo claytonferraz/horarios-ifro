@@ -65,7 +65,7 @@ export function HomeApp({ appMode }) {
   const navigateTo = (mode) => {
     if (mode === 'home') { router.push('/'); setMobileMenuOpen(false); }
     else if (mode === 'aluno') { scheduleState.setViewMode('hoje'); scheduleState.setScheduleMode('oficial'); router.push('/aluno'); setMobileMenuOpen(false); } 
-    else if (mode === 'professor') { scheduleState.setViewMode('professor'); scheduleState.setScheduleMode('oficial'); router.push('/professor'); setMobileMenuOpen(false); } 
+    else if (mode === 'professor') { scheduleState.setViewMode('dashboard'); scheduleState.setScheduleMode('oficial'); router.push('/professor'); setMobileMenuOpen(false); } 
     else if (mode === 'admin') { router.push('/admin'); setAdminTab('dashboard'); setMobileMenuOpen(false); }
     else if (mode === 'gestao_dape') { router.push('/gestao-dape'); setMobileMenuOpen(false); }
     else if (mode === 'servidores') { router.push('/admin/servidores'); setMobileMenuOpen(false); }
