@@ -558,20 +558,33 @@ export function PortalView({
       return `${DayLabel} ${day}/${month}`;
     };
 
-    const groupByDay = (items, weekIdForHeader = null) => {
+    // Helper: Agrupar por Dia + Semana (para evitar que Segunda da próx. semana apareça antes de Sexta desta semana)
+    const groupByDay = (items) => {
       const groups = {};
       items.forEach(item => {
+        const weekId = item.week_id || item.academic_week_id || item.weekId;
         const code = shortDayMap[item.day] || item.day;
-        if (!groups[code]) groups[code] = [];
-        groups[code].push({ ...item, dayCode: code });
+        const groupKey = `${weekId}-${code}`;
+        if (!groups[groupKey]) groups[groupKey] = [];
+        groups[groupKey].push({ ...item, dayCode: code, weekId });
       });
+      
       return Object.entries(groups)
-        .sort((a,b) => (dayOrder[a[0]] || 99) - (dayOrder[b[0]] || 99))
-        .map(([code, items]) => ({
-          dayCode: code,
-          dayLabel: getHeaderLabel(code, weekIdForHeader || items[0]?.week_id || items[0]?.academic_week_id || items[0]?.weekId),
-          items: items.sort((a,b) => a.time.localeCompare(b.time))
-        }));
+        .map(([key, items]) => {
+          const [wId, dCode] = key.split('-');
+          const weekIdx = academicWeeks.findIndex(w => String(w.id) === String(wId));
+          const dayVal = dayOrder[dCode] || 99;
+          const sortVal = (weekIdx !== -1 ? weekIdx * 10 : 999) + dayVal;
+          
+          return {
+            sortVal,
+            dayCode: dCode,
+            weekId: wId,
+            dayLabel: getHeaderLabel(dCode, wId),
+            items: items.sort((a,b) => a.time.localeCompare(b.time))
+          };
+        })
+        .sort((a,b) => a.sortVal - b.sortVal);
     };
 
     // 1. Atual (Lógica de "Agora": Esconder passado, transição no penúltimo dia)
@@ -656,13 +669,24 @@ export function PortalView({
       .map(s => String(s.classId))
     );
 
-    const vagasRaw = (schedules || [])
+    const rawVagasFiltered = (schedules || [])
       .filter(s => 
         (s.type === 'oficial' || s.type === 'atual') && 
         String(s.week_id) === String(dashboardBaseWeekId) &&
         (!s.teacherId || s.teacherId === "0000001" || isTeacherPending(s.teacherId)) && 
         myProdClasses.has(String(s.classId))
-      )
+      );
+    
+    // De-duplicação de Vagas (evitar oficial/atual no mesmo slot de vaga)
+    const dedupVagas = new Map();
+    rawVagasFiltered.forEach(s => {
+       const key = `${s.week_id}-${s.dayOfWeek || s.day}-${s.slotId || s.time}-${s.classId || s.className}-${s.disciplineId || s.subject}`;
+       if (!dedupVagas.has(key) || s.type === 'atual') {
+           dedupVagas.set(key, s);
+       }
+    });
+
+    const vagasRaw = Array.from(dedupVagas.values())
       .map(s => enrichScheduleItem(s))
       .filter(Boolean);
 
@@ -693,20 +717,30 @@ export function PortalView({
       return `${DayLabel} ${day}/${month}`;
     };
 
-    const groupByDay = (items, weekIdForHeader = null) => {
+    const groupByDay = (items) => {
       const groups = {};
       items.forEach(item => {
+        const weekId = item.week_id || item.academic_week_id || item.weekId;
         const code = shortDayMap[item.day] || item.day;
-        if (!groups[code]) groups[code] = [];
-        groups[code].push({ ...item, dayCode: code });
+        const groupKey = `${weekId}-${code}`;
+        if (!groups[groupKey]) groups[groupKey] = [];
+        groups[groupKey].push({ ...item, dayCode: code });
       });
       return Object.entries(groups)
-        .sort((a,b) => (dayOrder[a[0]] || 99) - (dayOrder[b[0]] || 99))
-        .map(([code, items]) => ({
-          dayCode: code,
-          dayLabel: getHeaderLabel(code, weekIdForHeader || items[0]?.week_id || items[0]?.academic_week_id || items[0]?.weekId),
-          items: items.sort((a,b) => a.time.localeCompare(b.time))
-        }));
+        .map(([key, items]) => {
+          const [wId, dCode] = key.split('-');
+          const weekIdx = academicWeeks.findIndex(w => String(w.id) === String(wId));
+          const dayVal = dayOrder[dCode] || 99;
+          const sortVal = (weekIdx !== -1 ? weekIdx * 10 : 999) + dayVal;
+          
+          return {
+            sortVal,
+            dayCode: dCode,
+            dayLabel: getHeaderLabel(dCode, wId),
+            items: items.sort((a,b) => a.time.localeCompare(b.time))
+          };
+        })
+        .sort((a,b) => a.sortVal - b.sortVal);
     };
 
     // 1. Atual (Minha Turma - oficiais da semana selecionada)
