@@ -340,6 +340,21 @@ router.put('/teachers/:siape/admin-status', verifyToken, requireAdmin, (req, res
   );
 });
 
+// --- AUDITORIA E LOGS (Para Dashboard) ---
+router.get('/audit-logs', verifyToken, requireAdmin, (req, res) => {
+  db.all("SELECT * FROM audit_logs ORDER BY id DESC LIMIT 20", (err, rows) => {
+    if (err) return res.status(500).json({ error: err.message });
+    res.json(rows || []);
+  });
+});
+
+router.get('/conflict-logs', verifyToken, requireManager, (req, res) => {
+  db.all("SELECT * FROM conflict_logs ORDER BY id DESC LIMIT 20", (err, rows) => {
+    if (err) return res.status(500).json({ error: err.message });
+    res.json(rows || []);
+  });
+});
+
 // ==========================================
 // ROTAS DE BACKUP / RESTORE DO BANCO (DAPE)
 // ==========================================

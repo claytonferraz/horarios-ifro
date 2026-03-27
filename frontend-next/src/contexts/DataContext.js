@@ -24,6 +24,9 @@ export function DataProvider({ children }) {
   const [subjectHoursMeta, setSubjectHoursMeta] = useState({});
   const [disciplinesMeta, setDisciplinesMeta] = useState({});
   const [academicYearsMeta, setAcademicYearsMeta] = useState({});
+  const [requests, setRequests] = useState([]);
+  const [auditLogs, setAuditLogs] = useState([]);
+  const [conflictLogs, setConflictLogs] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [errorMsg, setErrorMsg] = useState("");
 
@@ -118,6 +121,17 @@ export function DataProvider({ children }) {
       if (loadedWeeks) {
         setAcademicWeeks(loadedWeeks);
       }
+      
+      if (['admin', 'gestao'].includes(String(userRole || '').toLowerCase())) {
+         const [reqs, audits, conflicts] = await Promise.all([
+           apiClient.fetchRequests(),
+           apiClient.fetchAuditLogs(),
+           apiClient.fetchConflictLogs()
+         ]);
+         setRequests(reqs || []);
+         setAuditLogs(audits || []);
+         setConflictLogs(conflicts || []);
+      }
 
       await loadMetadata(userRole);
     } catch (err) {
@@ -179,6 +193,10 @@ export function DataProvider({ children }) {
     refreshData: loadData,
     loadAdminMetadata: loadMetadata,
     schedules,
+    requests,
+    setRequests,
+    auditLogs,
+    conflictLogs
   }), [
     rawData,
     disabledWeeks,
@@ -197,6 +215,9 @@ export function DataProvider({ children }) {
     isLoading,
     errorMsg,
     schedules,
+    requests,
+    auditLogs,
+    conflictLogs,
     loadData,
     loadMetadata
   ]);

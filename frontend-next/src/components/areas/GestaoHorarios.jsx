@@ -16,6 +16,7 @@ import { apiClient } from '@/lib/apiClient';
 import { useData } from '@/contexts/DataContext';
 import { CalendarDays } from 'lucide-react';
 import { AdminRequestsManager } from '../ui/admin/AdminRequestsManager';
+import { CommandCenterDashboard } from '../ui/admin/CommandCenterDashboard';
 
 
 export function GestaoHorarios({
@@ -78,9 +79,10 @@ export function GestaoHorarios({
           </div>
         )}
 
-        {/* DASHBOARD INICIAL ADMIN - CARDS ELEGANTES */}
+        {/* DASHBOARD INICIAL ADMIN - ATALHOS */}
         {adminTab === 'dashboard' && (
-           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 animate-in fade-in zoom-in duration-500">
+           <div className="space-y-6">
+             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 animate-in fade-in zoom-in duration-500 px-4 md:px-8">
              
              {/* Card 1: Gestão Escolar */}
              <button onClick={() => setAdminTab('disciplinas')} 
@@ -139,6 +141,7 @@ export function GestaoHorarios({
                  <p className={`text-sm font-medium ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>Configuração de integração via API com o SUAP e importação de dados acadêmicos externos.</p>
                </button>
              )}
+            </div>
            </div>
         )}
 
@@ -166,4 +169,3 @@ export function GestaoHorarios({
     </div>
   );
 }
-

@@ -95,6 +95,20 @@ export const apiClient = {
     }
   },
   
+  async fetchAuditLogs() {
+    try {
+      const res = await fetch(`${API_URL}/admin/audit-logs`, { headers: getHeaders(), credentials: 'same-origin' });
+      return res.ok ? await res.json() : [];
+    } catch(e) { return []; }
+  },
+
+  async fetchConflictLogs() {
+    try {
+      const res = await fetch(`${API_URL}/admin/conflict-logs`, { headers: getHeaders(), credentials: 'same-origin' });
+      return res.ok ? await res.json() : [];
+    } catch(e) { return []; }
+  },
+  
   async saveDisciplineMeta(id, data) {
     try {
       const res = await fetch(`${API_URL}/admin/disciplines`, { method: 'PUT', headers: getHeaders(), body: JSON.stringify({ id, ...data }) });

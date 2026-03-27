@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { 
   Users, 
   AlertCircle, 
@@ -6,12 +6,12 @@ import {
   Zap, 
   TrendingUp, 
   Clock, 
-  ArrowRight, 
   BarChart, 
   PieChart as PieChartIcon, 
   Activity,
   Layers,
-  ArrowUpRight
+  History,
+  ShieldAlert
 } from 'lucide-react';
 import { 
   BarChart as ReBarChart, 
@@ -26,36 +26,80 @@ import {
   Cell, 
   Legend 
 } from 'recharts';
-
-const mockData = {
-  kpis: { vagas: 14, pendentes: 5, extras: 8, ativosHoje: 42 },
-  graficoVagas: [
-    { curso: 'Informática', vagas: 8 }, 
-    { curso: 'Química', vagas: 4 }, 
-    { curso: 'Agropecuária', vagas: 2 },
-    { curso: 'Alimentos', vagas: 3 },
-    { curso: 'Edificações', vagas: 1 }
-  ],
-  graficoStatus: [
-    { name: 'Aprovadas', value: 65, fill: '#10b981' }, 
-    { name: 'Pendentes', value: 15, fill: '#f59e0b' }, 
-    { name: 'Recusadas', value: 20, fill: '#f43f5e' }
-  ],
-  fila: [
-    { id: 1, prof: 'João Silva', tipo: 'Permuta', turma: '2A INF', tempo: 'Há 10 min', status: 'pendente' },
-    { id: 2, prof: 'Maria Souza', tipo: 'Lançamento Extra', turma: '1B QUI', tempo: 'Há 2 horas', status: 'pendente' },
-    { id: 3, prof: 'Carlos Menezes', tipo: 'Assumir Vaga', turma: '3C AGRO', tempo: 'Há 5 horas', status: 'pendente' }
-  ],
-  timeline: [
-    { id: 1, text: "Professor João Silva assumiu vaga na turma 2A INF", time: "Há 12 min", icon: <CheckCircle size={14} className="text-emerald-500" /> },
-    { id: 2, text: "Nova solicitação de permuta enviada por Maria Souza", time: "Há 45 min", icon: <AlertCircle size={14} className="text-amber-500" /> },
-    { id: 3, text: "Configuração da Semana 12 finalizada por Admin", time: "Há 2 horas", icon: <Zap size={14} className="text-blue-500" /> }
-  ]
-};
+import { useData } from '@/contexts/DataContext';
+import { isTeacherPending } from '@/lib/dates';
 
 export const CommandCenterDashboard = ({ isDarkMode }) => {
+  const { rawData, requests, academicYearsMeta, selectedConfigYear, auditLogs, conflictLogs } = useData();
+
+  // 1. Processamento de Dados Reais
+  const analytics = useMemo(() => {
+    // KPIs
+    const vacancies = rawData.filter(s => isTeacherPending(s.teacher));
+    const pendingReqs = requests.filter(r => r.status === 'pendente');
+    
+    // Contagem de professores ativos (unique siapies)
+    const activeTeachersSiapies = new Set(
+      rawData
+        .filter(s => !isTeacherPending(s.teacher))
+        .map(s => s.teacher)
+    );
+
+    // Gráfico de Vagas por Curso
+    const vacanciesByCourse = {};
+    vacancies.forEach(v => {
+      const course = v.course || 'Outros';
+      vacanciesByCourse[course] = (vacanciesByCourse[course] || 0) + 1;
+    });
+    const barData = Object.entries(vacanciesByCourse)
+      .map(([curso, count]) => ({ curso, vagas: count }))
+      .sort((a, b) => b.vagas - a.vagas)
+      .slice(0, 5);
+
+    // Gráfico de Status de Solicitações
+    const statusCounts = {
+      'Aprovadas': requests.filter(r => r.status === 'aprovada').length,
+      'Pendentes': requests.filter(r => r.status === 'pendente').length,
+      'Recusadas': requests.filter(r => r.status === 'recusada' || r.status === 'cancelada').length,
+    };
+    const pieData = [
+      { name: 'Aprovadas', value: statusCounts.Aprovadas, fill: '#10b981' },
+      { name: 'Pendentes', value: statusCounts.Pendentes, fill: '#f59e0b' },
+      { name: 'Recusadas', value: statusCounts.Recusadas, fill: '#f43f5e' }
+    ].filter(d => d.value > 0);
+
+    // Timeline de atividades (usando Auditoria se houver, senão Solicitações)
+    const timeline = (auditLogs?.length > 0 ? auditLogs : requests).slice(0, 6).map(item => {
+      const isAudit = !!item.action;
+      return {
+        id: item.id,
+        text: isAudit ? `${item.action}: ${item.details || ''}` : `${item.requesterName || item.requesterSiape} solicitou ${item.type}`,
+        time: item.timestamp || item.createdAt || new Date().toISOString(),
+        icon: isAudit ? <History size={14} className="text-blue-500" /> : <Activity size={14} className="text-amber-500" />
+      };
+    });
+
+    // Cumprimento do Calendário
+    const yearMeta = academicYearsMeta[selectedConfigYear] || { currentDays: 0, totalDays: 200 };
+    const calendarProgress = yearMeta.totalDays > 0 ? Math.round((yearMeta.currentDays / yearMeta.totalDays) * 100) : 0;
+
+    return {
+      kpis: {
+        vagas: vacancies.length,
+        pendentes: pendingReqs.length,
+        conflitos: conflictLogs?.length || 0,
+        ativosHoje: activeTeachersSiapies.size,
+        progressoLetivo: calendarProgress
+      },
+      barData,
+      pieData,
+      timeline,
+      requestsInbox: requests.filter(r => r.status === 'pendente').slice(0, 5)
+    };
+  }, [rawData, requests, academicYearsMeta, selectedConfigYear, auditLogs, conflictLogs]);
+
   return (
-    <div className={`flex flex-col gap-8 p-4 md:p-8 animate-in fade-in duration-700`}>
+    <div className={`flex flex-col gap-8 animate-in fade-in duration-700`}>
       
       {/* Header Dinâmico */}
       <header className="flex flex-col md:flex-row md:items-center justify-between gap-4">
@@ -69,7 +113,7 @@ export const CommandCenterDashboard = ({ isDarkMode }) => {
             </span>
             <span className="w-1 h-1 rounded-full bg-slate-400" />
             <span className={`text-sm font-black uppercase tracking-widest ${isDarkMode ? "text-blue-400" : "text-blue-600"}`}>
-              Semana 11
+              Configuração {selectedConfigYear}
             </span>
           </div>
         </div>
@@ -80,7 +124,7 @@ export const CommandCenterDashboard = ({ isDarkMode }) => {
             <div className="absolute inset-0 w-2.5 h-2.5 rounded-full bg-emerald-500 animate-ping" />
           </div>
           <span className={`text-[10px] font-black uppercase tracking-[0.2em] ${isDarkMode ? "text-emerald-400" : "text-emerald-700"}`}>
-            Sistema Online
+            Monitoramento Ativo
           </span>
         </div>
       </header>
@@ -90,32 +134,32 @@ export const CommandCenterDashboard = ({ isDarkMode }) => {
         <KPICard 
           icon={<AlertCircle className="text-rose-500" />} 
           label="Aulas a Definir" 
-          value={mockData.kpis.vagas} 
-          sub="Vagas sem professor"
+          value={analytics.kpis.vagas} 
+          sub="Vagas no sistema"
           color="rose"
           isDarkMode={isDarkMode}
         />
         <KPICard 
           icon={<Clock className="text-amber-500" />} 
-          label="Aprovações Pendentes" 
-          value={mockData.kpis.pendentes} 
-          sub="Aguardando DAPE"
+          label="Solicitações" 
+          value={analytics.kpis.pendentes} 
+          sub="Aguardando análise"
           color="amber"
           isDarkMode={isDarkMode}
         />
         <KPICard 
           icon={<Zap className="text-emerald-500" />} 
-          label="Aulas Extras" 
-          value={mockData.kpis.extras} 
-          sub="Aprovadas na semana"
+          label="Progresso Letivo" 
+          value={`${analytics.kpis.progressoLetivo}%`} 
+          sub="Dias letivos cumpridos"
           color="emerald"
           isDarkMode={isDarkMode}
         />
         <KPICard 
-          icon={<Users className="text-blue-500" />} 
-          label="Professor Ativos" 
-          value={mockData.kpis.ativosHoje} 
-          sub="Docentes com aula hoje"
+          icon={<ShieldAlert className="text-blue-500" />} 
+          label="Conflitos" 
+          value={analytics.kpis.conflitos} 
+          sub="Alertas detectados"
           color="blue"
           isDarkMode={isDarkMode}
         />
@@ -130,42 +174,46 @@ export const CommandCenterDashboard = ({ isDarkMode }) => {
               <div className={`p-2 rounded-xl ${isDarkMode ? "bg-rose-500/10 text-rose-400" : "bg-rose-50 text-rose-600"}`}>
                 <BarChart size={20} />
               </div>
-              <h3 className={`text-sm font-black uppercase tracking-widest ${isDarkMode ? "text-white" : "text-slate-800"}`}>Vagas por Curso</h3>
+              <h3 className={`text-sm font-black uppercase tracking-widest ${isDarkMode ? "text-white" : "text-slate-800"}`}>Ocupação por Curso (Vagas)</h3>
             </div>
-            <button className={`p-2 rounded-xl text-xs font-bold transition-colors ${isDarkMode ? "hover:bg-slate-800 text-slate-400" : "hover:bg-slate-50 text-slate-500"}`}>
-              Ver Tudo
-            </button>
           </div>
           <div className="h-[300px] w-full">
-            <ResponsiveContainer width="100%" height="100%">
-              <ReBarChart data={mockData.graficoVagas} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={isDarkMode ? "#334155" : "#e2e8f0"} />
-                <XAxis 
-                  dataKey="curso" 
-                  axisLine={false} 
-                  tickLine={false} 
-                  tick={{ fontSize: 10, fontWeight: 700, fill: isDarkMode ? "#94a3b8" : "#64748b" }} 
-                  dy={10}
-                />
-                <YAxis hide />
-                <Tooltip 
-                  cursor={{ fill: isDarkMode ? "#1e293b" : "#f1f5f9" }}
-                  contentStyle={{ 
-                    backgroundColor: isDarkMode ? "#0f172a" : "#fff", 
-                    borderRadius: "1rem", 
-                    border: "none", 
-                    boxShadow: "0 10px 25px -5px rgba(0,0,0,0.1)" 
-                  }}
-                  labelStyle={{ fontWeight: 900, color: isDarkMode ? "#fff" : "#000" }}
-                />
-                <Bar 
-                  dataKey="vagas" 
-                  fill={isDarkMode ? "#f43f5e" : "#e11d48"} 
-                  radius={[8, 8, 0, 0]} 
-                  barSize={40} 
-                />
-              </ReBarChart>
-            </ResponsiveContainer>
+            {analytics.barData.length > 0 ? (
+              <ResponsiveContainer width="100%" height="100%">
+                <ReBarChart data={analytics.barData} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={isDarkMode ? "#334155" : "#e2e8f0"} />
+                  <XAxis 
+                    dataKey="curso" 
+                    axisLine={false} 
+                    tickLine={false} 
+                    tick={{ fontSize: 10, fontWeight: 700, fill: isDarkMode ? "#94a3b8" : "#64748b" }} 
+                    dy={10}
+                  />
+                  <YAxis hide />
+                  <Tooltip 
+                    cursor={{ fill: isDarkMode ? "#1e293b" : "#f1f5f9" }}
+                    contentStyle={{ 
+                      backgroundColor: isDarkMode ? "#0f172a" : "#fff", 
+                      borderRadius: "1rem", 
+                      border: "none", 
+                      boxShadow: "0 10px 25px -5px rgba(0,0,0,0.1)" 
+                    }}
+                    labelStyle={{ fontWeight: 900, color: isDarkMode ? "#fff" : "#000" }}
+                  />
+                  <Bar 
+                    dataKey="vagas" 
+                    fill={isDarkMode ? "#f43f5e" : "#e11d48"} 
+                    radius={[8, 8, 0, 0]} 
+                    barSize={40} 
+                  />
+                </ReBarChart>
+              </ResponsiveContainer>
+            ) : (
+              <div className="flex flex-col items-center justify-center h-full opacity-40">
+                <CheckCircle size={48} className="mb-2" />
+                <p className="text-xs font-black uppercase tracking-widest">Nenhuma aula vaga detectada</p>
+              </div>
+            )}
           </div>
         </div>
 
@@ -175,42 +223,41 @@ export const CommandCenterDashboard = ({ isDarkMode }) => {
             <div className={`p-2 rounded-xl ${isDarkMode ? "bg-indigo-500/10 text-indigo-400" : "bg-indigo-50 text-indigo-600"}`}>
               <PieChartIcon size={20} />
             </div>
-            <h3 className={`text-sm font-black uppercase tracking-widest ${isDarkMode ? "text-white" : "text-slate-800"}`}>Status das Solicitações</h3>
+            <h3 className={`text-sm font-black uppercase tracking-widest ${isDarkMode ? "text-white" : "text-slate-800"}`}>Solicitações</h3>
           </div>
           <div className="h-[250px] w-full">
-            <ResponsiveContainer width="100%" height="100%">
-              <PieChart>
-                <Pie
-                  data={mockData.graficoStatus}
-                  cx="50%"
-                  cy="50%"
-                  innerRadius={60}
-                  outerRadius={80}
-                  paddingAngle={5}
-                  dataKey="value"
-                >
-                  {mockData.graficoStatus.map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={entry.fill} />
-                  ))}
-                </Pie>
-                <Tooltip 
-                  contentStyle={{ 
-                    backgroundColor: isDarkMode ? "#0f172a" : "#fff", 
-                    borderRadius: "1rem", 
-                    border: "none" 
-                  }}
-                />
-                <Legend iconType="circle" />
-              </PieChart>
-            </ResponsiveContainer>
-          </div>
-          <div className="mt-4 flex justify-around">
-             {mockData.graficoStatus.map(s => (
-               <div key={s.name} className="text-center">
-                 <p className="text-[10px] font-black uppercase tracking-tighter text-slate-500">{s.name}</p>
-                 <p className={`text-lg font-black ${isDarkMode ? "text-white" : "text-slate-900"}`}>{s.value}%</p>
-               </div>
-             ))}
+            {analytics.pieData.length > 0 ? (
+              <ResponsiveContainer width="100%" height="100%">
+                <PieChart>
+                  <Pie
+                    data={analytics.pieData}
+                    cx="50%"
+                    cy="50%"
+                    innerRadius={60}
+                    outerRadius={80}
+                    paddingAngle={5}
+                    dataKey="value"
+                  >
+                    {analytics.pieData.map((entry, index) => (
+                      <Cell key={`cell-${index}`} fill={entry.fill} />
+                    ))}
+                  </Pie>
+                  <Tooltip 
+                    contentStyle={{ 
+                      backgroundColor: isDarkMode ? "#0f172a" : "#fff", 
+                      borderRadius: "1rem", 
+                      border: "none" 
+                    }}
+                  />
+                  <Legend iconType="circle" />
+                </PieChart>
+              </ResponsiveContainer>
+            ) : (
+              <div className="flex flex-col items-center justify-center h-full opacity-40">
+                <Clock size={48} className="mb-2" />
+                <p className="text-xs font-black uppercase tracking-widest text-center">Nenhuma solicitação<br/>no sistema</p>
+              </div>
+            )}
           </div>
         </div>
       </div>
@@ -225,36 +272,41 @@ export const CommandCenterDashboard = ({ isDarkMode }) => {
               <div className={`p-2 rounded-xl ${isDarkMode ? "bg-blue-500/10 text-blue-400" : "bg-blue-50 text-blue-600"}`}>
                 <Activity size={20} />
               </div>
-              <h3 className={`text-sm font-black uppercase tracking-widest ${isDarkMode ? "text-white" : "text-slate-800"}`}>Fila Expressa (Inbox)</h3>
+              <h3 className={`text-sm font-black uppercase tracking-widest ${isDarkMode ? "text-white" : "text-slate-800"}`}>Fila de Pendências</h3>
             </div>
           </div>
           <div className="space-y-4">
-            {mockData.fila.map((item) => (
-              <div 
-                key={item.id} 
-                className={`group flex items-center justify-between p-5 rounded-3xl border transition-all ${isDarkMode ? "bg-slate-800/50 border-slate-700 hover:bg-slate-800" : "bg-slate-50 border-transparent hover:bg-white hover:border-slate-200 hover:shadow-lg hover:shadow-slate-200/40"}`}
-              >
-                <div className="flex items-center gap-4">
-                  <div className={`w-10 h-10 rounded-xl flex items-center justify-center font-black text-xs ${isDarkMode ? "bg-slate-900 text-slate-400" : "bg-white text-slate-500 shadow-sm"}`}>
-                    {item.id}
-                  </div>
-                  <div>
-                    <h4 className={`text-xs font-black ${isDarkMode ? "text-white" : "text-slate-800"}`}>{item.prof}</h4>
-                    <div className="flex items-center gap-2 mt-1">
-                      <span className={`text-[9px] font-bold uppercase ${isDarkMode ? "text-slate-500" : "text-slate-400"}`}>{item.tipo}</span>
-                      <span className="w-1 h-1 rounded-full bg-slate-400" />
-                      <span className={`text-[9px] font-black uppercase text-blue-500`}>{item.turma}</span>
+            {analytics.requestsInbox.length > 0 ? (
+              analytics.requestsInbox.map((item) => (
+                <div 
+                  key={item.id} 
+                  className={`group flex items-center justify-between p-5 rounded-3xl border transition-all ${isDarkMode ? "bg-slate-800/50 border-slate-700 hover:bg-slate-800" : "bg-slate-50 border-transparent hover:bg-white hover:border-slate-200 hover:shadow-lg hover:shadow-slate-200/40"}`}
+                >
+                  <div className="flex items-center gap-4">
+                    <div className={`w-10 h-10 rounded-xl flex items-center justify-center font-black text-[10px] ${isDarkMode ? "bg-slate-900 text-slate-400" : "bg-white text-slate-500 shadow-sm"}`}>
+                      #{String(item.id).slice(-3)}
+                    </div>
+                    <div>
+                      <h4 className={`text-xs font-black ${isDarkMode ? "text-white" : "text-slate-800"}`}>
+                        {item.requesterName || item.requesterSiape}
+                      </h4>
+                      <div className="flex items-center gap-2 mt-1">
+                        <span className={`text-[9px] font-bold uppercase ${isDarkMode ? "text-slate-500" : "text-slate-400"}`}>{item.type}</span>
+                        <span className="w-1 h-1 rounded-full bg-slate-400" />
+                        <span className={`text-[9px] font-black uppercase text-blue-500`}>{item.className || 'Turma'}</span>
+                      </div>
                     </div>
                   </div>
+                  <div className="flex items-center gap-4">
+                    <span className={`hidden md:block text-[9px] font-bold text-slate-500`}>Pendente</span>
+                  </div>
                 </div>
-                <div className="flex items-center gap-4">
-                  <span className={`hidden md:block text-[9px] font-bold text-slate-500`}>{item.tempo}</span>
-                  <button className={`px-4 py-2 rounded-xl text-[9px] font-black uppercase tracking-widest bg-blue-600 text-white shadow-lg shadow-blue-500/30 hover:scale-105 active:scale-95 transition-all`}>
-                    Analisar
-                  </button>
-                </div>
+              ))
+            ) : (
+              <div className="py-12 text-center opacity-40">
+                <p className="text-[10px] font-black uppercase tracking-widest">Nada para aprovar no momento</p>
               </div>
-            ))}
+            )}
           </div>
         </div>
 
@@ -264,29 +316,30 @@ export const CommandCenterDashboard = ({ isDarkMode }) => {
             <div className={`p-2 rounded-xl ${isDarkMode ? "bg-emerald-500/10 text-emerald-400" : "bg-emerald-50 text-emerald-600"}`}>
               <Layers size={20} />
             </div>
-            <h3 className={`text-sm font-black uppercase tracking-widest ${isDarkMode ? "text-white" : "text-slate-800"}`}>Log de Atividades</h3>
+            <h3 className={`text-sm font-black uppercase tracking-widest ${isDarkMode ? "text-white" : "text-slate-800"}`}>Rastro de Auditoria</h3>
           </div>
           <div className="space-y-6 relative ml-3">
              <div className={`absolute left-[7px] top-2 bottom-2 w-0.5 rounded-full ${isDarkMode ? "bg-slate-800" : "bg-slate-100"}`} />
-             {mockData.timeline.map((log) => (
-               <div key={log.id} className="relative flex gap-4 items-start">
-                 <div className={`relative z-10 w-4 h-4 rounded-full flex items-center justify-center border-2 ${isDarkMode ? "bg-slate-900 border-slate-800" : "bg-white border-slate-100"}`}>
-                   {log.icon}
-                 </div>
-                 <div className="flex-1 -mt-1">
-                   <p className={`text-[11px] font-medium leading-relaxed ${isDarkMode ? "text-slate-300" : "text-slate-600"}`}>
-                     {log.text}
-                   </p>
-                   <span className="text-[9px] font-bold text-slate-500 uppercase tracking-tighter mt-1 block">
-                     {log.time}
-                   </span>
-                 </div>
-               </div>
-             ))}
+             {analytics.timeline.length > 0 ? (
+               analytics.timeline.map((log) => (
+                <div key={log.id} className="relative flex gap-4 items-start">
+                  <div className={`relative z-10 w-4 h-4 rounded-full flex items-center justify-center border-2 ${isDarkMode ? "bg-slate-900 border-slate-800" : "bg-white border-slate-100"}`}>
+                    {log.icon}
+                  </div>
+                  <div className="flex-1 -mt-1">
+                    <p className={`text-[11px] font-medium leading-relaxed ${isDarkMode ? "text-slate-300" : "text-slate-600"}`}>
+                      {log.text}
+                    </p>
+                    <span className="text-[9px] font-bold text-slate-500 uppercase tracking-tighter mt-1 block">
+                      {new Date(log.time).toLocaleString()}
+                    </span>
+                  </div>
+                </div>
+              ))
+             ) : (
+                <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest text-center py-10">Nenhuma atividade registrada</p>
+             )}
           </div>
-          <button className={`w-full mt-8 py-4 rounded-2xl border-2 border-dashed transition-all hover:border-solid ${isDarkMode ? "border-slate-800 hover:border-slate-600 hover:bg-slate-800/30 text-slate-500" : "border-slate-200 hover:border-slate-300 hover:bg-slate-50 text-slate-400"} text-[10px] font-bold uppercase tracking-widest`}>
-            Ver Log Completo
-          </button>
         </div>
 
       </div>

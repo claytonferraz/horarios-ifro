@@ -1,7 +1,7 @@
 import React, { useState, useTransition } from 'react';
 import { 
-  Calendar, UserCircle, Layers, AlertTriangle, BarChart3, ListTodo, CalendarDays, Settings, Bell, Sun, RefreshCcw, HandHeart, X, ExternalLink, Scissors, MapPin, Monitor, Mail, MessageCircle,
-  BookOpen, FileText, Users, CheckCircle, AlertCircle, XCircle, Eye, Clock, Check, Printer, Home, Globe, Book
+  Calendar, UserCircle, Layers, AlertTriangle, BarChart3, ListTodo, CalendarDays, Settings, Bell, Sun, RefreshCcw, HandHeart, X, ExternalLink, Scissors, MapPin, Monitor, Mail, MessageCircle, Activity,
+  BookOpen, FileText, Users, CheckCircle, AlertCircle, XCircle, Eye, Clock, Check, Printer, Home, Globe, Book, Shuffle, ClipboardList
 } from 'lucide-react';
 import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd';
 import { SearchableSelect } from '../ui/SearchableSelect';
@@ -21,6 +21,7 @@ import { ClassGrid } from './grids/ClassGrid';
 import { VacantGrid } from './grids/VacantGrid';
 import { TeacherRequestsSection } from '../ui/teacher/TeacherRequestsSection';
 import { AdminTotalControl } from '../ui/admin/AdminTotalControl';
+import { CommandCenterDashboard } from '../ui/admin/CommandCenterDashboard';
 
 const PENDING_REQUEST_STATUSES = new Set([
   'pendente',
@@ -1093,8 +1094,12 @@ export function PortalView({
    return (
      <>
           {/* DASHBOARD (DOCENTE OU ALUNO) */}
-          {(appMode === "professor" || appMode === "aluno") && viewMode === "dashboard" && (
-            <div className="flex flex-col lg:flex-row gap-8 animate-in fade-in zoom-in duration-700 no-print">
+          {/* GESTÃO DE DASHBOARDS (COMANDO VS PESSOAL) */}
+          {viewMode === "dashboard" && (
+            <div className="flex flex-col gap-2 w-full animate-in fade-in duration-500">
+              {/* RENDER: DASHBOARD ORIGINAL (Para Alunos, Professores, ou Admin na aba Pessoal) */}
+              
+                <div className="flex flex-col lg:flex-row gap-8 animate-in fade-in zoom-in duration-700 no-print mt-2">
                
                {/* LADO ESQUERDO: RESUMO DO HORÁRIO (60% no Desktop) */}
                <div className="w-full lg:w-[60%] flex flex-col order-1">
@@ -1378,125 +1383,161 @@ export function PortalView({
                    <h3 className={`text-[10px] font-black uppercase tracking-[0.3em] ml-4 ${isDarkMode ? "text-slate-500" : "text-slate-400"}`}>Atalhos e Ações</h3>
                    <div className="grid grid-cols-2 gap-4">
                      {appMode === "professor" ? (
-                       <>
-                         <button onClick={() => { setViewMode("professor"); if(typeof setSelectedTeacher === "function") setSelectedTeacher(siape); }} 
-                                 className={`group p-6 rounded-3xl border text-left transition-all hover:scale-[1.02] ${isDarkMode ? "bg-slate-800 border-slate-700 hover:border-indigo-500/50" : "bg-white border-slate-100 hover:border-indigo-200 shadow-sm hover:shadow-xl"}`}>
-                           <div className={`w-10 h-10 rounded-xl flex items-center justify-center mb-4 transition-colors ${isDarkMode ? "bg-indigo-950 text-indigo-400 group-hover:bg-indigo-600 group-hover:text-white" : "bg-indigo-50 text-indigo-600 group-hover:bg-indigo-600 group-hover:text-white"}`}>
-                             <UserCircle size={20} />
-                           </div>
-                           <h3 className={`text-sm font-black mb-1 ${isDarkMode ? "text-white" : "text-slate-800"}`}>Meu Horário</h3>
-                           <p className="text-[10px] font-medium text-slate-500 leading-tight">Painel completo da grade.</p>
-                         </button>
+                        <>
+                          <button onClick={() => { setViewMode("professor"); if(typeof setSelectedTeacher === "function") setSelectedTeacher(siape); }} 
+                                  className={`group p-6 rounded-3xl border text-left transition-all hover:scale-[1.02] ${isDarkMode ? "bg-slate-800 border-slate-700 hover:border-indigo-500/50" : "bg-white border-slate-100 hover:border-indigo-200 shadow-sm hover:shadow-xl"}`}>
+                            <div className={`w-10 h-10 rounded-xl flex items-center justify-center mb-4 transition-colors ${isDarkMode ? "bg-indigo-950 text-indigo-400 group-hover:bg-indigo-600 group-hover:text-white" : "bg-indigo-50 text-indigo-600 group-hover:bg-indigo-600 group-hover:text-white"}`}>
+                              <UserCircle size={20} />
+                            </div>
+                            <h3 className={`text-sm font-black mb-1 ${isDarkMode ? "text-white" : "text-slate-800"}`}>Meu Horário</h3>
+                            <p className="text-[10px] font-medium text-slate-500 leading-tight">Painel completo da grade.</p>
+                          </button>
 
-                         <button onClick={() => { setViewMode("curso"); if (siape) { setPadraoFilterTeacher(siape); setShowOnlyMyClasses(false); } }} 
-                                 className={`group p-6 rounded-3xl border text-left transition-all hover:scale-[1.02] ${isDarkMode ? "bg-slate-800 border-slate-700 hover:border-emerald-500/50" : "bg-white border-slate-100 hover:border-emerald-200 shadow-sm hover:shadow-xl"}`}>
-                           <div className={`w-10 h-10 rounded-xl flex items-center justify-center mb-4 transition-colors ${isDarkMode ? "bg-emerald-950 text-emerald-400 group-hover:bg-emerald-600 group-hover:text-white" : "bg-emerald-50 text-emerald-600 group-hover:bg-emerald-600 group-hover:text-white"}`}>
-                             <Layers size={20} />
-                           </div>
-                           <h3 className={`text-sm font-black mb-1 ${isDarkMode ? "text-white" : "text-slate-800"}`}>Permutas</h3>
-                           <p className="text-[10px] font-medium text-slate-500 leading-tight">Trocas de aula e vagas.</p>
-                         </button>
+                          <button onClick={() => { setViewMode("professor"); if(typeof setSelectedTeacher === "function") setSelectedTeacher(siape); }} 
+                                  className={`group p-6 rounded-3xl border text-left transition-all hover:scale-[1.02] ${isDarkMode ? "bg-slate-800 border-slate-700 hover:border-blue-500/50" : "bg-white border-slate-100 hover:border-blue-200 shadow-sm hover:shadow-xl"}`}>
+                            <div className={`w-10 h-10 rounded-xl flex items-center justify-center mb-4 transition-colors ${isDarkMode ? "bg-blue-950 text-blue-400 group-hover:bg-blue-600 group-hover:text-white" : "bg-blue-50 text-blue-600 group-hover:bg-blue-600 group-hover:text-white"}`}>
+                              <Calendar size={20} />
+                            </div>
+                            <h3 className={`text-sm font-black mb-1 ${isDarkMode ? "text-white" : "text-slate-800"}`}>Aulas Diárias</h3>
+                            <p className="text-[10px] font-medium text-slate-500 leading-tight">Visualizar grade do dia.</p>
+                          </button>
 
-                         <button onClick={() => setViewMode("solicitacoes")} 
-                                 className={`group p-6 rounded-3xl border text-left transition-all hover:scale-[1.02] ${isDarkMode ? "bg-slate-800 border-slate-700 hover:border-amber-500/50" : "bg-white border-slate-100 hover:border-amber-200 shadow-sm hover:shadow-xl"}`}>
-                           <div className={`w-10 h-10 rounded-xl flex items-center justify-center mb-4 transition-colors ${isDarkMode ? "bg-amber-950 text-amber-400 group-hover:bg-amber-600 group-hover:text-white" : "bg-amber-50 text-amber-600 group-hover:bg-amber-600 group-hover:text-white"}`}>
-                             <Bell size={20} />
-                           </div>
-                           <h3 className={`text-sm font-black mb-1 ${isDarkMode ? "text-white" : "text-slate-800"}`}>Solicitações</h3>
-                           <p className="text-[10px] font-medium text-slate-500 leading-tight">Trocas pendentes e alertas.</p>
-                         </button>
+                          <button onClick={() => setViewMode("curso")} 
+                                  className={`group p-6 rounded-3xl border text-left transition-all hover:scale-[1.02] ${isDarkMode ? "bg-slate-800 border-slate-700 hover:border-indigo-500/50" : "bg-white border-slate-100 hover:border-indigo-200 shadow-sm hover:shadow-xl"}`}>
+                            <div className={`w-10 h-10 rounded-xl flex items-center justify-center mb-4 transition-colors ${isDarkMode ? "bg-indigo-950 text-indigo-400 group-hover:bg-indigo-600 group-hover:text-white" : "bg-indigo-50 text-indigo-600 group-hover:bg-indigo-600 group-hover:text-white"}`}>
+                              <Shuffle size={20} />
+                            </div>
+                            <h3 className={`text-sm font-black mb-1 ${isDarkMode ? "text-white" : "text-slate-800"}`}>Permutas</h3>
+                            <p className="text-[10px] font-medium text-slate-500 leading-tight">Trocas de aula e vagas.</p>
+                          </button>
 
-                         <button onClick={() => setViewMode("total")} 
-                                 className={`group p-6 rounded-3xl border text-left transition-all hover:scale-[1.02] ${isDarkMode ? "bg-slate-800 border-slate-700 hover:border-orange-500/50" : "bg-white border-slate-100 hover:border-orange-200 shadow-sm hover:shadow-xl"}`}>
-                           <div className={`w-10 h-10 rounded-xl flex items-center justify-center mb-4 transition-colors ${isDarkMode ? "bg-orange-950 text-orange-400 group-hover:bg-orange-600 group-hover:text-white" : "bg-orange-50 text-orange-600 group-hover:bg-orange-600 group-hover:text-white"}`}>
-                             <BarChart3 size={20} />
-                           </div>
-                           <h3 className={`text-sm font-black mb-1 ${isDarkMode ? "text-white" : "text-slate-800"}`}>Controle</h3>
-                           <p className="text-[10px] font-medium text-slate-500 leading-tight">Controle de carga horária.</p>
-                         </button>
-                       </>
-                     ) : (
-                       <>
-                         <button onClick={() => setViewMode("hoje")} 
-                                 className={`group p-6 rounded-3xl border text-left transition-all hover:scale-[1.02] ${isDarkMode ? "bg-slate-800 border-slate-700 hover:border-blue-500/50" : "bg-white border-slate-100 hover:border-blue-200 shadow-sm hover:shadow-xl"}`}>
-                           <div className={`w-10 h-10 rounded-xl flex items-center justify-center mb-4 transition-colors ${isDarkMode ? "bg-blue-950 text-blue-400 group-hover:bg-blue-600 group-hover:text-white" : "bg-blue-50 text-blue-600 group-hover:bg-blue-600 group-hover:text-white"}`}>
-                             <ListTodo size={20} />
-                           </div>
-                           <h3 className={`text-sm font-black mb-1 ${isDarkMode ? "text-white" : "text-slate-800"}`}>Painel Diário</h3>
-                           <p className="text-[10px] font-medium text-slate-500 leading-tight">O que temos para hoje?</p>
-                         </button>
+                          <button onClick={() => setViewMode("solicitacoes")} 
+                                  className={`group p-6 rounded-3xl border text-left transition-all hover:scale-[1.02] ${isDarkMode ? "bg-slate-800 border-slate-700 hover:border-amber-500/50" : "bg-white border-slate-100 hover:border-amber-200 shadow-sm hover:shadow-xl"}`}>
+                            <div className={`w-10 h-10 rounded-xl flex items-center justify-center mb-4 transition-colors ${isDarkMode ? "bg-amber-950 text-amber-400 group-hover:bg-amber-600 group-hover:text-white" : "bg-amber-50 text-amber-600 group-hover:bg-amber-600 group-hover:text-white"}`}>
+                              <Bell size={20} />
+                            </div>
+                            <h3 className={`text-sm font-black mb-1 ${isDarkMode ? "text-white" : "text-slate-800"}`}>Solicitações</h3>
+                            <p className="text-[10px] font-medium text-slate-500 leading-tight">Trocas pendentes e alertas.</p>
+                          </button>
 
-                         <button onClick={() => setViewMode("turma")} 
-                                 className={`group p-6 rounded-3xl border text-left transition-all hover:scale-[1.02] ${isDarkMode ? "bg-slate-800 border-slate-700 hover:border-emerald-500/50" : "bg-white border-slate-100 hover:border-emerald-200 shadow-sm hover:shadow-xl"}`}>
-                           <div className={`w-10 h-10 rounded-xl flex items-center justify-center mb-4 transition-colors ${isDarkMode ? "bg-emerald-950 text-emerald-400 group-hover:bg-emerald-600 group-hover:text-white" : "bg-emerald-50 text-emerald-600 group-hover:bg-emerald-600 group-hover:text-white"}`}>
-                             <Calendar size={20} />
-                           </div>
-                           <h3 className={`text-sm font-black mb-1 ${isDarkMode ? "text-white" : "text-slate-800"}`}>Minha Turma</h3>
-                           <p className="text-[10px] font-medium text-slate-500 leading-tight">Visualizar horário completo.</p>
-                         </button>
+                          <button onClick={() => setViewMode("total")} 
+                                  className={`group p-6 rounded-3xl border text-left transition-all hover:scale-[1.02] ${isDarkMode ? "bg-slate-800 border-slate-700 hover:border-orange-500/50" : "bg-white border-slate-100 hover:border-orange-200 shadow-sm hover:shadow-xl"}`}>
+                            <div className={`w-10 h-10 rounded-xl flex items-center justify-center mb-4 transition-colors ${isDarkMode ? "bg-orange-950 text-orange-400 group-hover:bg-orange-600 group-hover:text-white" : "bg-orange-50 text-orange-600 group-hover:bg-orange-600 group-hover:text-white"}`}>
+                              <BarChart3 size={20} />
+                            </div>
+                            <h3 className={`text-sm font-black mb-1 ${isDarkMode ? "text-white" : "text-slate-800"}`}>Controle</h3>
+                            <p className="text-[10px] font-medium text-slate-500 leading-tight">Controle de carga horária.</p>
+                          </button>
+                        </>
+                      ) : (
+                        <>
+                          <button onClick={() => setViewMode("hoje")} 
+                                  className={`group p-6 rounded-3xl border text-left transition-all hover:scale-[1.02] ${isDarkMode ? "bg-slate-800 border-slate-700 hover:border-blue-500/50" : "bg-white border-slate-100 hover:border-blue-200 shadow-sm hover:shadow-xl"}`}>
+                            <div className={`w-10 h-10 rounded-xl flex items-center justify-center mb-4 transition-colors ${isDarkMode ? "bg-blue-950 text-blue-400 group-hover:bg-blue-600 group-hover:text-white" : "bg-blue-50 text-blue-600 group-hover:bg-blue-600 group-hover:text-white"}`}>
+                              <ListTodo size={20} />
+                            </div>
+                            <h3 className={`text-sm font-black mb-1 ${isDarkMode ? "text-white" : "text-slate-800"}`}>Painel Diário</h3>
+                            <p className="text-[10px] font-medium text-slate-500 leading-tight">O que temos para hoje?</p>
+                          </button>
 
-                         <button onClick={() => setViewMode("professor")} 
-                                 className={`group p-6 rounded-3xl border text-left transition-all hover:scale-[1.02] ${isDarkMode ? "bg-slate-800 border-slate-700 hover:border-indigo-500/50" : "bg-white border-slate-100 hover:border-indigo-200 shadow-sm hover:shadow-xl"}`}>
-                           <div className={`w-10 h-10 rounded-xl flex items-center justify-center mb-4 transition-colors ${isDarkMode ? "bg-indigo-950 text-indigo-400 group-hover:bg-indigo-600 group-hover:text-white" : "bg-indigo-50 text-indigo-600 group-hover:bg-indigo-600 group-hover:text-white"}`}>
-                             <UserCircle size={20} />
-                           </div>
-                           <h3 className={`text-sm font-black mb-1 ${isDarkMode ? "text-white" : "text-slate-800"}`}>Professor</h3>
-                           <p className="text-[10px] font-medium text-slate-500 leading-tight">Buscar por docente.</p>
-                         </button>
+                          <button onClick={() => setViewMode("turma")} 
+                                  className={`group p-6 rounded-3xl border text-left transition-all hover:scale-[1.02] ${isDarkMode ? "bg-slate-800 border-slate-700 hover:border-emerald-500/50" : "bg-white border-slate-100 hover:border-emerald-200 shadow-sm hover:shadow-xl"}`}>
+                            <div className={`w-10 h-10 rounded-xl flex items-center justify-center mb-4 transition-colors ${isDarkMode ? "bg-emerald-950 text-emerald-400 group-hover:bg-emerald-600 group-hover:text-white" : "bg-emerald-50 text-emerald-600 group-hover:bg-emerald-600 group-hover:text-white"}`}>
+                              <Calendar size={20} />
+                            </div>
+                            <h3 className={`text-sm font-black mb-1 ${isDarkMode ? "text-white" : "text-slate-800"}`}>Minha Turma</h3>
+                            <p className="text-[10px] font-medium text-slate-500 leading-tight">Visualizar horário completo.</p>
+                          </button>
 
-                         <button onClick={() => { setViewMode('historico'); setScheduleMode('oficial'); }} 
-                                 className={`group p-6 rounded-3xl border text-left transition-all hover:scale-[1.02] ${isDarkMode ? "bg-slate-800 border-slate-700 hover:border-orange-500/50" : "bg-white border-slate-100 hover:border-orange-200 shadow-sm hover:shadow-xl"}`}>
-                           <div className={`w-10 h-10 rounded-xl flex items-center justify-center mb-4 transition-colors ${isDarkMode ? "bg-orange-950 text-orange-400 group-hover:bg-orange-600 group-hover:text-white" : "bg-orange-50 text-orange-600 group-hover:bg-orange-600 group-hover:text-white"}`}>
-                             <Clock size={20} />
-                           </div>
-                           <h3 className={`text-sm font-black mb-1 ${isDarkMode ? "text-white" : "text-slate-800"}`}>Aulas Passadas</h3>
-                           <p className="text-[10px] font-medium text-slate-500 leading-tight">Histórico de aulas.</p>
-                         </button>
-                       </>
-                     )}
-                   </div>
-                 </div>
+                          <button onClick={() => setViewMode("professor")} 
+                                  className={`group p-6 rounded-3xl border text-left transition-all hover:scale-[1.02] ${isDarkMode ? "bg-slate-800 border-slate-700 hover:border-indigo-500/50" : "bg-white border-slate-100 hover:border-indigo-200 shadow-sm hover:shadow-xl"}`}>
+                            <div className={`w-10 h-10 rounded-xl flex items-center justify-center mb-4 transition-colors ${isDarkMode ? "bg-indigo-950 text-indigo-400 group-hover:bg-indigo-600 group-hover:text-white" : "bg-indigo-50 text-indigo-600 group-hover:bg-indigo-600 group-hover:text-white"}`}>
+                              <UserCircle size={20} />
+                            </div>
+                            <h3 className={`text-sm font-black mb-1 ${isDarkMode ? "text-white" : "text-slate-800"}`}>Professor</h3>
+                            <p className="text-[10px] font-medium text-slate-500 leading-tight">Buscar por docente.</p>
+                          </button>
 
-                 <div className="space-y-6">
+                          <button onClick={() => { setViewMode('historico'); setScheduleMode('oficial'); }} 
+                                  className={`group p-6 rounded-3xl border text-left transition-all hover:scale-[1.02] ${isDarkMode ? "bg-slate-800 border-slate-700 hover:border-orange-500/50" : "bg-white border-slate-100 hover:border-orange-200 shadow-sm hover:shadow-xl"}`}>
+                            <div className={`w-10 h-10 rounded-xl flex items-center justify-center mb-4 transition-colors ${isDarkMode ? "bg-orange-950 text-orange-400 group-hover:bg-orange-600 group-hover:text-white" : "bg-orange-50 text-orange-600 group-hover:bg-orange-600 group-hover:text-white"}`}>
+                              <Clock size={20} />
+                            </div>
+                            <h3 className={`text-sm font-black mb-1 ${isDarkMode ? "text-white" : "text-slate-800"}`}>Aulas Passadas</h3>
+                                         </button>
+                        </>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="space-y-6">
                     <h3 className={`text-[10px] font-black uppercase tracking-[0.3em] ml-4 ${isDarkMode ? "text-slate-500" : "text-slate-400"}`}>Sistemas IFRO</h3>
                     <div className="flex flex-col gap-4">
-                       <a href="https://suap.ifro.edu.br/" target="_blank" rel="noopener noreferrer" 
+                       <a href={appMode === 'professor' ? "https://suap.ifro.edu.br/edu/meus_diarios/" : "https://suap.ifro.edu.br/"} target="_blank" rel="noopener noreferrer" 
                           className={`group flex items-center gap-5 px-8 py-6 rounded-[2.5rem] border transition-all hover:scale-[1.02] ${isDarkMode ? "bg-slate-900 border-slate-800 hover:border-emerald-500/50" : "bg-white border-slate-100 shadow-xl shadow-slate-200/50 hover:border-emerald-200"}`}>
-                          <div className={`w-12 h-12 rounded-2xl flex items-center justify-center transition-all ${isDarkMode ? "bg-emerald-500/10 text-emerald-400 group-hover:bg-emerald-500 group-hover:text-white" : "bg-emerald-50 text-emerald-600 group-hover:bg-emerald-600 group-hover:text-white"}`}>
-                            <Globe size={24} />
+                          <div className={`w-12 h-12 rounded-2xl flex items-center justify-center transition-all ${isDarkMode ? "bg-emerald-500/10 text-emerald-400 group-hover:bg-emerald-600 group-hover:text-white" : "bg-emerald-50 text-emerald-600 group-hover:bg-emerald-600 group-hover:text-white"}`}>
+                            {appMode === 'professor' ? <ClipboardList size={24} /> : <Globe size={24} />}
                           </div>
                           <div className="text-left">
-                            <h4 className={`text-sm font-black ${isDarkMode ? "text-white" : "text-slate-900"}`}>Portal SUAP</h4>
-                            <p className="text-[10px] font-bold text-slate-500 tracking-wider uppercase">Notas</p>
+                            <h4 className={`text-sm font-black ${isDarkMode ? "text-white" : "text-slate-900"}`}>{appMode === 'professor' ? 'Meus Diários' : 'Portal SUAP'}</h4>
+                            <p className="text-[10px] font-bold text-slate-500 tracking-wider uppercase">{appMode === 'professor' ? 'Diários e Frequência' : 'Notas e Registros'}</p>
                           </div>
                        </a>
 
-                       <a href="https://virtual.ifro.edu.br/jiparana/" target="_blank" rel="noopener noreferrer" 
+                       <a href={appMode === 'professor' ? "https://sei.ifro.edu.br/" : "https://virtual.ifro.edu.br/jiparana/"} target="_blank" rel="noopener noreferrer" 
                           className={`group flex items-center gap-5 px-8 py-6 rounded-[2.5rem] border transition-all hover:scale-[1.02] ${isDarkMode ? "bg-slate-900 border-slate-800 hover:border-indigo-500/50" : "bg-white border-slate-100 shadow-xl shadow-slate-200/50 hover:border-indigo-200"}`}>
                           <div className={`w-12 h-12 rounded-2xl flex items-center justify-center transition-all ${isDarkMode ? "bg-indigo-500/10 text-indigo-400 group-hover:bg-indigo-500 group-hover:text-white" : "bg-indigo-50 text-indigo-600 group-hover:bg-indigo-600 group-hover:text-white"}`}>
-                            <Book size={24} />
+                            {appMode === 'professor' ? <FileText size={24} /> : <Book size={24} />}
                           </div>
                           <div className="text-left">
-                            <h4 className={`text-sm font-black ${isDarkMode ? "text-white" : "text-slate-900"}`}>AVA IFRO</h4>
-                            <p className="text-[10px] font-bold text-slate-500 tracking-wider uppercase">Virtual</p>
+                            <h4 className={`text-sm font-black ${isDarkMode ? "text-white" : "text-slate-900"}`}>{appMode === 'professor' ? 'SEI IFRO' : 'AVA IFRO'}</h4>
+                            <p className="text-[10px] font-bold text-slate-500 tracking-wider uppercase">{appMode === 'professor' ? 'Processos e Ofícios' : 'Ji-Paraná Virtual'}</p>
                           </div>
                        </a>
 
-                       <a href="https://wa.me/5569999047804" target="_blank" rel="noopener noreferrer" 
-                          className={`group flex items-center gap-5 px-8 py-6 rounded-[2.5rem] border transition-all hover:scale-[1.02] ${isDarkMode ? "bg-slate-900 border-slate-800 hover:border-green-500/50" : "bg-white border-slate-100 shadow-xl shadow-slate-200/50 hover:border-green-200"}`}>
-                          <div className={`w-12 h-12 rounded-2xl flex items-center justify-center transition-all ${isDarkMode ? "bg-green-500/10 text-green-400 group-hover:bg-green-500 group-hover:text-white" : "bg-green-50 text-green-600 group-hover:bg-green-600 group-hover:text-white"}`}>
-                            <MessageCircle size={24} />
+                       <a href={appMode === 'professor' ? "https://suap.ifro.edu.br/admin/comum/sala/?agendavel__exact=1&all=&predio__uo=7&tab=tab_any_data" : "https://wa.me/5569999047804"} target="_blank" rel="noopener noreferrer" 
+                          className={`group flex items-center gap-5 px-8 py-6 rounded-[2.5rem] border transition-all hover:scale-[1.02] ${isDarkMode ? "bg-slate-900 border-slate-800 hover:border-rose-500/50" : "bg-white border-slate-100 shadow-xl shadow-slate-200/50 hover:border-rose-200"}`}>
+                          <div className={`w-12 h-12 rounded-2xl flex items-center justify-center transition-all ${isDarkMode ? "bg-rose-500/10 text-rose-400 group-hover:bg-rose-600 group-hover:text-white" : "bg-rose-50 text-rose-600 group-hover:bg-rose-600 group-hover:text-white"}`}>
+                            {appMode === 'professor' ? <MapPin size={24} /> : <MessageCircle size={24} />}
                           </div>
                           <div className="text-left">
-                            <h4 className={`text-sm font-black ${isDarkMode ? "text-white" : "text-slate-900"}`}>WhatsApp</h4>
-                            <p className="text-[10px] font-bold text-slate-500 tracking-wider uppercase">CAED</p>
+                            <h4 className={`text-sm font-black ${isDarkMode ? "text-white" : "text-slate-900"}`}>{appMode === 'professor' ? 'Reservar Salas' : 'WhatsApp CAED'}</h4>
+                            <p className="text-[10px] font-bold text-slate-500 tracking-wider uppercase">{appMode === 'professor' ? 'Agendamento SUAP' : 'Suporte ao Aluno'}</p>
                           </div>
                        </a>
+
+                       {appMode === 'professor' && (
+                         <>
+                           <a href="https://docs.google.com/spreadsheets/d/1k9Tyy_2pYsJyRKeSq3NpSpXHzUoPigyweyRUHGiAbW4/edit?gid=176889928#gid=176889928" target="_blank" rel="noopener noreferrer" 
+                              className={`group flex items-center gap-5 px-8 py-6 rounded-[2.5rem] border transition-all hover:scale-[1.02] ${isDarkMode ? "bg-slate-900 border-slate-800 hover:border-blue-500/50" : "bg-white border-slate-100 shadow-xl shadow-slate-200/50 hover:border-blue-200"}`}>
+                              <div className={`w-12 h-12 rounded-2xl flex items-center justify-center transition-all ${isDarkMode ? "bg-blue-500/10 text-blue-400 group-hover:bg-blue-600 group-hover:text-white" : "bg-blue-50 text-blue-600 group-hover:bg-blue-600 group-hover:text-white"}`}>
+                                <Monitor size={24} />
+                              </div>
+                              <div className="text-left">
+                                <h4 className={`text-sm font-black ${isDarkMode ? "text-white" : "text-slate-900"}`}>Labs Informática</h4>
+                                <p className="text-[10px] font-bold text-slate-500 tracking-wider uppercase">Planilha de Reserva</p>
+                              </div>
+                           </a>
+
+                           <a href="https://virtual.ifro.edu.br/jiparana/" target="_blank" rel="noopener noreferrer" 
+                              className={`group flex items-center gap-5 px-8 py-6 rounded-[2.5rem] border transition-all hover:scale-[1.02] ${isDarkMode ? "bg-slate-900 border-slate-800 hover:border-indigo-500/50" : "bg-white border-slate-100 shadow-xl shadow-slate-200/50 hover:border-indigo-200"}`}>
+                              <div className={`w-12 h-12 rounded-2xl flex items-center justify-center transition-all ${isDarkMode ? "bg-indigo-500/10 text-indigo-400 group-hover:bg-indigo-500 group-hover:text-white" : "bg-indigo-50 text-indigo-600 group-hover:bg-indigo-600 group-hover:text-white"}`}>
+                                <Book size={24} />
+                              </div>
+                              <div className="text-left">
+                                <h4 className={`text-sm font-black ${isDarkMode ? "text-white" : "text-slate-900"}`}>AVA (Moodle)</h4>
+                                <p className="text-[10px] font-bold text-slate-500 tracking-wider uppercase">Ji-Paraná Virtual</p>
+                              </div>
+                           </a>
+                         </>
+                       )}
                     </div>
-                 </div>
-               </div>
+                  </div>
+                </div>
+              </div>
             </div>
            )}
+
         {/* DASHBOARD HEADER: LINKS ALUNO (UX PREMIUM - MOBILE OPTIMIZED) */}
 
 
@@ -2033,13 +2074,13 @@ export function PortalView({
                       getFormattedDayLabel={getFormattedDayLabel}
                     />
                   )}
-                </>
-              )}
-            </div>
-            </React.Fragment>
-            )}
-          </div>
-        )}
+                   </>
+                 )}
+               </div>
+             </React.Fragment>
+           )}
+         </div>
+       )}
         
       {/* Editor Interativo */}
       {editorModal && (

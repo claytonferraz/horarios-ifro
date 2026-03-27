@@ -90,7 +90,14 @@ export function GestaoDape({
 
       {/* Content Area */}
       <div className="animate-in fade-in duration-500">
-        {activeTab === 'dashboard' && <CommandCenterDashboard isDarkMode={isDarkMode} />}
+        {activeTab === 'dashboard' && (
+          <CommandCenterDashboard 
+            isDarkMode={isDarkMode} 
+            mappedSchedules={props.mappedSchedules}
+            finalFilteredTotalData={finalFilteredTotalData}
+            classesList={props.classesList || []}
+          />
+        )}
         {activeTab === 'solicitacoes' && <AdminRequestsManager isDarkMode={isDarkMode} />}
         
         {activeTab === 'master_grid' && (
