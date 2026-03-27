@@ -1236,8 +1236,9 @@ export function PortalView({
                                  let badgeClasses = isDarkMode ? "bg-slate-950 text-slate-400 border-slate-800" : "bg-slate-50 text-slate-800 border-slate-100";
                                  
                                  if (isVaga) {
-                                    containerClasses = isDarkMode ? "bg-orange-500/10 border-orange-500/50" : "bg-orange-50 border-orange-200 shadow-sm";
+                                    containerClasses = isDarkMode ? "bg-orange-500/10 border-orange-500/50 shadow-2xl shadow-orange-500/20 scale-[1.03] ring-2 ring-orange-500/50 animate-pulse" : "bg-orange-50 border-orange-200 shadow-xl shadow-orange-100 scale-[1.03] ring-2 ring-orange-500/30 animate-pulse";
                                     timeColor = isDarkMode ? "text-orange-400" : "text-orange-700";
+                                    badgeClasses = "bg-orange-600 text-white shadow-lg shadow-orange-500/30 border-orange-400";
                                  }
 
                                  if (isTarget) {
@@ -1247,7 +1248,27 @@ export function PortalView({
                                  }
 
                                  return (
-                                   <div key={aula.id || idx} className={`group/item relative flex items-center justify-between p-5 rounded-[2.5rem] border transition-all duration-500 m-1.5 ${containerClasses}`}>
+                                   <div 
+                                     key={aula.id || idx} 
+                                     className={`group/item relative flex items-center justify-between p-5 rounded-[2.5rem] border transition-all duration-500 m-1.5 ${containerClasses} ${isVaga && appMode === 'professor' && dashboardTab === 'vagas' ? 'cursor-pointer hover:scale-[1.02]' : ''}`}
+                                     onClick={() => {
+                                       if (appMode === 'professor' && dashboardTab === 'vagas' && isVaga) {
+                                           // Verifica restrição de turma
+                                           if (userRole !== 'admin' && userRole !== 'gestao' && profClassesMemo && !profClassesMemo.has(String(aula.className))) {
+                                               alert("Você só pode assumir vagas em turmas onde você já leciona ao menos uma disciplina.");
+                                               return;
+                                           }
+                                           setVacantRequestModal({
+                                               className: aula.className,
+                                               day: aula.day,
+                                               time: aula.time,
+                                               classId: aula.classId,
+                                               disciplineId: aula.disciplineId,
+                                               subject: aula.subject
+                                           });
+                                       }
+                                     }}
+                                   >
                                      <div className="flex flex-col">
                                        <span className={`text-[13px] font-black tracking-tighter ${timeColor}`}>
                                          {aula.time}

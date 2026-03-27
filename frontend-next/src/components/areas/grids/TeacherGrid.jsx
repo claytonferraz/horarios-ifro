@@ -38,12 +38,15 @@ export const TeacherGrid = React.memo(
   }) => {
     const activeTeacher = selectedColleague || selectedTeacher;
     const isGridInert = appMode === 'aluno' || scheduleMode === 'consolidado' || scheduleMode === 'oficial';
-    // 1. Descobre as turmas onde o professor leciona (protegendo contra string vazia que retorna true no includes)
+    // As turmas onde o professor logado leciona (para restrição de interação)
+    const myClasses = profClassesMemo || new Set();
+    
+    // Filtro principal de registros do professor selecionado (ou colega sendo visualizado)
     const directRecords = mappedSchedules.filter(r => r.teacherId && activeTeacher && String(r.teacherId).split(',').includes(String(activeTeacher)));
-    const profClasses = new Set(directRecords.map(r => r.className));
+    const targetClasses = new Set(directRecords.map(r => r.className));
     
     // Exibe as aulas do professor, as AULAS VAGAS e as aulas de OUTROS PROFESSORES nas turmas onde ele leciona
-    let profRecords = mappedSchedules.filter(r => profClasses.has(r.className));
+    let profRecords = mappedSchedules.filter(r => targetClasses.has(r.className));
 
     const profCourses = [...new Set(profRecords.map((r) => r.course))].sort(
       (a, b) => String(a).localeCompare(String(b)),
@@ -360,7 +363,7 @@ export const TeacherGrid = React.memo(
                                                             cardStyle += isDarkMode ? `bg-slate-800 border-dashed border-slate-500 text-slate-400 ${finalInert ? 'cursor-default opacity-80' : ''}` : `bg-slate-100 border-dashed border-slate-400 text-slate-500 ${finalInert ? 'cursor-default opacity-80' : ''}`;
                                                          } else if (isVagaReal) {
                                                             // 🟠 AULA VAGA — laranja vibrante + borda pulsante
-                                                            cardStyle += `vacant-slot-card ${isDarkMode ? 'bg-orange-500/10 border-orange-500/50 text-orange-200' : 'bg-orange-50 border-orange-200 text-orange-900 shadow-orange-100'} ${finalInert ? 'cursor-default' : 'cursor-pointer hover:scale-[1.03] hover:shadow-xl hover:border-orange-500'}`;
+                                                            cardStyle += `vacant-slot-card ${isDarkMode ? 'bg-orange-500/20 border-orange-500/80 text-orange-200' : 'bg-orange-100 border-orange-400 text-orange-900 shadow-orange-200'} animate-pulse ${finalInert ? 'cursor-default' : 'cursor-pointer hover:scale-[1.03] hover:shadow-xl hover:border-orange-500'}`;
                                                          } else if (hasPendingSwap) {
                                                             cardStyle += isDarkMode ? `bg-amber-500/10 border-amber-500/50 ${finalInert ? 'cursor-default' : 'cursor-pointer hover:scale-[1.02]'} text-amber-200 shadow-[0_0_10px_rgba(251,191,36,0.2)]` : `bg-amber-50 border-amber-200 text-amber-900 ${finalInert ? 'cursor-default' : 'cursor-pointer hover:scale-[1.02]'} shadow-xl shadow-amber-100`;
                                                          } else if (isActive) {
@@ -393,7 +396,7 @@ export const TeacherGrid = React.memo(
                                                                 
                                                                 if (isActive || isVagaReal) {
                                                                   if (userRole !== "admin" && userRole !== "gestao") {
-                                                                    if (!profClasses.has(r.className)) {
+                                                                    if (!myClasses.has(r.className)) {
                                                                        alert("Você só pode solicitar trocas ou assumir vagas em turmas onde você já leciona ao menos uma disciplina.");
                                                                        return;
                                                                     }
