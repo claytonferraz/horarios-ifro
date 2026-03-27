@@ -51,7 +51,7 @@ export const CourseGrid = React.memo(
     const [activeCourseTab, setActiveCourseTab] = useState("Todos");
     const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
     
-    const isGridInert = appMode === 'aluno' || (scheduleMode === 'consolidado' || scheduleMode === 'oficial');
+    const isGridInert = appMode === 'aluno' || (appMode === 'professor' && userRole !== 'admin' && userRole !== 'gestao') || (scheduleMode === 'consolidado' || scheduleMode === 'oficial');
 
     const activeTeacherFilter = showOnlyMyClasses ? siape : (padraoFilterTeacher && padraoFilterTeacher !== "Todos" ? padraoFilterTeacher : null);
 
