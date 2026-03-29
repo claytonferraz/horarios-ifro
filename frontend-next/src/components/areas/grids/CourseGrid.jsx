@@ -104,6 +104,15 @@ export const CourseGrid = React.memo(
       const coursesToPrint = activeCourseTab === "Todos" ? availableCourses : [activeCourseTab];
       const labelStr = dynamicWeeksList.find(w => w.value === selectedWeek)?.label || selectedWeek;
       
+      // Aplicar filtros de exibição nos dados de impressão
+      let printingSchedules = [...mappedSchedules];
+      
+      if (showOnlyMyClasses && siape) {
+        printingSchedules = printingSchedules.filter(r => r.teacherId && String(r.teacherId).split(',').includes(String(siape)));
+      } else if (padraoFilterTeacher !== 'Todos') {
+        printingSchedules = printingSchedules.filter(r => r.teacherId && String(r.teacherId).split(',').includes(String(padraoFilterTeacher)));
+      }
+
       let html = `
         <!DOCTYPE html>
         <html lang="pt-BR">
@@ -151,7 +160,8 @@ export const CourseGrid = React.memo(
       `;
 
       coursesToPrint.forEach(course => {
-        const records = mappedSchedules.filter(r => r.course === course);
+        const records = printingSchedules.filter(r => r.course === course);
+        if (records.length === 0) return; // Se não tem aula desse curso no filtro, pula a página
         const classes = [...new Set(records.map(r => r.className))].sort();
         
         // Obter campus da matriz
