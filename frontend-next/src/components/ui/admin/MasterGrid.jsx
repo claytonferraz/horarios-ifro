@@ -102,7 +102,7 @@ const GridCell = React.memo(({
                 </span>
              </div>
              {aulaNesteSlot.sala && (
-               <span title={aulaNesteSlot.sala} className="text-[7.5px] font-black bg-black/5 dark:bg-white/10 px-1 rounded flex items-center gap-0.5 shrink-0 max-w-[80px] overflow-hidden whitespace-nowrap">
+               <span title={aulaNesteSlot.sala} className="text-[7.5px] font-black bg-black/5 dark:bg-white/10 px-1 rounded flex items-center gap-0.5 shrink-0 max-w-[100px] overflow-hidden whitespace-nowrap">
                   <MapPin size={6} className="shrink-0" /> <span className="truncate">{aulaNesteSlot.sala}</span>
                </span>
              )}
@@ -112,15 +112,13 @@ const GridCell = React.memo(({
           <div className="absolute inset-0 bg-white/10 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none" />
 
           {/* Botão Remover X */}
-          {onRemoveCard && (
-            <button
-               title="Remover da Grade"
-               onClick={(e) => { e.stopPropagation(); onRemoveCard(slotKey); }}
-               className="absolute top-1 right-1 w-4 h-4 flex items-center justify-center bg-rose-500/90 hover:bg-rose-600 text-white rounded-full opacity-0 group-hover:opacity-100 transition-all shadow-sm z-20 print:hidden cursor-pointer hover:scale-110"
-            >
-               <X size={10} strokeWidth={3} />
-            </button>
-          )}
+             <button
+                title="Remover da Grade"
+                onClick={(e) => { e.stopPropagation(); onRemoveCard(slotKey); }}
+                className="absolute top-1 right-1 w-5 h-5 flex items-center justify-center bg-rose-500 hover:bg-rose-600 text-white rounded-full opacity-0 group-hover:opacity-100 transition-all shadow-md z-20 print:hidden cursor-pointer hover:scale-110 active:scale-95 border border-white/20"
+             >
+                <X size={12} strokeWidth={3} />
+             </button>
         </div>
       ) : (
         <div className={`w-full min-h-[58px] rounded-xl border-2 border-dashed flex items-center justify-center transition-colors group/empty ${
@@ -1115,8 +1113,8 @@ export function MasterGrid({ isDarkMode, ...props }) {
                  }`}
                >
                   {isSaving ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />} 
-                  <span>{isSaving ? 'Salvando...' : (isDirty ? 'Publicar Alterações' : (selectedType === 'padrao' ? 'Desdobrar Padrão' : 'Sem Pendências'))}</span>
-                  {isDirty && !isSaving && <div className="absolute -top-1.5 -right-1.5 w-4 h-4 bg-rose-500 rounded-full border-2 border-white dark:border-slate-900 flex items-center justify-center text-[8px] font-black text-white shadow-lg animate-bounce">!</div>}
+                  <span>{isSaving ? 'Salvando...' : (isDirty ? 'Publicar Alterações' : (selectedType === 'padrao' ? 'Publicar Grade Padrão' : 'Sem Pendências'))}</span>
+                  {(isDirty || selectedType === 'padrao') && !isSaving && <div className="absolute -top-1.5 -right-1.5 w-4 h-4 bg-rose-500 rounded-full border-2 border-white dark:border-slate-900 flex items-center justify-center text-[8px] font-black text-white shadow-lg animate-bounce">!</div>}
                </button>
                {isDirty && !isSaving && (
                  <div className="absolute bottom-full mb-3 left-1/2 -translate-x-1/2 p-2 px-3 rounded-lg bg-emerald-600 text-white text-[8px] font-black uppercase tracking-widest opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap shadow-xl">
@@ -1175,14 +1173,14 @@ export function MasterGrid({ isDarkMode, ...props }) {
           ) : (
             <select value={selectedWeek} onChange={(e) => setSelectedWeek(e.target.value)} className={`px-4 py-2.5 rounded-lg border shadow-sm outline-none cursor-pointer text-xs font-bold uppercase tracking-wider text-amber-600 dark:text-amber-400 ${isDarkMode ? 'bg-slate-800 border-slate-600' : 'bg-white border-slate-200'}`}>
               <option value="">-- Semana --</option>
-              {academicWeeks?.filter(w => String(w.academic_year) === String(selectedConfigYear)).sort((a,b) => (a.start_date || '').localeCompare(b.start_date || '') || ((parseInt((a.name||'').replace(/\\D/g, ''))||0) - (parseInt((b.name||'').replace(/\\D/g, ''))||0))).map(w => {
+              {academicWeeks?.filter(w => String(w.academic_year) === String(selectedConfigYear)).sort((a,b) => (a.start_date || '').localeCompare(b.start_date || '') || ((parseInt((a.name||'').replace(/\D/g, ''))||0) - (parseInt((b.name||'').replace(/\D/g, ''))||0))).map(w => {
                  const hasData = weeksWithData.has(String(w.id));
                  const d1 = w.start_date?.split('-');
                  const d2 = w.end_date?.split('-');
-                 const dateLabel = (d1?.length === 3 && d2?.length === 3) ? ` (${d1[2]}/${d1[1]} a ${d2[2]}/${d2[1]})` : '';
+                 const dateLabel = (d1 && d2 && d1.length === 3 && d2.length === 3) ? `${d1[2]}/${d1[1]} a ${d2[2]}/${d2[1]}` : '';
                  return (
                     <option key={w.id} value={w.id} className={hasData ? (isDarkMode ? 'bg-emerald-900/60 text-emerald-400 font-black' : 'bg-emerald-100 text-emerald-700 font-black') : (isDarkMode ? 'text-slate-400' : 'text-slate-500')}>
-                       {hasData ? '✔ ' : '⏳ '}{w.name}{dateLabel} {hasData ? '(Preenchida)' : ''}
+                       {hasData ? '✔ ' : '⏳ '}{w.name} {dateLabel ? `(${dateLabel})` : ''} {hasData ? '(Preenchida)' : ''}
                     </option>
                  )
               })}
@@ -1266,7 +1264,7 @@ export function MasterGrid({ isDarkMode, ...props }) {
               <>
                 <h3 className="text-[11px] font-black uppercase tracking-widest text-slate-500 mb-4 flex items-center justify-between border-b pb-2 border-slate-700/50">
                   <span className="flex items-center gap-2"><AlertCircle size={14} /> Disciplinas Pendentes</span>
-                  <span className={`px-2 py-0.5 rounded text-white shadow-sm ${totalMissing > 0 ? 'bg-rose-500' : 'bg-emerald-500'}`} title="Saldo de aulas (Vermelho = Faltam na Grade / Verde = Grade Completa ou Excedente)">
+                  <span className={`px-2 py-0.5 rounded text-white shadow-sm font-black min-w-[30px] text-center ${totalMissing <= 0 ? 'bg-emerald-500' : 'bg-rose-500'}`} title="Saldo total de aulas (Verde = Todas as aulas do curso alocadas | Vermelho = Faltam aulas)">
                     {totalMissing}
                   </span>
                 </h3>
@@ -1352,23 +1350,26 @@ export function MasterGrid({ isDarkMode, ...props }) {
                     <th key={turma.id} className={`py-2 px-2 text-center text-[11px] font-black uppercase tracking-widest border-b-2 bg-inherit group/th transition-all duration-300 ${draggedItem && String(draggedItem.aula.classId) !== String(turma.id) ? 'opacity-30 grayscale pointer-events-none' : ''} ${isDarkMode ? 'border-slate-700/50' : 'border-slate-200'}`}>
                       <div className="flex items-center justify-center gap-2 relative w-full h-full">
                          <span className="truncate max-w-[120px]">{turma.name}</span>
-                         <span className={`px-1.5 py-0.5 rounded-md text-[9px] font-black text-white shadow-sm min-w-[20px] ${saldoTurma > 0 ? 'bg-rose-500' : 'bg-emerald-500'}`} title={saldoTurma > 0 ? `Faltam ${saldoTurma} aulas na grade` : saldoTurma < 0 ? `Excedente de ${Math.abs(saldoTurma)} aulas` : 'Grade Completa'}>
+                         <span className={`px-1.5 py-0.5 rounded-md text-[9px] font-black text-white shadow-sm min-w-[20px] ${saldoTurma <= 0 ? 'bg-emerald-500' : 'bg-rose-500'}`} title={saldoTurma > 0 ? `Faltam ${saldoTurma} aulas na grade` : saldoTurma < 0 ? `Excedente de ${Math.abs(saldoTurma)} aulas` : 'Grade Completa'}>
                            {saldoTurma}
                          </span>
                          <div className="absolute right-0 flex items-center gap-1 opacity-0 group-hover/th:opacity-100 transition-opacity bg-inherit pl-2">
                             <button 
                                onClick={() => {
-                                  const otherClassIds = turmasDoCurso.map(t => String(t.id)).filter(id => id !== String(turma.id));
+                                  const allTurmaIds = turmasDoCurso.map(t => String(t.id));
+                                  const otherClassIds = allTurmaIds.filter(id => id !== String(turma.id));
                                   if (otherClassIds.length === 0) return;
-                                  const isIsolated = otherClassIds.every(id => hiddenClasses.includes(id));
-                                  if (isIsolated) {
+                                  
+                                  const isCurrentlyFocused = hiddenClasses.length === otherClassIds.length && otherClassIds.every(id => hiddenClasses.includes(id));
+                                  
+                                  if (isCurrentlyFocused) {
                                       setHiddenClasses([]); // Volta para todas as turmas
                                   } else {
                                       setHiddenClasses(otherClassIds); // Foca nesta turma (ocultando as demais)
                                   }
                                }} 
                                title={hiddenClasses.length > 0 && turmasDoCurso.map(t => String(t.id)).filter(id => id !== String(turma.id)).every(id => hiddenClasses.includes(id)) ? "Remover Modo Foco (Mostrar todas as turmas)" : "Modo Foco: Mostrar apenas esta turma"} 
-                               className={`hover:text-indigo-500 transition-colors rounded shadow-sm border p-0.5 ${isDarkMode ? 'bg-slate-800 border-slate-700 text-slate-400' : 'bg-white border-slate-200 text-slate-500'}`}
+                               className={`hover:text-indigo-500 transition-colors rounded shadow-sm border p-0.5 ${hiddenClasses.length > 0 && turmasDoCurso.map(t => String(t.id)).filter(id => id !== String(turma.id)).every(id => hiddenClasses.includes(id)) ? 'bg-indigo-600 border-indigo-500 text-white' : (isDarkMode ? 'bg-slate-800 border-slate-700 text-slate-400' : 'bg-white border-slate-200 text-slate-500')}`}
                              >
                                 <Target size={12} />
                              </button>
@@ -1404,14 +1405,15 @@ export function MasterGrid({ isDarkMode, ...props }) {
                     </tr>
                     
                     {disabledDays.has(diaNome) && (
-                      <tr className={`border-b-4 ${isDarkMode ? 'border-slate-800/80 bg-slate-900/50' : 'border-slate-100 bg-slate-50/50'}`}>
-                         <td className={`py-8 text-center sticky left-0 z-30 text-[9px] uppercase tracking-[0.3em] font-black opacity-30 ${isDarkMode ? 'text-slate-400 bg-slate-800' : 'text-slate-500 bg-slate-100'}`}></td>
-                         <td colSpan={turmasDoCurso.filter(t => !hiddenClasses.includes(t.id)).length} className="text-center font-black uppercase tracking-[0.5em] text-xs py-8 opacity-40 select-none">
-                            <div className="flex flex-col items-center justify-center gap-2">
-                               NÃO LETIVO / FERIADO
-                            </div>
-                         </td>
-                      </tr>
+                        <tr className={`border-b-4 ${isDarkMode ? 'border-slate-800/80 bg-rose-950/20' : 'border-slate-100 bg-rose-50/30'}`}>
+                           <td className={`py-12 text-center sticky left-0 z-30 text-[9px] uppercase tracking-[0.3em] font-black opacity-30 ${isDarkMode ? 'text-slate-400 bg-slate-800' : 'text-slate-500 bg-slate-100'}`}></td>
+                           <td colSpan={turmasDoCurso.filter(t => !hiddenClasses.includes(t.id)).length} className="text-center font-black uppercase tracking-[0.8em] text-xs py-12 opacity-50 select-none">
+                              <div className="flex flex-col items-center justify-center gap-2">
+                                 <span className={`text-sm ${isDarkMode ? 'text-rose-400' : 'text-rose-600'}`}>FERIADO OU DIA NÃO LETIVO</span>
+                                 <span className="text-[10px] tracking-widest opacity-60">As aulas deste dia não serão contabilizadas</span>
+                              </div>
+                           </td>
+                        </tr>
                     )}
 
                     {/* Horários do Dia */}
@@ -1613,7 +1615,7 @@ export function MasterGrid({ isDarkMode, ...props }) {
       )}
 
       {dashboardAlerts.list.length > 0 && (
-         <div className={`fixed bottom-4 left-4 sm:bottom-6 sm:left-6 z-[9990] flex flex-col items-start gap-2 max-w-[90vw] sm:max-w-sm transition-all duration-300 pointer-events-none`}>
+         <div className={`fixed bottom-4 left-4 sm:bottom-6 sm:left-6 z-[9990] flex flex-col items-start gap-2 max-w-[90vw] sm:max-w-sm transition-all duration-300 pointer-events-none print:hidden`}>
             {!isAlertsMinimized ? (
                <div className={`w-full rounded-2xl shadow-2xl border overflow-hidden flex flex-col pointer-events-auto animate-in slide-in-from-bottom-5 fade-in ${isDarkMode ? 'bg-slate-900 border-slate-700' : 'bg-white border-slate-300'}`}>
                   <div className={`p-3 border-b flex justify-between items-center ${isDarkMode ? 'bg-red-950/40 border-slate-800' : 'bg-red-50 border-slate-100'}`}>
@@ -1645,8 +1647,8 @@ export function MasterGrid({ isDarkMode, ...props }) {
          </div>
       )}
 
-      {isRightPanelOpen && <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-[9998]" onClick={() => setIsRightPanelOpen(false)} />}
-      <div className={`fixed top-0 right-0 h-full w-full sm:w-[400px] shadow-2xl z-[9999] transition-transform transform duration-300 flex flex-col ${isRightPanelOpen ? 'translate-x-0' : 'translate-x-full'} ${isDarkMode ? 'bg-slate-900 border-l border-slate-700' : 'bg-slate-50 border-l border-slate-300'}`}>
+      {isRightPanelOpen && <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-[9998] print:hidden" onClick={() => setIsRightPanelOpen(false)} />}
+      <div className={`fixed top-0 right-0 h-full w-full sm:w-[400px] shadow-2xl z-[9999] transition-transform transform duration-300 flex flex-col print:hidden ${isRightPanelOpen ? 'translate-x-0' : 'translate-x-full'} ${isDarkMode ? 'bg-slate-900 border-l border-slate-700' : 'bg-slate-50 border-l border-slate-300'}`}>
          <div className={`p-5 border-b flex justify-between items-center shadow-sm ${isDarkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'}`}>
             <h2 className="text-sm font-black uppercase tracking-widest flex items-center gap-2">
                <Bell size={18} className="text-indigo-500" />
@@ -1786,9 +1788,9 @@ function SaveMatrixModal({ isDarkMode, grade, selectedCourses, courses, saveOpti
      return m;
   }, [schedules]);
 
-  const currentYearWeeks = useMemo(() => {
-    return (academicWeeks?.filter(w => String(w.academic_year) === String(selectedConfigYear)) || []).sort((a,b) => (a.start_date || '').localeCompare(b.start_date || '') || ((parseInt((a.name||'').replace(/\\D/g, ''))||0) - (parseInt((b.name||'').replace(/\\D/g, ''))||0)));
-  }, [academicWeeks, selectedConfigYear]);
+   const currentYearWeeks = useMemo(() => {
+     return (academicWeeks?.filter(w => String(w.academic_year) === String(selectedConfigYear)) || []).sort((a,b) => (a.start_date || '').localeCompare(b.start_date || '') || ((parseInt((a.name||'').replace(/\D/g, ''))||0) - (parseInt((b.name||'').replace(/\D/g, ''))||0)));
+   }, [academicWeeks, selectedConfigYear]);
 
   const availableOptions = useMemo(() => {
     if (loadedType === 'padrao') return [{ value: 'padrao', label: '0. Atualizar: Padrão Anual (Base)' }, { value: 'previa', label: '1. Criar: Prévia Semanal' }];
@@ -1891,12 +1893,11 @@ function SaveMatrixModal({ isDarkMode, grade, selectedCourses, courses, saveOpti
           {saveOptions.type !== 'padrao' ? (
             <div>
               <label className="block text-[10px] font-black uppercase opacity-60 mb-2">Semana Destino</label>
-              <select value={saveOptions.weekId} onChange={e => setSaveOptions(p => ({...p, weekId: e.target.value}))} className={`w-full p-3.5 rounded-xl border text-sm font-bold outline-none transition-colors ${isDarkMode ? 'bg-slate-950 border-slate-700 focus:border-indigo-500' : 'bg-white border-slate-300 focus:border-indigo-500 text-black'}`}>
+              <select value={saveOptions.weekId} onChange={e => setSaveOptions({...saveOptions, weekId: e.target.value})} className={`w-full p-3.5 rounded-xl border text-sm font-bold outline-none transition-colors ${isDarkMode ? 'bg-slate-950 border-slate-700 focus:border-indigo-500' : 'bg-white border-slate-300 focus:border-indigo-500 text-black'}`}>
                  <option value="">Selecione...</option>
                  {currentYearWeeks.map(w => {
                      const d1 = w.start_date?.split('-');
                      const d2 = w.end_date?.split('-');
-                     const dateLabel = (d1?.length === 3 && d2?.length === 3) ? ` (${d1[2]}/${d1[1]} a ${d2[2]}/${d2[1]})` : '';
                      return (
                          <option key={w.id} value={w.id}>{w.name}{dateLabel}</option>
                      );

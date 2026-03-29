@@ -1923,6 +1923,7 @@ export function PortalView({
                       bimesters={bimesters}
                       academicWeeks={academicWeeks}
                       handlePrint={handlePrint}
+                      hideTeacherFilter={appMode === 'professor' || appMode === 'aluno'}
                     />
                     </div>
                   )}

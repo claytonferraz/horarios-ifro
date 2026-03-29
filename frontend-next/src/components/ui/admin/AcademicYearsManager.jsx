@@ -181,7 +181,7 @@ export function AcademicYearsManager({ isDarkMode, academicYearsMeta, uniqueYear
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {allYears.map(year => {
+            {allYears.map((year, idx) => {
               const meta = academicYearsMeta[year] || { totalDays: '' };
               const isFromDB = !!academicYearsMeta[year];
 
@@ -194,7 +194,7 @@ export function AcademicYearsManager({ isDarkMode, academicYearsMeta, uniqueYear
               const pct = meta.totalDays ? Math.min(100, Math.round((currentDaysCalc / Number(meta.totalDays)) * 100)) : 0;
 
               return (
-                <div key={year} className={`p-5 rounded-2xl border shadow-sm relative ${isDarkMode ? 'bg-slate-900 border-slate-700' : 'bg-slate-50 border-slate-200'}`}>
+                <div key={`${year}-${idx}`} className={`p-5 rounded-2xl border shadow-sm relative ${isDarkMode ? 'bg-slate-900 border-slate-700' : 'bg-slate-50 border-slate-200'}`}>
                   {/* Year header */}
                   <div className="flex items-center justify-between mb-4">
                     <h3 className={`text-xl font-black ${isDarkMode ? 'text-white' : 'text-slate-800'}`}>Ano Letivo {year}</h3>

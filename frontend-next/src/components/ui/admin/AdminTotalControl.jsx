@@ -39,7 +39,9 @@ export function AdminTotalControl({
             <label className="text-[9px] font-black tracking-[0.2em] text-slate-400 uppercase ml-1 block">Professor</label>
             <SearchableSelect 
               isDarkMode={isDarkMode} 
-              options={availableTeachersForTotal.map(t => ({value: t, label: resolveTeacherName(t, globalTeachers)}))} 
+              options={availableTeachersForTotal
+                .map(t => ({value: t, label: resolveTeacherName(t, globalTeachers)}))
+                .sort((a,b) => String(a.label).localeCompare(String(b.label)))} 
               value={totalFilterTeacher} 
               onChange={setTotalFilterTeacher} 
               colorClass={isDarkMode ? 'bg-slate-800 border-slate-700 text-slate-200 shadow-sm' : 'bg-white border-slate-200 text-slate-800 shadow-sm'} 
@@ -70,7 +72,7 @@ export function AdminTotalControl({
         </div>
       </div>
 
-      <div className={`rounded-2xl shadow-sm border p-4 sm:p-6 flex flex-col xl:flex-row items-center justify-between gap-4 bg-gradient-to-br no-print ${isDarkMode ? 'bg-slate-800 border-slate-700 from-slate-800 to-slate-900' : 'bg-white border-slate-200 from-white to-slate-50/50'}`}>
+      <div className={`rounded-2xl shadow-sm border p-4 sm:p-6 flex flex-col xl:flex-row items-center justify-between gap-4 bg-gradient-to-br ${isDarkMode ? 'bg-slate-800 border-slate-700 from-slate-800 to-slate-900' : 'bg-white border-slate-200 from-white to-slate-50/50'}`}>
         
         <div className="flex items-center gap-4 w-full xl:w-auto">
           <div className={`p-4 rounded-2xl text-white shadow-xl rotate-2 shrink-0 ${isDarkMode ? 'bg-amber-700 shadow-none' : 'bg-amber-600 shadow-amber-200'}`}><BarChart3 size={32}/></div>

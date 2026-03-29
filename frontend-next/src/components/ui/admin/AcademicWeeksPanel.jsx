@@ -96,6 +96,20 @@ export function AcademicWeeksPanel({ isDarkMode }) {
          map[cat].push(w);
       }
     });
+
+    // Sort weeks numerically/chronologically within each category to avoid discontinuity (10 -> 23)
+    Object.keys(map).forEach(cat => {
+      map[cat].sort((a, b) => {
+        const d1 = a.start_date || '';
+        const d2 = b.start_date || '';
+        if (d1 !== d2) return d1.localeCompare(d2);
+        
+        const n1 = parseInt((a.name || '').replace(/\D/g, '')) || 0;
+        const n2 = parseInt((b.name || '').replace(/\D/g, '')) || 0;
+        return n1 - n2;
+      });
+    });
+
     return map;
   }, [academicWeeks, selectedConfigYear]);
 

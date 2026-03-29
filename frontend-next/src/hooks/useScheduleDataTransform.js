@@ -83,9 +83,9 @@ export function useScheduleDataTransform({
 
     Object.keys(bySerie).forEach(s => {
       bySerie[s].sort((a,b) => 
-        (a.course || '').localeCompare(b.course || '') || 
-        (a.className || '').localeCompare(b.className || '') || 
-        (a.subject || '').localeCompare(b.subject || '')
+        (a.course || "").localeCompare(b.course || "") || 
+        (a.className || "").localeCompare(b.className || "") || 
+        (a.subject || "").localeCompare(b.subject || "")
       );
     });
 
