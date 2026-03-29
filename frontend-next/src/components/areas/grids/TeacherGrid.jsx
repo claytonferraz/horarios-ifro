@@ -54,21 +54,155 @@ export const TeacherGrid = React.memo(
         ? directRecords 
         : mappedSchedules.filter(r => targetClasses.has(r.className));
 
-    const profCourses = [...new Set(profRecords.map((r) => r.course))].sort(
-      (a, b) => String(a).localeCompare(String(b)),
-    );
-    const [activeCourseTab, setActiveCourseTab] = useState("Todos");
+    const profItems = appMode === 'aluno' 
+        ? [...new Set(profRecords.map((r) => r.className))].sort((a,b) => String(a).localeCompare(String(b)))
+        : [...new Set(profRecords.map((r) => r.course))].sort((a, b) => String(a).localeCompare(String(b)));
+        
+    const [activeTab, setActiveTab] = useState("Todos");
 
     useEffect(() => {
       if (
-        profCourses.length > 0 &&
-        (!activeCourseTab ||
-          (activeCourseTab !== "Todos" &&
-            !profCourses.includes(activeCourseTab)))
+        profItems.length > 0 &&
+        (!activeTab ||
+          (activeTab !== "Todos" &&
+            !profItems.includes(activeTab)))
       ) {
-        setActiveCourseTab("Todos");
+        setActiveTab("Todos");
       }
-    }, [profCourses, activeCourseTab]);
+    }, [profItems, activeTab]);
+
+    const handlePrintClick = () => {
+      const printWindow = window.open('', '_blank');
+      const itemsToPrint = activeTab === "Todos" ? profItems : [activeTab];
+      const labelStr = dynamicWeeksList.find(w => w.value === selectedWeek)?.label || selectedWeek;
+      const teacherName = resolveTeacherName(selectedTeacher, globalTeachers);
+      
+      // Aplicar filtros de exibição nos dados de impressão
+      let printingRecords = [...profRecords];
+      
+      let html = `
+        <!DOCTYPE html>
+        <html lang="pt-BR">
+        <head>
+          <meta charset="UTF-8">
+          <title>Horário do Professor - IFRO</title>
+          <style>
+            @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;700;900&display=swap');
+            @page { size: A4 landscape; margin: 5mm; }
+            body { font-family: 'Inter', sans-serif; margin: 0; padding: 10px; background: white; color: black; line-height: 1.2; }
+            .course-page { page-break-after: always; padding-bottom: 20px; }
+            .course-page:last-child { page-break-after: auto; }
+            
+            .header { text-align: center; border-bottom: 2px solid black; padding-bottom: 8px; margin-bottom: 12px; }
+            .header h1 { margin: 0; font-size: 16pt; text-transform: uppercase; font-weight: 900; letter-spacing: 2px; }
+            .header p { margin: 4px 0 0 0; font-size: 9pt; font-weight: bold; text-transform: uppercase; }
+            .meta-info { display: flex; justify-content: space-between; font-size: 8pt; font-weight: normal; margin-top: 5px; color: #333; }
+            
+            .course-name { font-size: 12pt; font-weight: 900; text-transform: uppercase; margin: 10px 0 8px 0; display: block; border-left: 6px solid black; padding-left: 8px; }
+            
+            table { width: 100%; border-collapse: collapse; border: 2pt solid black; table-layout: fixed; }
+            th, td { border: 1pt solid black !important; padding: 4px 3px; text-align: center; vertical-align: middle; font-size: 7.5pt; }
+            th { background-color: #f0f0f0; font-weight: 900; text-transform: uppercase; height: 28px; font-size: 7pt; }
+            
+            .day-divider { border-top: 2.5pt solid black !important; background-color: #f9f9f9 !important; }
+            .day-label-container { 
+               writing-mode: vertical-rl; 
+               transform: rotate(180deg); 
+               white-space: nowrap;
+               font-weight: 900;
+               font-size: 8.5pt;
+               letter-spacing: 1px;
+            }
+            
+            .subject { font-weight: 900; font-size: 7.2pt; text-transform: uppercase; }
+            .room-info { display: block; font-size: 6pt; font-weight: bold; margin-top: 1px; color: #444; opacity: 0.8; }
+            
+            .footer-print { margin-top: 10px; font-size: 7pt; font-style: italic; text-align: right; border-top: 1px solid #eee; padding-top: 5px; }
+          </style>
+        </head>
+        <body>
+      `;
+
+      itemsToPrint.forEach(item => {
+        const records = appMode === 'aluno' 
+            ? printingRecords.filter(r => r.className === item)
+            : printingRecords.filter(r => r.course === item);
+
+        if (records.length === 0) return;
+        const classes = [...new Set(records.map(r => r.className))].sort();
+
+        html += `<div class="course-page">
+          <div class="header">
+            <h1>IFRO Campus Ji-Paraná</h1>
+            <p>${scheduleMode === 'padrao' 
+                ? 'Horário Acadêmico Padrão | Versão 1' 
+                : `Horário Acadêmico ${scheduleMode === 'previa' 
+                    ? 'Prévia' 
+                    : scheduleMode === 'consolidado' 
+                      ? 'Consolidado' 
+                      : 'Em execução'} | ${labelStr.replace("SEM ", "SEMANA ")}`}</p>
+            <div class="meta-info">
+              <span>Professor: <strong>${teacherName.toUpperCase()}</strong></span>
+              <span>${appMode === 'aluno' ? 'Turma' : 'Curso'}: <strong>${item.toUpperCase()}</strong></span>
+              <span>Data de Emissão: ${new Date().toLocaleDateString('pt-BR')} ${new Date().toLocaleTimeString('pt-BR', {hour: '2-digit', minute:'2-digit'})}</span>
+            </div>
+          </div>
+          <table>
+            <thead>
+              <tr>
+                <th style="width: 40pt;">DIA</th>
+                <th style="width: 80pt;">HORÁRIO</th>
+                ${classes.map(cls => `<th>${cls}</th>`).join('')}
+              </tr>
+            </thead>
+            <tbody>`;
+
+        safeDays.forEach(day => {
+          const activeTimes = safeTimes.filter(t => {
+            const ts = t.timeStr || t;
+            return records.some(r => r.day === day && r.time === ts);
+          });
+
+          if (activeTimes.length > 0) {
+            activeTimes.forEach((tObj, tIdx) => {
+              const ts = tObj.timeStr || tObj;
+              html += `<tr class="${tIdx === 0 ? 'day-divider' : ''}">`;
+              if (tIdx === 0) {
+                html += `<td rowspan="${activeTimes.length}" style="background: #f0f0f0; border-right: 1.5pt solid black !important;">
+                  <div class="day-label-container">${day.substring(0,3).toUpperCase()}</div>
+                </td>`;
+              }
+              html += `<td style="font-weight: 700; background: #fafafa; font-size: 7.5pt;">${ts}</td>`;
+              
+              classes.forEach(cls => {
+                const r = records.find(rec => rec.className === cls && rec.day === day && rec.time === ts);
+                if (r) {
+                  html += `<td>
+                    <div class="subject">${r.subject || "LANCAMENTO"}</div>
+                    <div class="room-info">${r.room ? 'SALA ' + r.room : ''}</div>
+                  </td>`;
+                } else {
+                  html += `<td style="color: #ddd;">-</td>`;
+                }
+              });
+              html += `</tr>`;
+            });
+          }
+        });
+
+        html += `</tbody></table>
+          <div class="footer-print">Documento gerado eletronicamente pelo Portal de Horários IFRO</div>
+        </div>`;
+      });
+
+      html += `</body></html>`;
+      printWindow.document.write(html);
+      printWindow.document.close();
+      setTimeout(() => {
+        printWindow.print();
+        printWindow.close();
+      }, 500);
+    };
 
     return (
       <div className="flex flex-col xl:flex-row gap-6 items-start animate-in zoom-in-95 duration-500 print:w-full print:max-w-none print:m-0 print:p-0 print:block">
@@ -127,56 +261,61 @@ export const TeacherGrid = React.memo(
                     </label>
                   )}
 
-                  <button
-                    onClick={handlePrint}
-                    className="flex items-center gap-2 bg-white/10 hover:bg-white/25 text-white px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all shadow-sm active:scale-95 no-print ring-1 ring-white/10"
-                  >
-                    <Printer size={14} /> Imprimir Horário
-                  </button>
+                  {appMode === 'professor' && (
+                    <button
+                      onClick={handlePrintClick}
+                      className="flex items-center gap-2 bg-white/10 hover:bg-white/25 text-white px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all shadow-sm active:scale-95 no-print ring-1 ring-white/10"
+                    >
+                      <Printer size={14} /> Imprimir Horário
+                    </button>
+                  )}
                 </div>
               </div>
 
-              {profCourses.length === 0 ? (
+              {profItems.length === 0 ? (
                 <div className="p-12 text-center opacity-50 font-black tracking-widest uppercase text-sm">
                   Este professor não possui aulas alocadas nesta semana.
                 </div>
               ) : (
                 <>
-                  {/* ABAS DOS CURSOS */}
-                  {profCourses.length > 1 && (
+                  {/* ABAS DOS ITENS (CURSOS OU TURMAS) */}
+                  {profItems.length > 1 && (
                     <div className="flex flex-wrap gap-2 mb-2 no-print animate-in fade-in slide-in-from-top-2">
-                      {["Todos", ...profCourses].map((c) => (
+                      {["Todos", ...profItems].map((item) => (
                         <button
-                          key={c}
-                          onClick={() => setActiveCourseTab(c)}
-                          className={`px-4 py-2.5 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all shadow-sm ${activeCourseTab === c ? (scheduleMode === "padrao" ? "bg-blue-600 text-white ring-2 ring-blue-500/50 scale-[1.02] z-10" : scheduleMode === "previa" ? "bg-violet-600 text-white ring-2 ring-violet-500/50 scale-[1.02] z-10" : "bg-indigo-600 text-white ring-2 ring-indigo-500/50 scale-[1.02] z-10") : isDarkMode ? "bg-slate-800 text-slate-400 hover:text-white hover:bg-slate-700" : "bg-white text-slate-500 border border-slate-200 hover:text-slate-800"}`}
+                          key={item}
+                          onClick={() => setActiveTab(item)}
+                          className={`px-4 py-2.5 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all shadow-sm ${activeTab === item ? (scheduleMode === "padrao" ? "bg-blue-600 text-white ring-2 ring-blue-500/50 scale-[1.02] z-10" : scheduleMode === "previa" ? "bg-violet-600 text-white ring-2 ring-violet-500/50 scale-[1.02] z-10" : "bg-indigo-600 text-white ring-2 ring-indigo-500/50 scale-[1.02] z-10") : isDarkMode ? "bg-slate-800 text-slate-400 hover:text-white hover:bg-slate-700" : "bg-white text-slate-500 border border-slate-200 hover:text-slate-800"}`}
                         >
-                          {c === "Todos" ? "Todos os Cursos" : c}
+                          {item === "Todos" ? (appMode === 'aluno' ? "Todas as Turmas" : "Todos os Cursos") : item}
                         </button>
                       ))}
                     </div>
                   )}
 
                   {(() => {
-                const coursesToRender =
-                  activeCourseTab === "Todos"
-                    ? profCourses
-                    : [activeCourseTab || profCourses[0]];
+                const itemsToRender =
+                  activeTab === "Todos"
+                    ? profItems
+                    : [activeTab || profItems[0]];
 
-                return coursesToRender.map((course) => {
-                  const courseRecords = profRecords.filter(
-                    (r) => r.course === course,
-                  );
+                return itemsToRender.map((item) => {
+                  const records = appMode === 'aluno'
+                    ? profRecords.filter((r) => r.className === item)
+                    : profRecords.filter((r) => r.course === item);
+                  
+                  const headerLabel = appMode === 'aluno' ? `TURMA: ${item}` : `CURSO: ${item}`;
+                  
                   const courseClasses = [
-                    ...new Set(courseRecords.map((r) => r.className)),
+                    ...new Set(records.map((r) => r.className)),
                   ].sort();
                   const courseDays = showEmptySlots ? safeDays.filter(d => d !== 'Sunday' && d !== 'Saturday') : safeDays.filter((day) =>
-                    courseRecords.some((r) => r.day === day),
+                    records.some((r) => r.day === day),
                   );
 
                   return (
                     <div
-                      key={`prof-course-${course}`}
+                      key={`prof-item-${item}`}
                       className={`rounded-2xl shadow-sm border overflow-hidden mb-6 animate-in fade-in zoom-in-95 duration-300 print:mb-0 print:border-none print:shadow-none print:w-full print:p-0 ${isDarkMode ? "bg-slate-800 border-slate-700" : "bg-white border-slate-200"}`}
                     >
                       <div className="hidden print:block font-black text-[14px] uppercase border-b-[3px] border-black pb-2 tracking-widest mt-4 mb-4 text-black">
@@ -188,6 +327,13 @@ export const TeacherGrid = React.memo(
                             : `HORÁRIO ${scheduleMode.toUpperCase()} - ${(weekLabel || selectedWeek).replace("SEM ", "SEMANA ")}`}
                         </span>
                       </div>
+                      
+                      {/* Sub-Header para modo professor quando agrupa por curso */}
+                      {appMode !== 'aluno' && (
+                        <div className={`px-6 py-3 border-b font-black text-[10px] uppercase tracking-[0.2em] ${isDarkMode ? 'bg-slate-900/50 border-slate-700 text-slate-400' : 'bg-slate-50 border-slate-200 text-slate-500'}`}>
+                           {headerLabel}
+                        </div>
+                      )}
                       <div className="hidden md:block overflow-x-auto print:overflow-visible">
                         <table className="w-full min-w-[600px] border-collapse relative text-xs print:w-full print:min-w-0 print:max-w-none print:table-fixed print:border-collapse">
                           <thead>
@@ -219,7 +365,7 @@ export const TeacherGrid = React.memo(
                           >
                             {courseDays.map((day, dayIndex) => {
                               const activeTimes = showEmptySlots ? safeTimes : safeTimes.filter((timeObj) =>
-                                courseRecords.some(
+                                records.some(
                                   (r) =>
                                     r.day === day &&
                                     r.time === (timeObj.timeStr || timeObj),
@@ -312,7 +458,7 @@ export const TeacherGrid = React.memo(
                                           </td>
                                           {courseClasses.map((cls) => {
                                             const recordsNesteSlot =
-                                              courseRecords.filter(
+                                              records.filter(
                                                 (r) =>
                                                   r.day === day &&
                                                   r.time === timeStr &&
@@ -517,13 +663,13 @@ export const TeacherGrid = React.memo(
                       {/* Mobile Stacked View (Professor Full Week) */}
                       <div className="md:hidden no-print p-4 space-y-4">
                         {courseDays.map((day) => {
-                          const dayRecords = courseRecords.filter(
+                          const dayRecords = records.filter(
                             (r) => r.day === day,
                           );
                           if (dayRecords.length === 0 && !showEmptySlots) return null;
 
                           const dailyShifts = showEmptySlots ? new Set(safeTimes.map(t => t.shift).filter(Boolean)) : new Set(
-                            courseRecords
+                            records
                               .map(
                                 (r) =>
                                   safeTimes.find((t) => (t.timeStr || t) === r.time)
@@ -537,7 +683,7 @@ export const TeacherGrid = React.memo(
 
                           return (
                             <div
-                              key={`mob-prof-${course}-${day}`}
+                              key={`mob-prof-${item}-${day}`}
                               className={`rounded-xl border overflow-hidden shadow-sm animate-in fade-in ${isDarkMode ? "border-slate-700 bg-slate-800/30" : "border-slate-200 bg-white"}`}
                             >
                               <div
@@ -557,7 +703,7 @@ export const TeacherGrid = React.memo(
 
                                   const timeRow = (
                                     <div
-                                      key={`mob-prof-${course}-${day}-${time}-row`}
+                                      key={`mob-prof-${item}-${day}-${time}-row`}
                                       className={`flex items-start gap-3 p-3 transition-colors ${isDarkMode ? "hover:bg-slate-800/50" : "hover:bg-slate-50"}`}
                                     >
                                       <div className="w-16 shrink-0 text-center">
@@ -604,7 +750,7 @@ export const TeacherGrid = React.memo(
                                              onClick={() => {
                                                // Aqui o mobile precisaria de qual classe? Se não tem classe específica nesse contexto mobile, vamos usar a primeira do courseClasses
                                                if (showEmptySlots && appMode === 'professor' && typeof onEmptySlotClick === 'function' && courseClasses.length > 0) {
-                                                  onEmptySlotClick({ day, time, className: courseClasses[0], course });
+                                                  onEmptySlotClick({ day, time, className: courseClasses[0], course: item });
                                                }
                                              }}
                                              className={`w-full py-2.5 rounded-lg border-[2px] border-dashed text-center flex items-center justify-center transition-all ${showEmptySlots && appMode === 'professor' ? (isDarkMode ? "border-slate-700 bg-slate-800/30 text-indigo-400" : "border-slate-300 bg-slate-50 text-indigo-600 hover:bg-slate-100 cursor-pointer") : (isDarkMode ? "opacity-20 border-transparent text-slate-500" : "opacity-10 border-transparent text-slate-500")}`}
@@ -618,7 +764,7 @@ export const TeacherGrid = React.memo(
 
                                   return (
                                     <React.Fragment
-                                      key={`mob-prof-${course}-${day}-${time}-frag`}
+                                      key={`mob-prof-${item}-${day}-${time}-frag`}
                                     >
                                       {timeRow}
                                       {isLunch && (
