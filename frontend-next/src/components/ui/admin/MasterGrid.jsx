@@ -35,25 +35,91 @@ const getCardStyle = (courseId, classId, subjectName, isDarkMode) => {
     };
 };
 
-const formatWeekLabel = (w) => {
-    if (!w) return '';
-    // Troca a palavra "Semana" por "SEM" para economizar espaço
-    const name = String(w.name || '').replace(/semana\s*/i, 'SEM ');
-    
-    const formatDate = (dateStr) => {
-        if (!dateStr) return '';
-        // Extrai apenas YYYY-MM-DD para evitar bugs de fuso horário
-        const parts = dateStr.split('T')[0].split('-');
-        if (parts.length === 3) return `${parts[2]}/${parts[1]}`;
-        return dateStr;
-    };
-    
-    const start = formatDate(w.start_date || w.startDate);
-    const end = formatDate(w.end_date || w.endDate);
-    
-    if (start && end) return `${name} (${start} a ${end})`;
-    return name;
-};
+// SUBCOMPONENTE OTIMIZADO DE CÉLULA
+const GridCell = React.memo(({ 
+  slotKey,
+  turmaId,
+  diaId,
+  hora,
+  aulaNesteSlot, 
+  isDarkMode, 
+  onDragStart, 
+  onDragOver, 
+  onDrop, 
+  onOpenModal,
+  alertasObj
+}) => {
+  const hasAlert = alertasObj?.prof || alertasObj?.sala;
+
+  return (
+    <td 
+      onDragOver={onDragOver}
+      onDrop={(e) => onDrop(e, turmaId, diaId, hora)}
+      className={`p-1.5 h-[62px] min-w-[130px] transition-all border group relative ${
+        isDarkMode ? 'border-slate-800/40' : 'border-slate-100'
+      }`}
+    >
+      {aulaNesteSlot ? (
+        <div 
+          draggable 
+          onDragStart={(e) => onDragStart(e, aulaNesteSlot, slotKey)}
+          onClick={() => onOpenModal && onOpenModal(aulaNesteSlot, slotKey)}
+          className={`w-full h-full rounded-xl transition-all p-2 flex flex-col cursor-grab active:cursor-grabbing relative overflow-hidden glass-card ${
+            hasAlert ? 'ring-1 ring-rose-500/50 inner-glow-rose' : 'hover:scale-[1.02] hover:shadow-xl'
+          } ${aulaNesteSlot.isDisponibilizada ? 'vacant-slot-card' : ''}`}
+          style={{ 
+            ...getCardStyle(aulaNesteSlot.courseId, aulaNesteSlot.classId, aulaNesteSlot.disciplina, isDarkMode),
+            borderWidth: '1px'
+          }}
+        >
+          {/* Indicadores de Status */}
+          {aulaNesteSlot.isDisponibilizada && (
+            <div className="absolute top-0 left-0 z-10 print:hidden shadow-sm pointer-events-none">
+              <span className="text-[5px] font-black uppercase tracking-widest text-white px-1.5 py-[2px] rounded-br-md bg-orange-600 border-none shadow-sm block">VAGA</span>
+            </div>
+          )}
+          {aulaNesteSlot.isPermuted && (
+            <div className="absolute top-0 left-0 z-10 print:hidden shadow-sm pointer-events-none">
+              <span className="text-[5px] font-black uppercase tracking-widest text-white px-1.5 py-[2px] rounded-br-md bg-amber-600 block shadow-sm">PERMUTADA</span>
+            </div>
+          )}
+          {aulaNesteSlot.isSubstituted && !aulaNesteSlot.isDisponibilizada && !aulaNesteSlot.isPermuted && (
+             <div className="absolute top-0 left-0 z-10 print:hidden shadow-sm pointer-events-none">
+                <span className="text-[5px] font-black uppercase tracking-widest text-white px-1.5 py-[2px] rounded-br-md bg-indigo-600 block shadow-sm">SUBSTITUIÇÃO</span>
+             </div>
+          )}
+          
+          <div className="flex flex-col flex-1 shrink-0 mt-2.5">
+             <span className="text-[9px] font-black uppercase tracking-tight leading-[1.1] truncate">{aulaNesteSlot.disciplina}</span>
+             <span className="text-[7px] font-bold opacity-70 truncate mt-0.5">{aulaNesteSlot.className}</span>
+          </div>
+
+          <div className="flex justify-between items-center mt-auto pt-1 gap-1">
+             <div className={`flex items-center gap-1 overflow-hidden flex-1 ${alertasObj?.prof ? 'text-rose-600 dark:text-rose-400 font-black' : 'text-slate-600 dark:text-slate-300 font-bold'}`}>
+                <span className="truncate text-[8px]">
+                   {aulaNesteSlot.professores?.join(' + ').split(' ')[0] || 'Docente'}
+                </span>
+             </div>
+             {aulaNesteSlot.sala && (
+               <span className="text-[7.5px] font-black bg-black/5 dark:bg-white/10 px-1 rounded flex items-center gap-0.5 shrink-0">
+                  <MapPin size={6} /> {aulaNesteSlot.sala.slice(0, 6)}
+               </span>
+             )}
+          </div>
+          
+          {/* Efeito Visual Hover Glass */}
+          <div className="absolute inset-0 bg-white/10 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none" />
+        </div>
+      ) : (
+        <div className={`w-full min-h-[58px] rounded-xl border-2 border-dashed flex items-center justify-center transition-colors group/empty ${
+          isDarkMode ? 'border-slate-800 hover:bg-slate-800/40 hover:border-slate-700' : 'border-slate-100 hover:bg-slate-50 hover:border-slate-200'
+        }`}>
+          <div className="w-1.5 h-1.5 bg-slate-400/10 rounded-full group-hover/empty:scale-150 group-hover/empty:bg-slate-400/30 transition-all" />
+        </div>
+      )}
+    </td>
+  );
+});
 
 export function MasterGrid({ isDarkMode, ...props }) {
   const { globalTeachers: globalTeachersList, activeDays, classTimes, academicWeeks, selectedConfigYear, setSelectedConfigYear, academicYearsMeta, exchangeRequests } = useData();
@@ -74,6 +140,7 @@ export function MasterGrid({ isDarkMode, ...props }) {
 
   const [aulasNeutras, setAulasNeutras] = useState([]);
   const [grade, setGrade] = useState({});
+  const [originalGrade, setOriginalGrade] = useState({}); // Dirty State Tracking
   const [disabledDays, setDisabledDays] = useState(new Set());
   
   // ESTADO DA TELA PRINCIPAL (O que o usuário está visualizando)
@@ -487,6 +554,7 @@ export function MasterGrid({ isDarkMode, ...props }) {
     }
     setAulasNeutras(aulasReais); 
     setGrade(initialGrade);
+    setOriginalGrade(JSON.parse(JSON.stringify(initialGrade))); // Clone profundo para rastreio
   }, [selectedCourses, turmasDoCurso, curriculumData, globalTeachersList, schedules, selectedType, selectedWeek, selectedConfigYear, teacherFilter]);
 
   // Agrupa as aulas pendentes por Turma (Ordenadas Alfabeticamente)
@@ -749,6 +817,7 @@ export function MasterGrid({ isDarkMode, ...props }) {
       
       setAulasNeutras(aulasReais);
       setGrade(clonedGrade);
+      setOriginalGrade(JSON.parse(JSON.stringify(clonedGrade)));
       
       setShowCloneModal(false);
       setCloneSourceYear('');
@@ -759,6 +828,47 @@ export function MasterGrid({ isDarkMode, ...props }) {
   };
 
   // === CONCENTRADOR GLOBAL DE ALERTAS ===
+  const [isSaving, setIsSaving] = useState(false);
+
+  // FUNÇÃO DE SALVAMENTO FUNCIONAL (Fase 5)
+  const handleSaveSchedule = async () => {
+    if (!isDirty || isSaving || !selectedWeek) return;
+    
+    setIsSaving(true);
+    try {
+      // 1. Converter o mapa da grade em registros para o banco (Formato original da planilha)
+      const weekObj = academicWeeks.find(w => String(w.id) === String(selectedWeek));
+      const weekName = weekObj ? weekObj.name : 'Semana Selecionada';
+      const weekType = 'atual'; // Sempre salvamos como 'atual' no MasterGrid
+      const weekKey = `${weekName}-${weekType}`;
+
+      const recordsToSave = Object.values(grade).map(aula => ({
+        ...aula,
+        week: weekName,
+        type: weekType
+      }));
+
+      // 2. Persistir via API
+      await apiClient.saveSchedule(weekKey, {
+        week: weekName,
+        type: weekType,
+        records: JSON.stringify(recordsToSave)
+      });
+
+      // 3. Sucesso: Sincronizar originalGrade para remover o estado 'Dirty'
+      setOriginalGrade(JSON.parse(JSON.stringify(grade)));
+      
+      // 4. Notificar Sucesso (opcional, já temos o botão que muda de cor)
+      refreshData();
+      alert("Alterações salvas com sucesso!");
+    } catch (err) {
+       console.error("Erro ao salvar grade:", err);
+       alert("Falha ao salvar alterações: " + (err.message || "Erro desconhecido"));
+    } finally {
+       setIsSaving(false);
+    }
+  };
+
   const dashboardAlerts = useMemo(() => {
     const alerts = [];
     const cellAlerts = {}; 
@@ -767,14 +877,14 @@ export function MasterGrid({ isDarkMode, ...props }) {
 
     Object.entries(grade).forEach(([slotKey, aula]) => {
       const [classId, diaId, hora] = slotKey.split('|');
-      cellAlerts[slotKey] = [];
+      cellAlerts[slotKey] = { profAlert: false, profAlertMsg: [], salaAlert: false, salaText: '' };
 
       if (aula && aula.teacherIds && aula.teacherIds.length > 0 && aula.teacherIds[0] !== 'A Definir' && aula.teacherIds[0] !== '-') {
          const strConflito = verificarChoqueHorario(aula.teacherIds, aula.sala, diaId, hora, classId);
          if (strConflito) {
             if (strConflito.profDetails && strConflito.profDetails.length > 0) {
                 cellAlerts[slotKey].profAlert = true;
-                cellAlerts[slotKey].profText = strConflito.profMsg;
+                cellAlerts[slotKey].profAlertMsg.push(strConflito.profMsg);
                 
                 strConflito.profDetails.forEach(detail => {
                     const uniqueKey = `${detail.tId}_${diaId}_${hora}_${classId}_${detail.otherClassName}`;
@@ -815,7 +925,6 @@ export function MasterGrid({ isDarkMode, ...props }) {
              const afternoonStarts = horariosExibidos.find(h => { const v = parseInt(h.split(':')[0],10); return v >= 12 && v < 18; });
              if (profSlots.has(morningEnds) && profSlots.has(afternoonStarts) && (hora === morningEnds || hora === afternoonStarts)) {
                  const noRest = "Sem descanso (Manhã -> Tarde).";
-                 if (!cellAlerts[slotKey].profAlertMsg) cellAlerts[slotKey].profAlertMsg = [];
                  cellAlerts[slotKey].profAlertMsg.push(noRest);
                  cellAlerts[slotKey].profAlert = true;
                  const pName = resolveTeacherName(tId, globalTeachersList);
@@ -830,7 +939,6 @@ export function MasterGrid({ isDarkMode, ...props }) {
              });
              if (m && t && n) {
                 const threeShifts = "Alocado em 3 Turnos no dia.";
-                if (!cellAlerts[slotKey].profAlertMsg) cellAlerts[slotKey].profAlertMsg = [];
                 cellAlerts[slotKey].profAlertMsg.push(threeShifts);
                 cellAlerts[slotKey].profAlert = true;
                 const pName = resolveTeacherName(tId, globalTeachersList);
@@ -909,6 +1017,10 @@ export function MasterGrid({ isDarkMode, ...props }) {
      }
      setPrevAlertCount(totalAlerts);
   }, [totalAlerts, prevAlertCount]);
+
+  const isDirty = useMemo(() => {
+    return JSON.stringify(grade) !== JSON.stringify(originalGrade);
+  }, [grade, originalGrade]);
 
   return (
     <div className={`flex flex-col gap-4 animate-in fade-in duration-300 ${isDarkMode ? 'text-slate-200' : 'text-slate-800'}`}>
@@ -1004,15 +1116,32 @@ export function MasterGrid({ isDarkMode, ...props }) {
             </button>
 
             <button 
-              onClick={() => handleLimparTela()} 
-              disabled={selectedCourses.length === 0} className="flex items-center justify-center gap-2 bg-amber-100 text-amber-700 hover:bg-amber-200 disabled:opacity-50 px-5 py-3 rounded-xl text-xs font-black uppercase tracking-widest transition-all shadow-sm"
+             onClick={handleLimparTela} 
+             className={`flex items-center justify-center gap-2 px-6 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all shadow-sm border ${isDarkMode ? 'bg-slate-800 text-slate-300 border-slate-700 hover:bg-slate-700' : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50'}`}
            >
-              <Trash2 size={16} /> Limpar Tela
+              <Trash2 size={16} /> Limpar
            </button>
 
-           <button onClick={() => { setSaveOptions({ type: selectedType, weekId: selectedWeek }); setModalMode('save'); }} disabled={selectedCourses.length === 0} className="flex items-center justify-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white disabled:opacity-50 px-6 py-3 rounded-xl text-xs font-black uppercase tracking-widest transition-all shadow-md hover:shadow-lg">
-              <Save size={16} /> Alterar / Salvar Novo
-           </button>
+           <div className="relative group">
+               <button 
+                 onClick={handleSaveSchedule} 
+                 disabled={selectedCourses.length === 0 || !isDirty || isSaving} 
+                 className={`flex items-center justify-center gap-3 px-8 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all active:scale-95 border ${
+                   isDirty 
+                     ? 'bg-emerald-600 hover:bg-emerald-500 text-white animate-pulse shadow-[0_0_20px_rgba(16,185,129,0.5)] border-emerald-400/50 cursor-pointer' 
+                     : 'bg-slate-100 dark:bg-slate-800 text-slate-400 border-slate-200 dark:border-slate-700 opacity-60 cursor-not-allowed'
+                 }`}
+               >
+                  {isSaving ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />} 
+                  <span>{isSaving ? 'Salvando...' : (isDirty ? 'Publicar Alterações' : 'Sem Pendências')}</span>
+                  {isDirty && !isSaving && <div className="absolute -top-1.5 -right-1.5 w-4 h-4 bg-rose-500 rounded-full border-2 border-white dark:border-slate-900 flex items-center justify-center text-[8px] font-black text-white shadow-lg animate-bounce">!</div>}
+               </button>
+               {isDirty && !isSaving && (
+                 <div className="absolute bottom-full mb-3 left-1/2 -translate-x-1/2 p-2 px-3 rounded-lg bg-emerald-600 text-white text-[8px] font-black uppercase tracking-widest opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap shadow-xl">
+                    Há mudanças não salvas na grade
+                 </div>
+               )}
+            </div>
            
            <button onClick={() => setIsRightPanelOpen(true)} className={`relative flex items-center justify-center gap-2 disabled:opacity-50 px-6 py-3 rounded-xl text-xs font-black uppercase tracking-widest transition-all shadow-sm border ${isDarkMode ? 'bg-slate-800 text-slate-300 border-slate-700 hover:bg-slate-700' : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50'}`}>
               <Bell size={16} /> Central de Alertas
@@ -1061,7 +1190,7 @@ export function MasterGrid({ isDarkMode, ...props }) {
                  const hasData = weeksWithData.has(String(w.id));
                  return (
                     <option key={w.id} value={w.id} className={hasData ? (isDarkMode ? 'bg-emerald-900/60 text-emerald-400 font-black' : 'bg-emerald-100 text-emerald-700 font-black') : (isDarkMode ? 'text-slate-400' : 'text-slate-500')}>
-                       {hasData ? '✔ ' : '⏳ '}{formatWeekLabel ? formatWeekLabel(w) : w.name} {hasData ? '(Preenchida)' : ''}
+                       {hasData ? '✔ ' : '⏳ '}{w.name} {hasData ? '(Preenchida)' : ''}
                     </option>
                  )
               })}
@@ -1300,128 +1429,26 @@ export function MasterGrid({ isDarkMode, ...props }) {
                         {turmasDoCurso.filter(t => !hiddenClasses.includes(t.id)).map(turma => {
                           const slotKey = `${turma.id}|${diaId}|${hora}`;
                           const aulaNesteSlot = grade[slotKey];
-                          
-                          // Busca dos alertas pré-computados
-                          const alertasObj = dashboardAlerts.perCell[slotKey] || { profAlert: false, profAlertMsg: [], salaAlert: false, salaText: '' };
-                          const temAlertaProf = alertasObj.profAlert;
-                          const profMsgText = alertasObj.profAlertMsg?.length > 0 ? alertasObj.profAlertMsg.join('\n') : 'Conflito de Professor.';
-                          const temAlertaSala = alertasObj.salaAlert;
-                          
-                          const isVaga = !aulaNesteSlot?.professores || aulaNesteSlot.professores.length === 0 || aulaNesteSlot.professores.some(p => !p || p === 'A Definir' || p === '-' || p === 'SEM PROFESSOR');
+                          const alertasObj = dashboardAlerts.perCell[slotKey];
                           
                           return (
-                            <td 
-                              key={slotKey} 
-                              className={`p-1 border min-w-[140px] align-middle transition-all duration-300 ${draggedItem && String(draggedItem.aula.classId) !== String(turma.id) ? 'opacity-30 pointer-events-none bg-slate-100/50 dark:bg-slate-900/50' : ''} ${isDarkMode ? 'border-slate-700/50' : 'border-slate-200'}`}
+                            <GridCell
+                              key={slotKey}
+                              slotKey={slotKey}
+                              turmaId={turma.id}
+                              diaId={diaId}
+                              hora={hora}
+                              aulaNesteSlot={aulaNesteSlot}
+                              isDarkMode={isDarkMode}
+                              onDragStart={handleDragStart}
                               onDragOver={handleDragOver}
-                              onDrop={(e) => handleDropSlot(e, turma.id, diaId, hora)}
-                            >
-                              {aulaNesteSlot ? (
-                                <div 
-                                  draggable
-                                  onDragStart={(e) => handleDragStart(e, aulaNesteSlot, slotKey)}
-                                  onDragEnd={handleDragEnd}
-                                  className={`group/card w-[95%] sm:w-[90%] mx-auto min-h-[56px] rounded flex flex-col justify-between p-2 cursor-grab transition-all shadow-sm overflow-hidden relative border hover:ring-2 ${
-                                      isVaga
-                                        ? 'vacant-slot-card ring-orange-400 border-orange-400 border-2 ' + (isDarkMode ? 'bg-orange-950/60 ring-offset-slate-800' : 'bg-orange-50 ring-offset-white')
-                                        : 'ring-emerald-500'
-                                  }`}
-                                  style={isVaga ? undefined : getCardStyle(aulaNesteSlot.courseId, aulaNesteSlot.classId, aulaNesteSlot.disciplina, isDarkMode)}
-                                >
-                                  {isVaga ? (
-                                    // ════ AULA VAGA — Layout Especial de Alta Visibilidade ════
-                                    <>
-                                      <button onClick={(e) => { e.preventDefault(); e.stopPropagation(); setGrade(prev => { const n = {...prev}; delete n[slotKey]; return n; }); }} className="absolute top-0 right-0 bg-rose-500 hover:bg-rose-600 text-white font-bold p-1 rounded-bl-md z-20 opacity-0 group-hover/card:opacity-100 cursor-pointer transition-opacity shadow-sm" title="Remover Aula do Horário" >
-                                        <X size={8} strokeWidth={4} />
-                                      </button>
-                                      <div className="flex flex-col items-center justify-center h-full gap-1.5 py-1">
-                                        <div className={`flex items-center gap-1.5 px-2 py-1 rounded-full text-[9px] font-black uppercase tracking-widest border ${
-                                          isDarkMode
-                                            ? 'bg-orange-500/20 border-orange-500/50 text-orange-300'
-                                            : 'bg-orange-100 border-orange-400 text-orange-700'
-                                        }`}>
-                                          <AlertTriangle size={10} className="shrink-0" />
-                                          AULA VAGA
-                                        </div>
-                                        <span className={`text-[9px] font-black uppercase tracking-widest truncate max-w-full px-1 text-center ${
-                                          isDarkMode ? 'text-orange-200/80' : 'text-orange-800/80'
-                                        }`}>
-                                          {aulaNesteSlot.disciplina}
-                                        </span>
-                                        <span className={`text-[8px] font-bold uppercase tracking-wider truncate px-1.5 py-0.5 rounded ${
-                                          isDarkMode ? 'bg-orange-900/40 text-orange-400/70' : 'bg-orange-100/60 text-orange-600/80'
-                                        }`}>
-                                          {aulaNesteSlot.className}
-                                        </span>
-                                        <span className={`text-[7px] font-black uppercase tracking-widest opacity-60 ${
-                                          isDarkMode ? 'text-orange-300' : 'text-orange-700'
-                                        }`}>
-                                          Sem Docente
-                                        </span>
-                                      </div>
-                                    </>
-                                  ) : (
-                                    // ════ AULA NORMAL ════
-                                    <>
-                                      <button onClick={(e) => { e.preventDefault(); e.stopPropagation(); setGrade(prev => { const n = {...prev}; delete n[slotKey]; return n; }); }} className="absolute top-0 right-0 bg-rose-500 hover:bg-rose-600 text-white font-bold p-1 rounded-bl-md z-20 opacity-0 group-hover/card:opacity-100 cursor-pointer transition-opacity shadow-sm" title="Remover Aula do Horário" >
-                                        <X size={8} strokeWidth={4} />
-                                      </button>
-
-                                      <span className="absolute top-0 right-0 bg-slate-200 dark:bg-slate-600 text-slate-500 dark:text-slate-300 font-bold px-1 rounded-bl-md text-[7px] group-hover/card:opacity-0 transition-opacity" title={`Qtd Total desta Aula no Horário da Turma`}>
-                                         {Object.values(grade).filter(g => String(g.classId) === String(aulaNesteSlot.classId) && String(g.id) === String(aulaNesteSlot.id)).length}/{aulaNesteSlot.numAulas || 1}
-                                      </span>
-                                      {aulaNesteSlot.isDisponibilizada && (
-                                         <div className="absolute top-0 left-0 z-10 print:hidden shadow-sm pointer-events-none">
-                                            <span title="Aula Disponibilizada pelo Titular" className="text-[5px] font-black uppercase tracking-widest text-white px-1.5 py-[2px] rounded-br-md border-b border-r border-amber-500/50 bg-amber-600 block shadow-sm shadow-amber-900/40 relative z-10">Oferecida</span>
-                                         </div>
-                                      )}
-                                      {aulaNesteSlot.isPermuted && (
-                                         <div className="absolute top-0 left-0 z-10 print:hidden shadow-sm pointer-events-none">
-                                            <span title="Aula permutada por Acordo" className="text-[5px] font-black uppercase tracking-widest text-[#FFFBEB] px-1.5 py-[2px] rounded-br-md border-b border-r border-amber-500/50 bg-amber-600 block shadow-sm shadow-amber-900/40 relative z-10">PERMUTADA</span>
-                                         </div>
-                                      )}
-                                      {aulaNesteSlot.isSubstituted && !aulaNesteSlot.isDisponibilizada && !aulaNesteSlot.isPermuted && (
-                                         <div className="absolute top-0 left-0 z-10 print:hidden shadow-sm pointer-events-none">
-                                            <span title="Aula assumida via Vaga" className="text-[5px] font-black uppercase tracking-widest text-white px-1.5 py-[2px] rounded-br-md border-b border-r border-indigo-500/50 bg-indigo-600 block shadow-sm shadow-indigo-900/40 relative z-10">Substituição</span>
-                                         </div>
-                                      )}
-                                      {aulaNesteSlot.classType && aulaNesteSlot.classType !== 'Regular' && (
-                                         <div className="absolute top-0 right-0 z-10 print:hidden shadow-sm pointer-events-none">
-                                            <span className="text-[5px] font-black uppercase tracking-widest text-white px-1.5 py-[2px] rounded-bl-md border-b border-l border-emerald-500/50 bg-emerald-600 block shadow-sm shadow-emerald-900/40 relative z-10">{aulaNesteSlot.classType}</span>
-                                         </div>
-                                      )}
-                                      <div className={`flex flex-col flex-1 shrink-0 mt-3.5 mb-1`} title={`${aulaNesteSlot.disciplina} - ${aulaNesteSlot.className}`}>
-                                         <span className="text-[10px] font-black uppercase tracking-widest leading-none drop-shadow-sm">{aulaNesteSlot.disciplina}</span>
-                                         {aulaNesteSlot.isSubstituted && aulaNesteSlot.originalSubject && !aulaNesteSlot.isDisponibilizada && <span className="text-[7.5px] opacity-90 uppercase mt-0.5 leading-tight text-white bg-indigo-900/60 border border-indigo-400/30 rounded px-1 py-[1px] w-fit shadow-sm">Era: {aulaNesteSlot.originalSubject}</span>}
-                                         {aulaNesteSlot.isDisponibilizada && aulaNesteSlot.originalSubject && <span className="text-[7.5px] opacity-90 uppercase mt-0.5 leading-tight text-white bg-amber-900/60 border border-amber-400/30 rounded px-1 py-[1px] w-fit shadow-sm">Disp: {aulaNesteSlot.originalSubject}</span>}
-                                         <span className="text-[7.5px] opacity-90 font-bold tracking-widest truncate mt-1 break-words">{aulaNesteSlot.className}</span>
-                                      </div>
-                                      <div className="flex justify-between items-center mt-auto pt-1 gap-1" title={temAlertaProf ? profMsgText : "Professor e Local"}>
-                                        <div className={`flex items-center gap-1 overflow-hidden flex-1 ${temAlertaProf ? 'text-red-500 dark:text-red-400 bg-red-500/10 px-0.5 rounded border border-red-500/20' : 'text-slate-500 dark:text-slate-300'}`}>
-                                           {temAlertaProf && <AlertTriangle size={8} className="shrink-0" />}
-                                           <span className="truncate text-[9px] font-bold" title={aulaNesteSlot.professores?.join(' + ')}>
-                                               {aulaNesteSlot.professores && aulaNesteSlot.professores.length > 0
-                                                ? aulaNesteSlot.professores.map(p => p.split(' ')[0]).join(' + ')
-                                                : 'A Def.'}
-                                           </span>
-                                           {aulaNesteSlot.teacherChanged && (
-                                               <Clock size={11} className="text-amber-500 dark:text-amber-400 shrink-0" title="Registro Histórico: Professor diverge da matriz atual." />
-                                           )}
-                                        </div>
-                                        {aulaNesteSlot.sala && (
-                                          <span className={`text-[8px] font-bold flex items-center gap-0.5 truncate px-1 py-[1px] rounded ${temAlertaSala ? 'bg-amber-500/20 text-amber-600 border border-amber-500/30' : 'bg-black/5 dark:bg-white/5 text-slate-400'}`} title={temAlertaSala ? alertasObj.salaText : "Local da Aula"}>
-                                            {temAlertaSala ? <AlertTriangle size={6} className="shrink-0" /> : <MapPin size={6} className="shrink-0" />} {aulaNesteSlot.sala.slice(0, 8)}
-                                          </span>
-                                        )}
-                                      </div>
-                                    </>
-                                  )}
-                                </div>
-                              ) : (
-                                <div className={`w-[95%] sm:w-[90%] mx-auto min-h-[56px] rounded border border-dashed flex items-center justify-center transition-colors ${isDarkMode ? 'border-slate-700/50 hover:bg-slate-700/30' : 'border-slate-200 hover:bg-slate-50'}`}>
-                                </div>
-                              )}
-                            </td>
+                              onDrop={handleDropSlot}
+                              onOpenModal={(aula) => {
+                                 setModalMode('editAula');
+                                 setSaveOptions(prev => ({ ...prev, aulaToEdit: aula, keyToEdit: slotKey }));
+                              }}
+                              alertasObj={alertasObj}
+                            />
                           );
                         })}
                       </tr>

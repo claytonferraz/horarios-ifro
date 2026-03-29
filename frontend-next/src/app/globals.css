@@ -33,34 +33,26 @@
   --background: #f0f7f3;
   --foreground: #0f2d1f;
 
-  /* Superfícies */
-  --dim-bg:          #f0f7f3;   /* fundo de página — creme-esverdeado */
-  --dim-surface:     #ffffff;   /* cards e painéis — branco limpo */
-  --dim-surface-2:   #e8f5ee;   /* hover, linhas zebradas */
-  --dim-surface-3:   #d4edde;  /* selecionado / ativo */
+  /* Superfícies - Toque de Vidro */
+  --dim-bg:          #f0f7f3;   
+  --dim-surface:     rgba(255, 255, 255, 0.7);  /* Transparência para efeito vidro */
+  --dim-surface-2:   rgba(232, 245, 238, 0.8);
+  --dim-surface-3:   rgba(212, 237, 222, 0.9);
 
-  /* Bordas */
-  --dim-border:      #c8e6d4;   /* separadores suaves */
-  --dim-border-2:    #8dc9a5;   /* bordas de ênfase / foco */
+  /* Bordas Neon Suaves */
+  --dim-border:      rgba(200, 230, 212, 0.6);
+  --dim-border-2:    rgba(0, 129, 60, 0.4);
 
   /* Texto */
-  --dim-text:        #0f2d1f;   /* primário — verde muito escuro (quase preto) */
-  --dim-text-2:      #3d6e52;   /* secundário / muted */
-  --dim-text-3:      #6fa384;   /* placeholders / desabilitado */
-
-  /* Verde IFRO — #00813C e variações */
+  --dim-text:        #0f2d1f;
   --dim-accent:      #00813C;   /* verde principal IFRO */
-  --dim-accent-h:    #006830;   /* hover — 10% mais escuro */
-  --dim-accent-l:    #e6f4ec;   /* fundo suave de badge/chip */
-  --dim-accent-glow: rgba(0,129,60,0.15);
-
-  /* Status */
-  --dim-success:     #00813C;
-  --dim-warning:     #92600a;
-  --dim-danger:      #be1b1b;
+  --dim-accent-glow: rgba(0, 129, 60, 0.3);
 
   background: var(--dim-bg);
   color: var(--dim-text);
+  background-image: 
+    radial-gradient(at 0% 0%, rgba(0, 129, 60, 0.05) 0px, transparent 50%),
+    radial-gradient(at 100% 100%, rgba(0, 129, 60, 0.05) 0px, transparent 50%);
 }
 
 @theme inline {
@@ -292,5 +284,138 @@ button:hover .lucide-calendar-days { animation: calendarBounce 0.5s ease; }
   100% { width: 100%; left: 100%; }
 }
 
+/* ================================================
+   UTILITÁRIOS NEON-GLASS (NOVO)
+   ================================================ */
 
+.glass-card {
+  @apply backdrop-blur-xl border transition-all duration-300;
+}
 
+.dim .glass-card {
+  background: var(--dim-surface);
+  border-color: var(--dim-border);
+  box-shadow: 0 8px 32px 0 rgba(0, 129, 60, 0.05);
+}
+
+.dark .glass-card {
+  background: rgba(15, 23, 42, 0.6);
+  border-color: rgba(30, 41, 59, 0.5);
+  box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.4);
+}
+
+.neon-border-pulsing {
+  position: relative;
+}
+
+.neon-border-pulsing::after {
+  content: '';
+  position: absolute;
+  inset: -1px;
+  border-radius: inherit;
+  padding: 1px;
+  background: linear-gradient(45deg, var(--dim-accent, #10b981), transparent, var(--dim-accent, #10b981));
+  mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  mask-composite: exclude;
+  -webkit-mask-composite: destination-out;
+  animation: rotateNeon 4s linear infinite;
+  opacity: 0.8;
+}
+
+@keyframes rotateNeon {
+  from { filter: hue-rotate(0deg); }
+  to { filter: hue-rotate(360deg); }
+}
+
+.inner-glow-emerald {
+  box-shadow: inset 0 0 15px rgba(16, 185, 129, 0.2);
+}
+
+.inner-glow-rose {
+  box-shadow: inset 0 0 15px rgba(244, 63, 94, 0.2);
+}
+
+/* Scroll personalizável */
+* {
+  scrollbar-color: rgba(156, 163, 175, 0.3) transparent;
+}
+
+/* ================================================
+   ESTILOS DE IMPRESSÃO - PAUTA (A4 PAISAGEM)
+   ================================================ */
+@media print {
+  @page {
+    size: A4 landscape;
+    margin: 8mm;
+  }
+  
+  html, body {
+    width: 297mm;
+    background: white !important;
+    color: black !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+
+  /* Reset de containers para ocupar 100% da largura física */
+  #__next, main {
+    width: 100% !important;
+    max-width: none !important;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+
+  /* Forçar quebra de página e largura total nos grids */
+  #printable-area, 
+  .print\:w-full {
+    width: 100% !important;
+    max-width: none !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    display: block !important;
+  }
+
+  /* Ajuste de tabelas para preencher o espaço A4 */
+  table {
+    width: 100% !important;
+    table-layout: fixed !important;
+    border-collapse: collapse !important;
+  }
+
+  /* Ocultar o que não deve ser impresso */
+  .no-print, 
+  .print\:hidden,
+  header, 
+  nav, 
+  footer,
+  aside {
+    display: none !important;
+  }
+
+  /* Quebra de página por curso */
+  .print\:break-after-page {
+    page-break-after: always !important;
+    break-after: page !important;
+    display: block !important;
+    width: 100% !important;
+    margin-bottom: 0 !important;
+  }
+
+  /* Ajustes de cores para economia de tinta e contraste */
+  .print-clean-card {
+    background: #f8fafc !important;
+    border: 1px solid #cbd5e1 !important;
+    color: #000 !important;
+    box-shadow: none !important;
+  }
+  
+  .print-interval {
+    background: #f1f5f9 !important;
+    color: #1e293b !important;
+    border-top: 1px solid #cbd5e1 !important;
+    border-bottom: 1px solid #cbd5e1 !important;
+  }
+}

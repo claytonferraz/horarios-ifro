@@ -25,24 +25,18 @@ export function Navbar() {
   const getLinkClass = (path) => {
     const isActive = pathname === path || (path === "/" && pathname === "/");
     
-    const baseStyles = "px-4 py-2 rounded-xl text-sm font-bold transition-all flex items-center gap-2";
+    const baseStyles = "px-4 py-2 rounded-xl text-sm font-black uppercase tracking-widest transition-all duration-300 flex items-center gap-2 relative overflow-hidden group";
     
-    if (isDim) {
-      return `${baseStyles} ${
-        isActive 
-          ? "text-[var(--dim-accent)] bg-[var(--dim-surface-2)] shadow-sm" 
-          : "text-[var(--dim-text-2)] hover:text-[var(--dim-text)] hover:bg-[var(--dim-surface-2)]/50"
-      }`;
+    if (isActive) {
+      if (isDim) return `${baseStyles} text-white bg-emerald-600 shadow-[0_0_15px_rgba(16,185,129,0.4)]`;
+      if (isDarkMode) return `${baseStyles} text-emerald-400 bg-emerald-950/40 border border-emerald-500/30`;
+      return `${baseStyles} text-white bg-emerald-600 shadow-lg shadow-emerald-500/20`;
     }
-    
+
     return `${baseStyles} ${
-      isActive
-        ? isDarkMode 
-          ? "text-blue-400 bg-blue-950/30 border border-blue-900/40 shadow-sm" 
-          : "text-blue-600 bg-blue-50 border border-blue-100 shadow-sm"
-        : isDarkMode 
-          ? "text-slate-400 hover:text-white hover:bg-slate-800" 
-          : "text-slate-500 hover:text-slate-900 hover:bg-slate-100"
+      isDim ? "text-emerald-400/70 hover:text-emerald-300 hover:bg-emerald-950/30" :
+      isDarkMode ? "text-slate-400 hover:text-emerald-400 hover:bg-slate-800/50" :
+      "text-slate-500 hover:text-emerald-600 hover:bg-emerald-50"
     }`;
   };
 
@@ -52,12 +46,12 @@ export function Navbar() {
 
   return (
     <header
-      className={`border-b sticky top-0 z-50 transition-colors shadow-sm print:hidden ${
+      className={`sticky top-0 z-50 transition-all duration-500 border-b no-print ${
         isDim
-          ? "border-[var(--dim-border)] bg-[var(--dim-surface)]/95 backdrop-blur-sm"
+          ? "bg-[var(--dim-surface)]/80 backdrop-blur-xl border-emerald-900/30 shadow-[0_4px_20px_rgba(0,0,0,0.2)]"
           : isDarkMode
-          ? "bg-slate-900 border-slate-800"
-          : "bg-white border-slate-200"
+          ? "bg-slate-950/80 backdrop-blur-xl border-slate-800"
+          : "bg-white/80 backdrop-blur-xl border-slate-100 shadow-sm"
       }`}
     >
       <div className="w-full max-w-none mx-auto px-4 lg:px-6 h-16 flex items-center justify-between">
@@ -66,25 +60,24 @@ export function Navbar() {
           onClick={() => navigateTo("/")}
         >
           <div
-            className={`p-2 rounded-lg ${
+            className={`p-2 rounded-xl transition-all duration-500 ${
               isDim
-                ? "bg-[var(--dim-accent)] shadow-md shadow-emerald-200"
+                ? "bg-emerald-600 shadow-[0_0_15px_rgba(16,185,129,0.6)]"
                 : isDarkMode
-                ? "bg-blue-600"
-                : "bg-blue-600 shadow-md shadow-blue-200"
+                ? "bg-emerald-500 shadow-[0_0_10px_rgba(16,185,129,0.3)]"
+                : "bg-emerald-600 shadow-lg shadow-emerald-500/20"
             }`}
           >
-            <Calendar className="text-white" size={20} />
+            <Calendar className="text-white" size={22} strokeWidth={2.5} />
           </div>
           <div className="hidden sm:block">
             <h1
-              className={`text-lg font-black tracking-tight leading-none ${
-                isDim ? "text-[var(--dim-text)]" : isDarkMode ? "text-white" : "text-slate-900"
+              className={`text-xl font-black tracking-tighter leading-none transition-colors duration-500 ${
+                isDim ? "text-emerald-50" : isDarkMode ? "text-white" : "text-slate-900"
               }`}
             >
               Horários
-              <span className={isDim ? "text-[var(--dim-accent)]" : isDarkMode ? "text-blue-400" : "text-blue-600"}>
-                {" "}
+              <span className="text-emerald-500 ml-1">
                 ADM IFRO
               </span>
             </h1>

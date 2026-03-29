@@ -1134,7 +1134,7 @@ export function PortalView({
                
                {/* LADO ESQUERDO: RESUMO DO HORÁRIO (60% no Desktop) */}
                <div className="w-full lg:w-[60%] flex flex-col order-1">
-                 <div className={`group flex flex-col h-full min-h-[500px] p-5 sm:p-10 rounded-[2.5rem] sm:rounded-[3rem] border text-left transition-all hover:scale-[1.01] ${isDarkMode ? "bg-slate-900/50 border-slate-700 hover:border-blue-500/50 hover:shadow-2xl hover:shadow-blue-500/10" : "bg-blue-50/20 border-slate-200 hover:border-blue-300 hover:shadow-2xl hover:shadow-blue-500/5"}`}>
+                 <div className={`group flex flex-col h-full min-h-[500px] p-5 sm:p-10 rounded-[2.5rem] sm:rounded-[3rem] border text-left transition-all duration-500 glass-card inner-glow-emerald ${isDarkMode ? "bg-slate-900/40 border-slate-700 hover:border-emerald-500/30 shadow-2xl shadow-emerald-500/5" : "bg-white/60 border-emerald-100 hover:border-emerald-300 shadow-2xl shadow-emerald-500/5"}`}>
                    
                    <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-8 gap-4">
                      <div className="flex items-center gap-5">
@@ -1149,16 +1149,16 @@ export function PortalView({
                        </div>
                      </div>
 
-                     <div className={`flex p-1.5 rounded-2xl gap-1 overflow-x-auto no-scrollbar max-w-full ${isDarkMode ? "bg-slate-800" : "bg-slate-200/50"}`}>
-                         {["atual", "vagas", "previa"].map(tab => (
-                           <button 
-                             key={tab}
-                             onClick={() => setDashboardTab(tab)} 
-                             className={`px-3 sm:px-5 py-2 sm:py-2.5 rounded-xl text-[9px] sm:text-[10px] font-black uppercase tracking-wider transition-all duration-300 whitespace-nowrap ${dashboardTab === tab ? (isDarkMode ? "bg-slate-700 text-white shadow-xl" : "bg-white text-blue-600 shadow-xl") : "text-slate-500 hover:text-slate-700"}`}>
-                             {tab === "atual" ? "Atual" : tab === "vagas" ? "Vagas" : "Prévia"}
-                           </button>
-                         ))}
-                     </div>
+                     <div className={`flex p-1.5 rounded-2xl gap-1 overflow-x-auto no-scrollbar max-w-full glass-card ${isDarkMode ? "bg-slate-950/40 border-slate-800" : "bg-slate-100 border-slate-200"}`}>
+                          {["atual", "vagas", "previa"].map(tab => (
+                            <button 
+                              key={tab}
+                              onClick={() => setDashboardTab(tab)} 
+                              className={`px-3 sm:px-6 py-2.5 rounded-xl text-[9px] sm:text-[10px] font-black uppercase tracking-widest transition-all duration-300 whitespace-nowrap ${dashboardTab === tab ? (isDarkMode ? "bg-emerald-600 text-white shadow-[0_0_15px_rgba(16,185,129,0.4)]" : "bg-emerald-600 text-white shadow-lg shadow-emerald-500/30") : "text-slate-500 hover:text-emerald-500"}`}>
+                              {tab === "atual" ? "Atual" : tab === "vagas" ? "Vagas" : "Prévia"}
+                            </button>
+                          ))}
+                      </div>
                    </div>
 
                     {/* Filtros rápidos no Portal do Aluno */}
@@ -1301,26 +1301,28 @@ export function PortalView({
                                  })();
                                  
                                  const isVaga = isTeacherPending(aula.teacher);
-                                 let containerClasses = isDarkMode ? "bg-slate-900 border-slate-800 hover:bg-slate-800/80" : "bg-white border-slate-100 hover:shadow-lg shadow-slate-200/50";
-                                 let timeColor = isDarkMode ? "text-slate-200" : "text-slate-900";
-                                 let badgeClasses = isDarkMode ? "bg-slate-950 text-slate-400 border-slate-800" : "bg-slate-50 text-slate-800 border-slate-100";
+                                 // DEFINIÇÃO DE ESTILOS NEON-GLASS (Fase 3)
+                                 let containerClasses = "glass-card transition-all duration-500 hover:scale-[1.02] border-transparent";
+                                 let timeColor = isDarkMode ? "text-emerald-400" : "text-emerald-700";
+                                 let badgeClasses = isDarkMode ? "bg-slate-900/60 text-slate-400 border-slate-800" : "bg-white/60 text-slate-800 border-slate-100";
+                                 let glowClass = isDarkMode ? "inner-glow-emerald" : "";
                                  
                                  if (isVaga) {
-                                    containerClasses = isDarkMode ? "bg-orange-500/10 border-orange-500/50 shadow-2xl shadow-orange-500/20 scale-[1.03] ring-2 ring-orange-500/50 animate-pulse" : "bg-orange-50 border-orange-200 shadow-xl shadow-orange-100 scale-[1.03] ring-2 ring-orange-500/30 animate-pulse";
-                                    timeColor = isDarkMode ? "text-orange-400" : "text-orange-700";
-                                    badgeClasses = "bg-orange-600 text-white shadow-lg shadow-orange-500/30 border-orange-400";
-                                 }
-
-                                 if (isTarget) {
-                                    containerClasses = isDarkMode ? "bg-blue-500/10 border-blue-500/50 shadow-2xl shadow-blue-500/20 scale-[1.03] ring-2 ring-blue-500/50" : "bg-blue-50 border-blue-200 shadow-xl shadow-blue-100 scale-[1.03] ring-2 ring-blue-500/30";
-                                    timeColor = isDarkMode ? "text-blue-400" : "text-blue-700";
-                                    badgeClasses = "bg-blue-600 text-white shadow-lg shadow-blue-500/30 border-blue-400";
+                                    containerClasses = "glass-card neon-border-pulsing scale-[1.03] inner-glow-rose border-rose-500/30";
+                                    timeColor = "text-rose-500 dark:text-rose-400";
+                                    badgeClasses = "bg-rose-600 text-white shadow-lg shadow-rose-500/30 border-rose-400";
+                                    glowClass = "inner-glow-rose";
+                                 } else if (isTarget) {
+                                    containerClasses = "glass-card scale-[1.03] inner-glow-emerald border-emerald-500/40 shadow-emerald-500/10";
+                                    timeColor = "text-emerald-500 dark:text-emerald-400";
+                                    badgeClasses = "bg-emerald-600 text-white shadow-lg shadow-emerald-500/30 border-emerald-400";
+                                    glowClass = "inner-glow-emerald";
                                  }
 
                                  return (
                                    <div 
                                      key={aula.id || idx} 
-                                     className={`group/item relative flex items-center justify-between p-5 rounded-[2.5rem] border transition-all duration-500 m-1.5 ${containerClasses} ${isVaga && appMode === 'professor' && dashboardTab === 'vagas' ? 'cursor-pointer hover:scale-[1.02]' : ''}`}
+                                     className={`group/item relative flex items-center justify-between p-5 rounded-[2rem] border transition-all duration-500 m-1.5 ${containerClasses} ${isVaga && appMode === 'professor' && dashboardTab === 'vagas' ? 'cursor-pointer hover:scale-[1.02]' : ''}`}
                                      onClick={() => {
                                        if (appMode === 'professor' && dashboardTab === 'vagas' && isVaga) {
                                            // Verifica restrição de turma
@@ -1416,39 +1418,39 @@ export function PortalView({
                      {appMode === "professor" ? (
                         <>
                           <button onClick={() => { setViewMode("professor"); if(typeof setSelectedTeacher === "function") setSelectedTeacher(siape); }} 
-                                  className={`group p-6 rounded-3xl border text-left transition-all hover:scale-[1.02] ${isDarkMode ? "bg-slate-800 border-slate-700 hover:border-indigo-500/50" : "bg-white border-slate-100 hover:border-indigo-200 shadow-sm hover:shadow-xl"}`}>
-                            <div className={`w-10 h-10 rounded-xl flex items-center justify-center mb-4 transition-colors ${isDarkMode ? "bg-indigo-950 text-indigo-400 group-hover:bg-indigo-600 group-hover:text-white" : "bg-indigo-50 text-indigo-600 group-hover:bg-indigo-600 group-hover:text-white"}`}>
-                              <UserCircle size={20} />
+                                  className={`group p-6 rounded-[2rem] border text-left transition-all duration-500 glass-card inner-glow-emerald ${isDarkMode ? "border-slate-800 hover:border-emerald-500/40" : "border-slate-100 hover:border-emerald-200 hover:shadow-xl hover:shadow-emerald-500/5"}`}>
+                            <div className={`w-12 h-12 rounded-2xl flex items-center justify-center mb-4 transition-all duration-500 ${isDarkMode ? "bg-emerald-950/60 text-emerald-400 group-hover:bg-emerald-600 group-hover:text-white" : "bg-emerald-50 text-emerald-600 group-hover:bg-emerald-600 group-hover:text-white shadow-sm"}`}>
+                              <UserCircle size={24} />
                             </div>
-                            <h3 className={`text-sm font-black mb-1 ${isDarkMode ? "text-white" : "text-slate-800"}`}>Meu Horário</h3>
-                            <p className="text-[10px] font-medium text-slate-500 leading-tight">Painel completo da grade.</p>
+                            <h3 className={`text-sm font-black mb-1 ${isDarkMode ? "text-emerald-50" : "text-slate-800"}`}>Meu Horário</h3>
+                            <p className="text-[10px] font-bold text-slate-500 leading-tight uppercase tracking-tighter">Painel completo</p>
                           </button>
 
                           <button onClick={() => { setViewMode("professor"); if(typeof setSelectedTeacher === "function") setSelectedTeacher(siape); }} 
-                                  className={`group p-6 rounded-3xl border text-left transition-all hover:scale-[1.02] ${isDarkMode ? "bg-slate-800 border-slate-700 hover:border-blue-500/50" : "bg-white border-slate-100 hover:border-blue-200 shadow-sm hover:shadow-xl"}`}>
-                            <div className={`w-10 h-10 rounded-xl flex items-center justify-center mb-4 transition-colors ${isDarkMode ? "bg-blue-950 text-blue-400 group-hover:bg-blue-600 group-hover:text-white" : "bg-blue-50 text-blue-600 group-hover:bg-blue-600 group-hover:text-white"}`}>
-                              <Calendar size={20} />
+                                  className={`group p-6 rounded-[2rem] border text-left transition-all duration-500 glass-card inner-glow-emerald ${isDarkMode ? "border-slate-800 hover:border-emerald-500/40" : "border-slate-100 hover:border-emerald-200 hover:shadow-xl hover:shadow-emerald-500/5"}`}>
+                            <div className={`w-12 h-12 rounded-2xl flex items-center justify-center mb-4 transition-all duration-500 ${isDarkMode ? "bg-emerald-950/60 text-emerald-400 group-hover:bg-emerald-600 group-hover:text-white" : "bg-emerald-50 text-emerald-600 group-hover:bg-emerald-600 group-hover:text-white shadow-sm"}`}>
+                              <Calendar size={24} />
                             </div>
-                            <h3 className={`text-sm font-black mb-1 ${isDarkMode ? "text-white" : "text-slate-800"}`}>Aulas Diárias</h3>
-                            <p className="text-[10px] font-medium text-slate-500 leading-tight">Visualizar grade do dia.</p>
+                            <h3 className={`text-sm font-black mb-1 ${isDarkMode ? "text-emerald-50" : "text-slate-800"}`}>Aulas Diárias</h3>
+                            <p className="text-[10px] font-bold text-slate-500 leading-tight uppercase tracking-tighter">Grade do dia</p>
                           </button>
 
                           <button onClick={() => setViewMode("curso")} 
-                                  className={`group p-6 rounded-3xl border text-left transition-all hover:scale-[1.02] ${isDarkMode ? "bg-slate-800 border-slate-700 hover:border-indigo-500/50" : "bg-white border-slate-100 hover:border-indigo-200 shadow-sm hover:shadow-xl"}`}>
-                            <div className={`w-10 h-10 rounded-xl flex items-center justify-center mb-4 transition-colors ${isDarkMode ? "bg-indigo-950 text-indigo-400 group-hover:bg-indigo-600 group-hover:text-white" : "bg-indigo-50 text-indigo-600 group-hover:bg-indigo-600 group-hover:text-white"}`}>
-                              <Shuffle size={20} />
+                                  className={`group p-6 rounded-[2rem] border text-left transition-all duration-500 glass-card inner-glow-emerald ${isDarkMode ? "border-slate-800 hover:border-emerald-500/40" : "border-slate-100 hover:border-emerald-200 hover:shadow-xl hover:shadow-emerald-500/5"}`}>
+                            <div className={`w-12 h-12 rounded-2xl flex items-center justify-center mb-4 transition-all duration-500 ${isDarkMode ? "bg-emerald-950/60 text-emerald-400 group-hover:bg-emerald-600 group-hover:text-white" : "bg-emerald-50 text-emerald-600 group-hover:bg-emerald-600 group-hover:text-white shadow-sm"}`}>
+                              <Shuffle size={24} />
                             </div>
-                            <h3 className={`text-sm font-black mb-1 ${isDarkMode ? "text-white" : "text-slate-800"}`}>Grade de Horários</h3>
-                            <p className="text-[10px] font-medium text-slate-500 leading-tight">Consulta ao quadro global.</p>
+                            <h3 className={`text-sm font-black mb-1 ${isDarkMode ? "text-emerald-50" : "text-slate-800"}`}>Grade Global</h3>
+                            <p className="text-[10px] font-bold text-slate-500 leading-tight uppercase tracking-tighter">Consultar quadro</p>
                           </button>
 
                           <button onClick={() => setViewMode("solicitacoes")} 
-                                  className={`group p-6 rounded-3xl border text-left transition-all hover:scale-[1.02] ${isDarkMode ? "bg-slate-800 border-slate-700 hover:border-amber-500/50" : "bg-white border-slate-100 hover:border-amber-200 shadow-sm hover:shadow-xl"}`}>
-                            <div className={`w-10 h-10 rounded-xl flex items-center justify-center mb-4 transition-colors ${isDarkMode ? "bg-amber-950 text-amber-400 group-hover:bg-amber-600 group-hover:text-white" : "bg-amber-50 text-amber-600 group-hover:bg-amber-600 group-hover:text-white"}`}>
-                              <Bell size={20} />
+                                  className={`group p-6 rounded-[2rem] border text-left transition-all duration-500 glass-card inner-glow-emerald ${isDarkMode ? "border-slate-800 hover:border-emerald-500/40" : "border-slate-100 hover:border-emerald-200 hover:shadow-xl hover:shadow-emerald-500/5"}`}>
+                            <div className={`w-12 h-12 rounded-2xl flex items-center justify-center mb-4 transition-all duration-500 ${isDarkMode ? "bg-emerald-950/60 text-emerald-400 group-hover:bg-emerald-600 group-hover:text-white" : "bg-emerald-50 text-emerald-600 group-hover:bg-emerald-600 group-hover:text-white shadow-sm"}`}>
+                              <Bell size={24} />
                             </div>
-                            <h3 className={`text-sm font-black mb-1 ${isDarkMode ? "text-white" : "text-slate-800"}`}>Solicitações</h3>
-                            <p className="text-[10px] font-medium text-slate-500 leading-tight">Trocas pendentes e alertas.</p>
+                            <h3 className={`text-sm font-black mb-1 ${isDarkMode ? "text-emerald-50" : "text-slate-800"}`}>Minhas Solics.</h3>
+                            <p className="text-[10px] font-bold text-slate-500 leading-tight uppercase tracking-tighter">Avisos e Pedidos</p>
                           </button>
 
                           <button onClick={() => setViewMode("total")} 
@@ -1803,7 +1805,7 @@ export function PortalView({
             {isPending && <div className="top-loading-bar" />}
 
             {/* ÁREA ENCAPSULADA DE EXIBIÇÃO E IMPRESSÃO (COM DESFOQUE DE TRANSIÇÃO) */}
-            <div id="printable-area" className={isPending ? "page-transition-blur" : "transition-all duration-500"}>
+            <div id="printable-area" className={`print:w-full print:p-0 ${isPending ? "page-transition-blur" : "transition-all duration-500"}`}>
 
               
               {/* TRATAMENTO DE ESTADO VAZIO */}
