@@ -717,12 +717,13 @@ export function PortalView({
     // 3. Vagas (Busca todas as vagas das turmas que este professor atende - Independente de filtros externos)
     // Precisamos de uma lista de 'classIds' que o professor realmente atende na produção
     const myProdClasses = new Set((schedules || [])
-      .filter(s => (s.type === 'oficial' || s.type === 'atual') && String(s.teacherId).split(',').includes(String(siape)))
+      .filter(s => s.classId && (s.type === 'oficial' || s.type === 'atual') && String(s.teacherId).split(',').includes(String(siape)))
       .map(s => String(s.classId))
     );
 
     const rawVagasFiltered = (schedules || [])
       .filter(s => 
+        s.classId && 
         (s.type === 'oficial' || s.type === 'atual') && 
         String(s.week_id) === String(dashboardBaseWeekId) &&
         (!s.teacherId || s.teacherId === "0000001" || isTeacherPending(s.teacherId)) && 

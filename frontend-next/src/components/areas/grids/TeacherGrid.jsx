@@ -46,7 +46,7 @@ export const TeacherGrid = React.memo(
     
     // Filtro principal de registros do professor selecionado (ou colega sendo visualizado)
     const directRecords = mappedSchedules.filter(r => r.teacherId && activeTeacher && String(r.teacherId).split(',').includes(String(activeTeacher)));
-    const targetClasses = new Set(directRecords.map(r => r.className));
+    const targetClasses = new Set(directRecords.map(r => r.className).filter(Boolean));
     
     // Exibe as aulas do professor, as AULAS VAGAS e as aulas de OUTROS PROFESSORES nas turmas onde ele leciona
     // Se 'Apenas Minhas' estiver ativo, exibe somente directRecords
