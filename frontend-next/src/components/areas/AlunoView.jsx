@@ -1,6 +1,6 @@
 import React from 'react';
-import { PortalView } from './PortalView';
+import { PortalAluno } from './PortalAluno';
 
 export function AlunoView(props) {
-  return <PortalView appMode="aluno" {...props} />;
+  return <PortalAluno appMode="aluno" {...props} />;
 }
