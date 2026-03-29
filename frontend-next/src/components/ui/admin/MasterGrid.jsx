@@ -1159,18 +1159,28 @@ export function MasterGrid({ isDarkMode, ...props }) {
           {selectedType === 'padrao' ? (
             <select value={selectedWeek} onChange={(e) => setSelectedWeek(e.target.value)} className={`px-4 py-2.5 rounded-lg border shadow-sm outline-none cursor-pointer text-xs font-bold uppercase tracking-wider text-rose-600 dark:text-rose-400 ${isDarkMode ? 'bg-slate-800 border-slate-600' : 'bg-white border-slate-200'}`}>
               <option value="">-- Versão do Padrão --</option>
-              {Array.from({ length: Math.max(4, schedules.filter(s => s.type === 'padrao' && s.week_id?.startsWith('V')).reduce((max, s) => Math.max(max, parseInt(s.week_id.replace('V', '')) || 1), 1)) }).map((_, i) => (
-                  <option key={`V${i + 1}`} value={`V${i + 1}`}>Versão {i + 1} (V{i + 1})</option>
-              ))}
+              {Array.from({ length: Math.max(4, schedules.filter(s => s.type === 'padrao' && s.week_id?.startsWith('V')).reduce((max, s) => Math.max(max, parseInt(s.week_id.replace('V', '')) || 1), 1)) }).map((_, i) => {
+                  const vLabel = `V${i + 1}`;
+                  // Versão 1 trata nulo/vazio como "V1" por ser a versão raiz histórica
+                  const hasData = weeksWithData.has(vLabel) || (i === 0 && weeksWithData.has('')); 
+                  return (
+                    <option key={vLabel} value={vLabel} className={hasData ? (isDarkMode ? 'bg-emerald-900/60 text-emerald-400 font-black' : 'bg-emerald-100 text-emerald-700 font-black') : (isDarkMode ? 'text-slate-400' : 'text-slate-500')}>
+                       {hasData ? '✔ ' : '⏳ '}Versão {i + 1} ({vLabel}) {hasData ? '(Preenchida)' : ''}
+                    </option>
+                  );
+              })}
             </select>
           ) : (
             <select value={selectedWeek} onChange={(e) => setSelectedWeek(e.target.value)} className={`px-4 py-2.5 rounded-lg border shadow-sm outline-none cursor-pointer text-xs font-bold uppercase tracking-wider text-amber-600 dark:text-amber-400 ${isDarkMode ? 'bg-slate-800 border-slate-600' : 'bg-white border-slate-200'}`}>
               <option value="">-- Semana --</option>
-              {academicWeeks?.filter(w => String(w.academic_year) === String(selectedConfigYear)).map(w => {
+              {academicWeeks?.filter(w => String(w.academic_year) === String(selectedConfigYear)).sort((a,b) => (a.start_date || '').localeCompare(b.start_date || '') || ((parseInt((a.name||'').replace(/\\D/g, ''))||0) - (parseInt((b.name||'').replace(/\\D/g, ''))||0))).map(w => {
                  const hasData = weeksWithData.has(String(w.id));
+                 const d1 = w.start_date?.split('-');
+                 const d2 = w.end_date?.split('-');
+                 const dateLabel = (d1?.length === 3 && d2?.length === 3) ? ` (${d1[2]}/${d1[1]} a ${d2[2]}/${d2[1]})` : '';
                  return (
                     <option key={w.id} value={w.id} className={hasData ? (isDarkMode ? 'bg-emerald-900/60 text-emerald-400 font-black' : 'bg-emerald-100 text-emerald-700 font-black') : (isDarkMode ? 'text-slate-400' : 'text-slate-500')}>
-                       {hasData ? '✔ ' : '⏳ '}{w.name} {hasData ? '(Preenchida)' : ''}
+                       {hasData ? '✔ ' : '⏳ '}{w.name}{dateLabel} {hasData ? '(Preenchida)' : ''}
                     </option>
                  )
               })}
@@ -1320,12 +1330,12 @@ export function MasterGrid({ isDarkMode, ...props }) {
                                   if (otherClassIds.length === 0) return;
                                   const isIsolated = otherClassIds.every(id => hiddenClasses.includes(id));
                                   if (isIsolated) {
-                                      setHiddenClasses(prev => prev.filter(id => !otherClassIds.includes(id)));
+                                      setHiddenClasses([]); // Volta para todas as turmas
                                   } else {
-                                      setHiddenClasses(prev => [...prev.filter(id => !otherClassIds.includes(id)), ...otherClassIds]);
+                                      setHiddenClasses(otherClassIds); // Foca nesta turma (ocultando as demais)
                                   }
                                }} 
-                               title={hiddenClasses.length > 0 && turmasDoCurso.map(t => String(t.id)).filter(id => id !== String(turma.id)).every(id => hiddenClasses.includes(id)) ? "Remover Modo Foco (Mostrar outras turmas)" : "Modo Foco: Isolar esta turma (Ocultar as outras)"} 
+                               title={hiddenClasses.length > 0 && turmasDoCurso.map(t => String(t.id)).filter(id => id !== String(turma.id)).every(id => hiddenClasses.includes(id)) ? "Remover Modo Foco (Mostrar todas as turmas)" : "Modo Foco: Mostrar apenas esta turma"} 
                                className={`hover:text-indigo-500 transition-colors rounded shadow-sm border p-0.5 ${isDarkMode ? 'bg-slate-800 border-slate-700 text-slate-400' : 'bg-white border-slate-200 text-slate-500'}`}
                              >
                                 <Target size={12} />
@@ -1744,7 +1754,9 @@ function SaveMatrixModal({ isDarkMode, grade, selectedCourses, courses, saveOpti
      return m;
   }, [schedules]);
 
-  const currentYearWeeks = useMemo(() => academicWeeks?.filter(w => String(w.academic_year) === String(selectedConfigYear)) || [], [academicWeeks, selectedConfigYear]);
+  const currentYearWeeks = useMemo(() => {
+    return (academicWeeks?.filter(w => String(w.academic_year) === String(selectedConfigYear)) || []).sort((a,b) => (a.start_date || '').localeCompare(b.start_date || '') || ((parseInt((a.name||'').replace(/\\D/g, ''))||0) - (parseInt((b.name||'').replace(/\\D/g, ''))||0)));
+  }, [academicWeeks, selectedConfigYear]);
 
   const availableOptions = useMemo(() => {
     if (loadedType === 'padrao') return [{ value: 'padrao', label: '0. Atualizar: Padrão Anual (Base)' }, { value: 'previa', label: '1. Criar: Prévia Semanal' }];
@@ -1849,9 +1861,14 @@ function SaveMatrixModal({ isDarkMode, grade, selectedCourses, courses, saveOpti
               <label className="block text-[10px] font-black uppercase opacity-60 mb-2">Semana Destino</label>
               <select value={saveOptions.weekId} onChange={e => setSaveOptions(p => ({...p, weekId: e.target.value}))} className={`w-full p-3.5 rounded-xl border text-sm font-bold outline-none transition-colors ${isDarkMode ? 'bg-slate-950 border-slate-700 focus:border-indigo-500' : 'bg-white border-slate-300 focus:border-indigo-500 text-black'}`}>
                  <option value="">Selecione...</option>
-                 {currentYearWeeks.map(w => (
-                     <option key={w.id} value={w.id}>{formatWeekLabel ? formatWeekLabel(w) : w.name}</option>
-                 ))}
+                 {currentYearWeeks.map(w => {
+                     const d1 = w.start_date?.split('-');
+                     const d2 = w.end_date?.split('-');
+                     const dateLabel = (d1?.length === 3 && d2?.length === 3) ? ` (${d1[2]}/${d1[1]} a ${d2[2]}/${d2[1]})` : '';
+                     return (
+                         <option key={w.id} value={w.id}>{w.name}{dateLabel}</option>
+                     );
+                 })}
               </select>
             </div>
           ) : (

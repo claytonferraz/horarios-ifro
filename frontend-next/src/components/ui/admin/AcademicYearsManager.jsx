@@ -40,7 +40,7 @@ export function AcademicYearsManager({ isDarkMode, academicYearsMeta, uniqueYear
   // Merge years from the DB meta and from imported schedules, sort descending
   const dbYears = Object.keys(academicYearsMeta || {});
   const scheduleYears = uniqueYearsData || [];
-  const allYears = [...new Set([...dbYears, ...scheduleYears])].sort((a, b) => Number(b) - Number(a));
+  const allYears = [...new Set([...dbYears.map(String), ...scheduleYears.map(String)])].sort((a, b) => Number(b) - Number(a));
 
   const handleAddYear = async () => {
     const yr = newYear.trim();
