@@ -66,6 +66,7 @@ const adminRoutes = require('./routes/admin.routes')(io);
 const requestsRoutes = require('./routes/requests.routes')(io);
 const notificationsRoutes = require('./routes/notifications.routes')(io);
 const miscRoutes = require('./routes/misc.routes')(io);
+const scheduleRulesRoutes = require('./routes/scheduleRules.routes');
 
 // 3. Mapeamento de Endpoints (Compatibilidade API v1)
 app.use('/api', miscRoutes);          // /api/status, /api/teachers, /api/curriculum
@@ -75,6 +76,7 @@ app.use('/api/notifications', notificationsRoutes);
 app.use('/api/schedules', attachUserIfPresent, requirePublicScheduleAccess, schedulesRoutes);
 app.use('/api/admin', attachUserIfPresent, requirePublicScheduleAccess, adminRoutes);
 app.use('/api/requests', requestsRoutes);
+app.use('/api/schedule-rules', scheduleRulesRoutes);
 
 // Servidor
 const PORT = process.env.PORT || 3012;

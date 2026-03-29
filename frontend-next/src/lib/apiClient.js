@@ -454,5 +454,30 @@ export const apiClient = {
     });
     if (!res.ok) throw new Error('Falha ao atualizar solicitação');
     return await res.json();
+  },
+
+  // --- MOTOR DE REGRAS DE HORÁRIO ---
+  async fetchScheduleRules() {
+    try {
+      const res = await fetch(`${API_URL}/schedule-rules`, { headers: getHeaders(), credentials: 'same-origin' });
+      if (!res.ok) throw new Error('Falha ao buscar regras do painel');
+      return await res.json();
+    } catch (e) {
+      console.error(e);
+      return [];
+    }
+  },
+
+  async updateScheduleRule(id, data) {
+    const res = await fetch(`${API_URL}/schedule-rules/${id}`, {
+      method: 'PUT',
+      headers: getHeaders(),
+      body: JSON.stringify(data)
+    });
+    if (!res.ok) {
+       const err = await res.json().catch(() => ({}));
+       throw new Error(err.error || err.message || 'Falha ao atualizar a regra');
+    }
+    return await res.json();
   }
 };

@@ -1,11 +1,12 @@
 import React, { useState } from 'react';
 import { 
-  MessageSquare, CalendarDays, BarChart3, LayoutDashboard
+  MessageSquare, CalendarDays, BarChart3, LayoutDashboard, ShieldAlert
 } from 'lucide-react';
 import { MasterGrid } from '../ui/admin/MasterGrid';
 import { AdminRequestsManager } from '../ui/admin/AdminRequestsManager';
 import { AdminTotalControl } from '../ui/admin/AdminTotalControl';
 import { CommandCenterDashboard } from '../ui/admin/CommandCenterDashboard';
+import { ScheduleRulesManager } from '../ui/admin/ScheduleRulesManager';
 import { useData } from '@/contexts/DataContext';
 
 /**
@@ -85,6 +86,13 @@ export function GestaoDape({
           >
             <BarChart3 size={16} /> Controle de Aulas
           </button>
+
+          <button 
+            onClick={() => setActiveTab('regras_horario')}
+            className={`flex-1 sm:flex-none px-6 py-3 rounded-lg text-[11px] font-black uppercase tracking-widest transition-all flex items-center justify-center gap-2 ${activeTab === 'regras_horario' ? 'bg-emerald-600 text-white shadow-lg' : (isDarkMode ? 'text-slate-400 hover:text-white hover:bg-slate-800' : 'text-slate-500 hover:text-slate-900 hover:bg-white')}`}
+          >
+            <ShieldAlert size={16} /> Motor de Regras
+          </button>
         </div>
       </div>
 
@@ -131,6 +139,10 @@ export function GestaoDape({
             handlePrint={handlePrint}
             hideTeacherFilter={false} // Admin view show show all teachers
           />
+        )}
+
+        {activeTab === 'regras_horario' && (
+          <ScheduleRulesManager isDarkMode={isDarkMode} />
         )}
       </div>
     </div>
