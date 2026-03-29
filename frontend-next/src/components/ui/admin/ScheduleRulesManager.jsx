@@ -6,20 +6,27 @@ import { resolveTeacherName } from '@/lib/dates';
 
 export function ScheduleRulesManager({ isDarkMode }) {
     const { rules, isLoading, errorMsg, fetchRules, updateRule, setErrorMsg } = useScheduleRules();
-    const { globalTeachers = [], academicWeeks = [] } = useData();
+    const { 
+        globalTeachers = [], 
+        academicWeeks = [], 
+        academicYearsMeta = {}, 
+        selectedConfigYear, 
+        setSelectedConfigYear 
+    } = useData();
 
     // Estado do Modal de Exceções
     const [exceptionModal, setExceptionModal] = useState({ show: false, rule: null });
 
     useEffect(() => {
-        fetchRules();
-    }, [fetchRules]);
+        fetchRules(selectedConfigYear);
+    }, [fetchRules, selectedConfigYear]);
 
     const handleToggleActive = async (rule) => {
         await updateRule(rule.id, {
             severity: rule.severity,
             is_active: rule.is_active ? 0 : 1, // toggle
-            exceptions: typeof rule.exceptions === 'string' ? JSON.parse(rule.exceptions || '{}') : rule.exceptions
+            exceptions: typeof rule.exceptions === 'string' ? JSON.parse(rule.exceptions || '{}') : rule.exceptions,
+            academic_year: selectedConfigYear
         });
     };
 
@@ -27,7 +34,8 @@ export function ScheduleRulesManager({ isDarkMode }) {
         await updateRule(rule.id, {
             severity: newSeverity,
             is_active: rule.is_active,
-            exceptions: typeof rule.exceptions === 'string' ? JSON.parse(rule.exceptions || '{}') : rule.exceptions
+            exceptions: typeof rule.exceptions === 'string' ? JSON.parse(rule.exceptions || '{}') : rule.exceptions,
+            academic_year: selectedConfigYear
         });
     };
 
@@ -46,7 +54,8 @@ export function ScheduleRulesManager({ isDarkMode }) {
         await updateRule(rule.id, {
             severity: rule.severity,
             is_active: rule.is_active,
-            exceptions: { ignoredTeachers, ignoredWeeks }
+            exceptions: { ignoredTeachers, ignoredWeeks },
+            academic_year: selectedConfigYear
         });
         setExceptionModal({ show: false, rule: null });
     };
@@ -89,6 +98,31 @@ export function ScheduleRulesManager({ isDarkMode }) {
                     <p className={`text-[10px] font-bold uppercase tracking-widest mt-1 ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>
                         Gerencie as restrições logicas do sistema de horários (V1)
                     </p>
+                    <div className="mt-4 flex flex-col sm:flex-row items-start sm:items-center gap-4">
+                        <div className="flex flex-col gap-1">
+                            <label className={`text-[9px] font-black uppercase tracking-widest ${isDarkMode ? 'text-slate-500' : 'text-slate-400'}`}>Ano Letivo em Edição</label>
+                            <select 
+                                value={selectedConfigYear}
+                                onChange={(e) => setSelectedConfigYear(e.target.value)}
+                                className={`px-3 py-1.5 rounded-lg border text-xs font-bold outline-none transition-all ${isDarkMode ? 'bg-slate-900 border-slate-700 text-slate-200' : 'bg-white border-slate-200 text-slate-700 hover:border-slate-300'}`}
+                            >
+                                {Object.keys(academicYearsMeta).length > 0 ? (
+                                    Object.keys(academicYearsMeta).sort((a,b) => b-a).map(y => (
+                                        <option key={y} value={y}>{y}</option>
+                                    ))
+                                ) : (
+                                    <option value={new Date().getFullYear().toString()}>{new Date().getFullYear()}</option>
+                                )}
+                            </select>
+                        </div>
+                        
+                        <div className="flex flex-col gap-1">
+                            <label className={`text-[9px] font-black uppercase tracking-widest ${isDarkMode ? 'text-slate-500' : 'text-slate-400'}`}>Status Global</label>
+                            <span className={`px-2 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-tighter border ${isDarkMode ? 'bg-indigo-500/10 border-indigo-500/20 text-indigo-300' : 'bg-indigo-50 border-indigo-100 text-indigo-600'}`}>
+                                Contexto: Configurando regras para {selectedConfigYear}
+                            </span>
+                        </div>
+                    </div>
                 </div>
             </div>
 
@@ -211,9 +245,17 @@ export function ScheduleRulesManager({ isDarkMode }) {
                         </div>
                         
                         <div className="flex-1 overflow-y-auto space-y-6 pr-2 custom-scrollbar">
+                            <div className={`p-4 rounded-xl border flex items-center gap-3 ${isDarkMode ? 'bg-amber-900/10 border-amber-500/20 text-amber-200' : 'bg-amber-50 border-amber-100 text-amber-800'}`}>
+                                <AlertTriangle size={20} className="shrink-0" />
+                                <p className="text-[10px] font-bold uppercase tracking-widest leading-relaxed">
+                                    Lógica de Isenção: A regra será relaxada se o <b>Professor estiver na lista</b> OU se for <b>Lanço em uma Semana Isenta</b>.
+                                </p>
+                            </div>
+
                             {/* Bloco de Professores Ignorados */}
                             <div>
-                                <h4 className={`text-xs font-black uppercase tracking-wider mb-3 ${isDarkMode ? 'text-slate-300' : 'text-slate-700'}`}>Professores Isentos Destra Regra</h4>
+                                <h4 className={`text-xs font-black uppercase tracking-wider mb-1 ${isDarkMode ? 'text-slate-300' : 'text-slate-700'}`}>Professores Isentos Desta Regra</h4>
+                                <p className="text-[9px] opacity-60 mb-3 uppercase tracking-widest">A regra se tornará um Aviso apenas para estes docentes abaixo.</p>
                                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 h-48 overflow-y-auto border rounded-xl p-2 custom-scrollbar">
                                     {globalTeachers.length > 0 ? globalTeachers.map(teacher => {
                                         const isIgnored = exceptionModal.ignoredTeachers.includes(teacher.siape);

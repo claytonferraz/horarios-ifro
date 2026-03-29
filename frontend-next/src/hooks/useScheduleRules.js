@@ -6,11 +6,11 @@ export function useScheduleRules() {
     const [isLoading, setIsLoading] = useState(false);
     const [errorMsg, setErrorMsg] = useState('');
 
-    const fetchRules = useCallback(async () => {
+    const fetchRules = useCallback(async (year) => {
         setIsLoading(true);
         setErrorMsg('');
         try {
-            const data = await apiClient.fetchScheduleRules();
+            const data = await apiClient.fetchScheduleRules(year);
             setRules(data || []);
         } catch (err) {
             setErrorMsg(err.message || 'Erro ao carregar regras.');

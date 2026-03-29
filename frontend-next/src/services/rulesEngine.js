@@ -39,24 +39,23 @@ function determineTurno(timeStr) {
     return 'Desconhecido';
 }
 
-function processExceptions(rule, teacherId, weekId) {
+function processExceptions(rule, teacherId, weekId, academicYear) {
     try {
         const exs = typeof rule.exceptions === 'string' ? JSON.parse(rule.exceptions) : rule.exceptions;
         if (!exs) return false;
         
-        // Exceções por professor (ignorados)
-        if (exs.ignoredTeachers && teacherId) {
-            if (exs.ignoredTeachers.includes(teacherId)) return true;
-        }
+        // Se a regra for de outro ano letivo, ela não se aplica (opcional, dependendo de como salvamos)
+        // Por enquanto, as regras são globais mas contextuais à tela aberta.
 
-        // Exceções por semana específica
-        if (exs.ignoredWeeks && weekId) {
-            if (exs.ignoredWeeks.includes(weekId)) return true;
-        }
+        const isTeacherIgnored = exs.ignoredTeachers && teacherId && exs.ignoredTeachers.includes(teacherId);
+        const isWeekIgnored = exs.ignoredWeeks && weekId && exs.ignoredWeeks.includes(weekId);
+
+        // Lógica de Isenção: Se o professor está na lista OU a semana está na lista, a regra é relaxada.
+        if (isTeacherIgnored || isWeekIgnored) return true;
 
         return false;
     } catch {
-        return false; // Se der erro de parsing de JSON, finge que não tem exceção.
+        return false;
     }
 }
 
@@ -103,15 +102,15 @@ export function validateMove(rawSchedules, proposedDrop, activeRules, context = 
     // Helpers function para criar um issue padronizado
     const emitIssue = (rule, msgDetails) => {
         // Se a regra tem exceções ativas, abaixa severidade ou ignora
-        let isExceptional = processExceptions(rule, teacher, context.academicWeekId);
+        let isExceptional = processExceptions(rule, teacher, context.academicWeekId, context.academicYear);
 
         let finalType = rule.severity === 'MANDATORY' ? 'error' : 'warning';
         let desc = isExceptional ? `(EXCEÇÃO APLICADA) ${msgDetails}` : msgDetails;
 
-        if (rule.severity === 'MANDATORY_WITH_EXCEPTION' && isExceptional) {
-            finalType = 'warning'; // Cai a gravidade
+        if (isExceptional && rule.severity !== 'WARNING') {
+            finalType = 'warning'; // Cai a gravidade para aviso se houver exceção
         } else if (rule.severity === 'MANDATORY_WITH_EXCEPTION') {
-            finalType = 'error';
+            finalType = 'error'; // Bloqueia se não for exceção
         }
 
         logs.push({

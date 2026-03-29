@@ -3,9 +3,19 @@ const router = express.Router();
 const db = require('../db');
 const { verifyToken, requireAdmin } = require('../middlewares/auth.middleware');
 
-// GET all rules
+// GET all rules by academic year
 router.get('/', (req, res) => {
-    db.all('SELECT * FROM schedule_rules', [], (err, rows) => {
+    const { academic_year } = req.query;
+    
+    let query = 'SELECT * FROM schedule_rules';
+    let params = [];
+    
+    if (academic_year) {
+        query += ' WHERE academic_year = ?';
+        params.push(academic_year);
+    }
+
+    db.all(query, params, (err, rows) => {
         if (err) {
             console.error('Erro ao buscar regras:', err);
             return res.status(500).json({ message: 'Erro ao buscar regras.' });
@@ -17,7 +27,7 @@ router.get('/', (req, res) => {
 // PUT update a rule
 router.put('/:id', verifyToken, requireAdmin, (req, res) => {
     const { id } = req.params;
-    const { severity, is_active, exceptions } = req.body;
+    const { severity, is_active, exceptions, academic_year } = req.body;
     
     // As in V1 we don't modify the logic or codename, only settings
     db.run(

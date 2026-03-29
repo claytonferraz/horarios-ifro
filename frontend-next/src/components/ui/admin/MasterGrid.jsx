@@ -775,17 +775,10 @@ export function MasterGrid({ isDarkMode, ...props }) {
     }
 
     // Identifica todos os conflitos dos drops agrupados
-    const collisionIssues = [];
     const ruleEngineIssues = [];
 
     for (const drop of dropsToMake) {
-        // Validação Estrita (Obrigatória 1: Colisão de professores exatos ou Salas no mesmo slot - Base do sistema)
-        const check = verificarChoqueHorario(aula.teacherIds, aula.sala, diaId, drop.hora, classId);
-        if (check) {
-           collisionIssues.push(`[${drop.hora}] ${[check.profMsg, check.salaMsg].filter(Boolean).join(' | ')}`);
-        }
-
-        // Motor V1 - Múltiplas Validações Avançadas (Interseção, Turnos, Interjornada)
+        // Motor V1 - Múltiplas Validações Avançadas (Interseção, Turnos, Interjornada, Salas)
         if (aula.teacherIds && aula.teacherIds.length > 0) {
             for (const tId of aula.teacherIds) {
                 if (!tId || isTeacherPending(tId)) continue;
@@ -801,7 +794,10 @@ export function MasterGrid({ isDarkMode, ...props }) {
                     currentClass: aula.className
                 };
                 
-                const logs = validateMove(rawArray, proposedDropObj, activeSystemRules, { academicWeekId: selectedWeek });
+                const logs = validateMove(rawArray, proposedDropObj, activeSystemRules, { 
+                    academicWeekId: selectedWeek,
+                    academicYear: selectedConfigYear
+                });
                 if (logs && logs.length > 0) {
                      logs.forEach(lg => ruleEngineIssues.push(lg));
                 }
@@ -809,15 +805,15 @@ export function MasterGrid({ isDarkMode, ...props }) {
         }
     }
 
-    const hasStrictBlocker = collisionIssues.length > 0 || ruleEngineIssues.some(r => r.type === 'error');
+    const hasStrictBlocker = ruleEngineIssues.some(r => r.type === 'error');
     const hasWarnings = ruleEngineIssues.some(r => r.type === 'warning');
 
     if (hasStrictBlocker || hasWarnings) {
        setPendingDrop({
           aula, origem, classId, diaId,
           dropsToMake,
-          conflicts: collisionIssues, // Array de string legada
-          ruleLogs: ruleEngineIssues, // Array de obj { ruleId, title, type, message, isExceptional }
+          conflicts: [], // Limpa o array legado de colisões fixas
+          ruleLogs: ruleEngineIssues, // Agora tudo vem daqui
           hasStrictBlocker
        });
     } else {

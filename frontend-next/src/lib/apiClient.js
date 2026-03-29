@@ -457,9 +457,10 @@ export const apiClient = {
   },
 
   // --- MOTOR DE REGRAS DE HORÁRIO ---
-  async fetchScheduleRules() {
+  async fetchScheduleRules(academic_year) {
     try {
-      const res = await fetch(`${API_URL}/schedule-rules`, { headers: getHeaders(), credentials: 'same-origin' });
+      const url = academic_year ? `${API_URL}/schedule-rules?academic_year=${academic_year}` : `${API_URL}/schedule-rules`;
+      const res = await fetch(url, { headers: getHeaders(), credentials: 'same-origin' });
       if (!res.ok) throw new Error('Falha ao buscar regras do painel');
       return await res.json();
     } catch (e) {
