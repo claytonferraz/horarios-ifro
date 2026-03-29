@@ -47,6 +47,7 @@ const GridCell = React.memo(({
   onDragOver, 
   onDrop, 
   onOpenModal,
+  onRemoveCard,
   alertasObj
 }) => {
   const hasAlert = alertasObj?.prof || alertasObj?.sala;
@@ -101,14 +102,25 @@ const GridCell = React.memo(({
                 </span>
              </div>
              {aulaNesteSlot.sala && (
-               <span className="text-[7.5px] font-black bg-black/5 dark:bg-white/10 px-1 rounded flex items-center gap-0.5 shrink-0">
-                  <MapPin size={6} /> {aulaNesteSlot.sala.slice(0, 6)}
+               <span title={aulaNesteSlot.sala} className="text-[7.5px] font-black bg-black/5 dark:bg-white/10 px-1 rounded flex items-center gap-0.5 shrink-0 max-w-[80px] overflow-hidden whitespace-nowrap">
+                  <MapPin size={6} className="shrink-0" /> <span className="truncate">{aulaNesteSlot.sala}</span>
                </span>
              )}
           </div>
           
           {/* Efeito Visual Hover Glass */}
           <div className="absolute inset-0 bg-white/10 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none" />
+
+          {/* Botão Remover X */}
+          {onRemoveCard && (
+            <button
+               title="Remover da Grade"
+               onClick={(e) => { e.stopPropagation(); onRemoveCard(slotKey); }}
+               className="absolute top-1 right-1 w-4 h-4 flex items-center justify-center bg-rose-500/90 hover:bg-rose-600 text-white rounded-full opacity-0 group-hover:opacity-100 transition-all shadow-sm z-20 print:hidden cursor-pointer hover:scale-110"
+            >
+               <X size={10} strokeWidth={3} />
+            </button>
+          )}
         </div>
       ) : (
         <div className={`w-full min-h-[58px] rounded-xl border-2 border-dashed flex items-center justify-center transition-colors group/empty ${
@@ -830,43 +842,11 @@ export function MasterGrid({ isDarkMode, ...props }) {
   // === CONCENTRADOR GLOBAL DE ALERTAS ===
   const [isSaving, setIsSaving] = useState(false);
 
-  // FUNÇÃO DE SALVAMENTO FUNCIONAL (Fase 5)
-  const handleSaveSchedule = async () => {
-    if (!isDirty || isSaving || !selectedWeek) return;
-    
-    setIsSaving(true);
-    try {
-      // 1. Converter o mapa da grade em registros para o banco (Formato original da planilha)
-      const weekObj = academicWeeks.find(w => String(w.id) === String(selectedWeek));
-      const weekName = weekObj ? weekObj.name : 'Semana Selecionada';
-      const weekType = 'atual'; // Sempre salvamos como 'atual' no MasterGrid
-      const weekKey = `${weekName}-${weekType}`;
-
-      const recordsToSave = Object.values(grade).map(aula => ({
-        ...aula,
-        week: weekName,
-        type: weekType
-      }));
-
-      // 2. Persistir via API
-      await apiClient.saveSchedule(weekKey, {
-        week: weekName,
-        type: weekType,
-        records: JSON.stringify(recordsToSave)
-      });
-
-      // 3. Sucesso: Sincronizar originalGrade para remover o estado 'Dirty'
-      setOriginalGrade(JSON.parse(JSON.stringify(grade)));
-      
-      // 4. Notificar Sucesso (opcional, já temos o botão que muda de cor)
-      refreshData();
-      alert("Alterações salvas com sucesso!");
-    } catch (err) {
-       console.error("Erro ao salvar grade:", err);
-       alert("Falha ao salvar alterações: " + (err.message || "Erro desconhecido"));
-    } finally {
-       setIsSaving(false);
-    }
+  // FUNÇÃO DE SALVAMENTO FUNCIONAL (Fase 5 - Restaurando Modal de Pipeline)
+  const handleSaveSchedule = () => {
+    if (!isDirty || isSaving) return;
+    setSaveOptions({ type: selectedType || 'previa', weekId: selectedWeek || '' });
+    setModalMode('save');
   };
 
   const dashboardAlerts = useMemo(() => {
@@ -1447,6 +1427,13 @@ export function MasterGrid({ isDarkMode, ...props }) {
                                  setModalMode('editAula');
                                  setSaveOptions(prev => ({ ...prev, aulaToEdit: aula, keyToEdit: slotKey }));
                               }}
+                              onRemoveCard={(keyToDelete) => {
+                                 setGrade(prev => {
+                                    const nv = {...prev};
+                                    delete nv[keyToDelete];
+                                    return nv;
+                                 });
+                              }}
                               alertasObj={alertasObj}
                             />
                           );
@@ -1519,7 +1506,6 @@ export function MasterGrid({ isDarkMode, ...props }) {
            academicWeeks={academicWeeks} schedules={schedules} selectedConfigYear={selectedConfigYear}
            loadedType={selectedType} loadedWeek={selectedWeek} 
            onClose={() => setModalMode(null)} 
-           formatWeekLabel={formatWeekLabel}
            onSuccess={() => { setModalMode(null); setSystemDialog({ isOpen: true, type: 'alert', title: 'Sucesso!', message: 'Grade armazenada com sucesso no banco de dados.' }); setRefreshTrigger(prev => prev + 1); }} 
            setSystemDialog={setSystemDialog}
          />
