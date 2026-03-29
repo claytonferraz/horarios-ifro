@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { UserCircle, Printer } from "lucide-react";
+import { UserCircle, Printer, BookOpen, GraduationCap, CalendarDays, Clock, CheckCircle, Search, Sparkles } from "lucide-react";
 import { TeacherRequestsSection } from "../../ui/teacher/TeacherRequestsSection";
 
 export const TeacherGrid = React.memo(
@@ -209,64 +209,61 @@ export const TeacherGrid = React.memo(
         {/* Lado Principal: Grade */}
         <div className={`w-full space-y-6 print:w-full print:max-w-none`}>
             <div className="flex flex-col gap-4 w-full print:w-full">
-              {/* O CABEÇALHO GLOBAL DO PROFESSOR */}
+              {/* O CABEÇALHO GLOBAL DO PROFESSOR (ESTILO PREMIUM GLASS) */}
               <div
-                className={`text-white px-6 py-4 flex flex-col md:flex-row items-start md:items-center justify-between gap-4 rounded-2xl shadow-md no-print ${scheduleMode === "padrao" ? (isDarkMode ? "bg-blue-950" : "bg-blue-900") : scheduleMode === "previa" ? (isDarkMode ? "bg-violet-950" : "bg-violet-900") : isDarkMode ? "bg-indigo-950" : "bg-indigo-900"}`}
+                className={`relative overflow-hidden px-8 py-6 flex flex-col md:flex-row items-start md:items-center justify-between gap-6 rounded-[2.5rem] shadow-2xl no-print border transition-all duration-700 ${
+                  scheduleMode === "padrao" 
+                    ? (isDarkMode ? "bg-blue-950/80 border-blue-800/50" : "bg-blue-900 border-blue-800") 
+                    : scheduleMode === "previa" 
+                      ? (isDarkMode ? "bg-violet-950/80 border-violet-800/50" : "bg-violet-900 border-violet-800") 
+                      : (isDarkMode ? "bg-indigo-950/80 border-indigo-800/50" : "bg-indigo-900 border-indigo-800")
+                } backdrop-blur-xl`}
               >
-                <div className="flex flex-col gap-1.5 flex-1">
-                  <h2 className="font-black text-sm md:text-base uppercase tracking-widest flex items-center gap-2">
-                    <UserCircle size={20} className="opacity-80" />
-                    {scheduleMode === "padrao" && (
-                      <span className="bg-white/20 px-2 py-0.5 rounded text-[9px]">
-                        PADRÃO
-                      </span>
-                    )}
-                    {scheduleMode === "previa" && (
-                      <span className="bg-white/20 px-2 py-0.5 rounded text-[9px]">
-                        PRÉVIA
-                      </span>
-                    )}
-                    Horário do Professor:{" "}
-                    {resolveTeacherName(selectedTeacher, globalTeachers)}
-                  </h2>
-                  {scheduleMode !== "padrao" && (
-                    <span className="inline-block text-[9px] font-black bg-white/20 px-3 py-1 rounded-full w-fit tracking-widest uppercase shadow-sm mt-1">
-                      {dynamicWeeksList.find((w) => w.value === selectedWeek)
-                        ?.label || selectedWeek}
-                    </span>
-                  )}
+                {/* Efeito de Brilho de Fundo */}
+                <div className="absolute -top-24 -right-24 w-64 h-64 bg-white/5 blur-3xl rounded-full pointer-events-none" />
+                <div className="absolute -bottom-24 -left-24 w-64 h-64 bg-black/10 blur-3xl rounded-full pointer-events-none" />
+
+                <div className="flex items-center gap-5 flex-1 relative z-10">
+                  <div className="w-16 h-16 rounded-3xl bg-white/10 flex items-center justify-center backdrop-blur-md border border-white/20 shadow-2xl rotate-3">
+                    <UserCircle size={36} className="text-white/90" />
+                  </div>
+                  <div className="flex flex-col gap-1">
+                    <div className="flex items-center gap-2">
+                      <h2 className="font-black text-lg md:text-xl uppercase tracking-tighter text-white">
+                        {resolveTeacherName(selectedTeacher, globalTeachers)}
+                      </h2>
+                      {scheduleMode === "padrao" && <span className="bg-white/20 backdrop-blur-md border border-white/30 px-2.5 py-0.5 rounded-lg text-[9px] font-black uppercase tracking-widest shadow-sm">MATRIZ</span>}
+                      {scheduleMode === "previa" && <span className="bg-violet-400/30 backdrop-blur-md border border-violet-400/30 px-2.5 py-0.5 rounded-lg text-[9px] font-black uppercase tracking-widest shadow-sm text-violet-100">PRÉVIA</span>}
+                    </div>
+                    <div className="flex items-center gap-2">
+                       <Clock size={12} className="text-white/60" />
+                       <span className="text-[10px] font-bold text-white/70 uppercase tracking-[0.2em]">
+                         {dynamicWeeksList.find((w) => w.value === selectedWeek)?.label || selectedWeek || 'Semana não definida'}
+                       </span>
+                    </div>
+                  </div>
                 </div>
 
-                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-end gap-3 mt-2 sm:mt-0">
+                <div className="flex flex-wrap items-center justify-end gap-3 relative z-10 transition-all">
                   
-                  {/* TOGGLE: HORÁRIOS LIVRES (UX REFINADA) */}
+                  {/* TOGGLE: HORÁRIOS LIVRES */}
                   {appMode === 'professor' && scheduleMode !== 'consolidado' && scheduleMode !== 'oficial' && (
-                    <label className="flex items-center gap-2.5 cursor-pointer group bg-white/10 hover:bg-white/15 px-3 py-1.5 rounded-xl transition-all ring-1 ring-white/5 no-print">
-                        <div className={`w-9 h-5 rounded-full relative transition-all duration-300 ${showEmptySlots ? 'bg-emerald-500 shadow-[0_0_10px_rgba(16,185,129,0.3)]' : 'bg-white/20'}`}>
-                          <div className={`absolute top-1 left-1 w-3 h-3 rounded-full bg-white transition-all duration-300 shadow-sm ${showEmptySlots ? 'translate-x-[16px]' : 'translate-x-0'}`} />
+                    <label className="flex items-center gap-3 cursor-pointer group bg-white/10 hover:bg-white/20 px-4 py-2 rounded-2xl transition-all duration-300 ring-1 ring-white/10 no-print backdrop-blur-md shadow-lg">
+                        <div className={`w-10 h-6 rounded-full relative transition-all duration-500 shadow-inner ${showEmptySlots ? 'bg-emerald-500' : 'bg-white/20'}`}>
+                          <div className={`absolute top-1 left-1 w-4 h-4 rounded-full bg-white transition-all duration-500 shadow-md ${showEmptySlots ? 'translate-x-[16px]' : 'translate-x-0'}`} />
                         </div>
-                        <span className="text-[9px] font-black uppercase tracking-widest text-white/90 group-hover:text-white transition-colors">Horários Livres</span>
+                        <span className="text-[10px] font-black uppercase tracking-widest text-white/80 group-hover:text-white transition-colors">Horários Livres</span>
                         <input type="checkbox" checked={showEmptySlots} onChange={e => typeof setShowEmptySlots === 'function' && setShowEmptySlots(e.target.checked)} className="peer sr-only" />
-                    </label>
-                  )}
-                  {appMode === 'professor' && setShowOnlyMyClasses && (
-                    <label className="flex items-center gap-2 cursor-pointer bg-white/10 hover:bg-white/20 px-3 py-2 rounded-xl transition-colors text-white text-[9px] uppercase font-black tracking-widest shadow-sm ring-1 ring-white/10 whitespace-nowrap">
-                      <input
-                        type="checkbox"
-                        checked={showOnlyMyClasses}
-                        onChange={(e) => setShowOnlyMyClasses(e.target.checked)}
-                        className="accent-indigo-500 w-3 h-3"
-                      />
-                      Apenas Minhas
                     </label>
                   )}
 
                   {appMode === 'professor' && (
                     <button
                       onClick={handlePrintClick}
-                      className="flex items-center gap-2 bg-white/10 hover:bg-white/25 text-white px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all shadow-sm active:scale-95 no-print ring-1 ring-white/10"
+                      className="group flex items-center gap-3 bg-white text-indigo-900 hover:bg-indigo-50 px-5 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all duration-300 shadow-xl active:scale-95 no-print"
                     >
-                      <Printer size={14} /> Imprimir Horário
+                      <Printer size={16} className="group-hover:rotate-12 transition-transform" /> 
+                      Gerar Documento
                     </button>
                   )}
                 </div>
@@ -278,18 +275,43 @@ export const TeacherGrid = React.memo(
                 </div>
               ) : (
                 <>
-                  {/* ABAS DOS ITENS (CURSOS OU TURMAS) */}
+                  {/* ABAS DOS ITENS (CURSOS OU TURMAS) - NOVO PADRÃO "PINTURA CROMÁTICA" */}
                   {profItems.length > 1 && (
-                    <div className="flex flex-wrap gap-2 mb-2 no-print animate-in fade-in slide-in-from-top-2">
-                      {["Todos", ...profItems].map((item) => (
-                        <button
-                          key={item}
-                          onClick={() => setActiveTab(item)}
-                          className={`px-4 py-2.5 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all shadow-sm ${activeTab === item ? (scheduleMode === "padrao" ? "bg-blue-600 text-white ring-2 ring-blue-500/50 scale-[1.02] z-10" : scheduleMode === "previa" ? "bg-violet-600 text-white ring-2 ring-violet-500/50 scale-[1.02] z-10" : "bg-indigo-600 text-white ring-2 ring-indigo-500/50 scale-[1.02] z-10") : isDarkMode ? "bg-slate-800 text-slate-400 hover:text-white hover:bg-slate-700" : "bg-white text-slate-500 border border-slate-200 hover:text-slate-800"}`}
-                        >
-                          {item === "Todos" ? (appMode === 'aluno' ? "Todas as Turmas" : "Todos os Cursos") : item}
-                        </button>
-                      ))}
+                    <div className="flex flex-wrap gap-4 mb-2 no-print animate-in fade-in slide-in-from-top-4">
+                      {["Todos", ...profItems].map((item, idx) => {
+                         const isActive = activeTab === item;
+                         const isAll = item === "Todos";
+                         const IconTab = isAll ? Sparkles : (appMode === 'aluno' ? GraduationCap : BookOpen);
+                         const colorTheme = isAll ? "amber" : (idx % 2 === 0 ? "emerald" : "indigo");
+
+                         return (
+                          <button
+                            key={item}
+                            onClick={() => setActiveTab(item)}
+                            className={`group relative flex items-center gap-3 px-5 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all duration-500 ${
+                              isActive
+                                ? `bg-${colorTheme}-600 text-white shadow-lg shadow-${colorTheme}-500/30 scale-[1.05] z-10`
+                                : isDarkMode 
+                                  ? "bg-slate-800 text-slate-400 hover:text-white" 
+                                  : "bg-white text-slate-500 border border-slate-200 hover:border-slate-300 hover:text-slate-800"
+                            }`}
+                          >
+                            <div className={`w-7 h-7 rounded-xl flex items-center justify-center transition-all duration-500 ${
+                              isActive 
+                                ? "bg-white/20" 
+                                : isDarkMode 
+                                  ? `bg-slate-900 text-${colorTheme}-400 group-hover:bg-${colorTheme}-600 group-hover:text-white` 
+                                  : `bg-${colorTheme}-50 text-${colorTheme}-600 group-hover:bg-${colorTheme}-600 group-hover:text-white`
+                            }`}>
+                               <IconTab size={14} className="transition-transform duration-500 group-hover:scale-110" />
+                            </div>
+                            <span className="relative z-10">{isAll ? (appMode === 'aluno' ? "Todas as Turmas" : "Todos os Cursos") : item}</span>
+                            {!isActive && (
+                               <div className={`absolute inset-0 rounded-2xl opacity-0 group-hover:opacity-10 pointer-events-none transition-opacity bg-${colorTheme}-500`} />
+                            )}
+                          </button>
+                         );
+                      })}
                     </div>
                   )}
 
@@ -306,6 +328,7 @@ export const TeacherGrid = React.memo(
                   
                   const headerLabel = appMode === 'aluno' ? `TURMA: ${item}` : `CURSO: ${item}`;
                   
+                  const course = appMode === 'aluno' ? (records[0]?.course || '') : item;
                   const courseClasses = [
                     ...new Set(records.map((r) => r.className)),
                   ].sort();
@@ -345,7 +368,7 @@ export const TeacherGrid = React.memo(
                               >
                                 Dia
                               </th>
-                              <th
+              <th
                                 className={`sticky left-[40px] z-20 py-3 px-3 border-r-[3px] w-28 min-w-[112px] text-center shadow-sm ${isDarkMode ? "bg-slate-900 border-slate-700" : "bg-slate-100 border-slate-300"}`}
                               >
                                 Horários
@@ -353,9 +376,9 @@ export const TeacherGrid = React.memo(
                               {courseClasses.map((cls) => (
                                 <th
                                   key={`head-${cls}`}
-                                  className={`py-4 px-2 border-r-[3px] last:border-r-0 text-center ${isDarkMode ? "border-slate-700/50" : "border-slate-300/50"} align-middle`}
+                                  className={`py-6 px-3 border-r-[3.5px] last:border-r-0 text-center ${isDarkMode ? "border-slate-800/60" : "border-slate-200/80"} align-middle`}
                                 >
-                                  <div className={`px-3 py-2 rounded-xl border-b-[4px] font-black text-[11px] uppercase tracking-tighter shadow-md transition-all ${isDarkMode ? "bg-slate-800/80 border-indigo-500/30 text-indigo-400 shadow-indigo-900/10" : "bg-white border-indigo-100 text-indigo-700 shadow-indigo-50/50"}`}>
+                                  <div className={`px-4 py-3 rounded-2xl border-[1.5px] font-black text-[11px] uppercase tracking-widest shadow-2xl transition-all hover:scale-[1.05] flex items-center justify-center min-h-[54px] ${appMode === 'aluno' ? (isDarkMode ? "bg-gradient-to-br from-emerald-600/20 to-emerald-900/40 border-emerald-500/30 text-emerald-400 shadow-emerald-500/10" : "bg-gradient-to-br from-emerald-50 to-white border-emerald-100 text-emerald-700 shadow-emerald-200/50") : (isDarkMode ? "bg-gradient-to-br from-indigo-600/20 to-indigo-900/40 border-indigo-500/30 text-indigo-400 shadow-indigo-500/10" : "bg-gradient-to-br from-indigo-50 to-white border-indigo-100 text-indigo-700 shadow-indigo-200/50")}`}>
                                     {cls}
                                   </div>
                                 </th>

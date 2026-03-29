@@ -125,8 +125,8 @@ export function TeacherOfferModal({
   };
 
   return (
-    <div className="fixed inset-0 z-[150] flex justify-center items-center bg-slate-900/60 backdrop-blur-sm p-4 animate-in fade-in duration-200">
-      <div className={`w-full max-w-2xl rounded-2xl shadow-xl border flex flex-col max-h-[90vh] ${isDarkMode ? 'bg-slate-900 border-slate-700' : 'bg-white border-slate-200'}`}>
+    <div className="fixed inset-0 z-[150] flex justify-center items-center bg-slate-950/60 backdrop-blur-md p-4 animate-in fade-in duration-500">
+      <div className={`w-full max-w-2xl rounded-[2.5rem] shadow-2xl border flex flex-col max-h-[90vh] backdrop-blur-3xl transition-all duration-500 ${isDarkMode ? 'bg-slate-900/80 border-white/10' : 'bg-white/80 border-slate-200/50'}`}>
         
         {/* HEADER */}
         <div className={`px-6 py-4 flex items-center justify-between border-b ${isDarkMode ? 'bg-slate-800 border-slate-700' : 'bg-slate-50 border-slate-200'}`}>

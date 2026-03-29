@@ -1,7 +1,7 @@
 import React, { useState, useTransition } from 'react';
 import { 
   Calendar, UserCircle, Layers, AlertTriangle, BarChart3, ListTodo, CalendarDays, Settings, Bell, Sun, RefreshCcw, HandHeart, X, ExternalLink, Scissors, MapPin, Monitor, Mail, MessageCircle, Activity,
-  BookOpen, FileText, Users, CheckCircle, AlertCircle, XCircle, Eye, Clock, Check, Printer, Home, Globe, Book, Shuffle, ClipboardList
+  BookOpen, FileText, Users, CheckCircle, AlertCircle, XCircle, Eye, Clock, Check, Printer, Home, Globe, Book, Shuffle, ClipboardList, MailSearch, LayoutDashboard, MessageSquare
 } from 'lucide-react';
 import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd';
 import { SearchableSelect } from '../ui/SearchableSelect';
@@ -972,31 +972,18 @@ export function PortalView({
      });
 
      // Regra Aluno Prévia Estrita: Apenas exibir prévia na exata Próxima Semana letiva
+     // Regra Aluno Prévia: Exibir todas as semanas futuras publicadas como prévia
      if (appMode === 'aluno' && scheduleMode === 'previa') {
          const refDate = new Date(now);
          if (now.getDay() === 6) refDate.setDate(refDate.getDate() + 2);
          else if (now.getDay() === 0) refDate.setDate(refDate.getDate() + 1);
          refDate.setHours(0,0,0,0);
          
-         const currWeekIndex = sortedWeeks.findIndex(w => {
-             const s = new Date(w.start_date + 'T00:00:00'); 
-             const e = new Date(w.end_date + 'T23:59:59');
-             return refDate >= s && refDate <= e;
-         });
-         
-         let nextWeekId = null;
-         if (currWeekIndex !== -1 && currWeekIndex + 1 < sortedWeeks.length) {
-             nextWeekId = String(sortedWeeks[currWeekIndex + 1].id);
-         } else {
-             const fallback = sortedWeeks.find(w => new Date(w.start_date + 'T00:00:00') > refDate);
-             if (fallback) nextWeekId = String(fallback.id);
-         }
-         
-         if (nextWeekId) {
-             uniqueWeekIds = uniqueWeekIds.filter(id => id === nextWeekId);
-         } else {
-             uniqueWeekIds = []; // Nenhum alvo no futuro letivo aplicável
-         }
+         const futureWeekIds = sortedWeeks
+            .filter(w => new Date(w.start_date + 'T00:00:00') > refDate)
+            .map(w => String(w.id));
+            
+         uniqueWeekIds = uniqueWeekIds.filter(id => futureWeekIds.includes(id));
      }
      
      return uniqueWeekIds.map(id => {
@@ -1172,7 +1159,7 @@ export function PortalView({
                                previa: { color: "indigo", icon: Eye }
                              };
                              const { color, icon: Icon } = tabColors[tab];
-                             const label = tab === "atual" ? "Atual" : tab === "vagas" ? "Aulas Vagas" : "Prévia";
+                             const label = tab === "atual" ? "Atual" : tab === "vagas" ? "Vagas" : "Prévia";
                              const isActive = dashboardTab === tab;
 
                              return (
@@ -1182,8 +1169,8 @@ export function PortalView({
                                  className={`group px-4 py-2.5 rounded-xl text-[9px] sm:text-[10px] font-black uppercase tracking-widest transition-all duration-500 whitespace-nowrap flex items-center gap-3 ${isActive ? (isDarkMode ? `bg-${color}-600 text-white shadow-[0_0_20px_rgba(var(--tw-shadow-color),0.4)]` : `bg-${color}-600 text-white shadow-lg`) : (isDarkMode ? `text-slate-400 hover:text-${color}-400 hover:bg-slate-900` : `text-slate-500 hover:text-${color}-600 hover:bg-white`)}`}
                                  style={{ "--tw-shadow-color": color === 'emerald' ? '16,185,129' : color === 'orange' ? '249,115,22' : '99,102,241' }}
                                >
-                                 <div className={`w-8 h-8 rounded-lg flex items-center justify-center transition-all duration-500 ${isActive ? "bg-white/20 text-white" : (isDarkMode ? `bg-slate-800 text-${color}-400 group-hover:bg-${color}-600 group-hover:text-white` : `bg-${color}-50 text-${color}-600 group-hover:bg-${color}-600 group-hover:text-white`)}`}>
-                                   <Icon size={14} className={`transition-transform duration-500 ${isActive ? (tab === 'vagas' ? 'animate-bounce' : 'animate-pulse') : 'group-hover:scale-110'}`} />
+                                 <div className={`w-8 h-8 sm:w-10 sm:h-10 rounded-lg flex items-center justify-center transition-all duration-500 ${isActive ? "bg-white/20 text-white shadow-inner" : (isDarkMode ? `bg-slate-900 text-${color}-400 group-hover:bg-${color}-600 group-hover:text-white` : `bg-${color}-50 text-${color}-600 group-hover:bg-${color}-600 group-hover:text-white shadow-sm`)}`}>
+                                   <Icon size={16} className={`transition-all duration-500 ${isActive ? (tab === 'vagas' ? 'animate-bounce' : 'animate-pulse scale-110') : 'group-hover:scale-110'}`} />
                                  </div>
                                  {label}
                                </button>
@@ -1615,7 +1602,7 @@ export function PortalView({
               <div className={`flex items-center justify-between border-b pb-3 ${isDarkMode ? 'border-slate-700' : 'border-slate-100'}`}>
                 <div className={`flex flex-wrap items-center gap-2 p-1.5 rounded-xl shadow-inner w-full ${isDarkMode ? 'bg-slate-900' : 'bg-slate-100'}`}>
                   
-                  {["servidor", "admin", "gestao"].includes(userRole) ? (
+                  {appMode === 'professor' ? (
                     <>
                       <button onClick={() => setViewMode('dashboard')} 
                               className={`group flex items-center gap-3 px-5 py-3 rounded-2xl text-[9px] font-black uppercase tracking-widest transition-all duration-500 ${viewMode === 'dashboard' ? "bg-slate-700 text-white shadow-lg" : (isDarkMode ? "text-slate-400 hover:bg-slate-800 hover:text-white" : "text-slate-500 hover:bg-white hover:text-slate-900 border border-transparent hover:border-slate-100 hover:shadow-sm")}`}>
@@ -1816,34 +1803,34 @@ export function PortalView({
                     <>
                       {appMode === 'professor' || appMode === 'gestao' || appMode === 'admin' ? (
                         <>
-                          <button onClick={() => handleModeChange('atual')} className={`group flex items-center justify-center gap-2.5 px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all duration-500 ${scheduleMode === 'atual' ? 'bg-teal-600 text-white shadow-md' : (isDarkMode ? 'text-slate-400 hover:bg-slate-800 hover:text-white' : 'text-slate-500 hover:bg-white hover:text-slate-800 hover:shadow-sm')}`}>
-                            <div className={`w-7 h-7 rounded-lg flex items-center justify-center transition-all duration-500 ${scheduleMode === 'atual' ? 'bg-white/20' : (isDarkMode ? 'bg-slate-900 text-teal-400 group-hover:bg-teal-600 group-hover:text-white' : 'bg-teal-50 text-teal-600 group-hover:bg-teal-600 group-hover:text-white')}`}>
+                          <button onClick={() => handleModeChange('atual')} className={`group flex items-center justify-center gap-2.5 px-4 py-2 rounded-xl text-[9px] font-black uppercase tracking-tighter transition-all duration-500 ${scheduleMode === 'atual' ? 'bg-teal-600 text-white shadow-md shadow-teal-900/40' : (isDarkMode ? 'text-slate-400 hover:bg-slate-800 hover:text-white' : 'text-slate-500 hover:bg-white hover:text-slate-800 hover:shadow-sm')}`}>
+                            <div className={`w-7 h-7 rounded-lg flex items-center justify-center transition-all duration-500 ${scheduleMode === 'atual' ? 'bg-white/20' : (isDarkMode ? 'bg-slate-900 text-teal-400 group-hover:bg-teal-600 group-hover:text-white' : 'bg-teal-50 text-teal-600 group-hover:bg-teal-600 group-hover:text-white shadow-sm')}`}>
                                <Sun size={14} className="transition-transform duration-500 group-hover:scale-110" />
                             </div>
-                            Semana Atual
+                            Atual
                           </button>
-                          <button onClick={() => handleModeChange('previa')} className={`group flex items-center justify-center gap-2.5 px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all duration-500 ${scheduleMode === 'previa' ? 'bg-indigo-600 text-white shadow-md' : (isDarkMode ? 'text-slate-400 hover:bg-slate-800 hover:text-white' : 'text-slate-500 hover:bg-white hover:text-slate-800 hover:shadow-sm')}`}>
-                            <div className={`w-7 h-7 rounded-lg flex items-center justify-center transition-all duration-500 ${scheduleMode === 'previa' ? 'bg-white/20' : (isDarkMode ? 'bg-slate-900 text-indigo-400 group-hover:bg-indigo-600 group-hover:text-white' : 'bg-indigo-50 text-indigo-600 group-hover:bg-indigo-600 group-hover:text-white')}`}>
+                          <button onClick={() => handleModeChange('previa')} className={`group flex items-center justify-center gap-2.5 px-4 py-2 rounded-xl text-[9px] font-black uppercase tracking-tighter transition-all duration-500 ${scheduleMode === 'previa' ? 'bg-indigo-600 text-white shadow-md shadow-indigo-900/40' : (isDarkMode ? 'text-slate-400 hover:bg-slate-800 hover:text-white' : 'text-slate-500 hover:bg-white hover:text-slate-800 hover:shadow-sm')}`}>
+                            <div className={`w-7 h-7 rounded-lg flex items-center justify-center transition-all duration-500 ${scheduleMode === 'previa' ? 'bg-white/20' : (isDarkMode ? 'bg-slate-900 text-indigo-400 group-hover:bg-indigo-600 group-hover:text-white' : 'bg-indigo-50 text-indigo-600 group-hover:bg-indigo-600 group-hover:text-white shadow-sm')}`}>
                                <Eye size={14} className="transition-transform duration-500 group-hover:scale-110" />
                             </div>
-                            Prévia (Futuro)
+                            Prévia
                           </button>
-                          <button onClick={() => handleModeChange('padrao')} className={`group flex items-center justify-center gap-2.5 px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all duration-500 ${scheduleMode === 'padrao' ? 'bg-amber-600 text-white shadow-md' : (isDarkMode ? 'text-slate-400 hover:bg-slate-800 hover:text-white' : 'text-slate-500 hover:bg-white hover:text-slate-800 hover:shadow-sm')}`}>
-                            <div className={`w-7 h-7 rounded-lg flex items-center justify-center transition-all duration-500 ${scheduleMode === 'padrao' ? 'bg-white/20' : (isDarkMode ? 'bg-slate-900 text-amber-400 group-hover:bg-amber-600 group-hover:text-white' : 'bg-amber-50 text-amber-600 group-hover:bg-amber-600 group-hover:text-white')}`}>
+                          <button onClick={() => handleModeChange('padrao')} className={`group flex items-center justify-center gap-2.5 px-4 py-2 rounded-xl text-[9px] font-black uppercase tracking-tighter transition-all duration-500 ${scheduleMode === 'padrao' ? 'bg-amber-600 text-white shadow-md shadow-amber-900/40' : (isDarkMode ? 'text-slate-400 hover:bg-slate-800 hover:text-white' : 'text-slate-500 hover:bg-white hover:text-slate-800 hover:shadow-sm')}`}>
+                            <div className={`w-7 h-7 rounded-lg flex items-center justify-center transition-all duration-500 ${scheduleMode === 'padrao' ? 'bg-white/20' : (isDarkMode ? 'bg-slate-900 text-amber-400 group-hover:bg-amber-600 group-hover:text-white' : 'bg-amber-50 text-amber-600 group-hover:bg-amber-600 group-hover:text-white shadow-sm')}`}>
                                <BookOpen size={14} className="transition-transform duration-500 group-hover:scale-110" />
                             </div>
-                            Padrão Anual
+                            Padrão
                           </button>
-                          <button onClick={() => handleModeChange('consolidado')} className={`group flex items-center justify-center gap-2.5 px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all duration-500 ${scheduleMode === 'consolidado' ? 'bg-emerald-600 text-white shadow-md' : (isDarkMode ? 'text-slate-400 hover:bg-slate-800 hover:text-white' : 'text-slate-500 hover:bg-white hover:text-slate-800 hover:shadow-sm')}`}>
-                            <div className={`w-7 h-7 rounded-lg flex items-center justify-center transition-all duration-500 ${scheduleMode === 'consolidado' ? 'bg-white/20' : (isDarkMode ? 'bg-slate-900 text-emerald-400 group-hover:bg-emerald-600 group-hover:text-white' : 'bg-emerald-50 text-emerald-600 group-hover:bg-emerald-600 group-hover:text-white')}`}>
+                          <button onClick={() => handleModeChange('consolidado')} className={`group flex items-center justify-center gap-2.5 px-4 py-2 rounded-xl text-[9px] font-black uppercase tracking-tighter transition-all duration-500 ${scheduleMode === 'consolidado' ? 'bg-emerald-600 text-white shadow-md shadow-emerald-900/40' : (isDarkMode ? 'text-slate-400 hover:bg-slate-800 hover:text-white' : 'text-slate-500 hover:bg-white hover:text-slate-800 hover:shadow-sm')}`}>
+                            <div className={`w-7 h-7 rounded-lg flex items-center justify-center transition-all duration-500 ${scheduleMode === 'consolidado' ? 'bg-white/20' : (isDarkMode ? 'bg-slate-900 text-emerald-400 group-hover:bg-emerald-600 group-hover:text-white' : 'bg-emerald-50 text-emerald-600 group-hover:bg-emerald-600 group-hover:text-white shadow-sm')}`}>
                                <Calendar size={14} className="transition-transform duration-500 group-hover:scale-110" />
                             </div>
-                            Consolidado
+                            Oficial
                           </button>
                         </>
                       ) : (
-                        <button onClick={() => handleModeChange('consolidado')} className={`flex-1 md:flex-none flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all ${scheduleMode === 'consolidado' || scheduleMode === 'oficial' ? 'bg-emerald-500 text-white shadow-md' : (isDarkMode ? 'text-slate-400 hover:bg-slate-800 hover:text-white' : 'text-slate-500 hover:bg-slate-100 hover:text-slate-800')}`}>
-                          <Calendar size={14} /> Horário Oficial
+                        <button onClick={() => handleModeChange('consolidado')} className={`flex-1 md:flex-none flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-lg text-[9px] font-black uppercase tracking-tighter transition-all ${scheduleMode === 'consolidado' || scheduleMode === 'oficial' ? 'bg-emerald-500 text-white shadow-md' : (isDarkMode ? 'text-slate-400 hover:bg-slate-800 hover:text-white' : 'text-slate-500 hover:bg-slate-100 hover:text-slate-800')}`}>
+                          <Calendar size={14} /> Oficial
                         </button>
                       )}
                     </>
@@ -1887,7 +1874,30 @@ export function PortalView({
 
                   {/* TABELA DE CONTROLE (TOTAIS) E ESTATÍSTICAS DIÁRIO */}
                   {viewMode === 'total' && (
-                    <AdminTotalControl
+                    <div className="space-y-6 animate-in fade-in slide-in-from-bottom-5 duration-500">
+                      {/* Cabeçalho de Controle Modernizado */}
+                      <div className={`relative overflow-hidden px-8 py-6 flex flex-col md:flex-row items-center justify-between gap-6 rounded-[2.5rem] shadow-2xl border transition-all duration-700 backdrop-blur-xl ${isDarkMode ? 'bg-slate-900/80 border-white/10' : 'bg-slate-900 border-slate-800'}`}>
+                         <div className="flex items-center gap-5">
+                            <div className="w-14 h-14 rounded-2xl bg-amber-500 flex items-center justify-center text-white shadow-lg rotate-3">
+                               <BarChart3 size={32} />
+                            </div>
+                            <div>
+                               <h2 className="text-xl font-black uppercase tracking-tighter text-white">Controle de Aulas</h2>
+                               <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-0.5">Visão Geral de Integralização</p>
+                            </div>
+                         </div>
+                         <div className="flex items-center gap-4">
+                            <button onClick={() => setViewMode('total')} className={`group relative flex items-center gap-3 px-6 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all duration-500 bg-amber-600 text-white shadow-lg shadow-amber-500/30 scale-[1.05] z-10`}>
+                               <div className="w-8 h-8 rounded-xl bg-white/20 flex items-center justify-center transition-all duration-500 group-hover:scale-110">
+                                  <ClipboardList size={16} />
+                               </div>
+                               Relatório Geral
+                               <div className="absolute inset-0 rounded-2xl opacity-0 bg-white/10 group-hover:opacity-100 pointer-events-none transition-opacity" />
+                            </button>
+                         </div>
+                      </div>
+
+                      <AdminTotalControl
                       isDarkMode={isDarkMode}
                       diarioStats={diarioStats}
                       finalFilteredTotalData={finalFilteredTotalData}
@@ -1908,8 +1918,8 @@ export function PortalView({
                       bimesters={bimesters}
                       academicWeeks={academicWeeks}
                       handlePrint={handlePrint}
-                      hideTeacherFilter={appMode === 'professor'}
                     />
+                    </div>
                   )}
 
                   {/* GRADE DE HORÁRIO (Visão Curso MATRIZ) */}
@@ -2082,7 +2092,29 @@ export function PortalView({
 
       {/* SISTEMA DE SOLICITAÇÕES PARA O PROFESSOR (Apenas Fullscreen, Hub Flutuante movido globalmente para HomeApp) */}
       {appMode === 'professor' && viewMode === 'solicitacoes' && (
-        <div className="mt-4 w-full animate-in fade-in slide-in-from-bottom-4">
+        <div className="mt-4 w-full animate-in fade-in slide-in-from-bottom-6 duration-700 space-y-6">
+          {/* Cabeçalho de Solicitações Modernizado */}
+          <div className={`relative overflow-hidden px-8 py-6 flex flex-col md:flex-row items-center justify-between gap-6 rounded-[2.5rem] shadow-2xl border transition-all duration-700 backdrop-blur-xl ${isDarkMode ? 'bg-indigo-950/80 border-indigo-800/50' : 'bg-indigo-900 border-indigo-800'}`}>
+              <div className="flex items-center gap-5">
+                <div className="w-14 h-14 rounded-2xl bg-indigo-500 flex items-center justify-center text-white shadow-lg -rotate-3">
+                    <MessageSquare size={32} />
+                </div>
+                <div>
+                    <h2 className="text-xl font-black uppercase tracking-tighter text-white">Solicitações</h2>
+                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-0.5">Central de Atendimento DAPE</p>
+                </div>
+              </div>
+              <div className="flex items-center gap-4">
+                 <button className={`group relative flex items-center gap-3 px-6 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all duration-500 bg-indigo-600 text-white shadow-lg shadow-indigo-500/30 scale-[1.05] z-10`}>
+                    <div className="w-8 h-8 rounded-xl bg-white/20 flex items-center justify-center transition-all duration-500 group-hover:scale-110">
+                       <MailSearch size={16} />
+                    </div>
+                    Minhas Mudanças
+                    <div className="absolute inset-0 rounded-2xl opacity-0 bg-white/10 group-hover:opacity-100 pointer-events-none transition-opacity" />
+                 </button>
+              </div>
+          </div>
+
           <TeacherRequestsSection 
             requests={requests} 
             apiClient={apiClient}
@@ -2106,8 +2138,8 @@ export function PortalView({
       )}
 
       {vacantRequestModal && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in zoom-in-95">
-          <div className={"w-full max-w-md p-6 rounded-2xl shadow-2xl " + (isDarkMode ? 'bg-slate-800 border border-slate-700 text-white' : 'bg-white text-slate-900')}>
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-md animate-in fade-in zoom-in-95 duration-500">
+          <div className={"w-full max-w-md p-8 rounded-[2.5rem] shadow-2xl backdrop-blur-3xl border transition-all duration-500 " + (isDarkMode ? 'bg-slate-900/80 border-white/10 text-white shadow-indigo-500/10' : 'bg-white/80 border-slate-200/50 text-slate-900')}>
             <div className="flex justify-between items-center mb-4">
               <h3 className="text-lg font-black uppercase tracking-widest flex items-center gap-2 text-indigo-500">
                 <CheckCircle size={20} /> Assumir Aula Vaga
@@ -2197,8 +2229,8 @@ export function PortalView({
 
       {/* MODAL GLOBAL ESTILIZADO PARA FEEDBACKS (Ex: Sessão expirada, Sucesso) */}
       {alertModal && (
-        <div className="fixed inset-0 z-[99999] flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm animate-in fade-in zoom-in-95 duration-200">
-          <div className={`w-full max-w-sm p-6 rounded-3xl shadow-2xl flex flex-col items-center text-center ${isDarkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'} border`}>
+        <div className="fixed inset-0 z-[99999] flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-md animate-in fade-in zoom-in-95 duration-500">
+          <div className={`w-full max-w-sm p-8 rounded-[2.5rem] shadow-2xl backdrop-blur-3xl flex flex-col items-center text-center transition-all duration-500 ${isDarkMode ? 'bg-slate-900/80 border-white/10 shadow-indigo-500/10' : 'bg-white/80 border-slate-200/50'} border text-slate-900 dark:text-white`}>
             {alertModal.type === 'error' && <AlertCircle size={48} className={`mb-4 ${isDarkMode ? 'text-rose-400' : 'text-rose-500'}`} />}
             {alertModal.type === 'success' && <CheckCircle size={48} className={`mb-4 ${isDarkMode ? 'text-emerald-400' : 'text-emerald-500'}`} />}
             {alertModal.type === 'alert' && <AlertCircle size={48} className={`mb-4 ${isDarkMode ? 'text-amber-400' : 'text-amber-500'}`} />}
@@ -2217,8 +2249,8 @@ export function PortalView({
       )}
 
       {pendingReverseTarget && (
-        <div className="fixed inset-0 z-[200] flex justify-center items-center bg-slate-900/60 backdrop-blur-sm p-4 animate-in fade-in duration-200 no-print">
-           <div className={`w-full max-w-lg rounded-3xl shadow-2xl border flex flex-col overflow-hidden ${isDarkMode ? 'bg-slate-900 border-slate-700' : 'bg-white border-slate-200'}`}>
+        <div className="fixed inset-0 z-[200] flex justify-center items-center bg-slate-950/60 backdrop-blur-md p-4 animate-in fade-in duration-500 no-print">
+           <div className={`w-full max-w-lg rounded-[2.5rem] shadow-2xl backdrop-blur-3xl border flex flex-col overflow-hidden transition-all duration-500 ${isDarkMode ? 'bg-slate-900/80 border-white/10' : 'bg-white/80 border-slate-200/50'}`}>
               <div className={`p-5 border-b flex items-center justify-between ${isDarkMode ? 'bg-slate-800' : 'bg-slate-50'}`}>
                  <h3 className="font-black uppercase tracking-[0.2em] text-[10px] text-indigo-500">Escolha a Aula para Oferecer em Troca</h3>
                  <button onClick={() => setPendingReverseTarget(null)} className="p-2 rounded-xl text-slate-400 hover:text-rose-500 hover:bg-rose-500/10 transition-colors"><XCircle size={20}/></button>

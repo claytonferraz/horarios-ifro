@@ -182,9 +182,9 @@ export function TeacherDirectModal({
     }
   };
   return (
-    <div className="fixed inset-0 z-[999] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 sm:p-6 animate-in fade-in duration-200">
+    <div className="fixed inset-0 z-[999] bg-slate-950/60 backdrop-blur-md flex items-center justify-center p-4 sm:p-6 animate-in fade-in duration-500">
       <div 
-         className={`relative w-full max-w-lg rounded-3xl shadow-2xl overflow-hidden animate-in zoom-in-95 duration-300 ${isDarkMode ? 'bg-slate-900 border border-slate-700' : 'bg-white border border-slate-100'}`}
+         className={`relative w-full max-w-lg rounded-[2.5rem] shadow-2xl backdrop-blur-3xl overflow-hidden animate-in zoom-in-95 duration-500 border transition-all duration-500 ${isDarkMode ? 'bg-slate-900/80 border-white/10 shadow-indigo-500/10' : 'bg-white/80 border-slate-200/50'}`}
       >
         <div className={`px-6 py-4 flex items-center justify-between border-b ${isDarkMode ? 'bg-slate-800 border-slate-700' : 'bg-slate-50 border-slate-100'}`}>
           <div className="flex items-center gap-3">
