@@ -90,6 +90,29 @@ router.post('/', verifyToken, async (req, res) => {
         const classIdToUpdate = data.proposed_slot?.classId || targetClass;
         const originalSubjectName = data.proposed_slot?.originalSubject || subject;
 
+        // VALIDAÇÃO 1: Verificar se o professor já não possui aula no mesmo horário em OUTRA turma nesta semana
+        const conflictQuery = `
+            SELECT COUNT(*) as count 
+            FROM schedules 
+            WHERE teacherId = ? 
+              AND dayOfWeek = ? 
+              AND slotId = ? 
+              AND week_id = ? 
+              AND type IN ('previa', 'atual', 'oficial')
+        `;
+        
+        const conflictCount = await new Promise((resolve) => {
+            db.get(conflictQuery, [requester, proposedDay, proposedTime, returnWeekId], (err, row) => {
+                resolve(row?.count || 0);
+            });
+        });
+
+        if (conflictCount > 0) {
+            return res.status(400).json({ 
+                error: `Conflito de Horário! Você já possui uma aula registrada para ${proposedDay} às ${proposedTime} nesta semana.` 
+            });
+        }
+
         const dayOfWeekToUpdate = proposedDay;
 
         const updateQ = `UPDATE schedules SET teacherId = ?, disciplineId = ?, records = json_patch(COALESCE(records, '{}'), ?) WHERE classId = ? AND dayOfWeek = ? AND slotId = ? AND ( (week_id = ? AND type IN ('previa', 'atual', 'oficial')) OR (? IS NULL AND type = 'padrao' AND (week_id IS NULL OR week_id = '')) )`;
