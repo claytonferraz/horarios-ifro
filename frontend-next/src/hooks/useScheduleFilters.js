@@ -67,10 +67,13 @@ export function useScheduleFilters({
 
   // Maintain valid class selection automatically (but allow empty classes to remain selected)
   useEffect(() => {
-    if (classesList.length > 0 && !selectedClass) {
-      setSelectedClass(classesList[0]);
+    // No Dashboard não auto-selecionamos turma para manter a visão geral institucional
+    if (viewMode !== 'dashboard' && classesList.length > 0 && !selectedClass) {
+      if (typeof setSelectedClass === 'function') {
+         setSelectedClass(classesList[0]);
+      }
     }
-  }, [classesList, selectedClass, setSelectedClass]);
+  }, [classesList, selectedClass, setSelectedClass, viewMode]);
 
   // Unified utility proxy to query cells rapidly
   const getCellRecords = (day, time) => {

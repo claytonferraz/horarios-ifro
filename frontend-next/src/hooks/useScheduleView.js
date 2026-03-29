@@ -233,8 +233,11 @@ export function useScheduleView({ appMode, rawData, disabledWeeks, targetData, d
   }, [viewMode, selectedCourse, courses]);
 
   useEffect(() => {
-    if (classesList.length > 0 && (!selectedClass || !classesList.includes(selectedClass))) setSelectedClass(classesList[0]);
-  }, [classesList, selectedClass]);
+    // No Dashboard não forçamos auto-seleção para permitir a visão geral institucional
+    if (viewMode !== 'dashboard' && classesList.length > 0 && (!selectedClass || !classesList.includes(selectedClass))) {
+       setSelectedClass(classesList[0]);
+    }
+  }, [classesList, selectedClass, viewMode]);
 
   return {
     viewMode, setViewMode,

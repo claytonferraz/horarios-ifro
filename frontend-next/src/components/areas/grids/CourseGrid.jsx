@@ -51,6 +51,13 @@ export const CourseGrid = React.memo(
     const [dbClasses, setDbClasses] = useState([]);
     const isGridInert = true; 
 
+    // Resetar filtros de busca por professor logado ao carregar Grade Geral de Horários
+    useEffect(() => {
+      if (appMode !== 'professor' && !padraoFilterTeacher) {
+        if (setShowOnlyMyClasses) setShowOnlyMyClasses(false);
+      }
+    }, [setShowOnlyMyClasses, appMode, padraoFilterTeacher]);
+
     useEffect(() => {
       import('@/lib/apiClient').then(({ apiClient }) => {
         Promise.all([
@@ -65,6 +72,9 @@ export const CourseGrid = React.memo(
 
     const activeTeacherFilter = (padraoFilterTeacher && padraoFilterTeacher !== "Todos") ? padraoFilterTeacher : (showOnlyMyClasses ? siape : null);
 
+    // No painel do aluno (aluno ou public), se tiver filtro de professor, forçar modo consolidado
+    const isConsolidatedView = activeTeacherFilter || (appMode === 'aluno' && padraoFilterTeacher && padraoFilterTeacher !== "Todos");
+
     const availableCourses = useMemo(() => {
       // Por padrão, mostra todos os cursos disponíveis nos registros
       return [...new Set(mappedSchedules.map((r) => r.course))]
@@ -74,8 +84,9 @@ export const CourseGrid = React.memo(
 
     useEffect(() => {
       if (
+        activeCourseTab !== "Todos" &&
         availableCourses.length > 0 &&
-        (!activeCourseTab || (activeCourseTab !== "Todos" && !availableCourses.includes(activeCourseTab)))
+        !availableCourses.includes(activeCourseTab)
       ) {
         setActiveCourseTab("Todos");
       }
@@ -303,8 +314,8 @@ export const CourseGrid = React.memo(
           </div>
         </div>
 
-        {/* NAVEGAÇÃO DE CURSOS (TELA) - ESCONDER SE TIVER FILTRO DE PROFESSOR */}
-        {!activeTeacherFilter && availableCourses.length > 0 && (
+        {/* NAVEGAÇÃO DE CURSOS (TELA) - ESCONDER SE TIVER FILTRO DE PROFESSOR OU FOR VISÃO CONSOLIDADA */}
+        {!isConsolidatedView && availableCourses.length > 0 && (
           <div className="flex flex-wrap gap-3 animate-in fade-in slide-in-from-left-4 duration-700">
             {["Todos", ...availableCourses].map(c => (
               <button key={c} onClick={() => setActiveCourseTab(c)} className={`px-6 py-3.5 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all hover:translate-y-[-2px] ${activeCourseTab === c ? (isDarkMode ? "bg-slate-700 text-white shadow-xl shadow-indigo-500/20 ring-2 ring-indigo-500" : "bg-indigo-600 text-white shadow-xl shadow-indigo-500/30") : (isDarkMode ? "bg-slate-800/80 text-slate-400 hover:text-white border border-slate-700" : "bg-white text-slate-500 border border-slate-200 hover:border-indigo-400 hover:text-indigo-600 shadow-sm")}`}>
@@ -323,16 +334,14 @@ export const CourseGrid = React.memo(
                <p className={`mt-2 text-sm font-medium ${isDarkMode ? "text-slate-500" : "text-slate-400"}`}>Não encontramos horários para os filtros selecionados.</p>
             </div>
           ) : (
-            (activeTeacherFilter ? ["Visão Unificada"] : (activeCourseTab === "Todos" ? availableCourses : [activeCourseTab])).map(course => {
-              const courseRecords = activeTeacherFilter 
+            (isConsolidatedView ? ["Visão Unificada"] : (activeCourseTab === "Todos" ? availableCourses : [activeCourseTab])).map(course => {
+              const courseRecords = isConsolidatedView 
                 ? mappedSchedules.filter(r => (r.teacherId && String(r.teacherId).split(',').includes(String(activeTeacherFilter))))
                 : mappedSchedules.filter(r => r.course === course);
               
               const groupedClasses = [...new Set(courseRecords.map(r => r.className))].sort();
               
-              // Se tiver filtro de colega, as turmas podem ser de cursos diferentes de forma mista.
-              // O título do grupo muda se for visão unificada.
-              const groupTitle = activeTeacherFilter ? `Grade de Horários: ${resolveTeacherName(activeTeacherFilter, globalTeachers)}` : course;
+              const groupTitle = isConsolidatedView ? `Grade de Horários: ${resolveTeacherName(activeTeacherFilter, globalTeachers)}` : course;
               
               return (
                 <div key={course} className={`group relative rounded-[3rem] border shadow-2xl transition-all duration-500 hover:shadow-indigo-500/5 ${isDarkMode ? "bg-slate-900/80 border-slate-800" : "bg-white border-slate-100"}`}>

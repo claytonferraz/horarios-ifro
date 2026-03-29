@@ -139,11 +139,31 @@ export function PortalView({
 
   const previousViewMode = React.useRef(viewMode);
   React.useEffect(() => {
-    if (appMode === 'professor' && viewMode === 'curso' && previousViewMode.current !== 'curso') {
-       if (typeof setScheduleMode === 'function') setScheduleMode('atual');
+    // REGRA PARA PROFESSOR: Gestão de filtros entre abas
+    if (appMode === 'professor') {
+        // 1. Ao sair da Grade de Horários ('curso') para qualquer outra aba
+        if (previousViewMode.current === 'curso' && viewMode !== 'curso') {
+            if (showOnlyMyClasses) setShowOnlyMyClasses(false);
+            if (padraoFilterTeacher !== 'Todos') setPadraoFilterTeacher('Todos');
+            if (selectedCourse !== 'Todos' && typeof setSelectedCourse === 'function') setSelectedCourse('Todos');
+            if (selectedClass && typeof setSelectedClass === 'function') setSelectedClass('');
+        }
+        // 2. Ao entrar na Grade de Horários vindo de outro lugar (Iniciar limpo)
+        if (viewMode === 'curso' && previousViewMode.current !== 'curso') {
+            if (typeof setScheduleMode === 'function') setScheduleMode('atual');
+            if (showOnlyMyClasses) setShowOnlyMyClasses(false);
+            if (padraoFilterTeacher !== 'Todos') setPadraoFilterTeacher('Todos');
+        }
+        // 3. Ao entrar no Dashboard Geral
+        if (viewMode === 'dashboard') {
+            if (showOnlyMyClasses) setShowOnlyMyClasses(false);
+            if (padraoFilterTeacher !== 'Todos') setPadraoFilterTeacher('Todos');
+            if (selectedCourse !== 'Todos' && typeof setSelectedCourse === 'function') setSelectedCourse('Todos');
+            if (selectedClass && typeof setSelectedClass === 'function') setSelectedClass('');
+        }
     }
     previousViewMode.current = viewMode;
-  }, [viewMode, appMode, setScheduleMode]);
+  }, [viewMode, appMode, setScheduleMode, setSelectedCourse, setSelectedClass, showOnlyMyClasses, padraoFilterTeacher, selectedCourse, selectedClass]);
 
   React.useEffect(() => { 
     fetchRequests(); 
@@ -1045,11 +1065,8 @@ export function PortalView({
       }
     }, [dynamicWeeksList, academicWeeks, selectedWeek, setSelectedWeek]);
 
-   React.useEffect(() => {
-     if (!selectedClass && filteredClassesList.length > 0 && typeof setSelectedClass === 'function') {
-         setSelectedClass(filteredClassesList[0]);
-     }
-   }, [filteredClassesList, selectedClass, setSelectedClass]);
+    // Auto-seleção de turma removida para evitar loops de concorrência com o reset do Dashboard.
+    // O sistema agora prioriza o estado 'Limpo' no Dashboard e o localStorage no Portal do Aluno.
 
    const handleAlunoScheduleTab = React.useCallback((mode) => {
        setScheduleMode(mode);
