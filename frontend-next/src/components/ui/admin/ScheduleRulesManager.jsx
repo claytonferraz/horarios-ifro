@@ -1,9 +1,15 @@
-import React, { useEffect } from 'react';
-import { Settings, ShieldAlert, CheckCircle2, AlertTriangle, ShieldCheck } from 'lucide-react';
+import React, { useEffect, useState } from 'react';
+import { Settings, ShieldAlert, CheckCircle2, AlertTriangle, ShieldCheck, X } from 'lucide-react';
 import { useScheduleRules } from '@/hooks/useScheduleRules';
+import { useData } from '@/contexts/DataContext';
+import { resolveTeacherName } from '@/lib/dates';
 
 export function ScheduleRulesManager({ isDarkMode }) {
     const { rules, isLoading, errorMsg, fetchRules, updateRule, setErrorMsg } = useScheduleRules();
+    const { globalTeachers = [], academicWeeks = [] } = useData();
+
+    // Estado do Modal de Exceções
+    const [exceptionModal, setExceptionModal] = useState({ show: false, rule: null });
 
     useEffect(() => {
         fetchRules();
@@ -22,6 +28,46 @@ export function ScheduleRulesManager({ isDarkMode }) {
             severity: newSeverity,
             is_active: rule.is_active,
             exceptions: typeof rule.exceptions === 'string' ? JSON.parse(rule.exceptions || '{}') : rule.exceptions
+        });
+    };
+
+    const handleOpenExceptions = (rule) => {
+        const parsedExs = typeof rule.exceptions === 'string' ? JSON.parse(rule.exceptions || '{}') : rule.exceptions;
+        setExceptionModal({
+            show: true,
+            rule,
+            ignoredTeachers: parsedExs.ignoredTeachers || [],
+            ignoredWeeks: parsedExs.ignoredWeeks || []
+        });
+    };
+
+    const handleSaveExceptions = async () => {
+        const { rule, ignoredTeachers, ignoredWeeks } = exceptionModal;
+        await updateRule(rule.id, {
+            severity: rule.severity,
+            is_active: rule.is_active,
+            exceptions: { ignoredTeachers, ignoredWeeks }
+        });
+        setExceptionModal({ show: false, rule: null });
+    };
+
+    const toggleIgnoredTeacher = (teacherId) => {
+        setExceptionModal(prev => {
+            const list = prev.ignoredTeachers;
+            return {
+                ...prev,
+                ignoredTeachers: list.includes(teacherId) ? list.filter(id => id !== teacherId) : [...list, teacherId]
+            };
+        });
+    };
+
+    const toggleIgnoredWeek = (weekId) => {
+        setExceptionModal(prev => {
+            const list = prev.ignoredWeeks;
+            return {
+                ...prev,
+                ignoredWeeks: list.includes(weekId) ? list.filter(id => id !== weekId) : [...list, weekId]
+            };
         });
     };
 
@@ -121,7 +167,10 @@ export function ScheduleRulesManager({ isDarkMode }) {
                             
                             {/* Bloco Placeholder para Gestão de Exceções */}
                             {rule.severity === 'MANDATORY_WITH_EXCEPTION' && (
-                                <button className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-[0.2em] flex items-center gap-2 transition-all ${isDarkMode ? 'bg-slate-800 text-slate-300 hover:bg-slate-700' : 'bg-white text-slate-600 shadow-sm border hover:bg-slate-50'}`}>
+                                <button 
+                                    onClick={() => handleOpenExceptions(rule)}
+                                    className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-[0.2em] flex items-center gap-2 transition-all ${isDarkMode ? 'bg-slate-800 text-slate-300 hover:bg-slate-700' : 'bg-white text-slate-600 shadow-sm border hover:bg-slate-50'}`}
+                                >
                                     <Settings size={14} /> Exceções do DAPE
                                 </button>
                             )}
@@ -142,6 +191,95 @@ export function ScheduleRulesManager({ isDarkMode }) {
                    <b>Nota Arquitetural (V1):</b> As validações são processadas diretamente pelo Motor de Avaliação do servidor seguindo a política de <i>Strategy Pattern</i>. Desativar uma regra aqui faz com que o MasterGrid passe a ignorá-la imediatamente ao mover turmas.
                </p>
             </div>
+
+            {/* Modal de Exceções */}
+            {exceptionModal.show && (
+                <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
+                    <div className={`w-full max-w-2xl rounded-2xl shadow-2xl p-6 flex flex-col max-h-[90vh] ${isDarkMode ? 'bg-slate-900 border border-slate-700' : 'bg-white'}`}>
+                        <div className="flex justify-between items-center mb-6">
+                            <div>
+                                <h3 className={`text-xl font-black uppercase tracking-tighter ${isDarkMode ? 'text-white' : 'text-slate-900'}`}>
+                                    Gerenciar Exceções
+                                </h3>
+                                <p className={`text-[10px] font-black uppercase tracking-widest opacity-60 mt-1 ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>
+                                    Regra: {exceptionModal.rule.title}
+                                </p>
+                            </div>
+                            <button onClick={() => setExceptionModal({show: false, rule: null})} className={`p-2 rounded-full hover:bg-opacity-80 transition-all ${isDarkMode ? 'bg-slate-800 text-slate-400' : 'bg-slate-100 text-slate-600'}`}>
+                                <X size={20} />
+                            </button>
+                        </div>
+                        
+                        <div className="flex-1 overflow-y-auto space-y-6 pr-2 custom-scrollbar">
+                            {/* Bloco de Professores Ignorados */}
+                            <div>
+                                <h4 className={`text-xs font-black uppercase tracking-wider mb-3 ${isDarkMode ? 'text-slate-300' : 'text-slate-700'}`}>Professores Isentos Destra Regra</h4>
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 h-48 overflow-y-auto border rounded-xl p-2 custom-scrollbar">
+                                    {globalTeachers.length > 0 ? globalTeachers.map(teacher => {
+                                        const isIgnored = exceptionModal.ignoredTeachers.includes(teacher.siape);
+                                        return (
+                                            <div key={teacher.siape} 
+                                                 onClick={() => toggleIgnoredTeacher(teacher.siape)}
+                                                 className={`flex items-center gap-2 p-2 rounded-lg cursor-pointer border text-xs transition-colors ${
+                                                    isIgnored 
+                                                    ? (isDarkMode ? 'bg-indigo-900/40 border-indigo-700 text-indigo-300' : 'bg-indigo-50 border-indigo-200 text-indigo-800') 
+                                                    : (isDarkMode ? 'bg-slate-800 border-slate-700 text-slate-400' : 'bg-slate-50 border-slate-200 text-slate-600')
+                                                 }`}>
+                                                <input type="checkbox" checked={isIgnored} onChange={() => {}} className="pointer-events-none" />
+                                                <span className="truncate">{teacher.nome_exibicao || teacher.nome}</span>
+                                            </div>
+                                        );
+                                    }) : (
+                                        <div className="col-span-full text-xs p-4 text-center opacity-50">Nenhum professor registrado no ano.</div>
+                                    )}
+                                </div>
+                            </div>
+
+                            {/* Bloco de Semanas Ignoradas */}
+                            <div>
+                                <h4 className={`text-xs font-black uppercase tracking-wider mb-3 ${isDarkMode ? 'text-slate-300' : 'text-slate-700'}`}>Semanas Acadêmicas Isentas</h4>
+                                <div className="grid grid-cols-1 gap-2 border rounded-xl p-2 max-h-48 overflow-y-auto custom-scrollbar">
+                                    {academicWeeks.length > 0 ? academicWeeks.map(week => {
+                                        const isIgnored = exceptionModal.ignoredWeeks.includes(week.id);
+                                        return (
+                                            <div key={week.id} 
+                                                 onClick={() => toggleIgnoredWeek(week.id)}
+                                                 className={`flex items-center justify-between gap-2 p-3 rounded-lg cursor-pointer border text-xs transition-colors ${
+                                                    isIgnored 
+                                                    ? (isDarkMode ? 'bg-rose-900/20 border-rose-800/50 text-rose-400' : 'bg-rose-50 border-rose-200 text-rose-800') 
+                                                    : (isDarkMode ? 'bg-slate-800 border-slate-700 text-slate-400' : 'bg-slate-50 border-slate-200 text-slate-600')
+                                                 }`}>
+                                                <div className="flex flex-col">
+                                                    <span className="font-bold">{week.name || `Semana de ${week.start_date}`}</span>
+                                                    <span className="opacity-60 text-[10px] uppercase tracking-widest">{week.start_date.split('-').reverse().join('/')} até {week.end_date.split('-').reverse().join('/')}</span>
+                                                </div>
+                                                <input type="checkbox" checked={isIgnored} onChange={() => {}} className="pointer-events-none w-4 h-4" />
+                                            </div>
+                                        );
+                                    }) : (
+                                        <div className="text-xs p-4 text-center opacity-50">Nenhuma semana letiva especial registrada.</div>
+                                    )}
+                                </div>
+                            </div>
+                        </div>
+
+                        <div className="mt-6 pt-4 border-t flex items-center justify-end gap-3 border-slate-200 dark:border-slate-800">
+                            <button 
+                                onClick={() => setExceptionModal({show: false, rule: null})}
+                                className={`px-5 py-2.5 rounded-xl text-xs font-black uppercase tracking-widest transition-all ${isDarkMode ? 'bg-slate-800 text-slate-300 hover:bg-slate-700' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}
+                            >
+                                Cancelar
+                            </button>
+                            <button 
+                                onClick={handleSaveExceptions}
+                                className="px-5 py-2.5 rounded-xl text-xs font-black uppercase tracking-widest transition-all bg-emerald-600 text-white hover:bg-emerald-700 shadow-lg shadow-emerald-500/20 flex items-center gap-2"
+                            >
+                                <CheckCircle2 size={16} /> Salvar Exceções
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }
