@@ -702,9 +702,9 @@ export function PortalView({
     });
     const atual = groupByDay(atualRaw);
 
-    // 2. Prévia (Lógica: Quarta 12:00 -> Mostrar Prévia da Próxima Semana)
-    const isAfterWedNoon = (nowRef.getDay() === 3 && nowRef.getHours() >= 12) || nowRef.getDay() > 3 || nowRef.getDay() === 0;
-    const targetPreviewWeekId = isAfterWedNoon ? nextWeekId : dashboardBaseWeekId;
+    // 2. Prévia (Exibe sempre o planejamento da SEMANA SEGUINTE à selecionada no dashboard)
+    const currentWeekIdx = academicWeeks.findIndex(w => String(w.id) === String(dashboardBaseWeekId));
+    const targetPreviewWeekId = academicWeeks[currentWeekIdx + 1]?.id || dashboardBaseWeekId;
 
     const previaRaw = targetPreviewWeekId ? (schedules || []).filter(s => 
       s.type === 'previa' && 
@@ -807,11 +807,9 @@ export function PortalView({
     );
     const vagas = groupByDay(vagasRaw);
 
-    // 3. Prévia (Minha Turma - previas)
-    const now = new Date();
-    const isAfterWedNoon = (now.getDay() === 3 && now.getHours() >= 12) || now.getDay() > 3 || now.getDay() === 0;
+    // 3. Prévia (Minha Turma - Exibe planejamento da SEMANA SEGUINTE à selecionada)
     const currentWeekIdx = academicWeeks.findIndex(w => String(w.id) === String(selectedWeek));
-    const targetPreviewWeekId = isAfterWedNoon ? (academicWeeks[currentWeekIdx + 1]?.id || selectedWeek) : selectedWeek;
+    const targetPreviewWeekId = academicWeeks[currentWeekIdx + 1]?.id || selectedWeek;
 
     const previaRaw = targetPreviewWeekId ? (schedules || []).filter(s => 
       s.type === 'previa' && 
@@ -1167,17 +1165,30 @@ export function PortalView({
                      </div>
 
                      <div className={`flex p-1.5 rounded-2xl gap-1 overflow-x-auto no-scrollbar max-w-full glass-card ${isDarkMode ? "bg-slate-950/40 border-slate-800" : "bg-slate-100 border-slate-200"}`}>
-                          {["atual", "vagas", "previa"].map(tab => (
-                            <button 
-                              key={tab}
-                              onClick={() => setDashboardTab(tab)} 
-                              className={`px-3 sm:px-6 py-2.5 rounded-xl text-[9px] sm:text-[10px] font-black uppercase tracking-widest transition-all duration-300 whitespace-nowrap flex items-center gap-2 ${dashboardTab === tab ? (isDarkMode ? "bg-emerald-600 text-white shadow-[0_0_15px_rgba(16,185,129,0.4)]" : "bg-emerald-600 text-white shadow-lg shadow-emerald-500/30") : "text-slate-500 hover:text-emerald-500"}`}>
-                              {tab === "atual" && <Calendar size={14} className={dashboardTab === 'atual' ? "animate-pulse" : ""} />}
-                              {tab === "vagas" && <AlertCircle size={14} className={dashboardTab === 'vagas' ? "animate-bounce" : ""} />}
-                              {tab === "previa" && <Eye size={14} className={dashboardTab === 'previa' ? "animate-pulse" : ""} />}
-                              {tab === "atual" ? "Semana Atual" : tab === "vagas" ? "Aulas Vagas" : "Prévia da Próxima"}
-                            </button>
-                          ))}
+                           {["atual", "vagas", "previa"].map(tab => {
+                             const tabColors = {
+                               atual: { color: "emerald", icon: Calendar },
+                               vagas: { color: "orange", icon: AlertCircle },
+                               previa: { color: "indigo", icon: Eye }
+                             };
+                             const { color, icon: Icon } = tabColors[tab];
+                             const label = tab === "atual" ? "Atual" : tab === "vagas" ? "Aulas Vagas" : "Prévia";
+                             const isActive = dashboardTab === tab;
+
+                             return (
+                               <button 
+                                 key={tab}
+                                 onClick={() => setDashboardTab(tab)} 
+                                 className={`group px-4 py-2.5 rounded-xl text-[9px] sm:text-[10px] font-black uppercase tracking-widest transition-all duration-500 whitespace-nowrap flex items-center gap-3 ${isActive ? (isDarkMode ? `bg-${color}-600 text-white shadow-[0_0_20px_rgba(var(--tw-shadow-color),0.4)]` : `bg-${color}-600 text-white shadow-lg`) : (isDarkMode ? `text-slate-400 hover:text-${color}-400 hover:bg-slate-900` : `text-slate-500 hover:text-${color}-600 hover:bg-white`)}`}
+                                 style={{ "--tw-shadow-color": color === 'emerald' ? '16,185,129' : color === 'orange' ? '249,115,22' : '99,102,241' }}
+                               >
+                                 <div className={`w-8 h-8 rounded-lg flex items-center justify-center transition-all duration-500 ${isActive ? "bg-white/20 text-white" : (isDarkMode ? `bg-slate-800 text-${color}-400 group-hover:bg-${color}-600 group-hover:text-white` : `bg-${color}-50 text-${color}-600 group-hover:bg-${color}-600 group-hover:text-white`)}`}>
+                                   <Icon size={14} className={`transition-transform duration-500 ${isActive ? (tab === 'vagas' ? 'animate-bounce' : 'animate-pulse') : 'group-hover:scale-110'}`} />
+                                 </div>
+                                 {label}
+                               </button>
+                             );
+                           })}
                       </div>
                    </div>
 
@@ -1449,7 +1460,7 @@ export function PortalView({
                           <button onClick={() => { setViewMode("professor"); if(typeof setSelectedTeacher === "function") setSelectedTeacher(siape); }} 
                                   className={`group p-6 rounded-[2rem] border text-left transition-all duration-500 glass-card inner-glow-emerald ${isDarkMode ? "border-slate-800 hover:border-emerald-500/40" : "border-slate-100 hover:border-emerald-200 hover:shadow-xl hover:shadow-emerald-500/5"}`}>
                             <div className={`w-12 h-12 rounded-2xl flex items-center justify-center mb-4 transition-all duration-500 ${isDarkMode ? "bg-emerald-950/60 text-emerald-400 group-hover:bg-emerald-600 group-hover:text-white" : "bg-emerald-50 text-emerald-600 group-hover:bg-emerald-600 group-hover:text-white shadow-sm"}`}>
-                              <Calendar size={24} />
+                              <Calendar size={24} className="transition-transform duration-500 group-hover:scale-110" />
                             </div>
                             <h3 className={`text-sm font-black mb-1 ${isDarkMode ? "text-emerald-50" : "text-slate-800"}`}>Aulas Diárias</h3>
                             <p className="text-[10px] font-bold text-slate-500 leading-tight uppercase tracking-tighter">Grade do dia</p>
@@ -1458,7 +1469,7 @@ export function PortalView({
                           <button onClick={() => setViewMode("curso")} 
                                   className={`group p-6 rounded-[2rem] border text-left transition-all duration-500 glass-card inner-glow-emerald ${isDarkMode ? "border-slate-800 hover:border-emerald-500/40" : "border-slate-100 hover:border-emerald-200 hover:shadow-xl hover:shadow-emerald-500/5"}`}>
                             <div className={`w-12 h-12 rounded-2xl flex items-center justify-center mb-4 transition-all duration-500 ${isDarkMode ? "bg-emerald-950/60 text-emerald-400 group-hover:bg-emerald-600 group-hover:text-white" : "bg-emerald-50 text-emerald-600 group-hover:bg-emerald-600 group-hover:text-white shadow-sm"}`}>
-                              <Shuffle size={24} />
+                              <Shuffle size={24} className="transition-transform duration-500 group-hover:scale-110" />
                             </div>
                             <h3 className={`text-sm font-black mb-1 ${isDarkMode ? "text-emerald-50" : "text-slate-800"}`}>Grade Global</h3>
                             <p className="text-[10px] font-bold text-slate-500 leading-tight uppercase tracking-tighter">Consultar quadro</p>
@@ -1467,7 +1478,7 @@ export function PortalView({
                           <button onClick={() => setViewMode("solicitacoes")} 
                                   className={`group p-6 rounded-[2rem] border text-left transition-all duration-500 glass-card inner-glow-emerald ${isDarkMode ? "border-slate-800 hover:border-emerald-500/40" : "border-slate-100 hover:border-emerald-200 hover:shadow-xl hover:shadow-emerald-500/5"}`}>
                             <div className={`w-12 h-12 rounded-2xl flex items-center justify-center mb-4 transition-all duration-500 ${isDarkMode ? "bg-emerald-950/60 text-emerald-400 group-hover:bg-emerald-600 group-hover:text-white" : "bg-emerald-50 text-emerald-600 group-hover:bg-emerald-600 group-hover:text-white shadow-sm"}`}>
-                              <Bell size={24} />
+                              <Bell size={24} className="transition-transform duration-500 group-hover:scale-110" />
                             </div>
                             <h3 className={`text-sm font-black mb-1 ${isDarkMode ? "text-emerald-50" : "text-slate-800"}`}>Minhas Solics.</h3>
                             <p className="text-[10px] font-bold text-slate-500 leading-tight uppercase tracking-tighter">Avisos e Pedidos</p>
@@ -1476,7 +1487,7 @@ export function PortalView({
                           <button onClick={() => setViewMode("total")} 
                                   className={`group p-6 rounded-3xl border text-left transition-all hover:scale-[1.02] ${isDarkMode ? "bg-slate-800 border-slate-700 hover:border-orange-500/50" : "bg-white border-slate-100 hover:border-orange-200 shadow-sm hover:shadow-xl"}`}>
                             <div className={`w-10 h-10 rounded-xl flex items-center justify-center mb-4 transition-colors ${isDarkMode ? "bg-orange-950 text-orange-400 group-hover:bg-orange-600 group-hover:text-white" : "bg-orange-50 text-orange-600 group-hover:bg-orange-600 group-hover:text-white"}`}>
-                              <BarChart3 size={20} />
+                              <BarChart3 size={20} className="transition-transform duration-500 group-hover:scale-110" />
                             </div>
                             <h3 className={`text-sm font-black mb-1 ${isDarkMode ? "text-white" : "text-slate-800"}`}>Controle</h3>
                             <p className="text-[10px] font-medium text-slate-500 leading-tight">Controle de carga horária.</p>
@@ -1487,7 +1498,7 @@ export function PortalView({
                           <button onClick={() => setViewMode("turma")} 
                                   className={`group p-6 rounded-[2rem] border text-left transition-all duration-500 glass-card inner-glow-emerald ${isDarkMode ? "border-slate-800 hover:border-emerald-500/40" : "border-slate-100 hover:border-emerald-200 hover:shadow-xl hover:shadow-emerald-500/5"}`}>
                             <div className={`w-12 h-12 rounded-2xl flex items-center justify-center mb-4 transition-all duration-500 ${isDarkMode ? "bg-emerald-950/60 text-emerald-400 group-hover:bg-emerald-600 group-hover:text-white" : "bg-emerald-50 text-emerald-600 group-hover:bg-emerald-600 group-hover:text-white shadow-sm"}`}>
-                              <Calendar size={24} />
+                              <Calendar size={24} className="transition-transform duration-500 group-hover:scale-110" />
                             </div>
                             <h3 className={`text-sm font-black mb-1 ${isDarkMode ? "text-emerald-50" : "text-slate-800"}`}>Minha Turma</h3>
                             <p className="text-[10px] font-bold text-slate-500 leading-tight uppercase tracking-tighter">Visualizar horário completo</p>
@@ -1496,7 +1507,7 @@ export function PortalView({
                           <button onClick={() => setViewMode("professor")} 
                                   className={`group p-6 rounded-[2rem] border text-left transition-all duration-500 glass-card inner-glow-indigo ${isDarkMode ? "border-slate-800 hover:border-indigo-500/40" : "border-slate-100 hover:border-indigo-200 hover:shadow-xl hover:shadow-indigo-500/5"}`}>
                             <div className={`w-12 h-12 rounded-2xl flex items-center justify-center mb-4 transition-all duration-500 ${isDarkMode ? "bg-indigo-950/60 text-indigo-400 group-hover:bg-indigo-600 group-hover:text-white" : "bg-indigo-50 text-indigo-600 group-hover:bg-indigo-600 group-hover:text-white shadow-sm"}`}>
-                              <UserCircle size={24} />
+                              <UserCircle size={24} className="transition-transform duration-500 group-hover:scale-110" />
                             </div>
                             <h3 className={`text-sm font-black mb-1 ${isDarkMode ? "text-indigo-50" : "text-slate-800"}`}>Professor</h3>
                             <p className="text-[10px] font-bold text-slate-500 leading-tight uppercase tracking-tighter">Buscar por docente</p>
@@ -1505,7 +1516,7 @@ export function PortalView({
                           <button onClick={() => { setViewMode('historico'); setScheduleMode('oficial'); }} 
                                   className={`group p-6 rounded-[2rem] border text-left transition-all duration-500 glass-card inner-glow-orange ${isDarkMode ? "border-slate-800 hover:border-orange-500/40" : "border-slate-100 hover:border-orange-200 hover:shadow-xl hover:shadow-orange-500/5"}`}>
                             <div className={`w-12 h-12 rounded-2xl flex items-center justify-center mb-4 transition-all duration-500 ${isDarkMode ? "bg-orange-950/60 text-orange-400 group-hover:bg-orange-600 group-hover:text-white" : "bg-orange-50 text-orange-600 group-hover:bg-orange-600 group-hover:text-white shadow-sm"}`}>
-                              <Clock size={24} />
+                              <Clock size={24} className="transition-transform duration-500 group-hover:scale-110" />
                             </div>
                             <h3 className={`text-sm font-black mb-1 ${isDarkMode ? "text-orange-50" : "text-slate-800"}`}>Aulas Passadas</h3>
                             <p className="text-[10px] font-bold text-slate-500 leading-tight uppercase tracking-tighter">Histórico semanal</p>
@@ -1604,53 +1615,80 @@ export function PortalView({
               <div className={`flex items-center justify-between border-b pb-3 ${isDarkMode ? 'border-slate-700' : 'border-slate-100'}`}>
                 <div className={`flex flex-wrap items-center gap-2 p-1.5 rounded-xl shadow-inner w-full ${isDarkMode ? 'bg-slate-900' : 'bg-slate-100'}`}>
                   
-                  {appMode === 'professor' && (
+                  {["servidor", "admin", "gestao"].includes(userRole) ? (
                     <>
                       <button onClick={() => setViewMode('dashboard')} 
-                              className={"flex flex-1 sm:flex-none min-w-[130px] items-center justify-center gap-2 px-4 py-3 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all " + (viewMode === 'dashboard' ? 'bg-slate-700 text-white shadow-lg' : (isDarkMode ? 'bg-slate-800 text-slate-300 hover:text-white hover:bg-slate-700' : 'bg-white text-slate-600 border border-slate-200 hover:text-slate-900'))}>
-                        <Home size={14} /> Dashboard
+                              className={`group flex items-center gap-3 px-5 py-3 rounded-2xl text-[9px] font-black uppercase tracking-widest transition-all duration-500 ${viewMode === 'dashboard' ? "bg-slate-700 text-white shadow-lg" : (isDarkMode ? "text-slate-400 hover:bg-slate-800 hover:text-white" : "text-slate-500 hover:bg-white hover:text-slate-900 border border-transparent hover:border-slate-100 hover:shadow-sm")}`}>
+                        <div className={`w-8 h-8 rounded-lg flex items-center justify-center transition-all duration-500 ${viewMode === 'dashboard' ? "bg-white/10 text-white" : (isDarkMode ? "bg-slate-900 text-emerald-400 group-hover:bg-emerald-600 group-hover:text-white" : "bg-emerald-50 text-emerald-600 group-hover:bg-emerald-600 group-hover:text-white")}`}>
+                          <Home size={14} className="transition-transform duration-500 group-hover:scale-110" />
+                        </div>
+                        Dashboard
                       </button>
 
-                      <button onClick={() => { setViewMode('professor'); if(['servidor', 'admin', 'gestao'].includes(userRole) && typeof setSelectedTeacher === 'function') setSelectedTeacher(siape); setSelectedColleague(''); }} 
-                              className={"flex flex-1 sm:flex-none min-w-[130px] items-center justify-center gap-2 px-4 py-3 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all " + (viewMode === 'professor' && !selectedColleague ? 'bg-indigo-600 text-white shadow-lg ring-2 ring-indigo-400/50' : (isDarkMode ? 'bg-slate-800 text-slate-300 hover:text-white hover:bg-slate-700' : 'bg-white text-slate-600 border border-slate-200 hover:text-slate-900'))}>
-                        <UserCircle size={14} /> Meu Horário
+                      <button onClick={() => { setViewMode('professor'); if(typeof setSelectedTeacher === 'function') setSelectedTeacher(siape); setSelectedColleague(''); }} 
+                              className={`group flex items-center gap-3 px-5 py-3 rounded-2xl text-[9px] font-black uppercase tracking-widest transition-all duration-500 ${viewMode === 'professor' ? "bg-indigo-600 text-white shadow-lg" : (isDarkMode ? "text-slate-400 hover:bg-slate-800 hover:text-white" : "text-slate-500 hover:bg-white hover:text-slate-900 border border-transparent hover:border-slate-100 hover:shadow-sm")}`}>
+                        <div className={`w-8 h-8 rounded-lg flex items-center justify-center transition-all duration-500 ${viewMode === 'professor' ? "bg-white/10 text-white" : (isDarkMode ? "bg-slate-900 text-indigo-400 group-hover:bg-indigo-600 group-hover:text-white" : "bg-indigo-50 text-indigo-600 group-hover:bg-indigo-600 group-hover:text-white")}`}>
+                          <UserCircle size={14} className="transition-transform duration-500 group-hover:scale-110" />
+                        </div>
+                        Meu Horário
                       </button>
 
                       <button onClick={() => { setViewMode('curso'); setPadraoFilterTeacher('Todos'); setShowOnlyMyClasses(false); }} 
-                              className={"flex flex-1 sm:flex-none min-w-[130px] items-center justify-center gap-2 px-4 py-3 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all " + (viewMode === 'curso' ? 'bg-emerald-600 text-white shadow-lg ring-2 ring-emerald-400/50' : (isDarkMode ? 'bg-slate-800 text-slate-300 hover:text-white hover:bg-slate-700' : 'bg-white text-slate-600 border border-slate-200 hover:text-slate-900'))}>
-                        <Layers size={14} /> Grade de Horários
+                              className={`group flex items-center gap-3 px-5 py-3 rounded-2xl text-[9px] font-black uppercase tracking-widest transition-all duration-500 ${viewMode === 'curso' ? "bg-emerald-600 text-white shadow-lg" : (isDarkMode ? "text-slate-400 hover:bg-slate-800 hover:text-white" : "text-slate-500 hover:bg-white hover:text-slate-900 border border-transparent hover:border-slate-100 hover:shadow-sm")}`}>
+                        <div className={`w-8 h-8 rounded-lg flex items-center justify-center transition-all duration-500 ${viewMode === 'curso' ? "bg-white/10 text-white" : (isDarkMode ? "bg-slate-900 text-emerald-400 group-hover:bg-emerald-600 group-hover:text-white" : "bg-emerald-50 text-emerald-600 group-hover:bg-emerald-600 group-hover:text-white")}`}>
+                          <Layers size={14} className="transition-transform duration-500 group-hover:scale-110" />
+                        </div>
+                        Grade Global
                       </button>
 
                       <button onClick={() => setViewMode('solicitacoes')} 
-                              className={"flex flex-1 sm:flex-none min-w-[130px] items-center justify-center gap-2 px-4 py-3 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all " + (viewMode === 'solicitacoes' ? 'bg-amber-500 text-white shadow-lg ring-2 ring-amber-400/50' : (isDarkMode ? 'bg-slate-800 text-slate-300 hover:text-white hover:bg-slate-700' : 'bg-white text-slate-600 border border-slate-200 hover:text-slate-900'))}>
-                        <Bell size={14} /> Solicitações
+                              className={`group flex items-center gap-3 px-5 py-3 rounded-2xl text-[9px] font-black uppercase tracking-widest transition-all duration-500 ${viewMode === 'solicitacoes' ? "bg-indigo-600 text-white shadow-lg" : (isDarkMode ? "text-slate-400 hover:bg-slate-800 hover:text-white" : "text-slate-500 hover:bg-white hover:text-slate-900 border border-transparent hover:border-slate-100 hover:shadow-sm")}`}>
+                        <div className={`w-8 h-8 rounded-lg flex items-center justify-center transition-all duration-500 ${viewMode === 'solicitacoes' ? "bg-white/10 text-white" : (isDarkMode ? "bg-slate-900 text-indigo-400 group-hover:bg-indigo-600 group-hover:text-white" : "bg-indigo-50 text-indigo-600 group-hover:bg-indigo-600 group-hover:text-white")}`}>
+                          <Bell size={14} className="transition-transform duration-500 group-hover:rotate-12" />
+                        </div>
+                        Solicitações
                       </button>
-                      
+
                       <button onClick={() => setViewMode('total')} 
-                              className={"flex flex-1 sm:flex-none min-w-[130px] items-center justify-center gap-2 px-4 py-3 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all " + (viewMode === 'total' ? 'bg-orange-600 text-white shadow-lg ring-2 ring-orange-400/50' : (isDarkMode ? 'bg-slate-800 text-slate-300 hover:text-white hover:bg-slate-700' : 'bg-white text-slate-600 border border-slate-200 hover:text-slate-900'))}>
-                        <BarChart3 size={14} /> Controle
+                              className={`group flex items-center gap-3 px-5 py-3 rounded-2xl text-[9px] font-black uppercase tracking-widest transition-all duration-500 ${viewMode === 'total' ? "bg-orange-600 text-white shadow-lg" : (isDarkMode ? "text-slate-400 hover:bg-slate-800 hover:text-white" : "text-slate-500 hover:bg-white hover:text-slate-900 border border-transparent hover:border-slate-100 hover:shadow-sm")}`}>
+                        <div className={`w-8 h-8 rounded-lg flex items-center justify-center transition-all duration-500 ${viewMode === 'total' ? "bg-white/10 text-white" : (isDarkMode ? "bg-slate-900 text-orange-400 group-hover:bg-orange-600 group-hover:text-white" : "bg-orange-50 text-orange-600 group-hover:bg-orange-600 group-hover:text-white")}`}>
+                          <BarChart3 size={14} className="transition-transform duration-500 group-hover:scale-110" />
+                        </div>
+                        Controle
                       </button>
                     </>
-                  )}
-
-                  {appMode === 'aluno' && (
+                  ) : (
                     <>
-                      {/* Destaques Aluno */}
                       <button onClick={() => setViewMode('dashboard')} 
-                              className={`flex-1 sm:flex-none min-w-[130px] flex items-center justify-center gap-2 px-4 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${viewMode === 'dashboard' ? (isDarkMode ? 'bg-slate-700 text-white shadow-lg ring-1 ring-slate-600' : 'bg-slate-600 text-white shadow-lg ring-2 ring-slate-400/30') : (isDarkMode ? 'bg-slate-800 text-slate-300 hover:text-white hover:bg-slate-700' : 'bg-white text-slate-600 hover:text-slate-900 border border-slate-200 shadow-sm')}`}>
-                        <Home size={14} /> Início
+                              className={`group flex items-center gap-3 px-5 py-3 rounded-2xl text-[9px] font-black uppercase tracking-widest transition-all duration-500 ${viewMode === 'dashboard' ? "bg-slate-700 text-white shadow-lg" : (isDarkMode ? "text-slate-400 hover:bg-slate-800 hover:text-white" : "text-slate-500 hover:bg-white hover:text-slate-900 border border-transparent hover:border-slate-100 hover:shadow-sm")}`}>
+                        <div className={`w-8 h-8 rounded-lg flex items-center justify-center transition-all duration-500 ${viewMode === 'dashboard' ? "bg-white/10 text-white" : (isDarkMode ? "bg-slate-900 text-emerald-400 group-hover:bg-emerald-600 group-hover:text-white" : "bg-emerald-50 text-emerald-600 group-hover:bg-emerald-600 group-hover:text-white")}`}>
+                          <Home size={14} className="transition-transform duration-500 group-hover:scale-110" />
+                        </div>
+                        Início
                       </button>
+
                       <button onClick={() => { setViewMode('turma'); if (scheduleMode === 'oficial') handleAlunoScheduleTab('atual'); }} 
-                              className={`flex-1 sm:flex-none min-w-[130px] flex items-center justify-center gap-2 px-4 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${viewMode === 'turma' ? 'bg-emerald-600 text-white shadow-lg shadow-emerald-900/40 ring-2 ring-emerald-400/50' : (isDarkMode ? 'bg-slate-800 text-slate-300 hover:text-white hover:bg-slate-700' : 'bg-white text-slate-600 hover:text-slate-900 border border-slate-200 shadow-sm')}`}>
-                        <Calendar size={14} /> Minha Turma
+                              className={`group flex items-center gap-3 px-5 py-3 rounded-2xl text-[9px] font-black uppercase tracking-widest transition-all duration-500 ${viewMode === 'turma' ? "bg-emerald-600 text-white shadow-lg shadow-emerald-900/40" : (isDarkMode ? "text-slate-400 hover:bg-slate-800 hover:text-white" : "text-slate-500 hover:bg-white hover:text-slate-900 border border-transparent hover:border-slate-100 hover:shadow-sm")}`}>
+                        <div className={`w-8 h-8 rounded-lg flex items-center justify-center transition-all duration-500 ${viewMode === 'turma' ? "bg-white/20 text-white" : (isDarkMode ? "bg-slate-900 text-emerald-400 group-hover:bg-emerald-600 group-hover:text-white" : "bg-emerald-50 text-emerald-600 group-hover:bg-emerald-600 group-hover:text-white")}`}>
+                          <Calendar size={14} className="transition-transform duration-500 group-hover:scale-110" />
+                        </div>
+                        Minha Turma
                       </button>
+
                       <button onClick={() => setViewMode('professor')} 
-                              className={`flex-1 sm:flex-none min-w-[130px] flex items-center justify-center gap-2 px-4 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${viewMode === 'professor' ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-900/40 ring-2 ring-indigo-400/50' : (isDarkMode ? 'bg-slate-800 text-slate-300 hover:text-white hover:bg-slate-700' : 'bg-white text-slate-600 hover:text-slate-900 border border-slate-200 shadow-sm')}`}>
-                        <UserCircle size={14} /> Professor
+                              className={`group flex items-center gap-3 px-5 py-3 rounded-2xl text-[9px] font-black uppercase tracking-widest transition-all duration-500 ${viewMode === 'professor' ? "bg-indigo-600 text-white shadow-lg shadow-indigo-900/40" : (isDarkMode ? "text-slate-400 hover:bg-slate-800 hover:text-white" : "text-slate-500 hover:bg-white hover:text-slate-900 border border-transparent hover:border-slate-100 hover:shadow-sm")}`}>
+                        <div className={`w-8 h-8 rounded-lg flex items-center justify-center transition-all duration-500 ${viewMode === 'professor' ? "bg-white/20 text-white" : (isDarkMode ? "bg-slate-900 text-indigo-400 group-hover:bg-indigo-600 group-hover:text-white" : "bg-indigo-50 text-indigo-600 group-hover:bg-indigo-600 group-hover:text-white")}`}>
+                          <UserCircle size={14} className="transition-transform duration-500 group-hover:scale-110" />
+                        </div>
+                        Professor
                       </button>
+
                       <button onClick={() => { setViewMode('historico'); setScheduleMode('oficial'); }} 
-                              className={`flex-1 sm:flex-none min-w-[130px] flex items-center justify-center gap-2 px-4 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${viewMode === 'historico' ? 'bg-orange-600 text-white shadow-lg shadow-orange-900/40 ring-2 ring-orange-400/50' : (isDarkMode ? 'bg-slate-800 text-slate-300 hover:text-white hover:bg-slate-700' : 'bg-white text-slate-600 hover:text-slate-900 border border-slate-200 shadow-sm')}`}>
-                        <Clock size={14} /> Aulas Passadas
+                              className={`group flex items-center gap-3 px-5 py-3 rounded-2xl text-[9px] font-black uppercase tracking-widest transition-all duration-500 ${viewMode === 'historico' ? "bg-orange-600 text-white shadow-lg shadow-orange-900/40" : (isDarkMode ? "text-slate-400 hover:bg-slate-800 hover:text-white" : "text-slate-500 hover:bg-white hover:text-slate-900 border border-transparent hover:border-slate-100 hover:shadow-sm")}`}>
+                        <div className={`w-8 h-8 rounded-lg flex items-center justify-center transition-all duration-500 ${viewMode === 'historico' ? "bg-white/20 text-white" : (isDarkMode ? "bg-slate-900 text-orange-400 group-hover:bg-orange-600 group-hover:text-white" : "bg-orange-50 text-orange-600 group-hover:bg-orange-600 group-hover:text-white")}`}>
+                          <Clock size={14} className="transition-transform duration-500 group-hover:scale-110" />
+                        </div>
+                        Aulas Passadas
                       </button>
                     </>
                   )}
@@ -1778,17 +1816,29 @@ export function PortalView({
                     <>
                       {appMode === 'professor' || appMode === 'gestao' || appMode === 'admin' ? (
                         <>
-                          <button onClick={() => handleModeChange('atual')} className={`flex-1 md:flex-none flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all ${scheduleMode === 'atual' ? 'bg-teal-500 text-white shadow-md' : (isDarkMode ? 'text-slate-400 hover:bg-slate-800 hover:text-white' : 'text-slate-500 hover:bg-slate-100 hover:text-slate-800')}`}>
-                            <Sun size={14} /> Semana Atual
+                          <button onClick={() => handleModeChange('atual')} className={`group flex items-center justify-center gap-2.5 px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all duration-500 ${scheduleMode === 'atual' ? 'bg-teal-600 text-white shadow-md' : (isDarkMode ? 'text-slate-400 hover:bg-slate-800 hover:text-white' : 'text-slate-500 hover:bg-white hover:text-slate-800 hover:shadow-sm')}`}>
+                            <div className={`w-7 h-7 rounded-lg flex items-center justify-center transition-all duration-500 ${scheduleMode === 'atual' ? 'bg-white/20' : (isDarkMode ? 'bg-slate-900 text-teal-400 group-hover:bg-teal-600 group-hover:text-white' : 'bg-teal-50 text-teal-600 group-hover:bg-teal-600 group-hover:text-white')}`}>
+                               <Sun size={14} className="transition-transform duration-500 group-hover:scale-110" />
+                            </div>
+                            Semana Atual
                           </button>
-                          <button onClick={() => handleModeChange('previa')} className={`flex-1 md:flex-none flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all ${scheduleMode === 'previa' ? 'bg-violet-500 text-white shadow-md' : (isDarkMode ? 'text-slate-400 hover:bg-slate-800 hover:text-white' : 'text-slate-500 hover:bg-slate-100 hover:text-slate-800')}`}>
-                            <Eye size={14} /> Prévia (Futuro)
+                          <button onClick={() => handleModeChange('previa')} className={`group flex items-center justify-center gap-2.5 px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all duration-500 ${scheduleMode === 'previa' ? 'bg-indigo-600 text-white shadow-md' : (isDarkMode ? 'text-slate-400 hover:bg-slate-800 hover:text-white' : 'text-slate-500 hover:bg-white hover:text-slate-800 hover:shadow-sm')}`}>
+                            <div className={`w-7 h-7 rounded-lg flex items-center justify-center transition-all duration-500 ${scheduleMode === 'previa' ? 'bg-white/20' : (isDarkMode ? 'bg-slate-900 text-indigo-400 group-hover:bg-indigo-600 group-hover:text-white' : 'bg-indigo-50 text-indigo-600 group-hover:bg-indigo-600 group-hover:text-white')}`}>
+                               <Eye size={14} className="transition-transform duration-500 group-hover:scale-110" />
+                            </div>
+                            Prévia (Futuro)
                           </button>
-                          <button onClick={() => handleModeChange('padrao')} className={`flex-1 md:flex-none flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all ${scheduleMode === 'padrao' ? 'bg-blue-500 text-white shadow-md' : (isDarkMode ? 'text-slate-400 hover:bg-slate-800 hover:text-white' : 'text-slate-500 hover:bg-slate-100 hover:text-slate-800')}`}>
-                            <BookOpen size={14} /> Padrão Anual
+                          <button onClick={() => handleModeChange('padrao')} className={`group flex items-center justify-center gap-2.5 px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all duration-500 ${scheduleMode === 'padrao' ? 'bg-amber-600 text-white shadow-md' : (isDarkMode ? 'text-slate-400 hover:bg-slate-800 hover:text-white' : 'text-slate-500 hover:bg-white hover:text-slate-800 hover:shadow-sm')}`}>
+                            <div className={`w-7 h-7 rounded-lg flex items-center justify-center transition-all duration-500 ${scheduleMode === 'padrao' ? 'bg-white/20' : (isDarkMode ? 'bg-slate-900 text-amber-400 group-hover:bg-amber-600 group-hover:text-white' : 'bg-amber-50 text-amber-600 group-hover:bg-amber-600 group-hover:text-white')}`}>
+                               <BookOpen size={14} className="transition-transform duration-500 group-hover:scale-110" />
+                            </div>
+                            Padrão Anual
                           </button>
-                          <button onClick={() => handleModeChange('consolidado')} className={`flex-1 md:flex-none flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all ${scheduleMode === 'consolidado' ? 'bg-emerald-500 text-white shadow-md' : (isDarkMode ? 'text-slate-400 hover:bg-slate-800 hover:text-white' : 'text-slate-500 hover:bg-slate-100 hover:text-slate-800')}`}>
-                            <Calendar size={14} /> Consolidado
+                          <button onClick={() => handleModeChange('consolidado')} className={`group flex items-center justify-center gap-2.5 px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all duration-500 ${scheduleMode === 'consolidado' ? 'bg-emerald-600 text-white shadow-md' : (isDarkMode ? 'text-slate-400 hover:bg-slate-800 hover:text-white' : 'text-slate-500 hover:bg-white hover:text-slate-800 hover:shadow-sm')}`}>
+                            <div className={`w-7 h-7 rounded-lg flex items-center justify-center transition-all duration-500 ${scheduleMode === 'consolidado' ? 'bg-white/20' : (isDarkMode ? 'bg-slate-900 text-emerald-400 group-hover:bg-emerald-600 group-hover:text-white' : 'bg-emerald-50 text-emerald-600 group-hover:bg-emerald-600 group-hover:text-white')}`}>
+                               <Calendar size={14} className="transition-transform duration-500 group-hover:scale-110" />
+                            </div>
+                            Consolidado
                           </button>
                         </>
                       ) : (
