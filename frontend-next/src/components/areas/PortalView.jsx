@@ -546,40 +546,55 @@ export function PortalView({
     };
   }, [dbClasses, dbCourses, matrixDisciplinesMap, disciplinesMeta, subjectHoursMeta, globalTeachers, dayFullLabels]);
 
+  // --------------------------------------------------------------------------
+  // Metadados de Tempo Real e Identificação da Semana Atual
+  // --------------------------------------------------------------------------
+  const nowRaw = new Date();
+  const currentDayIdx = nowRaw.getDay(); // 0 (Dom) a 6 (Sab)
+  const currentTimeVal = nowRaw.getHours() * 60 + nowRaw.getMinutes();
+  const currentDayCode = ['dom', 'seg', 'ter', 'qua', 'qui', 'sex', 'sab'][currentDayIdx];
 
+  // Cálculo da Semana Real de Hoje (Fixo na Data do Robô)
+  const refDateForNow = (() => {
+    const d = new Date(nowRaw);
+    if (nowRaw.getDay() === 6) d.setDate(d.getDate() + 2);
+    else if (nowRaw.getDay() === 0) d.setDate(d.getDate() + 1);
+    d.setHours(0,0,0,0);
+    return d;
+  })();
 
-   const mappedSchedules = React.useMemo(() => {
-       return (horariosFiltrados || []).map(s => enrichScheduleItem(s)).filter(Boolean);
-   }, [horariosFiltrados, enrichScheduleItem]);
+  const actualCurrentWeek = academicWeeks.find(w => {
+    const startStr = String(w.start_date || '').split('T')[0];
+    const endStr = String(w.end_date || '').split('T')[0];
+    if (!startStr || !endStr) return false;
+    const s = new Date(startStr + 'T00:00:00'); 
+    const e = new Date(endStr + 'T23:59:59');
+    return refDateForNow >= s && refDateForNow <= e;
+  });
+  const actualCurrentWeekId = actualCurrentWeek ? String(actualCurrentWeek.id) : null;
+
+  const mappedSchedules = React.useMemo(() => {
+      return (horariosFiltrados || []).map(s => enrichScheduleItem(s)).filter(Boolean);
+  }, [horariosFiltrados, enrichScheduleItem]);
 
   const teacherSummary = React.useMemo(() => {
     if (!siape || !mappedSchedules || !schedules || !academicWeeks) return { atual: [], previa: [], vagas: [] };
     
-
-    // Cálculo de Datas para os Headers
-    const weekData = academicWeeks.find(w => String(w.id) === String(selectedWeek));
-    
     const getHeaderLabel = (itemDay, weekId) => {
       const dayCode = shortDayMap[itemDay] || itemDay;
       const DayLabel = dayFullLabels[dayCode] || dayCode;
-      
       const targetWeekData = academicWeeks.find(w => String(w.id) === String(weekId || selectedWeek));
       if (!targetWeekData || !targetWeekData.start_date) return DayLabel;
-      
       const cleanDate = String(targetWeekData.start_date).split('T')[0];
       const d = new Date(cleanDate + 'T12:00:00Z');
-      
       if (isNaN(d.getTime())) return DayLabel;
-      
       const offset = (dayOrder[dayCode] || 1) - 1;
       d.setUTCDate(d.getUTCDate() + offset);
-      
       const day = String(d.getUTCDate()).padStart(2, '0');
       const month = String(d.getUTCMonth() + 1).padStart(2, '0');
       return `${DayLabel} ${day}/${month}`;
     };
 
-    // Helper: Agrupar por Dia + Semana (para evitar que Segunda da próx. semana apareça antes de Sexta desta semana)
     const groupByDay = (items) => {
       const groups = {};
       items.forEach(item => {
@@ -589,14 +604,12 @@ export function PortalView({
         if (!groups[groupKey]) groups[groupKey] = [];
         groups[groupKey].push({ ...item, dayCode: code, weekId });
       });
-      
       return Object.entries(groups)
         .map(([key, items]) => {
           const [wId, dCode] = key.split('-');
           const weekIdx = academicWeeks.findIndex(w => String(w.id) === String(wId));
           const dayVal = dayOrder[dCode] || 99;
           const sortVal = (weekIdx !== -1 ? weekIdx * 10 : 999) + dayVal;
-          
           return {
             sortVal,
             dayCode: dCode,
@@ -608,119 +621,56 @@ export function PortalView({
         .sort((a,b) => a.sortVal - b.sortVal);
     };
 
-    // 1. Atual (Lógica de "Agora": Esconder passado, transição no penúltimo dia)
-    const now = new Date();
-    const todayIdx = now.getDay(); // 0 (Dom) a 6 (Sab)
-    
-    // 0. Identificar a semana REAL de hoje (sem influência do seletor global)
-    const nowRef = new Date();
-    const refDate = new Date(nowRef);
-    if (nowRef.getDay() === 6) refDate.setDate(refDate.getDate() + 2);
-    else if (nowRef.getDay() === 0) refDate.setDate(refDate.getDate() + 1);
-    refDate.setHours(0,0,0,0);
-
-    const actualCurrentWeek = academicWeeks.find(w => {
-        // Usamos splits para garantir que pegamos apenas a data YYYY-MM-DD e evitamos ruído de T00...
-        const startStr = String(w.start_date || '').split('T')[0];
-        const endStr = String(w.end_date || '').split('T')[0];
-        if (!startStr || !endStr) return false;
-
-        const s = new Date(startStr + 'T00:00:00'); 
-        const e = new Date(endStr + 'T23:59:59');
-        return refDate >= s && refDate <= e;
-     });
-    const actualCurrentWeekId = actualCurrentWeek ? String(actualCurrentWeek.id) : null;
-    
     const actualCurrentWeekIdx = academicWeeks.findIndex(w => String(w.id) === String(actualCurrentWeekId || ''));
     const nextWeekId = (actualCurrentWeekIdx !== -1 && actualCurrentWeekIdx < academicWeeks.length - 1)
       ? String(academicWeeks[actualCurrentWeekIdx + 1].id)
       : null;
-    
-    // Fallback: Se não encontrou semana atual por data e selectedWeek está vindo vazio do estado global
     const dashboardBaseWeekId = actualCurrentWeekId || selectedWeek || (academicWeeks.length > 0 ? String(academicWeeks[0].id) : null);
-
-    // Lógica de "Agora": Agrupa a semana atual. Se for Sexta/Sáb/Dom, TAMBÉM inclui a próxima semana.
     const validWeekIds = [dashboardBaseWeekId];
-    if ((todayIdx === 5 || todayIdx === 6 || todayIdx === 0) && nextWeekId) {
+    if ((currentDayIdx === 5 || currentDayIdx === 6 || currentDayIdx === 0) && nextWeekId) {
         validWeekIds.push(nextWeekId);
     }
 
-    // 1. Atual (Minha Turma - filtra as semanas válidas e o SIAPE fixo do usuário logado)
     const rawItemsFiltered = (schedules || []).filter(s => {
       if (!s.teacherId) return false;
       const isCorrectType = s.type === 'oficial' || s.type === 'atual';
       const isCorrectWeek = validWeekIds.includes(String(s.week_id));
       const mySiapeStr = String(siape).trim();
       const teacherIds = String(s.teacherId).split(',').map(id => id.trim());
-      
       return isCorrectType && isCorrectWeek && teacherIds.includes(mySiapeStr);
     });
 
-    // De-duplicação: Preferimos 'atual' sobre 'oficial'
     const dedupMap = new Map();
     rawItemsFiltered.forEach(s => {
-       // BUG FIX: O uso dos nomes de campos originais da tabela 'schedules' no banco (dayOfWeek, slotId, disciplineId) 
-       // é crucial aqui pois estamos operando sobre o array 'schedules' bruto antes do enriquecimento.
        const key = `${s.week_id}-${s.dayOfWeek || s.day}-${s.slotId || s.time}-${s.classId || s.className}-${s.disciplineId || s.subject}`;
        if (!dedupMap.has(key) || s.type === 'atual') {
            dedupMap.set(key, s);
        }
     });
 
-    // 3. Vagas (Opcional, se precisar mostrar no dashboard as salas/horários vagos dele)
-    // No momento, o resumo do docente foca no que ele TEM de aula.
-    
-    // Filtro de Dias Passados
-    const diaHoje = refDate.getDate();
-    const mesHoje = refDate.getMonth();
-    const anoHoje = refDate.getFullYear();
-    
-    const isToday = (dStr) => {
-        if (!dStr) return false;
-        const parts = dStr.split('/');
-        if (parts.length !== 3) return false;
-        return parseInt(parts[0]) === diaHoje && parseInt(parts[1]) === (mesHoje + 1) && parseInt(parts[2]) === anoHoje;
-    };
-
-    const rawItemsForAtual = Array.from(dedupMap.values())
-      .map(s => enrichScheduleItem(s))
-      .filter(Boolean);
-
-    // Removemos os dias que já passaram da semana ATUAL, para limpar o dashboard
-    // Removemos os dias que já passaram da semana ATUAL, para limpar o dashboard
-    // UPDATE: Se for final de semana (Sáb/Dom), mantemos a visibilidade total para conferência
+    const rawItemsForAtual = Array.from(dedupMap.values()).map(s => enrichScheduleItem(s)).filter(Boolean);
     const atualRaw = rawItemsForAtual.filter(s => {
-       if (String(s.week_id) !== String(dashboardBaseWeekId)) return true; // Mostra tudo da próxima semana
+       if (String(s.week_id) !== String(dashboardBaseWeekId)) return true;
        const dayOrderMap = { "seg": 1, "ter": 2, "qua": 3, "qui": 4, "sex": 5, "sab": 6, "dom": 0 };
        const sDayCode = shortDayMap[s.day] || s.day;
        const sDayIdx = dayOrderMap[sDayCode];
-       
-       // Sábado e Domingo liberam a visualização da semana inteira que passou/está acabando
-       if (todayIdx === 0 || todayIdx === 6) return true; 
-       
-       return sDayIdx >= todayIdx; // Oculta dias passados de segunda a sexta
+       if (currentDayIdx === 0 || currentDayIdx === 6) return true; 
+       return sDayIdx >= currentDayIdx;
     });
     const atual = groupByDay(atualRaw);
 
-    // 2. Prévia (Exibe sempre o planejamento da SEMANA SEGUINTE à selecionada no dashboard)
-    const currentWeekIdx = academicWeeks.findIndex(w => String(w.id) === String(dashboardBaseWeekId));
-    const targetPreviewWeekId = academicWeeks[currentWeekIdx + 1]?.id || dashboardBaseWeekId;
-
+    const targetPreviewWeekId = nextWeekId || dashboardBaseWeekId;
     const previaRaw = targetPreviewWeekId ? (schedules || []).filter(s => 
       s.type === 'previa' && 
       s.teacherId && String(s.teacherId).split(',').includes(String(siape)) && 
       String(s.week_id) === String(targetPreviewWeekId)
     ).map(s => enrichScheduleItem(s)).filter(Boolean) : [];
-
     const previa = groupByDay(previaRaw, targetPreviewWeekId);
 
-    // 3. Vagas (Busca todas as vagas das turmas que este professor atende - Independente de filtros externos)
-    // Precisamos de uma lista de 'classIds' que o professor realmente atende na produção
     const myProdClasses = new Set((schedules || [])
       .filter(s => s.classId && (s.type === 'oficial' || s.type === 'atual') && String(s.teacherId).split(',').includes(String(siape)))
       .map(s => String(s.classId))
     );
-
     const rawVagasFiltered = (schedules || [])
       .filter(s => 
         s.classId && 
@@ -729,31 +679,21 @@ export function PortalView({
         (!s.teacherId || s.teacherId === "0000001" || isTeacherPending(s.teacherId)) && 
         myProdClasses.has(String(s.classId))
       );
-    
-    // De-duplicação de Vagas (evitar oficial/atual no mesmo slot de vaga)
     const dedupVagas = new Map();
     rawVagasFiltered.forEach(s => {
        const key = `${s.week_id}-${s.dayOfWeek || s.day}-${s.slotId || s.time}-${s.classId || s.className}-${s.disciplineId || s.subject}`;
-       if (!dedupVagas.has(key) || s.type === 'atual') {
-           dedupVagas.set(key, s);
-       }
+       if (!dedupVagas.has(key) || s.type === 'atual') dedupVagas.set(key, s);
     });
-
-    const vagasRaw = Array.from(dedupVagas.values())
-      .map(s => enrichScheduleItem(s))
-      .filter(Boolean);
-
+    const vagasRaw = Array.from(dedupVagas.values()).map(s => enrichScheduleItem(s)).filter(Boolean);
     const vagas = groupByDay(vagasRaw);
 
     return { atual, previa, vagas };
-  }, [siape, schedules, dbClasses, selectedConfigYear, selectedWeek, academicWeeks, matrixDisciplinesMap, disciplinesMeta, subjectHoursMeta, MAP_DAYS, globalTeachers, isTeacherPending]);
+  }, [siape, schedules, dbClasses, selectedConfigYear, selectedWeek, academicWeeks, matrixDisciplinesMap, disciplinesMeta, subjectHoursMeta, MAP_DAYS, globalTeachers, isTeacherPending, currentDayIdx, actualCurrentWeekId]);
 
-   const alunoSummary = React.useMemo(() => {
+  const alunoSummary = React.useMemo(() => {
     if (appMode !== 'aluno' || !selectedClass || !mappedSchedules || !selectedWeek || !academicWeeks || !dbClasses) return { atual: [], previa: [], vagas: [] };
-    
     const targetClassObj = dbClasses.find(c => c.name === selectedClass);
     const classIdRef = targetClassObj ? String(targetClassObj.id) : String(selectedClass);
-    
 
     const getHeaderLabel = (itemDay, weekId) => {
       const dayCode = shortDayMap[itemDay] || itemDay;
@@ -779,66 +719,37 @@ export function PortalView({
         if (!groups[groupKey]) groups[groupKey] = [];
         groups[groupKey].push({ ...item, dayCode: code });
       });
-      return Object.entries(groups)
-        .map(([key, items]) => {
+      return Object.entries(groups).map(([key, items]) => {
           const [wId, dCode] = key.split('-');
           const weekIdx = academicWeeks.findIndex(w => String(w.id) === String(wId));
           const dayVal = dayOrder[dCode] || 99;
           const sortVal = (weekIdx !== -1 ? weekIdx * 10 : 999) + dayVal;
-          
           return {
             sortVal,
             dayCode: dCode,
             dayLabel: getHeaderLabel(dCode, wId),
             items: items.sort((a,b) => a.time.localeCompare(b.time))
           };
-        })
-        .sort((a,b) => a.sortVal - b.sortVal);
+      }).sort((a,b) => a.sortVal - b.sortVal);
     };
 
-    // 0. Identificar a semana REAL de hoje (sem influência do seletor global)
-    const nowRef = new Date();
-    const refDate = new Date(nowRef);
-    if (nowRef.getDay() === 6) refDate.setDate(refDate.getDate() + 2);
-    else if (nowRef.getDay() === 0) refDate.setDate(refDate.getDate() + 1);
-    refDate.setHours(0,0,0,0);
-
-    const actualCurrentWeek = academicWeeks.find(w => {
-        const startStr = String(w.start_date || '').split('T')[0];
-        const endStr = String(w.end_date || '').split('T')[0];
-        if (!startStr || !endStr) return false;
-        const s = new Date(startStr + 'T00:00:00'); 
-        const e = new Date(endStr + 'T23:59:59');
-        return refDate >= s && refDate <= e;
-     });
-    const dashboardBaseWeekId = actualCurrentWeek ? String(actualCurrentWeek.id) : (selectedWeek || (academicWeeks.length > 0 ? String(academicWeeks[0].id) : null));
-
-    // 1. Atual (Minha Turma - oficiais da semana identificada como atual)
+    const dashboardBaseWeekId = selectedWeek || actualCurrentWeekId || (academicWeeks.length > 0 ? String(academicWeeks[0].id) : null);
     const atualRaw = mappedSchedules.filter(s => 
       String(s.classId) === classIdRef &&
       String(s.week || s.week_id || s.academic_week_id) === String(dashboardBaseWeekId)
     );
     const atual = groupByDay(atualRaw, dashboardBaseWeekId);
-
-    // 2. Aulas Vagas (Minha Turma - oficiais sem professor)
-    const vagasRaw = atualRaw.filter(s => 
-      (!s.teacherId || s.teacherId === 'A Definir' || s.teacherId === '')
-    );
+    const vagasRaw = atualRaw.filter(s => (!s.teacherId || s.teacherId === 'A Definir' || s.teacherId === ''));
     const vagas = groupByDay(vagasRaw);
-
-    // 3. Prévia (Minha Turma - Exibe planejamento da SEMANA SEGUINTE à identificada hoje)
     const currentWeekIdx = academicWeeks.findIndex(w => String(w.id) === String(dashboardBaseWeekId));
     const targetPreviewWeekId = academicWeeks[currentWeekIdx + 1]?.id || dashboardBaseWeekId;
-
     const previaRaw = targetPreviewWeekId ? (schedules || []).filter(s => 
-      s.type === 'previa' && 
-      String(s.classId) === classIdRef && 
-      String(s.week_id) === String(targetPreviewWeekId)
+      s.type === 'previa' && String(s.classId) === classIdRef && String(s.week_id) === String(targetPreviewWeekId)
     ).map(s => enrichScheduleItem(s)).filter(Boolean) : [];
     const previa = groupByDay(previaRaw, targetPreviewWeekId);
 
     return { atual, previa, vagas };
-  }, [appMode, selectedClass, mappedSchedules, schedules, selectedWeek, academicWeeks, enrichScheduleItem]);
+  }, [appMode, selectedClass, mappedSchedules, schedules, selectedWeek, academicWeeks, enrichScheduleItem, actualCurrentWeekId]);
 
   const lastAutoSelectContext = React.useRef({ week: null, role: null });
 
@@ -940,6 +851,17 @@ export function PortalView({
 
       return lists.length > 0 ? lists : dynamicClassesList;
     }, [selectedCourse, dbClasses, dbCourses, dynamicClassesList, appMode, showOnlyMyClasses, schedules, siape, mappedSchedules]);
+    
+    // Auto-seleção de turma ao trocar de curso para evitar classes órfãs e agilizar a navegação
+    React.useEffect(() => {
+      if (selectedCourse && selectedCourse !== 'Todos' && filteredClassesList.length > 0) {
+        if (!selectedClass || !filteredClassesList.includes(selectedClass)) {
+          if (typeof setSelectedClass === 'function') {
+            setSelectedClass(filteredClassesList[0]);
+          }
+        }
+      }
+    }, [selectedCourse, filteredClassesList, selectedClass, setSelectedClass]);
 
    const dynamicWeeksList = React.useMemo(() => {
      if (!schedules || !Array.isArray(schedules) || !academicWeeks) return [];
@@ -1292,11 +1214,10 @@ export function PortalView({
                       }
 
                       return filteredByDay.map((grupo, gIdx) => {
-                        const colors = dayColorMap[grupo.dayCode] || { primary: "blue" };
                         const isDayToday = grupo.dayCode === currentDayCode;
                         
                         return (
-                          <div key={grupo.dayCode + gIdx} className="space-y-4">
+                          <div key={grupo.dayCode + gIdx} className="space-y-6">
                             <div className="flex items-center gap-3">
                               <div className={`h-px flex-1 ${isDarkMode ? "bg-slate-800" : "bg-slate-100"}`} />
                               <span className={`text-[10px] font-black uppercase tracking-[0.4em] ${isDarkMode ? "text-slate-500" : "text-slate-400"}`}>
@@ -1305,142 +1226,131 @@ export function PortalView({
                               <div className={`h-px flex-1 ${isDarkMode ? "bg-slate-800" : "bg-slate-100"}`} />
                             </div>
 
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                               {grupo.items.map((aula, idx) => {
-                                 const isTarget = (() => {
-                                   if (dashboardTab !== "atual") return false;
-                                   
-                                   // Regra: Se a próxima for igual à destacada, também destaca
-                                   if (firstFutureFound && highlightedSubject && (String(aula.subject) === String(highlightedSubject))) {
-                                      return true;
+                            <div className="space-y-8 pb-10">
+                               {(() => {
+                                 const turnos = { "Matutino": [], "Vespertino": [], "Noturno": [] };
+                                 grupo.items.forEach(aula => {
+                                   const startHour = parseInt(String(aula.time).split(":")[0]);
+                                   if (!isNaN(startHour)) {
+                                     if (startHour < 12) turnos["Matutino"].push(aula);
+                                     else if (startHour < 18) turnos["Vespertino"].push(aula);
+                                     else turnos["Noturno"].push(aula);
+                                   } else {
+                                     turnos["Matutino"].push(aula);
                                    }
+                                 });
 
-                                   if (!firstFutureFound) {
-                                     const parts = String(aula.time).split("-");
-                                     if (parts.length === 2) {
-                                       const endParts = parts[1].trim().split(":");
-                                       const endVal = parseInt(endParts[0]) * 60 + parseInt(endParts[1]);
-                                       if (grupo.dayCode === currentDayCode) {
-                                         if (currentTimeVal < endVal) { 
-                                           firstFutureFound = true; 
-                                           highlightedSubject = aula.subject;
-                                           return true; 
-                                         }
-                                       } else {
-                                          const dayOrderMap = { "seg": 1, "ter": 2, "qua": 3, "qui": 4, "sex": 5, "sab": 6, "dom": 0 };
-                                          const itemDayIdx = dayOrderMap[grupo.dayCode];
-                                          if (itemDayIdx > currentDayIdx || (currentDayIdx === 6 && itemDayIdx === 1)) {
-                                             firstFutureFound = true; 
-                                             highlightedSubject = aula.subject;
-                                             return true;
-                                          }
-                                       }
-                                     }
-                                   }
-                                   return false;
-                                 })();
-                                 
-                                 const isVaga = isTeacherPending(aula.teacher);
-                                 // DEFINIÇÃO DE ESTILOS NEON-GLASS (Fase 3)
-                                 let containerClasses = "glass-card transition-all duration-500 hover:scale-[1.02] border-transparent";
-                                 let timeColor = isDarkMode ? "text-emerald-400" : "text-emerald-700";
-                                 let badgeClasses = isDarkMode ? "bg-slate-900/60 text-slate-400 border-slate-800" : "bg-white/60 text-slate-800 border-slate-100";
-                                 let glowClass = isDarkMode ? "inner-glow-emerald" : "";
-                                 
-                                 if (isVaga) {
-                                    containerClasses = "glass-card neon-border-pulsing scale-[1.03] inner-glow-rose border-rose-500/30";
-                                    timeColor = "text-rose-500 dark:text-rose-400";
-                                    badgeClasses = "bg-rose-600 text-white shadow-lg shadow-rose-500/30 border-rose-400";
-                                    glowClass = "inner-glow-rose";
-                                 } else if (isTarget) {
-                                    containerClasses = "glass-card scale-[1.03] inner-glow-emerald border-emerald-500/40 shadow-emerald-500/10";
-                                    timeColor = "text-emerald-500 dark:text-emerald-400";
-                                    badgeClasses = "bg-emerald-600 text-white shadow-lg shadow-emerald-500/30 border-emerald-400";
-                                    glowClass = "inner-glow-emerald";
-                                 }
-
-                                 return (
-                                   <div 
-                                     key={aula.id || idx} 
-                                     className={`group/item relative flex items-center justify-between p-5 rounded-[2rem] border transition-all duration-500 m-1.5 ${containerClasses} ${isVaga && appMode === 'professor' && dashboardTab === 'vagas' ? 'cursor-pointer hover:scale-[1.02]' : ''}`}
-                                     onClick={() => {
-                                       if (appMode === 'professor' && dashboardTab === 'vagas' && isVaga) {
-                                           // Verifica restrição de turma
-                                           if (userRole !== 'admin' && userRole !== 'gestao' && profClassesMemo && !profClassesMemo.has(String(aula.className))) {
-                                               alert("Você só pode assumir vagas em turmas onde você já leciona ao menos uma disciplina.");
-                                               return;
-                                           }
-                                           setVacantRequestModal({
-                                               className: aula.className,
-                                               day: aula.day,
-                                               time: aula.time,
-                                               classId: aula.classId,
-                                               disciplineId: aula.disciplineId,
-                                               subject: aula.subject
-                                           });
-                                       }
-                                     }}
-                                   >
-                                     <div className="flex flex-col">
-                                       <span className={`text-[13px] font-black tracking-tighter ${timeColor}`}>
-                                         {aula.time}
-                                       </span>
-                                       {(() => {
-                                         const subjectColorMap = {
-                                           0: "text-blue-500 dark:text-blue-400",
-                                           1: "text-emerald-500 dark:text-emerald-400",
-                                           2: "text-indigo-500 dark:text-indigo-400",
-                                           3: "text-rose-500 dark:text-rose-400",
-                                           4: "text-amber-500 dark:text-amber-400",
-                                           5: "text-sky-500 dark:text-sky-400"
-                                          };
-                                          const hash = aula.subject ? aula.subject.split("").reduce((acc, char) => acc + char.charCodeAt(0), 0) : 0;
-                                          const colorClass = subjectColorMap[hash % 6] || "text-slate-500";
-                                          const colorBg = colorClass.replace('text-', 'bg-');
-
-                                          return (
-                                            <div className="flex flex-col gap-1">
-                                              <span className={`text-[10px] font-bold uppercase tracking-widest leading-tight transition-colors duration-500 ${isTarget ? "text-blue-600 dark:text-blue-400" : colorClass}`}>
-                                                {aula.subject || "Horário Agendado"}
-                                              </span>
-                                              
-                                              {/* LABELS DE TIPO / STATUS */}
-                                              <div className="flex flex-wrap gap-1">
-                                                {isVaga && <span className="px-2 py-0.5 rounded-md text-[7px] font-black bg-rose-600 text-white uppercase tracking-tighter">Aula Vaga</span>}
-                                                {aula.isSubstituted && <span className="px-2 py-0.5 rounded-md text-[7px] font-black bg-indigo-600 text-white uppercase tracking-tighter">Substituição</span>}
-                                                {aula.isSwap && <span className="px-2 py-0.5 rounded-md text-[7px] font-black bg-emerald-600 text-white uppercase tracking-tighter">Permuta</span>}
-                                                {aula.classType && !['regular', 'normal', ''].includes(String(aula.classType).toLowerCase().trim()) && (
-                                                  <span className="px-2 py-0.5 rounded-md text-[7px] font-black bg-amber-500 text-white uppercase tracking-tighter">
-                                                    {String(aula.classType).toLowerCase().trim() === 'atendimento' ? 'Atendimento ao Aluno' : aula.classType}
-                                                  </span>
-                                                )}
-                                              </div>
-                                            </div>
-                                          );
-                                        })()}
+                                 return Object.entries(turnos).filter(([_, aulas]) => aulas.length > 0).map(([nomeTurno, aulasTurno], tIdx) => (
+                                   <div key={nomeTurno} className="space-y-4">
+                                      <div className="flex items-center gap-2 px-2">
+                                        <div className={`w-1.5 h-1.5 rounded-full ${nomeTurno === 'Matutino' ? 'bg-amber-400 shadow-[0_0_8px_rgba(251,191,36,0.5)]' : nomeTurno === 'Vespertino' ? 'bg-orange-500 shadow-[0_0_8px_rgba(249,115,22,0.5)]' : 'bg-indigo-500 shadow-[0_0_8px_rgba(99,102,241,0.5)]'}`} />
+                                        <span className={`text-[10px] font-black uppercase tracking-widest ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>{nomeTurno}</span>
                                       </div>
+                                      
+                                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                         {aulasTurno.map((aula, idx) => {
+                                           const { isTarget, isPast } = (() => {
+                                             if (dashboardTab !== "atual") return { isTarget: false, isPast: false };
+                                             const dayOrderMap = { "seg": 1, "ter": 2, "qua": 3, "qui": 4, "sex": 5, "sab": 6, "dom": 0 };
+                                             const itemDayIdx = dayOrderMap[grupo.dayCode];
+                                             const parts = String(aula.time).split("-");
+                                             if (parts.length !== 2) return { isTarget: false, isPast: false };
+                                             
+                                             const startParts = parts[0].trim().split(":");
+                                             const endParts = parts[1].trim().split(":");
+                                             const startVal = parseInt(startParts[0]) * 60 + parseInt(startParts[1]);
+                                             const endVal = parseInt(endParts[0]) * 60 + parseInt(endParts[1]);
 
-                                      <div className="flex flex-col items-end">
-                                        <div className="flex items-center gap-2">
-                                          {(() => {
-                                            const hash = aula.subject ? aula.subject.split("").reduce((acc, char) => acc + char.charCodeAt(0), 0) : 0;
-                                            const colorClass = (isTarget || isVaga) ? "" : ({0:"text-blue-500 dark:text-blue-400", 1:"text-emerald-500 dark:text-emerald-400", 2:"text-indigo-500 dark:text-indigo-400", 3:"text-rose-500 dark:text-rose-400", 4:"text-amber-500 dark:text-amber-400", 5:"text-sky-500 dark:text-sky-400"}[hash % 6] || "text-slate-500");
-                                            const colorBg = colorClass ? colorClass.replace('text-', 'bg-') : (isTarget ? "bg-blue-500" : (isVaga ? "bg-orange-500" : (isDarkMode ? "bg-slate-400" : "bg-slate-500")));
-                                            
-                                            return (
-                                              <>
-                                                <div className={`w-1.5 h-1.5 rounded-full ${colorBg}`} />
-                                                <span className={`px-4 py-2 rounded-2xl text-[9px] font-black uppercase tracking-widest border transition-all ${badgeClasses} ${colorClass}`}>
-                                                  {appMode === "aluno" ? (aula.teacher || "A Definir") : (aula.className)}
-                                                </span>
-                                              </>
-                                            );
-                                          })()}
-                                        </div>
+                                             const weekIdx = academicWeeks.findIndex(w => String(w.id) === String(grupo.weekId || selectedWeek));
+                                             const curWeekIdx = academicWeeks.findIndex(w => String(w.id) === String(actualCurrentWeekId));
+
+                                             if (weekIdx < curWeekIdx) return { isTarget: false, isPast: true };
+                                             if (weekIdx > curWeekIdx) return { isTarget: false, isPast: false };
+                                             if (itemDayIdx < currentDayIdx) return { isTarget: false, isPast: true };
+                                             if (itemDayIdx > currentDayIdx) return { isTarget: false, isPast: false };
+                                             return { isTarget: currentTimeVal >= startVal && currentTimeVal <= endVal, isPast: currentTimeVal > endVal };
+                                           })();
+                                           
+                                           const isVaga = isTeacherPending(aula.teacher);
+                                           let containerClasses = `glass-card transition-all duration-500 hover:scale-[1.02] border-transparent ${isPast ? "opacity-40 grayscale-[0.4]" : ""}`;
+                                           let timeColor = isDarkMode ? "text-emerald-400" : "text-emerald-700";
+                                           let badgeClasses = isDarkMode ? "bg-slate-900/60 text-slate-400 border-slate-800" : "bg-white/60 text-slate-800 border-slate-100";
+                                           
+                                           if (isVaga) {
+                                              containerClasses = `glass-card neon-border-pulsing scale-[1.03] inner-glow-rose border-rose-500/30 ${isPast ? "opacity-40" : ""}`;
+                                              timeColor = "text-rose-500 dark:text-rose-400";
+                                              badgeClasses = "bg-rose-600 text-white shadow-lg shadow-rose-500/30 border-rose-400";
+                                           } else if (isTarget) {
+                                              containerClasses = "glass-card scale-[1.03] inner-glow-emerald border-emerald-500/40 shadow-emerald-500/10";
+                                              timeColor = "text-emerald-500 dark:text-emerald-400";
+                                              badgeClasses = "bg-emerald-600 text-white shadow-lg shadow-emerald-500/30 border-emerald-400";
+                                           }
+
+                                           return (
+                                              <div 
+                                                key={aula.id || idx} 
+                                                className={`group/item relative flex items-center justify-between p-5 rounded-[2rem] border transition-all duration-500 m-1 ${containerClasses} ${isVaga && appMode === 'professor' && dashboardTab === 'vagas' ? 'cursor-pointer' : ''}`}
+                                                onClick={() => {
+                                                  if (appMode === 'professor' && dashboardTab === 'vagas' && isVaga) {
+                                                      setVacantRequestModal({
+                                                          className: aula.className, day: aula.day, time: aula.time,
+                                                          classId: aula.classId, disciplineId: aula.disciplineId, subject: aula.subject
+                                                      });
+                                                  }
+                                                }}
+                                              >
+                                                <div className="flex flex-col">
+                                                  <span className={`text-[13px] font-black tracking-tighter ${timeColor}`}>
+                                                    {aula.time}
+                                                  </span>
+                                                  {(() => {
+                                                     const subjectColorMap = {
+                                                       0: "text-blue-500 dark:text-blue-400", 1: "text-emerald-500 dark:text-emerald-400",
+                                                       2: "text-indigo-500 dark:text-indigo-400", 3: "text-rose-500 dark:text-rose-400",
+                                                       4: "text-amber-500 dark:text-amber-400", 5: "text-sky-500 dark:text-sky-400"
+                                                     };
+                                                     const hash = aula.subject ? aula.subject.split("").reduce((acc, char) => acc + char.charCodeAt(0), 0) : 0;
+                                                     const colorClass = subjectColorMap[hash % 6] || "text-slate-500";
+                                                     return (
+                                                        <h4 className={`text-sm font-black mt-0.5 leading-tight ${colorClass}`}>
+                                                           {aula.subject}
+                                                        </h4>
+                                                     );
+                                                  })()}
+                                                  <div className="flex items-center gap-2 mt-1.5">
+                                                     <div className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full border text-[9px] font-bold uppercase tracking-wider ${badgeClasses}`}>
+                                                        <Users size={10} />
+                                                        {aula.className}
+                                                     </div>
+                                                     {appMode === 'aluno' && aula.teacher && (
+                                                        <div className={`px-2.5 py-1 rounded-full border text-[9px] font-bold uppercase tracking-wider ${isDarkMode ? 'bg-slate-900/40 border-slate-700 text-slate-400' : 'bg-slate-50 border-slate-100 text-slate-600'}`}>
+                                                           {aula.teacher}
+                                                        </div>
+                                                     )}
+                                                  </div>
+                                                </div>
+                                                <div className="flex flex-col items-end gap-2">
+                                                   {isVaga ? (
+                                                      <div className="w-10 h-10 rounded-2xl bg-rose-500 flex items-center justify-center text-white animate-pulse shadow-lg shadow-rose-500/40">
+                                                         <AlertTriangle size={18} />
+                                                      </div>
+                                                   ) : isTarget ? (
+                                                      <div className="w-10 h-10 rounded-2xl bg-emerald-500 flex items-center justify-center text-white shadow-lg shadow-emerald-500/40 animate-bounce">
+                                                         <Clock size={18} />
+                                                      </div>
+                                                   ) : (
+                                                      <div className={`w-10 h-10 rounded-2xl flex items-center justify-center transition-all duration-500 ${isDarkMode ? 'bg-slate-800 text-slate-600 group-hover/item:bg-emerald-500/20 group-hover/item:text-emerald-400' : 'bg-slate-100 text-slate-400 group-hover/item:bg-emerald-50 group-hover/item:text-emerald-600'}`}>
+                                                         <ExternalLink size={16} />
+                                                      </div>
+                                                   )}
+                                                </div>
+                                              </div>
+                                           );
+                                         })}
                                       </div>
                                    </div>
-                                 );
-                               })}
+                                 ));
+                               })()}
                             </div>
                           </div>
                         );

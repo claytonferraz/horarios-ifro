@@ -30,9 +30,9 @@ export function useScheduleFilters({
 
   // Derived dataset: The actual records matching the current week (unless we view default or student where we see everything active)
   const recordsForWeek = useMemo(() => {
-    if (appMode === 'aluno' || scheduleMode === 'padrao') return targetData;
+    if (scheduleMode === 'padrao') return targetData;
     return targetData.filter(r => r.week === selectedWeek);
-  }, [targetData, selectedWeek, appMode, scheduleMode]);
+  }, [targetData, selectedWeek, scheduleMode]);
 
   // Derived courses based on currently selected week's records
   const courses = useMemo(() => {
