@@ -65,6 +65,13 @@ export function useScheduleFilters({
     return daysToUse.filter(day => recordsForWeek.some(r => r.course === selectedCourse && r.day === day));
   }, [viewMode, selectedCourse, recordsForWeek, activeDays]);
 
+  // Reseta a turma selecionada sempre que o curso mudar (e não for 'Todos') para evitar turmas órfãs
+  useEffect(() => {
+    if (selectedCourse && selectedCourse !== 'Todos' && typeof setSelectedClass === 'function') {
+       setSelectedClass('');
+    }
+  }, [selectedCourse, setSelectedClass]);
+
   // Maintain valid class selection automatically (but allow empty classes to remain selected)
   useEffect(() => {
     // No Dashboard não auto-selecionamos turma para manter a visão geral institucional

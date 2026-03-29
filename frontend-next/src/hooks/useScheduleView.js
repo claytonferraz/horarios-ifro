@@ -208,6 +208,37 @@ export function useScheduleView({ appMode, rawData, disabledWeeks, targetData, d
   // ==========================================
   
   useEffect(() => {
+    // AUTO-SELEÇÃO DE SEMANA ATUAL NO CARREGAMENTO INICIAL
+    if (['professor', 'aluno', 'admin'].includes(appMode) && !selectedWeek && academicWeeks && academicWeeks.length > 0) {
+      const today = new Date();
+      
+      // 1. Tenta encontrar a semana que contém a data de hoje
+      const currentWeekObj = academicWeeks.find(week => {
+        if (!week.start_date || !week.end_date) return false;
+        const start = new Date(week.start_date + 'T00:00:00');
+        const end = new Date(week.end_date + 'T23:59:59');
+        return today >= start && today <= end;
+      });
+
+      if (currentWeekObj) {
+        setSelectedWeek(String(currentWeekObj.id));
+      } else {
+        // 2. Se hoje não é dia letivo, tenta a semana futura mais próxima
+        const futureWeeks = [...academicWeeks]
+          .filter(w => w.start_date && new Date(w.start_date + 'T00:00:00') > today)
+          .sort((a, b) => new Date(a.start_date) - new Date(b.start_date));
+        
+        if (futureWeeks.length > 0) {
+          setSelectedWeek(String(futureWeeks[0].id));
+        } else {
+          // 3. Fallback final: seleciona a primeira semana cadastrada
+          setSelectedWeek(String(academicWeeks[0].id));
+        }
+      }
+    }
+  }, [academicWeeks, selectedWeek, appMode]);
+
+  useEffect(() => {
     if (appMode === 'professor' && siape && !selectedTeacher) {
       setSelectedTeacher(String(siape));
     }

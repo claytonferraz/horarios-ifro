@@ -8,6 +8,21 @@ import { SearchableSelect } from '../SearchableSelect';
 import { useScheduleRules } from '@/hooks/useScheduleRules';
 import { validateMove } from '@/services/rulesEngine';
 
+const focusStyles = `
+  @keyframes highlight-pulse-DAPE {
+    0% { transform: scale(1); box-shadow: 0 0 0 0 rgba(244, 63, 94, 0.7); ring: 0px; }
+    50% { transform: scale(1.03); box-shadow: 0 0 0 10px rgba(244, 63, 94, 0); ring: 4px; }
+    100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(244, 63, 94, 0); ring: 0px; }
+  }
+  .highlight-conflict-card {
+    animation: highlight-pulse-DAPE 1.5s cubic-bezier(0.4, 0, 0.2, 1) infinite !important;
+    z-index: 100 !important;
+    position: relative !important;
+    outline: 3px solid #f43f5e !important;
+    outline-offset: 2px !important;
+  }
+`;
+
 const getCardStyle = (courseId, classId, subjectName, isDarkMode) => {
     const strToNum = (str) => {
         let hash = 0;
@@ -136,6 +151,13 @@ const GridCell = React.memo(({
 });
 
 export function MasterGrid({ isDarkMode, ...props }) {
+  useEffect(() => {
+    const styleTag = document.createElement('style');
+    styleTag.textContent = focusStyles;
+    document.head.appendChild(styleTag);
+    return () => document.head.removeChild(styleTag);
+  }, []);
+
   const { globalTeachers: globalTeachersList, activeDays, classTimes, academicWeeks, selectedConfigYear, setSelectedConfigYear, academicYearsMeta, exchangeRequests } = useData();
 
 
@@ -618,11 +640,21 @@ export function MasterGrid({ isDarkMode, ...props }) {
       }
     }
 
-    // 2. Verifica no banco global (outros cursos)
+    // 2. Verifica no banco global (outros cursos) respeitando o CONTEXTO (Ano, Tipo, Semana)
     const relRows = schedules?.filter(s => {
        const dbD = isNaN(s.dayOfWeek) ? String(s.dayOfWeek) : String(MAP_DAYS[s.dayOfWeek]);
-       return dbD === String(diaId) && s.slotId === hora && String(s.classId) !== String(currentClassId);
+       const sameYear = String(s.academic_year) === String(selectedConfigYear);
+       const sameType = s.type === selectedType;
+       const sameWeek = (selectedType === 'padrao') 
+          ? (String(s.week_id) === String(selectedWeek) || (!s.week_id && selectedWeek === 'V1'))
+          : String(s.week_id) === String(selectedWeek);
+
+       return dbD === String(diaId) && 
+              s.slotId === hora && 
+              String(s.classId) !== String(currentClassId) &&
+              sameYear && sameType && sameWeek;
     }) || [];
+
     for (const row of relRows) {
        for (const tId of teacherIdsArray) {
          if (tId && !isTeacherPending(tId) && row.teacherId && String(row.teacherId).split(',').includes(String(tId))) {
@@ -989,7 +1021,18 @@ export function MasterGrid({ isDarkMode, ...props }) {
              }
              schedules?.forEach(s => {
                  const dbD = isNaN(s.dayOfWeek) ? String(s.dayOfWeek) : String(MAP_DAYS[s.dayOfWeek]);
-                 if (dbD === diaId && s.teacherId && String(s.teacherId).split(',').includes(String(tId))) profSlots.add(s.slotId);
+                 const sameYear = String(s.academic_year) === String(selectedConfigYear);
+                 const sameType = s.type === selectedType;
+                 const sameWeek = (selectedType === 'padrao') 
+                    ? (String(s.week_id) === String(selectedWeek) || (!s.week_id && selectedWeek === 'V1'))
+                    : String(s.week_id) === String(selectedWeek);
+
+                 if (dbD === diaId && 
+                     s.teacherId && 
+                     String(s.teacherId).split(',').includes(String(tId)) &&
+                     sameYear && sameType && sameWeek) {
+                    profSlots.add(s.slotId);
+                 }
              });
 
              let m = false; let t = false; let n = false;
@@ -1556,7 +1599,7 @@ export function MasterGrid({ isDarkMode, ...props }) {
                           
                           return (
                             <GridCell
-                              id={`slot-${diaId}-${hora}`}
+                              id={`slot-${turma.id}-${diaId}-${hora}`}
                               key={slotKey}
                               slotKey={slotKey}
                               turmaId={turma.id}
@@ -1645,29 +1688,42 @@ export function MasterGrid({ isDarkMode, ...props }) {
                                  // 1. Identifica turmas a exibir
                                  const involved = [pendingDrop.aula.className, log.context.clashWith].filter(Boolean);
                                  if (involved.length > 0) {
-                                    // Filtra os IDs das turmas
-                                    const ids = turmasDoCurso.filter(t => involved.includes(t.name)).map(t => t.id);
-                                    if (ids.length > 0) {
-                                       setSelectedCourses(prev => {
-                                          const base = [...prev];
-                                          ids.forEach(id => { if (!base.includes(id)) base.push(id); });
-                                          return base;
-                                       });
-                                       setHiddenClasses(prev => prev.filter(id => !ids.includes(id)));
+                                    // 1. Mapeia nomes para objetos reais do banco para pegar CourseId e ClassId
+                                    const involvedObjs = classesList.filter(c => involved.includes(c.name));
+                                    const involvedCourseIds = Array.from(new Set(involvedObjs.map(c => String(c.courseId))));
+                                    const involvedClassIds = involvedObjs.map(c => String(c.id));
+
+                                    if (involvedCourseIds.length > 0) {
+                                       // Define os cursos envolvidos no filtro global
+                                       setSelectedCourses(involvedCourseIds);
+                                       
+                                       // Oculta todas as turmas desses cursos, exceto as que causaram o conflito
+                                       const otherClassIds = classesList
+                                          .filter(c => involvedCourseIds.includes(String(c.courseId)) && !involvedClassIds.includes(String(c.id)))
+                                          .map(c => String(c.id));
+                                          
+                                       setHiddenClasses(otherClassIds);
+
+                                       // 2. Scroll e Destaque Animado para os slots envolvidos
+                                       setTimeout(() => {
+                                          const dayNorm = log.context.day;
+                                          const timeNorm = log.context.time;
+                                          
+                                          involvedClassIds.forEach(tId => {
+                                             const elementId = `slot-${tId}-${dayNorm}-${timeNorm}`;
+                                             const element = document.getElementById(elementId);
+                                             if (element) {
+                                                element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                                                const card = element.querySelector('.glass-card');
+                                                if (card) {
+                                                   card.classList.add('highlight-conflict-card');
+                                                   setTimeout(() => card.classList.remove('highlight-conflict-card'), 5000);
+                                                }
+                                             }
+                                          });
+                                       }, 400);
                                     }
                                  }
-
-                                 // 2. Scroll para o slot
-                                 setTimeout(() => {
-                                    const dayNorm = log.context.day;
-                                    const timeNorm = log.context.time;
-                                    const element = document.getElementById(`slot-${dayNorm}-${timeNorm}`);
-                                    if (element) {
-                                       element.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                                       element.classList.add('ring-4', 'ring-rose-500', 'ring-offset-2');
-                                       setTimeout(() => element.classList.remove('ring-4', 'ring-rose-500', 'ring-offset-2'), 4000);
-                                    }
-                                 }, 300);
 
                                  setPendingDrop(null); // Fecha o modal para ver o foco
                               }
@@ -1716,8 +1772,23 @@ export function MasterGrid({ isDarkMode, ...props }) {
            saveOptions={saveOptions} setSaveOptions={setSaveOptions} 
            academicWeeks={academicWeeks} schedules={schedules} selectedConfigYear={selectedConfigYear}
            loadedType={selectedType} loadedWeek={selectedWeek} 
+           setSelectedType={setSelectedType} setSelectedWeek={setSelectedWeek}
            onClose={() => setModalMode(null)} 
-           onSuccess={() => { setModalMode(null); setSystemDialog({ isOpen: true, type: 'alert', title: 'Sucesso!', message: 'Grade armazenada com sucesso no banco de dados.' }); setRefreshTrigger(prev => prev + 1); }} 
+           onSuccess={(savedType, savedWeek) => { 
+              setModalMode(null); 
+              setSystemDialog({ isOpen: true, type: 'alert', title: 'Sucesso!', message: 'Grade armazenada com sucesso no banco de dados.' }); 
+              
+              // 1. Limpa grade local para forçar recarga limpa do banco
+              setGrade({});
+              setOriginalGrade({});
+              
+              // 2. Sincroniza seletores da UI para o que foi salvo
+              if (savedType) setSelectedType(savedType);
+              if (savedWeek) setSelectedWeek(savedWeek);
+              
+              // 3. Trigger de recarga
+              setRefreshTrigger(prev => prev + 1); 
+           }} 
            setSystemDialog={setSystemDialog}
          />
       )}
@@ -1781,65 +1852,7 @@ export function MasterGrid({ isDarkMode, ...props }) {
         </div>
       )}
 
-      {dashboardAlerts.list.length > 0 && (
-         <div className={`fixed bottom-4 left-4 sm:bottom-6 sm:left-6 z-[9990] flex flex-col items-start gap-2 max-w-[90vw] sm:max-w-sm transition-all duration-300 pointer-events-none print:hidden`}>
-            {!isAlertsMinimized ? (
-               <div className={`w-full rounded-2xl shadow-2xl border overflow-hidden flex flex-col pointer-events-auto animate-in slide-in-from-bottom-5 fade-in ${isDarkMode ? 'bg-slate-900 border-slate-700' : 'bg-white border-slate-300'}`}>
-                  <div className={`p-3 border-b flex justify-between items-center ${isDarkMode ? 'bg-red-950/40 border-slate-800' : 'bg-red-50 border-slate-100'}`}>
-                     <div className="flex flex-col gap-0.5">
-                        <span className={`text-[11px] font-black uppercase tracking-widest flex items-center gap-1.5 ${isDarkMode ? 'text-red-400' : 'text-red-600'}`}>
-                           <AlertTriangle size={14} className="animate-pulse shrink-0" /> Choques Operacionais ({dashboardAlerts.list.length})
-                        </span>
-                        <span className="text-[9px] font-bold text-slate-500 uppercase tracking-widest">Alerta em Tempo Real</span>
-                     </div>
-                     <button onClick={() => setIsAlertsMinimized(true)} className={`p-1.5 rounded transition-colors self-start shrink-0 ${isDarkMode ? 'text-slate-400 hover:bg-slate-800 hover:text-white' : 'text-slate-500 hover:bg-slate-200 hover:text-black'}`}>
-                        <X size={16} />
-                     </button>
-                  </div>
-                  <div className="p-3 max-h-[30vh] sm:max-h-[40vh] overflow-y-auto w-full">
-                     <ul className="flex flex-col gap-2">
-                        {dashboardAlerts.list.map((msg, i) => (
-                           <li 
-                              key={i} 
-                              onClick={() => {
-                                 const item = dashboardAlerts.list[i];
-                                 if (item && item.context) {
-                                    const involved = item.context.involved || [];
-                                    const ids = turmasDoCurso.filter(t => involved.includes(t.name)).map(t => t.id);
-                                    if (ids.length > 0) {
-                                       setSelectedCourses(prev => {
-                                          const base = [...prev];
-                                          ids.forEach(id => { if (!base.includes(id)) base.push(id); });
-                                          return base;
-                                       });
-                                       setHiddenClasses(prev => prev.filter(id => !ids.includes(id)));
-                                    }
-                                    setTimeout(() => {
-                                       const element = document.getElementById(`slot-${item.context.day}-${item.context.time}`);
-                                       if (element) {
-                                          element.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                                          element.classList.add('ring-4', 'ring-rose-500', 'ring-offset-2');
-                                          setTimeout(() => element.classList.remove('ring-4', 'ring-rose-500', 'ring-offset-2'), 4000);
-                                       }
-                                    }, 300);
-                                    setIsAlertsMinimized(true);
-                                 }
-                              }}
-                              className={`text-[10px] font-bold flex items-start gap-2 p-2 rounded-lg cursor-pointer hover:ring-1 hover:ring-red-500/50 transition-all ${isDarkMode ? 'bg-red-900/20 text-red-300/80 border border-red-500/10' : 'bg-red-50 text-red-800/80 border border-red-200/50 shadow-sm'}`}
-                           >
-                              <span className="mt-0.5 shrink-0">•</span> <span>{msg.msg || msg}</span>
-                           </li>
-                        ))}
-                     </ul>
-                  </div>
-               </div>
-            ) : (
-               <button onClick={() => setIsAlertsMinimized(false)} className={`pointer-events-auto flex items-center gap-2 px-4 py-2.5 rounded-full shadow-lg border backdrop-blur-md transition-all hover:scale-105 active:scale-95 animate-in zoom-in duration-300 ${isDarkMode ? 'bg-red-950/90 border-red-800/50 text-red-400' : 'bg-white border-red-200 text-red-600'}`}>
-                  <AlertTriangle size={16} className="animate-pulse shrink-0" /> <span className="text-[10px] font-black uppercase tracking-widest">{dashboardAlerts.list.length} Choque(s) Ativo(s)</span>
-               </button>
-            )}
-         </div>
-      )}
+      {/* APENAS O WIDGET DA DIREITA ABAIXO */}
 
       {isRightPanelOpen && <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-[9998] print:hidden" onClick={() => setIsRightPanelOpen(false)} />}
       <div className={`fixed top-0 right-0 h-full w-full sm:w-[400px] shadow-2xl z-[9999] transition-transform transform duration-300 flex flex-col print:hidden ${isRightPanelOpen ? 'translate-x-0' : 'translate-x-full'} ${isDarkMode ? 'bg-slate-900 border-l border-slate-700' : 'bg-slate-50 border-l border-slate-300'}`}>
@@ -1872,24 +1885,42 @@ export function MasterGrid({ isDarkMode, ...props }) {
                               if (item.context) {
                                  const involved = item.context.involved || [];
                                  if (involved.length > 0) {
-                                    const ids = turmasDoCurso.filter(t => involved.includes(t.name)).map(t => t.id);
-                                    if (ids.length > 0) {
-                                       setSelectedCourses(prev => {
-                                          const base = [...prev];
-                                          ids.forEach(id => { if (!base.includes(id)) base.push(id); });
-                                          return base;
-                                       });
-                                       setHiddenClasses(prev => prev.filter(id => !ids.includes(id)));
+                                    // 1. Mapeia nomes para objetos reais do banco para pegar CourseId e ClassId
+                                    const involvedObjs = classesList.filter(c => involved.includes(c.name));
+                                    const involvedCourseIds = Array.from(new Set(involvedObjs.map(c => String(c.courseId))));
+                                    const involvedClassIds = involvedObjs.map(c => String(c.id));
+
+                                    if (involvedCourseIds.length > 0) {
+                                       // Define os cursos envolvidos no filtro global
+                                       setSelectedCourses(involvedCourseIds);
+                                       
+                                       // Oculta todas as turmas desses cursos, exceto as que causaram o conflito
+                                       const otherClassIds = classesList
+                                          .filter(c => involvedCourseIds.includes(String(c.courseId)) && !involvedClassIds.includes(String(c.id)))
+                                          .map(c => String(c.id));
+                                          
+                                       setHiddenClasses(otherClassIds);
+
+                                       // 2. Scroll e Destaque Animado (Moved inside scope)
+                                       setTimeout(() => {
+                                          const dayNorm = item.context.day;
+                                          const timeNorm = item.context.time;
+                                          
+                                          involvedClassIds.forEach(tId => {
+                                             const elementId = `slot-${tId}-${dayNorm}-${timeNorm}`;
+                                             const element = document.getElementById(elementId);
+                                             if (element) {
+                                                element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                                                const card = element.querySelector('.glass-card');
+                                                if (card) {
+                                                   card.classList.add('highlight-conflict-card');
+                                                   setTimeout(() => card.classList.remove('highlight-conflict-card'), 5000);
+                                                }
+                                             }
+                                          });
+                                       }, 400);
                                     }
                                  }
-                                 setTimeout(() => {
-                                    const element = document.getElementById(`slot-${item.context.day}-${item.context.time}`);
-                                    if (element) {
-                                       element.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                                       element.classList.add('ring-4', 'ring-rose-500', 'ring-offset-2');
-                                       setTimeout(() => element.classList.remove('ring-4', 'ring-rose-500', 'ring-offset-2'), 4000);
-                                    }
-                                 }, 300);
                                  setIsRightPanelOpen(false);
                               }
                            }}
@@ -1943,50 +1974,17 @@ export function MasterGrid({ isDarkMode, ...props }) {
       
       {/* WIDGETS FLUTUANTES (DAPE, etc) */}
       <div className="fixed bottom-6 right-6 z-[90] flex flex-col items-end gap-3 print:hidden">
-         {(!isRequestsWidgetOpen && !isRightPanelOpen) && (
-            <>
-               {isWidgetMenuOpen ? (
-                  <div className={`p-4 rounded-2xl shadow-2xl flex flex-col gap-2 animate-in slide-in-from-bottom-5 ${isDarkMode ? 'bg-slate-800 border border-slate-700' : 'bg-white border border-slate-200'}`}>
-                     <div className="flex justify-between items-center mb-2 border-b pb-2 border-slate-200 dark:border-slate-700">
-                        <span className="font-black text-[10px] uppercase tracking-widest text-slate-500">Central de Avisos</span>
-                        <button onClick={() => setIsWidgetMenuOpen(false)} className="text-slate-400 hover:text-rose-500 font-bold px-2">X</button>
-                     </div>
-                     <button onClick={() => { setIsRequestsWidgetOpen(true); setIsWidgetMenuOpen(false); }} className={`flex items-center justify-between gap-4 px-4 py-3 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all ${isDarkMode ? 'bg-indigo-900/40 text-indigo-300 hover:bg-indigo-600 hover:text-white' : 'bg-indigo-50 text-indigo-700 hover:bg-indigo-600 hover:text-white'}`}>
-                        <span>🔔 DAPE Central de Pedidos</span>
-                        {pendingRequests?.length > 0 && <span className="bg-red-500 text-white rounded-full px-2 py-0.5 text-[10px]">{pendingRequests.length}</span>}
-                     </button>
-                     <button onClick={() => { setIsRightPanelOpen(true); setIsWidgetMenuOpen(false); }} className={`flex items-center justify-between gap-4 px-4 py-3 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all ${isDarkMode ? 'bg-amber-900/40 text-amber-300 hover:bg-amber-500 hover:text-slate-900' : 'bg-amber-50 text-amber-700 hover:bg-amber-500 hover:text-white'}`}>
-                        <span>⚠️ Alertas da Grade {gradeAlertsCount > 0 && `(${gradeAlertsCount})`}</span>
-                        {gradeAlertsCount > 0 && <span className="bg-red-500 text-white rounded-full px-2 py-0.5 text-[10px]">{gradeAlertsCount}</span>}
-                     </button>
-                  </div>
-               ) : (
-                  <button onClick={() => setIsWidgetMenuOpen(true)} className={`p-4 rounded-full text-white shadow-2xl hover:scale-110 transition-all flex items-center justify-center relative border-2 ${isDarkMode ? 'bg-slate-700 border-slate-500' : 'bg-slate-800 border-slate-600'}`}>
-                     <Bell size={24} />
-                     {quickBadgeCount > 0 && (
-                        <span className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full min-w-[20px] h-[20px] flex items-center justify-center text-[10px] font-bold shadow-lg px-1 border-2 border-slate-800">
-                           {quickBadgeCount}
-                        </span>
-                     )}
-                  </button>
+         {!isRightPanelOpen && (
+            <button onClick={() => setIsRightPanelOpen(true)} className={`p-4 rounded-full text-white shadow-2xl hover:scale-110 transition-all flex items-center justify-center relative border-2 ${isDarkMode ? 'bg-slate-700 border-slate-500' : 'bg-slate-800 border-slate-600'}`}>
+               <Bell size={24} />
+               {quickBadgeCount > 0 && (
+                  <span className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full min-w-[20px] h-[20px] flex items-center justify-center text-[10px] font-bold shadow-lg px-1 border-2 border-slate-800">
+                     {quickBadgeCount}
+                  </span>
                )}
-            </>
-         )}
-         
-         {isRequestsWidgetOpen && (
-           <div className="animate-in slide-in-from-bottom-10 z-[100]">
-             <FloatingRequestsWidget 
-               isDarkMode={isDarkMode} 
-               userRole="admin" 
-               appMode="admin" 
-               controlledIsOpen={isRequestsWidgetOpen} 
-               setControlledIsOpen={setIsRequestsWidgetOpen} 
-               hideButton={true} 
-             />
-           </div>
+            </button>
          )}
       </div>
-
     </div>
   );
 }
@@ -1994,7 +1992,7 @@ export function MasterGrid({ isDarkMode, ...props }) {
 // -------------------------------------------------------------
 // SUB-COMPONENTES DE AÇÃO (SALVAR E IMPORTAR)
 // -------------------------------------------------------------
-function SaveMatrixModal({ isDarkMode, grade, selectedCourses, courses, saveOptions, setSaveOptions, academicWeeks, schedules, selectedConfigYear, loadedType, loadedWeek, onClose, onSuccess, setSystemDialog, formatWeekLabel }) {
+function SaveMatrixModal({ isDarkMode, grade, selectedCourses, courses, saveOptions, setSaveOptions, academicWeeks, schedules, selectedConfigYear, loadedType, loadedWeek, setSelectedType, setSelectedWeek, onClose, onSuccess, setSystemDialog, formatWeekLabel }) {
   const [isSaving, setIsSaving] = useState(false);
   const [padraoBaseVersion, setPadraoBaseVersion] = useState('V1');
 
@@ -2082,7 +2080,7 @@ function SaveMatrixModal({ isDarkMode, grade, selectedCourses, courses, saveOpti
             const errData = await resp.json().catch(() => ({}));
             throw new Error(errData.error || 'Erro Crítico desconhecido no Backend!');
         }
-        onSuccess();
+        onSuccess(saveOptions.type, saveOptions.weekId);
     } catch(e) { setSystemDialog({ isOpen: true, type: 'alert', title: 'Falha ao Salvar', message: e.message }); } finally { setIsSaving(false); }
   };
 
