@@ -46,19 +46,40 @@ export const ClassGrid = React.memo(({
       )}
       
       <div className={`rounded-2xl shadow-sm border overflow-hidden animate-in zoom-in-95 duration-500 ${isDarkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'}`}>
-      <div className={`text-white px-6 py-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 no-print ${scheduleMode === 'padrao' ? (isDarkMode ? 'bg-blue-950' : 'bg-blue-900') : scheduleMode === 'previa' ? (isDarkMode ? 'bg-violet-950' : 'bg-violet-900') : (isDarkMode ? 'bg-emerald-950' : 'bg-emerald-800')}`}>
-        <div className="flex items-center gap-2.5">
-          <Users size={18} className="opacity-80" />
-          <h2 className="font-black text-sm uppercase tracking-widest flex items-center gap-2">
-            {scheduleMode === 'padrao' && <span className="bg-white/20 px-1.5 py-0.5 rounded text-[8px]">PADRÃO</span>}
-            {scheduleMode === 'previa' && <span className="bg-white/20 px-1.5 py-0.5 rounded text-[8px]">PRÉVIA</span>}
-            Grade: {selectedClass}
-          </h2>
-          {scheduleMode !== 'padrao' && weekLabel && <span className="text-[9px] font-black bg-white/10 px-3 py-1 rounded-full tracking-widest uppercase shadow-inner ml-2">{weekLabel}</span>}
+      <div className={`relative overflow-hidden px-8 py-6 flex flex-col md:flex-row items-center justify-between gap-6 rounded-[2.5rem] shadow-2xl border transition-all duration-700 no-print backdrop-blur-xl mb-4 ${
+        scheduleMode === 'padrao' 
+          ? (isDarkMode ? 'bg-blue-950/80 border-blue-800/50' : 'bg-blue-900 border-blue-800') 
+          : scheduleMode === 'previa' 
+            ? (isDarkMode ? 'bg-violet-950/80 border-violet-800/50' : 'bg-violet-900 border-violet-800') 
+            : (isDarkMode ? 'bg-emerald-950/80 border-emerald-800/50' : 'bg-emerald-800 border-emerald-700')
+      }`}>
+        <div className="flex items-center gap-5">
+          <div className={`w-14 h-14 rounded-2xl flex items-center justify-center text-white shadow-lg -rotate-3 transition-transform duration-500 hover:rotate-0 ${
+            scheduleMode === 'padrao' ? 'bg-blue-500' : scheduleMode === 'previa' ? 'bg-violet-500' : 'bg-emerald-500'
+          }`}>
+            <Users size={32} />
+          </div>
+          <div>
+            <h2 className="text-xl font-black uppercase tracking-tighter text-white flex items-center gap-2">
+              {scheduleMode === 'padrao' && <span className="bg-white/20 px-2 py-0.5 rounded-lg text-[10px] tracking-widest font-black">PADRÃO</span>}
+              {scheduleMode === 'previa' && <span className="bg-white/20 px-2 py-0.5 rounded-lg text-[10px] tracking-widest font-black">PRÉVIA</span>}
+              Grade: {selectedClass}
+            </h2>
+            <div className="flex items-center gap-2 mt-1">
+               <p className="text-[10px] font-bold text-slate-300 uppercase tracking-widest">{scheduleMode === 'padrao' ? 'Quadro de Horário Permanente' : 'Planejamento de Aulas Semanal'}</p>
+               {scheduleMode !== 'padrao' && weekLabel && (
+                 <span className="text-[9px] font-black bg-white/10 text-white px-3 py-0.5 rounded-full tracking-tighter uppercase border border-white/10">
+                   {weekLabel}
+                 </span>
+               )}
+            </div>
+          </div>
         </div>
         
-        <button onClick={handlePrint} className="hidden md:flex items-center gap-2 bg-white/20 hover:bg-white/30 text-white px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all shadow-sm active:scale-95 no-print">
-          <Printer size={14} /> Imprimir Grade
+        <button onClick={handlePrint} className="group relative flex items-center gap-3 px-6 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all duration-500 bg-white/10 hover:bg-white/20 text-white border border-white/20 active:scale-95 no-print overflow-hidden">
+          <div className="absolute inset-0 bg-white/10 opacity-0 group-hover:opacity-100 transition-opacity" />
+          <Printer size={16} className="relative z-10 transition-transform duration-500 group-hover:scale-110" />
+          <span className="relative z-10">Imprimir Grade</span>
         </button>
       </div>
       

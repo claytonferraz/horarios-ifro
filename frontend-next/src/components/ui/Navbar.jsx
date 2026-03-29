@@ -25,7 +25,7 @@ export function Navbar() {
   const getLinkClass = (path) => {
     const isActive = pathname === path || (path === "/" && pathname === "/");
     
-    const baseStyles = "px-4 py-2 rounded-xl text-[11px] font-black uppercase tracking-widest transition-all duration-300 flex items-center gap-2 relative overflow-hidden group";
+    const baseStyles = "px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all duration-300 flex items-center gap-2 relative overflow-hidden group";
     
     if (isActive) {
       if (isDim) return `${baseStyles} text-white bg-emerald-600 shadow-[0_0_15px_rgba(16,185,129,0.4)]`;
@@ -72,7 +72,7 @@ export function Navbar() {
           </div>
           <div className="hidden sm:block">
             <h1
-              className={`text-lg font-black tracking-tighter leading-none transition-colors duration-500 ${
+              className={`text-[16px] font-black tracking-tighter leading-none transition-colors duration-500 ${
                 isDim ? "text-emerald-50" : isDarkMode ? "text-white" : "text-slate-900"
               }`}
             >

@@ -380,7 +380,7 @@ export function HomeApp({ appMode }) {
                     </div>
                 </div>
                 <AlunoView 
-                    appMode="aluno" isDarkMode={isDarkMode}
+                    appMode="aluno" isDarkMode={isDarkMode} isDim={isDim}
                     userRole={userRole} rawData={rawData} loadAdminMetadata={loadAdminMetadata}
                     intervals={intervals}
                     {...scheduleState}
@@ -412,7 +412,7 @@ export function HomeApp({ appMode }) {
                     )}
                 </div>
                 <ProfessorView 
-                    appMode="professor" isDarkMode={isDarkMode}
+                    appMode="professor" isDarkMode={isDarkMode} isDim={isDim}
                     userRole={userRole} rawData={rawData} loadAdminMetadata={loadAdminMetadata}
                     intervals={intervals}
                     siape={siape}

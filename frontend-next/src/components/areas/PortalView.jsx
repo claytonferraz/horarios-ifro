@@ -1,7 +1,7 @@
 import React, { useState, useTransition } from 'react';
 import { 
   Calendar, UserCircle, Layers, AlertTriangle, BarChart3, ListTodo, CalendarDays, Settings, Bell, Sun, RefreshCcw, HandHeart, X, ExternalLink, Scissors, MapPin, Monitor, Mail, MessageCircle, Activity,
-  BookOpen, FileText, Users, CheckCircle, AlertCircle, XCircle, Eye, Clock, Check, Printer, Home, Globe, Book, Shuffle, ClipboardList, MailSearch, LayoutDashboard, MessageSquare
+  BookOpen, FileText, Users, CheckCircle, AlertCircle, XCircle, Eye, Clock, Check, Printer, Home, Globe, Book, Shuffle, ClipboardList, Search, LayoutDashboard, MessageSquare
 } from 'lucide-react';
 import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd';
 import { SearchableSelect } from '../ui/SearchableSelect';
@@ -31,7 +31,7 @@ const PENDING_REQUEST_STATUSES = new Set([
 ]);
 
 export function PortalView({
-  appMode, isDarkMode, viewMode, setViewMode, scheduleMode, setScheduleMode, userRole, siape,
+  appMode, isDarkMode, isDim, viewMode, setViewMode, scheduleMode, setScheduleMode, userRole, siape,
   selectedCourse, setSelectedCourse, selectedClass, setSelectedClass, selectedTeacher, setSelectedTeacher,
   totalFilterYear, setTotalFilterYear, totalFilterTeacher, setTotalFilterTeacher, totalFilterClass, setTotalFilterClass, totalFilterSubject, setTotalFilterSubject,
   courses, classesList, globalTeachersList, availableYearsForTotal, availableTeachersForTotal, availableClassesForTotal, availableSubjectsForTotal,
@@ -1151,31 +1151,47 @@ export function PortalView({
                        </div>
                      </div>
 
-                     <div className={`flex p-1.5 rounded-2xl gap-1 overflow-x-auto no-scrollbar max-w-full glass-card ${isDarkMode ? "bg-slate-950/40 border-slate-800" : "bg-slate-100 border-slate-200"}`}>
-                           {["atual", "vagas", "previa"].map(tab => {
-                             const tabColors = {
-                               atual: { color: "emerald", icon: Calendar },
-                               vagas: { color: "orange", icon: AlertCircle },
-                               previa: { color: "indigo", icon: Eye }
-                             };
-                             const { color, icon: Icon } = tabColors[tab];
-                             const label = tab === "atual" ? "Atual" : tab === "vagas" ? "Vagas" : "Prévia";
-                             const isActive = dashboardTab === tab;
+                     <div className="flex flex-col sm:flex-row items-center gap-3 w-full sm:w-auto">
+                        <div className={`flex p-1.5 rounded-2xl gap-1 overflow-x-auto no-scrollbar max-w-full glass-card ${isDarkMode ? "bg-slate-950/40 border-slate-800" : "bg-slate-100 border-slate-200"}`}>
+                              {["atual", "vagas", "previa"].map(tab => {
+                                const tabColors = {
+                                  atual: { color: "emerald", icon: Calendar },
+                                  vagas: { color: "orange", icon: AlertCircle },
+                                  previa: { color: "indigo", icon: Eye }
+                                };
+                                const { color, icon: Icon } = tabColors[tab];
+                                const label = tab === "atual" ? "Atual" : tab === "vagas" ? "Aula Vaga" : "Prévia";
+                                const isActive = dashboardTab === tab;
 
-                             return (
-                               <button 
-                                 key={tab}
-                                 onClick={() => setDashboardTab(tab)} 
-                                 className={`group px-4 py-2.5 rounded-xl text-[9px] sm:text-[10px] font-black uppercase tracking-widest transition-all duration-500 whitespace-nowrap flex items-center gap-3 ${isActive ? (isDarkMode ? `bg-${color}-600 text-white shadow-[0_0_20px_rgba(var(--tw-shadow-color),0.4)]` : `bg-${color}-600 text-white shadow-lg`) : (isDarkMode ? `text-slate-400 hover:text-${color}-400 hover:bg-slate-900` : `text-slate-500 hover:text-${color}-600 hover:bg-white`)}`}
-                                 style={{ "--tw-shadow-color": color === 'emerald' ? '16,185,129' : color === 'orange' ? '249,115,22' : '99,102,241' }}
-                               >
-                                 <div className={`w-8 h-8 sm:w-10 sm:h-10 rounded-lg flex items-center justify-center transition-all duration-500 ${isActive ? "bg-white/20 text-white shadow-inner" : (isDarkMode ? `bg-slate-900 text-${color}-400 group-hover:bg-${color}-600 group-hover:text-white` : `bg-${color}-50 text-${color}-600 group-hover:bg-${color}-600 group-hover:text-white shadow-sm`)}`}>
-                                   <Icon size={16} className={`transition-all duration-500 ${isActive ? (tab === 'vagas' ? 'animate-bounce' : 'animate-pulse scale-110') : 'group-hover:scale-110'}`} />
-                                 </div>
-                                 {label}
-                               </button>
-                             );
-                           })}
+                                return (
+                                  <button 
+                                    key={tab}
+                                    onClick={() => setDashboardTab(tab)} 
+                                    className={`group px-4 py-2.5 rounded-xl text-[9px] sm:text-[10px] font-black uppercase tracking-widest transition-all duration-500 whitespace-nowrap flex items-center gap-3 ${isActive ? (isDarkMode ? `bg-${color}-600 text-white shadow-[0_0_20px_rgba(var(--tw-shadow-color),0.4)]` : `bg-${color}-600 text-white shadow-lg`) : (isDarkMode ? `text-slate-400 hover:text-${color}-400 hover:bg-slate-900` : `text-slate-500 hover:text-${color}-600 hover:bg-white`)}`}
+                                    style={{ "--tw-shadow-color": color === 'emerald' ? '16,185,129' : color === 'orange' ? '249,115,22' : '99,102,241' }}
+                                  >
+                                    <div className={`w-8 h-8 sm:w-10 sm:h-10 rounded-lg flex items-center justify-center transition-all duration-500 ${isActive ? "bg-white/20 text-white shadow-inner" : (isDarkMode ? `bg-slate-800 text-${color}-400 group-hover:bg-${color}-500 group-hover:text-white` : `bg-${color}-50 text-${color}-600 group-hover:bg-${color}-600 group-hover:text-white shadow-sm`)}`}>
+                                      <Icon size={16} className={`transition-all duration-500 ${isActive ? (tab === 'vagas' ? 'animate-bounce' : 'animate-pulse scale-110') : 'group-hover:rotate-12 group-hover:scale-110'}`} />
+                                    </div>
+                                    {label}
+                                  </button>
+                                );
+                              })}
+                        </div>
+                        
+                        <button 
+                          onClick={() => {
+                            // Se estiver no dashboard de aluno, muda para vista de turma antes de imprimir para garantir o grid completo, 
+                            // ou chama o handlePrint que se encarrega de saber o que imprimir.
+                            if (typeof handlePrint === 'function') handlePrint();
+                          }}
+                          className={`group flex items-center justify-center gap-2 px-6 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all duration-500 no-print border ${isDarkMode ? 'bg-slate-800 border-slate-700 text-slate-400 hover:text-white hover:bg-slate-700 hover:border-slate-600' : 'bg-white border-slate-200 text-slate-500 hover:bg-slate-50 hover:border-slate-300 shadow-sm'}`}
+                        >
+                          <div className={`w-8 h-8 rounded-lg flex items-center justify-center transition-all duration-500 ${isDarkMode ? 'bg-slate-900 text-slate-400 group-hover:bg-slate-600 group-hover:text-white' : 'bg-slate-100 text-slate-500 group-hover:bg-white group-hover:text-slate-900 shadow-inner'}`}>
+                             <Printer size={16} className="group-hover:rotate-12 group-hover:scale-110 transition-transform duration-500" />
+                          </div>
+                          Imprimir
+                        </button>
                       </div>
                    </div>
 
@@ -2107,7 +2123,7 @@ export function PortalView({
               <div className="flex items-center gap-4">
                  <button className={`group relative flex items-center gap-3 px-6 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all duration-500 bg-indigo-600 text-white shadow-lg shadow-indigo-500/30 scale-[1.05] z-10`}>
                     <div className="w-8 h-8 rounded-xl bg-white/20 flex items-center justify-center transition-all duration-500 group-hover:scale-110">
-                       <MailSearch size={16} />
+                       <Search size={16} />
                     </div>
                     Minhas Mudanças
                     <div className="absolute inset-0 rounded-2xl opacity-0 bg-white/10 group-hover:opacity-100 pointer-events-none transition-opacity" />
