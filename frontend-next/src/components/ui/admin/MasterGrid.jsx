@@ -5,6 +5,8 @@ import { MAP_DAYS, getColorHash, resolveTeacherName, isTeacherPending } from '@/
 import { apiClient, getHeaders } from '@/lib/apiClient';
 import { FloatingRequestsWidget } from './FloatingRequestsWidget';
 import { SearchableSelect } from '../SearchableSelect';
+import { useScheduleRules } from '@/hooks/useScheduleRules';
+import { validateMove } from '@/services/rulesEngine';
 
 const getCardStyle = (courseId, classId, subjectName, isDarkMode) => {
     const strToNum = (str) => {
@@ -141,6 +143,13 @@ export function MasterGrid({ isDarkMode, ...props }) {
  
   const [showCloneModal, setShowCloneModal] = useState(false);
   const [cloneSourceYear, setCloneSourceYear] = useState('');
+
+  // Rules Engine
+  const { rules: activeSystemRules, fetchRules } = useScheduleRules();
+
+  useEffect(() => {
+    fetchRules();
+  }, [fetchRules]);
 
   const [isRightPanelOpen, setIsRightPanelOpen] = useState(false);
   const [dismissedRequests, setDismissedRequests] = useState(() => {
@@ -639,6 +648,56 @@ export function MasterGrid({ isDarkMode, ...props }) {
     return null;
   };
 
+  // Helper para construir os schedules globais rápidos pro Motor
+  const buildRawSchedulesForTeacher = (teacherIdToFilter) => {
+      const items = [];
+      // Adiciona da tela ativa (grade baseada em tela)
+      Object.entries(grade).forEach(([key, aula]) => {
+          const [tClassId, tDiaId, tHora] = key.split('|');
+          if (aula.teacherIds?.includes(teacherIdToFilter)) {
+              items.push({
+                  day: tDiaId,
+                  time: tHora,
+                  className: aula.className,
+                  teacher: teacherIdToFilter,
+                  subject: aula.disciplina
+              });
+          }
+      });
+      // Adiciona do DB global omitindo os duplicados que estão na tela ativa
+      const dbSchedulesForTeacher = schedules?.filter(s => {
+           if (s.type !== selectedType) return false;
+           if (s.academic_year && selectedConfigYear && String(s.academic_year) !== String(selectedConfigYear)) return false;
+           
+           if (selectedType === 'padrao') {
+                if (String(s.week_id) !== String(selectedWeek) && (s.week_id || selectedWeek !== 'V1')) {
+                     return false;
+                }
+           } else {
+                if (String(s.week_id) !== String(selectedWeek)) return false;
+           }
+           
+           if (!s.teacherId || !String(s.teacherId).split(',').includes(String(teacherIdToFilter))) return false;
+           return true;
+      }) || [];
+      
+      dbSchedulesForTeacher.forEach(s => {
+          const dbDayNorm = isNaN(s.dayOfWeek) ? String(s.dayOfWeek) : String(MAP_DAYS[s.dayOfWeek]);
+          const keyInScreen = `${s.classId}|${dbDayNorm}|${s.slotId}`;
+          if (!grade[keyInScreen]) {
+              const turmaRef = classesList?.find(c => String(c.id) === String(s.classId));
+              items.push({
+                  day: dbDayNorm,
+                  time: s.slotId, // "19:00 - 19:50"
+                  className: turmaRef?.name || 'Externa',
+                  teacher: teacherIdToFilter,
+                  subject: 'Indefinida/Externa'
+              });
+          }
+      });
+      return items;
+  };
+
   // === FUNÇÕES DE DRAG AND DROP ===
   const handleDragStart = (e, aula, origem) => {
     e.dataTransfer.setData('application/json', JSON.stringify({ aula, origem }));
@@ -716,19 +775,50 @@ export function MasterGrid({ isDarkMode, ...props }) {
     }
 
     // Identifica todos os conflitos dos drops agrupados
-    const conflicts = [];
+    const collisionIssues = [];
+    const ruleEngineIssues = [];
+
     for (const drop of dropsToMake) {
+        // Validação Estrita (Obrigatória 1: Colisão de professores exatos ou Salas no mesmo slot - Base do sistema)
         const check = verificarChoqueHorario(aula.teacherIds, aula.sala, diaId, drop.hora, classId);
         if (check) {
-           conflicts.push(`[${drop.hora}] ${[check.profMsg, check.salaMsg].filter(Boolean).join(' | ')}`);
+           collisionIssues.push(`[${drop.hora}] ${[check.profMsg, check.salaMsg].filter(Boolean).join(' | ')}`);
+        }
+
+        // Motor V1 - Múltiplas Validações Avançadas (Interseção, Turnos, Interjornada)
+        if (aula.teacherIds && aula.teacherIds.length > 0) {
+            for (const tId of aula.teacherIds) {
+                if (!tId || isTeacherPending(tId)) continue;
+                const rawArray = buildRawSchedulesForTeacher(tId);
+                const proposedDropObj = {
+                    teacher: tId,
+                    subject: aula.disciplina,
+                    room: aula.sala,
+                    targetDay: diaId,
+                    targetTime: drop.hora,
+                    sourceDay: origem !== 'neutra' ? origem.split('|')[1] : null,
+                    sourceTime: origem !== 'neutra' ? origem.split('|')[2] : null,
+                    currentClass: aula.className
+                };
+                
+                const logs = validateMove(rawArray, proposedDropObj, activeSystemRules, { academicWeekId: selectedWeek });
+                if (logs && logs.length > 0) {
+                     logs.forEach(lg => ruleEngineIssues.push(lg));
+                }
+            }
         }
     }
 
-    if (conflicts.length > 0) {
+    const hasStrictBlocker = collisionIssues.length > 0 || ruleEngineIssues.some(r => r.type === 'error');
+    const hasWarnings = ruleEngineIssues.some(r => r.type === 'warning');
+
+    if (hasStrictBlocker || hasWarnings) {
        setPendingDrop({
           aula, origem, classId, diaId,
           dropsToMake,
-          conflicts
+          conflicts: collisionIssues, // Array de string legada
+          ruleLogs: ruleEngineIssues, // Array de obj { ruleId, title, type, message, isExceptional }
+          hasStrictBlocker
        });
     } else {
        executeDrop(aula, origem, dropsToMake);
@@ -1512,20 +1602,42 @@ export function MasterGrid({ isDarkMode, ...props }) {
       {pendingDrop && (
          <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-in fade-in duration-200">
             <div className={`w-full max-w-lg rounded-xl shadow-2xl flex flex-col overflow-hidden ${isDarkMode ? 'bg-slate-800 border border-slate-700' : 'bg-white border border-slate-200'}`}>
-               <div className="bg-rose-500/10 p-5 flex border-b border-rose-500/20">
-                  <AlertTriangle size={24} className="text-rose-500 shrink-0 mr-3 mt-1" />
+               <div className={`${pendingDrop.hasStrictBlocker ? 'bg-rose-500/10 border-rose-500/20' : 'bg-amber-500/10 border-amber-500/20'} p-5 flex border-b`}>
+                  <AlertTriangle size={24} className={`${pendingDrop.hasStrictBlocker ? 'text-rose-500' : 'text-amber-500'} shrink-0 mr-3 mt-1`} />
                   <div>
-                    <h2 className={`font-black uppercase tracking-widest ${isDarkMode ? 'text-rose-400' : 'text-rose-600'}`}>Atenção: Choque Detectado</h2>
-                    <p className={`text-[11px] font-bold mt-1 leading-snug ${isDarkMode ? 'text-rose-300/70' : 'text-rose-800/70'}`}>A matriz relatará incorreções operacionais e os registros podem não aprovar caso estes choques sejam salvos como Oficiais e Transversais.</p>
+                    <h2 className={`font-black uppercase tracking-widest ${pendingDrop.hasStrictBlocker ? (isDarkMode ? 'text-rose-400' : 'text-rose-600') : (isDarkMode ? 'text-amber-400' : 'text-amber-600')}`}>
+                        {pendingDrop.hasStrictBlocker ? 'Atenção: Choque Bloqueante Detectado' : 'Aviso: Regra Desejável Quebrada'}
+                    </h2>
+                    <p className={`text-[11px] font-bold mt-1 leading-snug ${isDarkMode ? 'text-slate-300' : 'text-slate-600'}`}>
+                        {pendingDrop.hasStrictBlocker 
+                          ? 'A alocação possui conflitos mandatórios (salas iguais, professor no mesmo horário ou regras estritas). Ela não pode ser completada.' 
+                          : 'A alocação quebra regras configuradas como "Desejáveis/Avisos". Você tem permissão para forçar a soltura do card se julgar necessário.'}
+                    </p>
                   </div>
                </div>
                
                <div className="p-5 overflow-y-auto max-h-[40vh] bg-slate-50/50 dark:bg-slate-900/20">
                   <ul className="flex flex-col gap-2">
-                     {pendingDrop.conflicts.map((c, i) => (
-                        <li key={i} className={`text-[11px] font-bold flex gap-2 p-2.5 rounded whitespace-pre-wrap ${isDarkMode ? 'bg-slate-900 text-slate-300' : 'bg-white text-slate-600 border shadow-sm'}`}>
+                     {/* Conflitos base (prof/sala ocupados no MESMO slot) */}
+                     {pendingDrop.conflicts?.map((c, i) => (
+                        <li key={`base-${i}`} className={`text-[11px] font-bold flex gap-2 p-2.5 rounded whitespace-pre-wrap ${isDarkMode ? 'bg-slate-900 text-rose-300 border-rose-900/50' : 'bg-white text-rose-700 border-rose-100 shadow-sm border'}`}>
                            <span className="text-rose-500 font-black shrink-0">•</span>
-                           <span>{c}</span>
+                           <span>[Conflito Físico] {c}</span>
+                        </li>
+                     ))}
+
+                     {/* Logs do Motor de Regras DAPE V1 */}
+                     {pendingDrop.ruleLogs?.map((log, i) => (
+                        <li key={`rule-${i}`} className={`text-[11px] font-bold flex gap-2 p-2.5 rounded whitespace-pre-wrap ${
+                           log.type === 'error' 
+                             ? (isDarkMode ? 'bg-slate-900 text-rose-300 border-rose-900/50 border' : 'bg-white text-rose-700 border-rose-100 shadow-sm border')
+                             : (isDarkMode ? 'bg-slate-900 text-amber-300 border-amber-900/50 border' : 'bg-white text-amber-700 border-amber-100 shadow-sm border')
+                        }`}>
+                           <span className={`${log.type === 'error' ? 'text-rose-500' : 'text-amber-500'} font-black shrink-0`}>•</span>
+                           <div className="flex flex-col">
+                              <span className="opacity-70 text-[9px] uppercase tracking-widest">{log.title}</span>
+                              <span className="mt-0.5">{log.message}</span>
+                           </div>
                         </li>
                      ))}
                   </ul>
@@ -1535,7 +1647,15 @@ export function MasterGrid({ isDarkMode, ...props }) {
                   <button onClick={() => setPendingDrop(null)} className={`w-full sm:w-auto px-4 py-2.5 rounded font-bold text-xs transition-colors ${isDarkMode ? 'bg-slate-700 hover:bg-slate-600 text-slate-300' : 'bg-white border hover:bg-slate-50 text-slate-600 border-slate-300'}`}>
                      Cancelar Soltura e Voltar
                   </button>
-                  <button onClick={() => executeDrop(pendingDrop.aula, pendingDrop.origem, pendingDrop.dropsToMake)} className="w-full sm:w-auto px-5 py-2.5 bg-rose-500 hover:bg-rose-600 text-white rounded font-bold text-xs shadow hover:shadow-lg transition-all">
+                  <button 
+                     onClick={() => !pendingDrop.hasStrictBlocker && executeDrop(pendingDrop.aula, pendingDrop.origem, pendingDrop.dropsToMake)} 
+                     disabled={pendingDrop.hasStrictBlocker}
+                     className={`w-full sm:w-auto px-5 py-2.5 rounded font-bold text-xs shadow transition-all ${
+                        pendingDrop.hasStrictBlocker 
+                        ? 'bg-slate-300 text-slate-500 cursor-not-allowed dark:bg-slate-700 dark:text-slate-500' 
+                        : 'bg-amber-500 hover:bg-amber-600 text-white hover:shadow-lg'
+                     }`}
+                  >
                      Forçar Alocação Completa
                   </button>
                </div>

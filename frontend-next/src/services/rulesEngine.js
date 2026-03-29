@@ -198,5 +198,21 @@ export function validateMove(rawSchedules, proposedDrop, activeRules, context = 
         }
     }
 
+    // -----------------------------------------------------
+    // REGULAMENTO 5: Conflito de Espaço/Sala (V1)
+    // -----------------------------------------------------
+    const ruleRoom = rulesMap.get('no_room_overlap');
+    if (ruleRoom?.is_active && proposedDrop.room) {
+        const roomClash = rawSchedules.find(r => 
+            r.day === simulatedAula.day && 
+            r.time === simulatedAula.time && 
+            r.className !== simulatedAula.className &&
+            r.room === proposedDrop.room
+        );
+        if (roomClash) {
+            emitIssue(ruleRoom, `O espaço "${proposedDrop.room}" já está sendo usado pela turma "${roomClash.className}".`);
+        }
+    }
+
     return logs;
 }
