@@ -1462,7 +1462,7 @@ export function PortalView({
                             <div className={`w-12 h-12 rounded-2xl flex items-center justify-center mb-4 transition-all duration-500 ${isDarkMode ? "bg-emerald-950/60 text-emerald-400 group-hover:bg-emerald-600 group-hover:text-white" : "bg-emerald-50 text-emerald-600 group-hover:bg-emerald-600 group-hover:text-white shadow-sm"}`}>
                               <UserCircle size={24} />
                             </div>
-                            <h3 className={`text-sm font-black mb-1 ${isDarkMode ? "text-emerald-50" : "text-slate-800"}`}>Meu Horário</h3>
+                            <h3 className={`text-sm font-black mb-1 ${isDarkMode ? "text-emerald-50" : "text-slate-800"}`}>Solicitações e trocas</h3>
                             <p className="text-[10px] font-bold text-slate-500 leading-tight uppercase tracking-tighter">Painel completo</p>
                           </button>
 
@@ -1639,7 +1639,7 @@ export function PortalView({
                         <div className={`w-8 h-8 rounded-lg flex items-center justify-center transition-all duration-500 ${viewMode === 'professor' ? "bg-white/10 text-white" : (isDarkMode ? "bg-slate-900 text-indigo-400 group-hover:bg-indigo-600 group-hover:text-white" : "bg-indigo-50 text-indigo-600 group-hover:bg-indigo-600 group-hover:text-white")}`}>
                           <UserCircle size={14} className="transition-transform duration-500 group-hover:scale-110" />
                         </div>
-                        Meu Horário
+                        Solicitações e troca de aulas
                       </button>
 
                       <button onClick={() => { setViewMode('curso'); setPadraoFilterTeacher('Todos'); setShowOnlyMyClasses(false); }} 
@@ -1655,7 +1655,7 @@ export function PortalView({
                         <div className={`w-8 h-8 rounded-lg flex items-center justify-center transition-all duration-500 ${viewMode === 'solicitacoes' ? "bg-white/10 text-white" : (isDarkMode ? "bg-slate-900 text-indigo-400 group-hover:bg-indigo-600 group-hover:text-white" : "bg-indigo-50 text-indigo-600 group-hover:bg-indigo-600 group-hover:text-white")}`}>
                           <Bell size={14} className="transition-transform duration-500 group-hover:rotate-12" />
                         </div>
-                        Solicitações
+                        Meus Pedidos
                       </button>
 
                       <button onClick={() => setViewMode('total')} 
@@ -2123,7 +2123,7 @@ export function PortalView({
                     <MessageSquare size={32} />
                 </div>
                 <div>
-                    <h2 className="text-xl font-black uppercase tracking-tighter text-white">Solicitações</h2>
+                    <h2 className="text-xl font-black uppercase tracking-tighter text-white">Meus Pedidos</h2>
                     <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-0.5">Central de Atendimento DAPE</p>
                 </div>
               </div>
