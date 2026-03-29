@@ -148,6 +148,7 @@ function MatricesTab({ isDarkMode, matrices, setMatrices, generateId, groupedDis
         name: '', 
         course: '', 
         courseAcronym: '', 
+        campus: 'Ji-Paraná',
         academicYear: filterYear || new Date().getFullYear().toString(),
         series: [] 
       });
@@ -276,13 +277,17 @@ function MatricesTab({ isDarkMode, matrices, setMatrices, generateId, groupedDis
           </div>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
           <div>
             <label className="block text-[10px] font-black uppercase tracking-widest opacity-60 mb-2">Ano Letivo</label>
             <select value={localFormData.academicYear} onChange={e => setLocalFormData({...localFormData, academicYear: e.target.value})} className={`w-full px-3 py-2.5 rounded-xl border focus:ring-2 focus:ring-indigo-500 font-bold transition-all ${isDarkMode ? 'bg-slate-900 border-slate-700' : 'bg-slate-50 border-slate-200'}`}>
                {activeYearsList.length === 0 && <option value={localFormData.academicYear}>{localFormData.academicYear}</option>}
                {activeYearsList.map(y => <option key={y} value={y}>{y}</option>)}
             </select>
+          </div>
+          <div>
+            <label className="block text-[10px] font-black uppercase tracking-widest opacity-60 mb-2">Campus IFRO</label>
+            <input type="text" value={localFormData.campus || ''} onChange={e => setLocalFormData({...localFormData, campus: e.target.value})} placeholder="Ex: Ji-Paraná" className={`w-full px-3 py-2.5 rounded-xl border focus:ring-2 focus:ring-indigo-500 font-bold transition-all ${isDarkMode ? 'bg-slate-900 border-slate-700' : 'bg-slate-50 border-slate-200'}`} />
           </div>
           <div>
             <label className="block text-[10px] font-black uppercase tracking-widest opacity-60 mb-2">Nome da Matriz</label>
@@ -418,7 +423,11 @@ function MatricesTab({ isDarkMode, matrices, setMatrices, generateId, groupedDis
               <div>
                 <div className="flex justify-between items-start mb-2">
                    <h4 className="font-black text-lg">{matrix.name}</h4>
-                   <span className={`px-2 py-0.5 rounded text-[9px] font-black uppercase tracking-widest ${isDarkMode ? 'bg-indigo-900/80 text-indigo-300' : 'bg-indigo-100 text-indigo-700'}`}>{matrix.courseAcronym ? `${matrix.course} (${matrix.courseAcronym})` : matrix.course}</span>
+                   <span className={`px-2 py-0.5 rounded text-[9px] font-black uppercase tracking-widest ${isDarkMode ? 'bg-indigo-900/80 text-indigo-300' : 'bg-indigo-100 text-indigo-700'}`}>{matrix.campus ? `Campus ${matrix.campus}` : 'Campus não definido'}</span>
+                </div>
+                <div className="flex justify-between items-start mb-2">
+                   <h4 className="font-black text-lg">{matrix.name}</h4>
+                   <span className={`px-2 py-0.5 rounded text-[9px] font-black uppercase tracking-widest ${isDarkMode ? 'bg-blue-900/80 text-blue-300' : 'bg-blue-100 text-blue-700'}`}>{matrix.courseAcronym ? `${matrix.course} (${matrix.courseAcronym})` : matrix.course}</span>
                 </div>
                 <p className="text-xs font-bold opacity-60 mb-5">{totalSeries} Anos/Séries, total de {totalDisciplines} Disciplinas cadastradas.</p>
               </div>
@@ -445,16 +454,20 @@ function MatricesTab({ isDarkMode, matrices, setMatrices, generateId, groupedDis
 function ClassesTab({ isDarkMode, matrices, classes, setClasses, generateId, academicYearsMeta, globalTeachers = [], showConfirm, refreshGlobalTeachers }) {
   const [editingId, setEditingId] = useState(null);
   const [localFormData, setLocalFormData] = useState(null);
-
   const [filterYear, setFilterYear] = useState('');
   const [filterCourse, setFilterCourse] = useState('');
   const activeYearsList = Object.keys(academicYearsMeta || {}).sort((a,b) => Number(b) - Number(a));
   const availableCourses = Array.from(new Set(matrices.map(m => m.course).filter(Boolean))).sort();
 
+  const filteredMatrices = useMemo(() => {
+    return matrices.filter(m => m.academicYear === filterYear);
+  }, [matrices, filterYear]);
+
   useEffect(() => {
     if(!filterYear && activeYearsList.length > 0) {
        const currentY = new Date().getFullYear().toString();
-       setFilterYear(activeYearsList.includes(currentY) ? currentY : activeYearsList[0]);
+       const targetY = activeYearsList.includes(currentY) ? currentY : activeYearsList[0];
+       setFilterYear(targetY);
     }
   }, [activeYearsList, filterYear]);
 

@@ -47,7 +47,21 @@ export const CourseGrid = React.memo(
   }) => {
     const [mobileSelectedClasses, setMobileSelectedClasses] = useState({});
     const [activeCourseTab, setActiveCourseTab] = useState("Todos");
+    const [dbCourses, setDbCourses] = useState([]);
+    const [dbClasses, setDbClasses] = useState([]);
     const isGridInert = true; 
+
+    useEffect(() => {
+      import('@/lib/apiClient').then(({ apiClient }) => {
+        Promise.all([
+          apiClient.fetchCurriculum('matrix'),
+          apiClient.fetchCurriculum('class')
+        ]).then(([crs, cls]) => {
+          setDbCourses(crs || []);
+          setDbClasses(cls || []);
+        });
+      });
+    }, []);
 
     const activeTeacherFilter = showOnlyMyClasses ? siape : (padraoFilterTeacher && padraoFilterTeacher !== "Todos" ? padraoFilterTeacher : null);
 
@@ -63,7 +77,7 @@ export const CourseGrid = React.memo(
       return [...new Set(filteredSchedules.map((r) => r.course))]
         .filter(Boolean)
         .sort((a, b) => a.localeCompare(b));
-    }, [mappedSchedules, activeTeacherFilter]);
+    }, [mappedSchedules, activeTeacherFilter, isTeacherPending]);
 
     useEffect(() => {
       if (
@@ -73,6 +87,13 @@ export const CourseGrid = React.memo(
         setActiveCourseTab("Todos");
       }
     }, [availableCourses, activeCourseTab]);
+
+    const loggedUser = useMemo(() => {
+      if (!siape || !globalTeachers) return null;
+      return globalTeachers.find(t => String(t.siape || t.id) === String(siape));
+    }, [siape, globalTeachers]);
+    
+    const loggedUserName = loggedUser ? (loggedUser.nome_completo || loggedUser.nome_exibicao) : "Servidor não identificado";
 
     const handlePrintClick = () => {
       const printWindow = window.open('', '_blank');
@@ -87,30 +108,38 @@ export const CourseGrid = React.memo(
           <style>
             @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;700;900&display=swap');
             @page { size: A4 landscape; margin: 5mm; }
-            body { font-family: 'Inter', sans-serif; margin: 0; padding: 10px; background: white; color: black; }
+            body { font-family: 'Inter', sans-serif; margin: 0; padding: 10px; background: white; color: black; line-height: 1.2; }
             .course-page { page-break-after: always; padding-bottom: 20px; }
             .course-page:last-child { page-break-after: auto; }
             
-            .header { text-align: center; border-bottom: 4px double black; padding-bottom: 10px; margin-bottom: 15px; }
-            .header h1 { margin: 0; font-size: 20pt; text-transform: uppercase; font-weight: 900; letter-spacing: -1px; }
-            .header p { margin: 5px 0 0 0; font-size: 11pt; font-weight: bold; text-transform: uppercase; font-variant: small-caps; }
+            .header { text-align: center; border-bottom: 2px solid black; padding-bottom: 8px; margin-bottom: 12px; }
+            .header h1 { margin: 0; font-size: 16pt; text-transform: uppercase; font-weight: 900; letter-spacing: 2px; }
+            .header p { margin: 4px 0 0 0; font-size: 9pt; font-weight: bold; text-transform: uppercase; }
+            .meta-info { display: flex; justify-content: space-between; font-size: 8pt; font-weight: normal; margin-top: 5px; color: #333; }
             
-            .course-name { font-size: 16pt; font-weight: 900; text-transform: uppercase; margin: 15px 0 10px 0; display: block; border-left: 10px solid black; padding-left: 10px; }
+            .course-name { font-size: 12pt; font-weight: 900; text-transform: uppercase; margin: 10px 0 8px 0; display: block; border-left: 6px solid black; padding-left: 8px; }
             
-            table { width: 100%; border-collapse: collapse; border: 2.5pt solid black; table-layout: fixed; }
-            th, td { border: 1.2pt solid black !important; padding: 6px 4px; text-align: center; vertical-align: middle; font-size: 9pt; line-height: 1.1; }
-            th { background-color: #e5e5e5; font-weight: 900; text-transform: uppercase; height: 35px; }
+            table { width: 100%; border-collapse: collapse; border: 2pt solid black; table-layout: fixed; }
+            th, td { border: 1pt solid black !important; padding: 4px 3px; text-align: center; vertical-align: middle; font-size: 7.5pt; }
+            th { background-color: #f0f0f0; font-weight: 900; text-transform: uppercase; height: 28px; font-size: 7pt; }
             
-            /* Divisão entre dias na impressão */
-            .day-divider { border-top: 3.5pt solid black !important; background-color: #f2f2f2 !important; font-weight: 900; text-transform: uppercase; font-size: 9.5pt; }
+            .day-divider { border-top: 2.5pt solid black !important; background-color: #f9f9f9 !important; }
+            .day-label-container { 
+               writing-mode: vertical-rl; 
+               transform: rotate(180deg); 
+               white-space: nowrap;
+               font-weight: 900;
+               font-size: 8.5pt;
+               letter-spacing: 1px;
+            }
             
-            .subject { font-weight: 900; font-size: 9pt; text-transform: uppercase; }
-            .teacher { font-weight: normal; font-size: 8.5pt; font-style: italic; }
-            /* Disciplina e professor na mesma linha conforme solicitado */
-            .aula-box { display: block; width: 100%; }
-            .room-info { display: block; font-size: 8pt; font-weight: bold; margin-top: 3px; color: #444; border-top: 0.5pt solid #ccc; padding-top: 2px; }
+            .subject { font-weight: 900; font-size: 7.5pt; text-transform: uppercase; display: block; }
+            .teacher { font-weight: normal; font-size: 7pt; font-style: italic; display: block; margin-top: 2px; }
+            .aula-box { display: block; width: 100%; text-align: left; padding: 2px 4px; }
+            .room-info { display: block; font-size: 6.5pt; font-weight: bold; margin-top: 3px; color: #444; border-top: 0.5pt solid #ddd; padding-top: 2px; }
             
-            .empty { color: #888; font-weight: normal; opacity: 0.5; }
+            .empty { color: #ccc; font-weight: normal; }
+            .footer-print { margin-top: 10px; font-size: 7pt; font-style: italic; text-align: right; border-top: 1px solid #eee; padding-top: 5px; }
           </style>
         </head>
         <body>
@@ -120,7 +149,10 @@ export const CourseGrid = React.memo(
         const records = mappedSchedules.filter(r => r.course === course);
         const classes = [...new Set(records.map(r => r.className))].sort();
         
-        // Sala predominante
+        // Obter campus da matriz
+        const courseObj = (dbCourses || []).find(c => c.course === course);
+        const campusName = courseObj?.campus || "Ji-Paraná";
+
         const classRooms = {};
         classes.forEach(cls => {
           const rooms = records.filter(r => r.className === cls && r.room).map(r => r.room);
@@ -133,35 +165,52 @@ export const CourseGrid = React.memo(
 
         html += `<div class="course-page">
           <div class="header">
-            <h1>Instituto Federal de Rondônia - Porto Velho Zona Norte</h1>
-            <p>Horário Acadêmico | ${course.toUpperCase()} | ${selectedWeek} | ${scheduleMode.toUpperCase()}</p>
+            <h1>IFRO Campus ${campusName}</h1>
+            <p>Horário Acadêmico | ${selectedWeek}</p>
+            <div class="meta-info">
+              <span>Curso: <strong>${course.toUpperCase()}</strong></span>
+              <span>Emitido por: <strong>${loggedUserName}</strong></span>
+              <span>Data: ${new Date().toLocaleDateString('pt-BR')} ${new Date().toLocaleTimeString('pt-BR', {hour: '2-digit', minute:'2-digit'})}</span>
+            </div>
           </div>
-          <div class="course-name">${course}</div>
           <table>
             <thead>
               <tr>
-                <th style="width: 50pt;">DIA</th>
-                <th style="width: 100pt;">HORÁRIO</th>
-                ${classes.map(cls => `<th>${cls}${classRooms[cls] ? `<br><span style="font-size: 7.5pt; opacity: 0.8;">SALA ${classRooms[cls]}</span>` : ''}</th>`).join('')}
+                <th style="width: 40pt;">DIA</th>
+                <th style="width: 80pt;">HORÁRIO</th>
+                ${classes.map(cls => `<th>${cls}${classRooms[cls] ? `<br><span style="font-size: 6.5pt; opacity: 0.8;">SALA ${classRooms[cls]}</span>` : ''}</th>`).join('')}
               </tr>
             </thead>
             <tbody>`;
 
         safeDays.forEach(day => {
-          // FILTRAGEM DE TURNOS VAZIOS: Só mostra horários que possuem aula para este curso neste dia
           const activeTimes = safeTimes.filter(t => {
             const ts = t.timeStr || t;
             return records.some(r => r.day === day && r.time === ts);
           });
 
           if (activeTimes.length > 0) {
+            // Calcular data real baseada no selectedWeek (ex: "Semana de 24/03 a ...")
+            let dayAndDate = day.substring(0,3).toUpperCase();
+            try {
+              const startMatch = selectedWeek.match(/de\s+(\d{2})\/(\d{2})/);
+              if (startMatch) {
+                const daysMap = { "Segunda": 0, "Terça": 1, "Quarta": 2, "Quinta": 3, "Sexta": 4, "Sábado": 5, "Domingo": 6 };
+                const dt = new Date(new Date().getFullYear(), parseInt(startMatch[2]) - 1, parseInt(startMatch[1]));
+                dt.setDate(dt.getDate() + (daysMap[day] || 0));
+                dayAndDate += ` ${dt.getDate().toString().padStart(2,'0')}/${(dt.getMonth()+1).toString().padStart(2,'0')}`;
+              }
+            } catch(e) {}
+
             activeTimes.forEach((tObj, tIdx) => {
               const ts = tObj.timeStr || tObj;
               html += `<tr class="${tIdx === 0 ? 'day-divider' : ''}">`;
               if (tIdx === 0) {
-                html += `<td rowspan="${activeTimes.length}" style="background: #f2f2f2; font-weight: 900; border-right: 2pt solid black !important;">${day.substring(0,3).toUpperCase()}</td>`;
+                html += `<td rowspan="${activeTimes.length}" style="background: #f0f0f0; border-right: 1.5pt solid black !important;">
+                  <div class="day-label-container">${dayAndDate}</div>
+                </td>`;
               }
-              html += `<td style="font-weight: 700; background: #fafafa;">${ts}</td>`;
+              html += `<td style="font-weight: 700; background: #fafafa; font-size: 7.5pt;">${ts}</td>`;
               
               classes.forEach(cls => {
                 const r = records.find(rec => rec.className === cls && rec.day === day && rec.time === ts);
@@ -181,14 +230,15 @@ export const CourseGrid = React.memo(
           }
         });
 
-        html += `</tbody></table></div>`;
+        html += `</tbody></table>
+          <div class="footer-print">Documento gerado automaticamente pelo Sistema de Horários IFRO</div>
+        </div>`;
       });
 
       html += `
         <script>
           window.onload = () => {
             window.print();
-            // window.onafterprint = () => window.close();
           };
         </script>
         </body></html>
@@ -287,13 +337,7 @@ export const CourseGrid = React.memo(
                        </thead>
                        <tbody>
                           {safeDays.map(day => {
-                            // NA TELA: Mostra todos os horários para dar visão de "grade vazia" se quiserem, pois facilita o arraste se habilitado no futuro.
-                            // Mas se o usuário quiser ocultar turnos vazios na TELA também, descomente a filtragem abaixo:
-                            // const recordsOfDay = courseRecords.filter(r => r.day === day);
-                            // const activeTimes = safeTimes.filter(t => recordsOfDay.some(r => r.time === (t.timeStr || t)));
-                            
-                            const displayTimes = safeTimes; // Por enquanto, tela mostra tudo para manter o visual premium de grid.
-                            
+                            const displayTimes = safeTimes;
                             return (
                               <React.Fragment key={day}>
                                 {displayTimes.map((timeObj, idx) => (
