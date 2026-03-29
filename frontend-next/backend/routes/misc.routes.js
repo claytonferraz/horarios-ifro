@@ -2,19 +2,9 @@ const express = require('express');
 const db = require('../db');
 const { attachUserIfPresent, requirePublicScheduleAccess } = require('../middlewares/auth.middleware');
 
+// Mapeia para /api (miscRoutes no server.js)
 module.exports = function(io) {
   const router = express.Router();
-
-  // ==========================================
-  // ROTA PÚBLICA DE STATUS
-  // ==========================================
-  router.get('/status', (req, res) => {
-    try {
-      res.json({ lastUpdate: new Date().toISOString() }); // Idealmente buscar do orquestrador global
-    } catch(e) {
-      res.status(500).json({ error: e.message });
-    }
-  });
 
   // ==========================================
   // ROTA PÚBLICA DE LISTA DE PROFESSORES

@@ -120,20 +120,7 @@ router.put('/academic-years', verifyToken, requireManager, (req, res) => {
   );
 });
 
-// --- CURRICULUM MANAGEMENT ---
-router.get('/curriculum/:type', (req, res) => {
-  const { type } = req.params;
-  if (!['matrix', 'class'].includes(type)) return res.status(400).json({ error: 'Invalid type' });
-  
-  db.all("SELECT id, payload FROM curriculum_data WHERE dataType = ?", [type], (err, rows) => {
-    if (err) return res.status(500).json({ error: err.message });
-    const records = rows.map(r => {
-      try { return JSON.parse(r.payload); } catch (e) { return null; }
-    }).filter(Boolean);
-    res.json(records);
-  });
-});
-
+// --- CURRICULUM MANAGEMENT (GET movido para misc.routes.js para acesso público)
 router.put('/curriculum/:type', verifyToken, requireManager, (req, res) => {
   const { type } = req.params;
   if (!['matrix', 'class'].includes(type)) return res.status(400).json({ error: 'Invalid type' });

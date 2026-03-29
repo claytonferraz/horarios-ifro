@@ -522,7 +522,7 @@ export function PortalView({
       time: s.slotId || s.time,
       subject: discName,
       teacher: teacherName,
-      teacherId: s.teacherId || ''
+      teacherId: String(s.teacherId || '').trim()
     };
   }, [dbClasses, dbCourses, matrixDisciplinesMap, disciplinesMeta, subjectHoursMeta, globalTeachers, dayFullLabels]);
 
@@ -533,7 +533,7 @@ export function PortalView({
    }, [horariosFiltrados, enrichScheduleItem]);
 
   const teacherSummary = React.useMemo(() => {
-    if (!siape || !mappedSchedules || !schedules || !selectedWeek || !academicWeeks) return { atual: [], previa: [], vagas: [] };
+    if (!siape || !mappedSchedules || !schedules || !academicWeeks) return { atual: [], previa: [], vagas: [] };
     
 
     // Cálculo de Datas para os Headers
@@ -600,17 +600,24 @@ export function PortalView({
     refDate.setHours(0,0,0,0);
 
     const actualCurrentWeek = academicWeeks.find(w => {
-       const s = new Date(w.start_date + 'T00:00:00'); 
-       const e = new Date(w.end_date + 'T23:59:59');
-       return refDate >= s && refDate <= e;
-    });
+        // Usamos splits para garantir que pegamos apenas a data YYYY-MM-DD e evitamos ruído de T00...
+        const startStr = String(w.start_date || '').split('T')[0];
+        const endStr = String(w.end_date || '').split('T')[0];
+        if (!startStr || !endStr) return false;
+
+        const s = new Date(startStr + 'T00:00:00'); 
+        const e = new Date(endStr + 'T23:59:59');
+        return refDate >= s && refDate <= e;
+     });
     const actualCurrentWeekId = actualCurrentWeek ? String(actualCurrentWeek.id) : null;
     
-    const dashboardBaseWeekId = actualCurrentWeekId || selectedWeek; // Fallback se não achar por data
-    const actualCurrentWeekIdx = academicWeeks.findIndex(w => String(w.id) === String(dashboardBaseWeekId));
+    const actualCurrentWeekIdx = academicWeeks.findIndex(w => String(w.id) === String(actualCurrentWeekId || ''));
     const nextWeekId = (actualCurrentWeekIdx !== -1 && actualCurrentWeekIdx < academicWeeks.length - 1)
       ? String(academicWeeks[actualCurrentWeekIdx + 1].id)
       : null;
+    
+    // Fallback: Se não encontrou semana atual por data e selectedWeek está vindo vazio do estado global
+    const dashboardBaseWeekId = actualCurrentWeekId || selectedWeek || (academicWeeks.length > 0 ? String(academicWeeks[0].id) : null);
 
     // Lógica de "Agora": Agrupa a semana atual. Se for Sexta/Sáb/Dom, TAMBÉM inclui a próxima semana.
     const validWeekIds = [dashboardBaseWeekId];
@@ -619,11 +626,15 @@ export function PortalView({
     }
 
     // 1. Atual (Minha Turma - filtra as semanas válidas e o SIAPE fixo do usuário logado)
-    const rawItemsFiltered = (schedules || []).filter(s => 
-      (s.type === 'oficial' || s.type === 'atual') && 
-      validWeekIds.includes(String(s.week_id)) &&
-      s.teacherId && String(s.teacherId).split(',').includes(String(siape))
-    );
+    const rawItemsFiltered = (schedules || []).filter(s => {
+      if (!s.teacherId) return false;
+      const isCorrectType = s.type === 'oficial' || s.type === 'atual';
+      const isCorrectWeek = validWeekIds.includes(String(s.week_id));
+      const mySiapeStr = String(siape).trim();
+      const teacherIds = String(s.teacherId).split(',').map(id => id.trim());
+      
+      return isCorrectType && isCorrectWeek && teacherIds.includes(mySiapeStr);
+    });
 
     // De-duplicação: Preferimos 'atual' sobre 'oficial'
     const dedupMap = new Map();
@@ -636,18 +647,38 @@ export function PortalView({
        }
     });
 
+    // 3. Vagas (Opcional, se precisar mostrar no dashboard as salas/horários vagos dele)
+    // No momento, o resumo do docente foca no que ele TEM de aula.
+    
+    // Filtro de Dias Passados
+    const diaHoje = refDate.getDate();
+    const mesHoje = refDate.getMonth();
+    const anoHoje = refDate.getFullYear();
+    
+    const isToday = (dStr) => {
+        if (!dStr) return false;
+        const parts = dStr.split('/');
+        if (parts.length !== 3) return false;
+        return parseInt(parts[0]) === diaHoje && parseInt(parts[1]) === (mesHoje + 1) && parseInt(parts[2]) === anoHoje;
+    };
+
     const rawItemsForAtual = Array.from(dedupMap.values())
       .map(s => enrichScheduleItem(s))
       .filter(Boolean);
 
     // Removemos os dias que já passaram da semana ATUAL, para limpar o dashboard
+    // Removemos os dias que já passaram da semana ATUAL, para limpar o dashboard
+    // UPDATE: Se for final de semana (Sáb/Dom), mantemos a visibilidade total para conferência
     const atualRaw = rawItemsForAtual.filter(s => {
        if (String(s.week_id) !== String(dashboardBaseWeekId)) return true; // Mostra tudo da próxima semana
        const dayOrderMap = { "seg": 1, "ter": 2, "qua": 3, "qui": 4, "sex": 5, "sab": 6, "dom": 0 };
        const sDayCode = shortDayMap[s.day] || s.day;
        const sDayIdx = dayOrderMap[sDayCode];
-       if (todayIdx === 0) return true; // Se for domingo, a semana letiva já acabou, mostra o que sobrou
-       return sDayIdx >= todayIdx; // Oculta dias passados
+       
+       // Sábado e Domingo liberam a visualização da semana inteira que passou/está acabando
+       if (todayIdx === 0 || todayIdx === 6) return true; 
+       
+       return sDayIdx >= todayIdx; // Oculta dias passados de segunda a sexta
     });
     const atual = groupByDay(atualRaw);
 
