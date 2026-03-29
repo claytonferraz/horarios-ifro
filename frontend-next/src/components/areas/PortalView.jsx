@@ -1171,8 +1171,11 @@ export function PortalView({
                             <button 
                               key={tab}
                               onClick={() => setDashboardTab(tab)} 
-                              className={`px-3 sm:px-6 py-2.5 rounded-xl text-[9px] sm:text-[10px] font-black uppercase tracking-widest transition-all duration-300 whitespace-nowrap ${dashboardTab === tab ? (isDarkMode ? "bg-emerald-600 text-white shadow-[0_0_15px_rgba(16,185,129,0.4)]" : "bg-emerald-600 text-white shadow-lg shadow-emerald-500/30") : "text-slate-500 hover:text-emerald-500"}`}>
-                              {tab === "atual" ? "Atual" : tab === "vagas" ? "Vagas" : "Prévia"}
+                              className={`px-3 sm:px-6 py-2.5 rounded-xl text-[9px] sm:text-[10px] font-black uppercase tracking-widest transition-all duration-300 whitespace-nowrap flex items-center gap-2 ${dashboardTab === tab ? (isDarkMode ? "bg-emerald-600 text-white shadow-[0_0_15px_rgba(16,185,129,0.4)]" : "bg-emerald-600 text-white shadow-lg shadow-emerald-500/30") : "text-slate-500 hover:text-emerald-500"}`}>
+                              {tab === "atual" && <Calendar size={14} className={dashboardTab === 'atual' ? "animate-pulse" : ""} />}
+                              {tab === "vagas" && <AlertCircle size={14} className={dashboardTab === 'vagas' ? "animate-bounce" : ""} />}
+                              {tab === "previa" && <Eye size={14} className={dashboardTab === 'previa' ? "animate-pulse" : ""} />}
+                              {tab === "atual" ? "Semana Atual" : tab === "vagas" ? "Aulas Vagas" : "Prévia da Próxima"}
                             </button>
                           ))}
                       </div>
