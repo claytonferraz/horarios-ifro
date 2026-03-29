@@ -844,7 +844,7 @@ export function MasterGrid({ isDarkMode, ...props }) {
 
   // FUNÇÃO DE SALVAMENTO FUNCIONAL (Fase 5 - Restaurando Modal de Pipeline)
   const handleSaveSchedule = () => {
-    if (!isDirty || isSaving) return;
+    if ((!isDirty && selectedType !== 'padrao') || isSaving) return;
     setSaveOptions({ type: selectedType || 'previa', weekId: selectedWeek || '' });
     setModalMode('save');
   };
@@ -1105,15 +1105,17 @@ export function MasterGrid({ isDarkMode, ...props }) {
            <div className="relative group">
                <button 
                  onClick={handleSaveSchedule} 
-                 disabled={selectedCourses.length === 0 || !isDirty || isSaving} 
+                 disabled={selectedCourses.length === 0 || (!isDirty && selectedType !== 'padrao') || isSaving} 
                  className={`flex items-center justify-center gap-3 px-8 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all active:scale-95 border ${
                    isDirty 
                      ? 'bg-emerald-600 hover:bg-emerald-500 text-white animate-pulse shadow-[0_0_20px_rgba(16,185,129,0.5)] border-emerald-400/50 cursor-pointer' 
-                     : 'bg-slate-100 dark:bg-slate-800 text-slate-400 border-slate-200 dark:border-slate-700 opacity-60 cursor-not-allowed'
+                     : (selectedType === 'padrao' && selectedCourses.length > 0)
+                       ? 'bg-indigo-600 hover:bg-indigo-500 text-white border-indigo-500 cursor-pointer shadow-sm'
+                       : 'bg-slate-100 dark:bg-slate-800 text-slate-400 border-slate-200 dark:border-slate-700 opacity-60 cursor-not-allowed'
                  }`}
                >
                   {isSaving ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />} 
-                  <span>{isSaving ? 'Salvando...' : (isDirty ? 'Publicar Alterações' : 'Sem Pendências')}</span>
+                  <span>{isSaving ? 'Salvando...' : (isDirty ? 'Publicar Alterações' : (selectedType === 'padrao' ? 'Desdobrar Padrão' : 'Sem Pendências'))}</span>
                   {isDirty && !isSaving && <div className="absolute -top-1.5 -right-1.5 w-4 h-4 bg-rose-500 rounded-full border-2 border-white dark:border-slate-900 flex items-center justify-center text-[8px] font-black text-white shadow-lg animate-bounce">!</div>}
                </button>
                {isDirty && !isSaving && (
@@ -1234,19 +1236,8 @@ export function MasterGrid({ isDarkMode, ...props }) {
           onDragOver={handleDragOver}
           onDrop={handleDropNeutra}
         >
-          <h3 className="text-[11px] font-black uppercase tracking-widest text-slate-500 mb-4 flex items-center justify-between border-b pb-2 border-slate-700/50">
-            <span className="flex items-center gap-2"><AlertCircle size={14} /> Disciplinas Pendentes</span>
-            <span className="bg-slate-200 dark:bg-slate-700 px-2 py-0.5 rounded">{aulasNeutras.length}</span>
-          </h3>
-          
-          <div className="flex flex-col gap-4">
-            {selectedCourses.length === 0 && (
-              <div className="text-center text-slate-400 text-xs mt-10 p-4 border-2 border-dashed border-slate-300 dark:border-slate-700 rounded-lg">
-                Selecione os Cursos para carregar as disciplinas.
-              </div>
-            )}
-
-            {Object.entries(neutrasPorTurma)
+          {(() => {
+            const filteredNeutras = Object.entries(neutrasPorTurma)
               .sort((a, b) => {
                 const turmaA = turmasDoCurso.find(c => c.name === a[0]);
                 const turmaB = turmasDoCurso.find(c => c.name === b[0]);
@@ -1260,8 +1251,34 @@ export function MasterGrid({ isDarkMode, ...props }) {
               .filter(([nomeTurma]) => {
                 const turmaObj = turmasDoCurso.find(t => t.name === nomeTurma);
                 return turmaObj && !hiddenClasses.includes(turmaObj.id);
-              })
-              .map(([nomeTurma, aulas]) => (
+              });
+
+            const totalMissing = filteredNeutras.reduce((acc, [_, aulas]) => {
+              return acc + aulas.reduce((sum, aula) => {
+                const extraTypes = ['Recuperação', 'Exame Final', 'Atendimento ao aluno', 'Lançamento Extra'];
+                const countInGrid = Object.values(grade).filter(g => String(g.classId) === String(aula.classId) && String(g.id) === String(aula.id) && !extraTypes.includes(g.classType)).length;
+                const qtyPadrao = aula.numAulas || 1;
+                return sum + (qtyPadrao - countInGrid);
+              }, 0);
+            }, 0);
+
+            return (
+              <>
+                <h3 className="text-[11px] font-black uppercase tracking-widest text-slate-500 mb-4 flex items-center justify-between border-b pb-2 border-slate-700/50">
+                  <span className="flex items-center gap-2"><AlertCircle size={14} /> Disciplinas Pendentes</span>
+                  <span className={`px-2 py-0.5 rounded text-white shadow-sm ${totalMissing > 0 ? 'bg-rose-500' : 'bg-emerald-500'}`} title="Saldo de aulas (Vermelho = Faltam na Grade / Verde = Grade Completa ou Excedente)">
+                    {totalMissing}
+                  </span>
+                </h3>
+                
+                <div className="flex flex-col gap-4">
+                  {selectedCourses.length === 0 && (
+                    <div className="text-center text-slate-400 text-xs mt-10 p-4 border-2 border-dashed border-slate-300 dark:border-slate-700 rounded-lg">
+                      Selecione os Cursos para carregar as disciplinas.
+                    </div>
+                  )}
+
+                  {filteredNeutras.map(([nomeTurma, aulas]) => (
               <div key={nomeTurma} className="mb-2">
                 <div className="text-[10px] font-bold text-slate-400 mb-2 uppercase tracking-wider">{nomeTurma}</div>
                 <div className="flex flex-col gap-2">
@@ -1306,7 +1323,10 @@ export function MasterGrid({ isDarkMode, ...props }) {
               </div>
             ))}
           </div>
-        </div>
+          </>
+        );
+      })()}
+    </div>
 
         {/* GRADE MATRIZ PRINCIPAL (As Turmas lado a lado) */}
         <div className={`w-full p-4 rounded-xl border shadow-sm h-[75vh] overflow-auto ${isDarkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'}`}>
@@ -1319,10 +1339,22 @@ export function MasterGrid({ isDarkMode, ...props }) {
               <thead className={`sticky top-0 z-40 shadow-sm ${isDarkMode ? 'bg-slate-800' : 'bg-white'}`}>
                 <tr>
                   <th className={`py-2 px-2 w-20 sticky left-0 top-0 z-50 ${isDarkMode ? 'bg-slate-800' : 'bg-white'}`}></th>
-                  {turmasDoCurso.filter(t => !hiddenClasses.includes(t.id)).map(turma => (
+                  {turmasDoCurso.filter(t => !hiddenClasses.includes(t.id)).map(turma => {
+                    const aulasDaTurma = aulasNeutras.filter(a => String(a.classId) === String(turma.id));
+                    const saldoTurma = aulasDaTurma.reduce((acc, aula) => {
+                      const extraTypes = ['Recuperação', 'Exame Final', 'Atendimento ao aluno', 'Lançamento Extra'];
+                      const countInGrid = Object.values(grade).filter(g => String(g.classId) === String(aula.classId) && String(g.id) === String(aula.id) && !extraTypes.includes(g.classType)).length;
+                      const qtyPadrao = aula.numAulas || 1;
+                      return acc + (qtyPadrao - countInGrid);
+                    }, 0);
+
+                    return (
                     <th key={turma.id} className={`py-2 px-2 text-center text-[11px] font-black uppercase tracking-widest border-b-2 bg-inherit group/th transition-all duration-300 ${draggedItem && String(draggedItem.aula.classId) !== String(turma.id) ? 'opacity-30 grayscale pointer-events-none' : ''} ${isDarkMode ? 'border-slate-700/50' : 'border-slate-200'}`}>
-                      <div className="flex items-center justify-center relative w-full h-full">
-                         <span className="truncate px-4">{turma.name}</span>
+                      <div className="flex items-center justify-center gap-2 relative w-full h-full">
+                         <span className="truncate max-w-[120px]">{turma.name}</span>
+                         <span className={`px-1.5 py-0.5 rounded-md text-[9px] font-black text-white shadow-sm min-w-[20px] ${saldoTurma > 0 ? 'bg-rose-500' : 'bg-emerald-500'}`} title={saldoTurma > 0 ? `Faltam ${saldoTurma} aulas na grade` : saldoTurma < 0 ? `Excedente de ${Math.abs(saldoTurma)} aulas` : 'Grade Completa'}>
+                           {saldoTurma}
+                         </span>
                          <div className="absolute right-0 flex items-center gap-1 opacity-0 group-hover/th:opacity-100 transition-opacity bg-inherit pl-2">
                             <button 
                                onClick={() => {
@@ -1350,7 +1382,7 @@ export function MasterGrid({ isDarkMode, ...props }) {
                          </div>
                       </div>
                     </th>
-                  ))}
+                  )})}
                 </tr>
               </thead>
               <tbody>
