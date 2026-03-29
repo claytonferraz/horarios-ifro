@@ -63,21 +63,14 @@ export const CourseGrid = React.memo(
       });
     }, []);
 
-    const activeTeacherFilter = showOnlyMyClasses ? siape : (padraoFilterTeacher && padraoFilterTeacher !== "Todos" ? padraoFilterTeacher : null);
+    const activeTeacherFilter = (padraoFilterTeacher && padraoFilterTeacher !== "Todos") ? padraoFilterTeacher : (showOnlyMyClasses ? siape : null);
 
     const availableCourses = useMemo(() => {
-      let filteredSchedules = mappedSchedules;
-      if (activeTeacherFilter) {
-        filteredSchedules = mappedSchedules.filter(r => {
-           const isMatch = r.teacherId && String(r.teacherId).split(',').includes(String(activeTeacherFilter));
-           const isVacant = isTeacherPending(r.teacherId || r.teacher);
-           return isMatch || isVacant;
-        });
-      }
-      return [...new Set(filteredSchedules.map((r) => r.course))]
+      // Por padrão, mostra todos os cursos disponíveis nos registros
+      return [...new Set(mappedSchedules.map((r) => r.course))]
         .filter(Boolean)
         .sort((a, b) => a.localeCompare(b));
-    }, [mappedSchedules, activeTeacherFilter, isTeacherPending]);
+    }, [mappedSchedules]);
 
     useEffect(() => {
       if (
@@ -98,6 +91,7 @@ export const CourseGrid = React.memo(
     const handlePrintClick = () => {
       const printWindow = window.open('', '_blank');
       const coursesToPrint = activeCourseTab === "Todos" ? availableCourses : [activeCourseTab];
+      const labelStr = dynamicWeeksList.find(w => w.value === selectedWeek)?.label || selectedWeek;
       
       let html = `
         <!DOCTYPE html>
@@ -133,10 +127,10 @@ export const CourseGrid = React.memo(
                letter-spacing: 1px;
             }
             
-            .subject { font-weight: 900; font-size: 7.5pt; text-transform: uppercase; display: block; }
-            .teacher { font-weight: normal; font-size: 7pt; font-style: italic; display: block; margin-top: 2px; }
-            .aula-box { display: block; width: 100%; text-align: left; padding: 2px 4px; }
-            .room-info { display: block; font-size: 6.5pt; font-weight: bold; margin-top: 3px; color: #444; border-top: 0.5pt solid #ddd; padding-top: 2px; }
+            .subject { font-weight: 900; font-size: 7.2pt; text-transform: uppercase; }
+            .teacher { font-weight: normal; font-size: 6.8pt; font-style: italic; }
+            .aula-box { display: block; width: 100%; text-align: left; padding: 1px 3px; line-height: 1.1; }
+            .room-info { display: block; font-size: 6pt; font-weight: bold; margin-top: 1px; color: #444; opacity: 0.8; }
             
             .empty { color: #ccc; font-weight: normal; }
             .footer-print { margin-top: 10px; font-size: 7pt; font-style: italic; text-align: right; border-top: 1px solid #eee; padding-top: 5px; }
@@ -166,7 +160,13 @@ export const CourseGrid = React.memo(
         html += `<div class="course-page">
           <div class="header">
             <h1>IFRO Campus ${campusName}</h1>
-            <p>Horário Acadêmico | ${selectedWeek}</p>
+            <p>${scheduleMode === 'padrao' 
+                ? 'Horário Acadêmico Padrão | Versão 1' 
+                : `Horário Acadêmico ${scheduleMode === 'previa' 
+                    ? 'Prévia' 
+                    : scheduleMode === 'consolidado' 
+                      ? 'Consolidado' 
+                      : 'Em execução'} | ${labelStr}`}</p>
             <div class="meta-info">
               <span>Curso: <strong>${course.toUpperCase()}</strong></span>
               <span>Emitido por: <strong>${loggedUserName}</strong></span>
@@ -190,17 +190,27 @@ export const CourseGrid = React.memo(
           });
 
           if (activeTimes.length > 0) {
-            // Calcular data real baseada no selectedWeek (ex: "Semana de 24/03 a ...")
+            // Calcular data real baseada na label da semana (ex: "Semana de 24/03 a ...")
             let dayAndDate = day.substring(0,3).toUpperCase();
             try {
-              const startMatch = selectedWeek.match(/de\s+(\d{2})\/(\d{2})/);
-              if (startMatch) {
+              // Regex mais flexível: procura o primeiro par DD/MM na string da semana
+              const dateParts = labelStr.match(/(\d{2})\/(\d{2})/);
+              if (dateParts) {
+                const dayVal = parseInt(dateParts[1]);
+                const monthVal = parseInt(dateParts[2]) - 1;
                 const daysMap = { "Segunda": 0, "Terça": 1, "Quarta": 2, "Quinta": 3, "Sexta": 4, "Sábado": 5, "Domingo": 6 };
-                const dt = new Date(new Date().getFullYear(), parseInt(startMatch[2]) - 1, parseInt(startMatch[1]));
+                
+                // Criar data base para o cálculo
+                const dt = new Date(new Date().getFullYear(), monthVal, dayVal);
                 dt.setDate(dt.getDate() + (daysMap[day] || 0));
-                dayAndDate += ` ${dt.getDate().toString().padStart(2,'0')}/${(dt.getMonth()+1).toString().padStart(2,'0')}`;
+                
+                const dFormatted = dt.getDate().toString().padStart(2, '0');
+                const mFormatted = (dt.getMonth() + 1).toString().padStart(2, '0');
+                dayAndDate += ` ${dFormatted}/${mFormatted}`;
               }
-            } catch(e) {}
+            } catch(e) {
+              console.error("Erro ao calcular data para impressão:", e);
+            }
 
             activeTimes.forEach((tObj, tIdx) => {
               const ts = tObj.timeStr || tObj;
@@ -215,10 +225,11 @@ export const CourseGrid = React.memo(
               classes.forEach(cls => {
                 const r = records.find(rec => rec.className === cls && rec.day === day && rec.time === ts);
                 if (r) {
+                  const teacherName = resolveTeacherName(r.teacher, globalTeachers);
                   html += `<td>
                     <div class="aula-box">
-                      <span class="subject">${r.subject}</span> - <span class="teacher">${resolveTeacherName(r.teacher, globalTeachers)}</span>
-                      ${r.room && r.room !== classRooms[cls] ? `<span class="room-info">SALA ${r.room}</span>` : ''}
+                      <div class="subject-line"><span class="subject">${r.subject}</span> - <span class="teacher">${teacherName}</span></div>
+                      ${r.room ? `<div class="room-info">S ${r.room}</div>` : ""}
                     </div>
                   </td>`;
                 } else {
@@ -250,8 +261,8 @@ export const CourseGrid = React.memo(
 
     return (
       <div className={`flex flex-col gap-8 w-full ${appMode === 'professor' ? 'max-w-full' : 'max-w-7xl'} mx-auto px-4 sm:px-8 mt-8 pb-20`}>
-        {/* CABEÇALHO PREMIUM (TELA) */}
-        <div className={`relative overflow-hidden p-8 rounded-[2.5rem] shadow-2xl transition-all duration-700 ${scheduleMode === "padrao" ? "bg-gradient-to-br from-blue-600 via-blue-700 to-indigo-900" : scheduleMode === "previa" ? "bg-gradient-to-br from-violet-600 via-purple-700 to-fuchsia-900" : "bg-gradient-to-br from-rose-600 via-rose-700 to-orange-900"}`}>
+        {/* CABEÇALHO PREMIUM (TELA) - REMOVIDO OVERFLOW HIDDEN PARA APARECER O SELECT */}
+        <div className={`relative p-8 rounded-[2.5rem] shadow-2xl transition-all duration-700 ${scheduleMode === "padrao" ? "bg-gradient-to-br from-indigo-700 via-blue-700 to-emerald-800" : "bg-gradient-to-br from-blue-700 via-teal-700 to-emerald-800"}`}>
           <div className="absolute top-0 right-0 w-96 h-96 bg-white/5 rounded-full -translate-y-1/2 translate-x-1/2 blur-3xl pointer-events-none" />
           <div className="absolute bottom-0 left-0 w-64 h-64 bg-black/10 rounded-full translate-y-1/2 -translate-x-1/2 blur-2xl pointer-events-none" />
           
@@ -272,7 +283,7 @@ export const CourseGrid = React.memo(
               </div>
             </div>
 
-            <div className="flex flex-wrap items-center gap-4 w-full md:w-auto">
+            <div className="flex flex-wrap items-center gap-4 w-full md:w-auto relative z-20">
               {setPadraoFilterTeacher && (
                 <div className="flex-1 md:w-72">
                   <SearchableSelect
@@ -283,7 +294,7 @@ export const CourseGrid = React.memo(
                   />
                 </div>
               )}
-              <button onClick={handlePrintClick} className="group relative overflow-hidden bg-white text-slate-900 px-8 py-4 rounded-2xl text-[12px] font-black uppercase tracking-widest transition-all hover:scale-105 hover:shadow-2xl active:scale-95 flex items-center gap-3">
+              <button onClick={handlePrintClick} className="group relative overflow-hidden bg-white text-slate-900 px-6 py-3 rounded-2xl text-[11px] font-black uppercase tracking-widest transition-all hover:scale-105 hover:shadow-2xl active:scale-95 flex items-center gap-3">
                 <div className="absolute inset-0 bg-gradient-to-r from-transparent via-black/5 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-1000" />
                 <Printer size={20} className="group-hover:rotate-12 transition-transform" />
                 Imprimir Pauta Oficial
@@ -292,8 +303,8 @@ export const CourseGrid = React.memo(
           </div>
         </div>
 
-        {/* NAVEGAÇÃO DE CURSOS (TELA) */}
-        {availableCourses.length > 0 && (
+        {/* NAVEGAÇÃO DE CURSOS (TELA) - ESCONDER SE TIVER FILTRO DE PROFESSOR */}
+        {!activeTeacherFilter && availableCourses.length > 0 && (
           <div className="flex flex-wrap gap-3 animate-in fade-in slide-in-from-left-4 duration-700">
             {["Todos", ...availableCourses].map(c => (
               <button key={c} onClick={() => setActiveCourseTab(c)} className={`px-6 py-3.5 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all hover:translate-y-[-2px] ${activeCourseTab === c ? (isDarkMode ? "bg-slate-700 text-white shadow-xl shadow-indigo-500/20 ring-2 ring-indigo-500" : "bg-indigo-600 text-white shadow-xl shadow-indigo-500/30") : (isDarkMode ? "bg-slate-800/80 text-slate-400 hover:text-white border border-slate-700" : "bg-white text-slate-500 border border-slate-200 hover:border-indigo-400 hover:text-indigo-600 shadow-sm")}`}>
@@ -312,64 +323,77 @@ export const CourseGrid = React.memo(
                <p className={`mt-2 text-sm font-medium ${isDarkMode ? "text-slate-500" : "text-slate-400"}`}>Não encontramos horários para os filtros selecionados.</p>
             </div>
           ) : (
-            (activeCourseTab === "Todos" ? availableCourses : [activeCourseTab]).map(course => {
-              const courseRecords = mappedSchedules.filter(r => r.course === course);
-              const courseClasses = [...new Set(courseRecords.map(r => r.className))].sort();
+            (activeTeacherFilter ? ["Visão Unificada"] : (activeCourseTab === "Todos" ? availableCourses : [activeCourseTab])).map(course => {
+              const courseRecords = activeTeacherFilter 
+                ? mappedSchedules.filter(r => (r.teacherId && String(r.teacherId).split(',').includes(String(activeTeacherFilter))))
+                : mappedSchedules.filter(r => r.course === course);
+              
+              const groupedClasses = [...new Set(courseRecords.map(r => r.className))].sort();
+              
+              // Se tiver filtro de colega, as turmas podem ser de cursos diferentes de forma mista.
+              // O título do grupo muda se for visão unificada.
+              const groupTitle = activeTeacherFilter ? `Grade de Horários: ${resolveTeacherName(activeTeacherFilter, globalTeachers)}` : course;
               
               return (
                 <div key={course} className={`group relative rounded-[3rem] border shadow-2xl transition-all duration-500 hover:shadow-indigo-500/5 ${isDarkMode ? "bg-slate-900/80 border-slate-800" : "bg-white border-slate-100"}`}>
                   <div className={`px-10 py-6 border-b flex items-center justify-between ${isDarkMode ? "border-slate-800/50" : "border-slate-50"}`}>
                     <div className="flex items-center gap-4">
                       <div className={`w-3 h-8 rounded-full ${scheduleMode === 'padrao' ? "bg-blue-500" : "bg-rose-500"}`} />
-                      <h3 className={`text-lg font-black uppercase tracking-tighter ${isDarkMode ? "text-slate-100" : "text-slate-800"}`}>{course}</h3>
+                      <h3 className={`text-lg font-black uppercase tracking-tighter ${isDarkMode ? "text-slate-100" : "text-slate-800"}`}>{groupTitle}</h3>
                     </div>
-                    <span className={`text-[10px] font-black opacity-30 uppercase tracking-[0.3em]`}>{courseClasses.length} Turmas</span>
+                    <span className={`text-[10px] font-black opacity-30 uppercase tracking-[0.3em]`}>{groupedClasses.length} Turmas</span>
                   </div>
                   
                   <div className="overflow-x-auto p-4 sm:p-8">
-                    <table className="w-full border-separate border-spacing-2">
+                    <table className="w-full border-separate border-spacing-1.5">
                        <thead>
-                          <tr className={`text-[11px] font-black uppercase tracking-[0.2em] ${isDarkMode ? "text-slate-500" : "text-slate-400"}`}>
-                            <th className="py-4 px-2 w-20 text-center">Dia</th>
-                            <th className="py-4 px-2 w-44 text-center">Intervalo</th>
-                            {courseClasses.map(cls => <th key={cls} className="py-4 px-6 text-center min-w-[180px]">{cls}</th>)}
+                          <tr className={`text-[10px] font-black uppercase tracking-[0.2em] ${isDarkMode ? "text-slate-500" : "text-slate-400"}`}>
+                            <th className="py-2 px-2 w-16 text-center">Dia</th>
+                            <th className="py-2 px-2 w-32 text-center">Intervalo</th>
+                            {groupedClasses.map(cls => <th key={cls} className="py-2 px-4 text-center min-w-[150px]">{cls}</th>)}
                           </tr>
                        </thead>
                        <tbody>
                           {safeDays.map(day => {
-                            const displayTimes = safeTimes;
+                            // Filtro dinâmico de horários para otimizar espaço - oculta linhas sem nenhuma aula em nenhuma turma do grupo
+                            const displayTimes = safeTimes.filter(t => 
+                               courseRecords.some(r => r.day === day && r.time === (t.timeStr || t))
+                            );
+
+                            if (displayTimes.length === 0) return null;
+
                             return (
                               <React.Fragment key={day}>
                                 {displayTimes.map((timeObj, idx) => (
                                   <tr key={timeObj.timeStr} className="group/row">
                                      {idx === 0 && (
-                                       <td rowSpan={displayTimes.length} className={`rounded-3xl border-2 border-dashed font-black text-[12px] uppercase text-center rotate-180 align-middle transition-all group-hover:border-indigo-500/50 group-hover:bg-indigo-500/5 ${isDarkMode ? "bg-slate-800/40 border-slate-800 text-slate-600" : "bg-slate-50 border-slate-200 text-slate-400"}`} style={{ writingMode: 'vertical-rl' }}>
+                                       <td rowSpan={displayTimes.length} className={`rounded-2xl border-2 border-dashed font-black text-[10px] uppercase text-center rotate-180 align-middle transition-all group-hover:border-indigo-500/50 group-hover:bg-indigo-500/5 ${isDarkMode ? "bg-slate-800/40 border-slate-800 text-slate-600" : "bg-slate-50 border-slate-200 text-slate-400"}`} style={{ writingMode: 'vertical-rl' }}>
                                          {getFormattedDayLabel(day)}
                                        </td>
                                      )}
-                                     <td className={`p-4 text-center font-black text-xs tracking-widest ${isDarkMode ? "text-slate-500" : "text-slate-400"}`}>
-                                        <div className={`px-4 py-2 rounded-xl border ${isDarkMode ? "border-slate-800 bg-slate-800/50" : "border-slate-100 bg-slate-50/50"}`}>
+                                     <td className={`p-1.5 text-center font-black text-[10px] tracking-widest ${isDarkMode ? "text-slate-500" : "text-slate-400"}`}>
+                                        <div className={`px-3 py-1.5 rounded-lg border ${isDarkMode ? "border-slate-800 bg-slate-800/50" : "border-slate-100 bg-slate-50/50"}`}>
                                           {timeObj.timeStr}
                                         </div>
                                      </td>
-                                     {courseClasses.map(cls => {
+                                     {groupedClasses.map(cls => {
                                         const r = courseRecords.find(rec => rec.className === cls && rec.day === day && rec.time === (timeObj.timeStr || timeObj));
                                         return (
-                                          <td key={cls} className="p-1 align-middle">
+                                          <td key={cls} className="p-0.5 align-middle">
                                              {r ? (
-                                                <div className={`group/card relative p-5 rounded-[1.8rem] border-b-[4px] shadow-xl transition-all duration-300 hover:translate-y-[-4px] hover:shadow-2xl overflow-hidden ${getColorHash(r.subject, isDarkMode)}`}>
-                                                   <div className="absolute top-0 right-0 w-16 h-16 bg-white/10 rounded-full translate-x-1/2 -translate-y-1/2 blur-lg group-hover/card:scale-150 transition-transform" />
-                                                   <div className="relative z-10 text-center flex flex-col gap-1.5">
-                                                      <span className="text-[11px] font-black uppercase leading-tight tracking-tight drop-shadow-sm">{r.subject}</span>
-                                                      <div className="flex flex-col items-center gap-0.5 opacity-80">
-                                                        <span className="text-[9px] font-bold italic">{resolveTeacherName(r.teacher, globalTeachers)}</span>
-                                                        {r.room && <span className="text-[8px] bg-black/20 px-2 py-0.5 rounded-lg mt-1 font-black tracking-widest uppercase">SALA {r.room}</span>}
+                                                <div className={`group/card relative p-2.5 rounded-[1.2rem] border-b-[3px] shadow-lg transition-all duration-300 hover:translate-y-[-2px] hover:shadow-xl overflow-hidden ${getColorHash(r.subject, isDarkMode)}`}>
+                                                   <div className="absolute top-0 right-0 w-12 h-12 bg-white/10 rounded-full translate-x-1/2 -translate-y-1/2 blur-md group-hover/card:scale-150 transition-transform" />
+                                                   <div className="relative z-10 text-center flex flex-col gap-0.5">
+                                                      <span className="text-[10px] font-black uppercase leading-tight tracking-tight drop-shadow-sm truncate">{r.subject}</span>
+                                                      <div className="flex flex-col items-center gap-0 opacity-80">
+                                                        <span className="text-[8px] font-bold italic truncate w-full">{resolveTeacherName(r.teacher, globalTeachers)}</span>
+                                                        {r.room && <span className="text-[7px] bg-black/20 px-1.5 py-0.5 rounded-md mt-0.5 font-black tracking-widest uppercase">SALA {r.room}</span>}
                                                       </div>
                                                    </div>
                                                 </div>
                                              ) : (
-                                                <div className={`h-16 rounded-[1.8rem] border-2 border-dashed flex items-center justify-center transition-all ${isDarkMode ? "border-slate-800/50 hover:border-slate-700" : "border-slate-100 hover:border-slate-200"}`}>
-                                                   <span className="text-xl font-black opacity-5 tracking-[0.5em]">-</span>
+                                                <div className={`h-10 rounded-[1.2rem] border-2 border-dashed flex items-center justify-center transition-all ${isDarkMode ? "border-slate-800/50 hover:border-slate-700" : "border-slate-100 hover:border-slate-200"}`}>
+                                                   <span className="text-sm font-black opacity-5 tracking-[0.3em]">-</span>
                                                 </div>
                                              )}
                                           </td>
