@@ -48,6 +48,27 @@ export function PortalProfessor({
   const dayOrder = React.useMemo(() => ({ 'seg': 1, 'ter': 2, 'qua': 3, 'qui': 4, 'sex': 5, 'sab': 6, 'dom': 7 }), []);
   const shortDayMap = React.useMemo(() => ({ 'Segunda-feira': 'seg', 'Terça-feira': 'ter', 'Quarta-feira': 'qua', 'Quinta-feira': 'qui', 'Sexta-feira': 'sex', 'Sábado': 'sab', 'Domingo': 'dom', 'seg': 'seg', 'ter': 'ter', 'qua': 'qua', 'qui': 'qui', 'sex': 'sex', 'sab': 'sab', 'dom': 'dom' }), []);
 
+  const [dbCourses, setDbCourses] = useState([]);
+  const [dbClasses, setDbClasses] = useState([]);
+  const [editorModal, setEditorModal] = useState(null);
+  const [showOnlyMyClasses, setShowOnlyMyClasses] = useState(true);
+  const [showEmptySlots, setShowEmptySlots] = useState(false);
+  const [padraoFilterTeacher, setPadraoFilterTeacher] = useState('Todos');
+  const [selectedColleague, setSelectedColleague] = useState('');
+  const [pendingRequests, setPendingRequests] = useState([]);
+  const [requests, setRequests] = useState([]);
+  const [showVacantInMyClasses, setShowVacantInMyClasses] = useState(false);
+  const [dashboardTab, setDashboardTab] = useState('atual');
+  const [vacantRequestModal, setVacantRequestModal] = useState(null);
+  const [teacherDirectModal, setTeacherDirectModal] = useState(null);
+  const [alertModal, setAlertModal] = useState(null);
+  const [draggingRecord, setDraggingRecord] = useState(null);
+  const [exchangeTarget, setExchangeTarget] = useState(null);
+  const [exchangeAction, setExchangeAction] = useState(null);
+  const [pendingReverseTarget, setPendingReverseTarget] = useState(null);
+
+  const previousViewMode = React.useRef(viewMode);
+
   const handleModeChange = (newMode) => {
     if (typeof setScheduleMode === 'function') {
       startTransition(() => {
@@ -120,18 +141,8 @@ export function PortalProfessor({
     }
 
     return filtered;
-   }, [schedules, selectedClass, dbClasses, selectedWeek]);
+   }, [schedules, selectedClass, dbClasses, selectedWeek, scheduleMode, selectedConfigYear]);
 
-  const [editorModal, setEditorModal] = useState(null);
-  const [showOnlyMyClasses, setShowOnlyMyClasses] = useState(true);
-  const [showEmptySlots, setShowEmptySlots] = useState(false);
-  const [padraoFilterTeacher, setPadraoFilterTeacher] = useState('Todos');
-  const [selectedColleague, setSelectedColleague] = useState('');
-  const [pendingRequests, setPendingRequests] = useState([]);
-  
-  // New Requests Logic as requested
-  const [requests, setRequests] = useState([]);
-  const previousViewMode = React.useRef(viewMode);
   React.useEffect(() => {
     previousViewMode.current = viewMode;
   }, [viewMode, setScheduleMode, setSelectedCourse, setSelectedClass, showOnlyMyClasses, padraoFilterTeacher, selectedCourse, selectedClass]);
@@ -139,13 +150,6 @@ export function PortalProfessor({
   React.useEffect(() => { 
     apiClient.getRequests().then(data => setRequests(data)).catch(console.error);
   }, []);
-
-  const [showVacantInMyClasses, setShowVacantInMyClasses] = useState(false);
-  const [dashboardTab, setDashboardTab] = useState('atual');
-  const [vacantRequestModal, setVacantRequestModal] = useState(null);
-  const [teacherDirectModal, setTeacherDirectModal] = useState(null);
-  const [alertModal, setAlertModal] = useState(null);
-  
 
   const canReadProtectedRequests = React.useMemo(() => {
     return !!siape;
@@ -178,11 +182,6 @@ export function PortalProfessor({
     socket.on('schedule_updated', onScheduleUpdated);
     return () => socket.off('schedule_updated', onScheduleUpdated);
   }, [loadPendingRequests, scheduleMode, canReadProtectedRequests]);
-
-  const [draggingRecord, setDraggingRecord] = useState(null);
-  const [exchangeTarget, setExchangeTarget] = useState(null);
-  const [exchangeAction, setExchangeAction] = useState(null);
-  const [pendingReverseTarget, setPendingReverseTarget] = useState(null);
   
 
   const padraoExchangeRecords = React.useMemo(() => {
@@ -407,9 +406,6 @@ export function PortalProfessor({
       semanasComRegistro: weeks.size
     };
   }, [schedules, selectedConfigYear, appMode, siape, selectedTeacher]);
-
-  const [dbCourses, setDbCourses] = useState([]);
-  const [dbClasses, setDbClasses] = useState([]);
 
   React.useEffect(() => {
     Promise.all([

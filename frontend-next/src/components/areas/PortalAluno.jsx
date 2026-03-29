@@ -1,6 +1,6 @@
 import React, { useState, useTransition } from 'react';
 import { 
-  Calendar, Layers, BarChart3, ListTodo, CalendarDays, Sun, RefreshCcw, HandHeart, X, ExternalLink, Scissors, MapPin, Monitor, Mail, MessageCircle, Activity,
+  Calendar, UserCircle, Layers, BarChart3, ListTodo, CalendarDays, Sun, RefreshCcw, HandHeart, X, ExternalLink, Scissors, MapPin, Monitor, Mail, MessageCircle, Activity,
   BookOpen, FileText, Users, CheckCircle, AlertCircle, XCircle, Eye, Clock, Check, Printer, Home, Globe, Book, Shuffle, ClipboardList, Search, LayoutDashboard, MessageSquare
 } from 'lucide-react';
 import { SearchableSelect } from '../ui/SearchableSelect';
@@ -23,6 +23,8 @@ export function PortalAluno({
   const { globalTeachers, subjectHoursMeta, selectedConfigYear, disciplinesMeta, schedules, academicWeeks } = useData();
   const [isPending, startTransition] = useTransition();
   const [dashboardTab, setDashboardTab] = useState('atual');
+  const [dbCourses, setDbCourses] = useState([]);
+  const [dbClasses, setDbClasses] = useState([]);
 
   // Constantes de mapeamento de dias
   const dayFullLabels = React.useMemo(() => ({ 'seg': 'Segunda', 'ter': 'Terça', 'qua': 'Quarta', 'qui': 'Quinta', 'sex': 'Sexta', 'sab': 'Sábado', 'dom': 'Domingo' }), []);
@@ -136,8 +138,6 @@ export function PortalAluno({
     return `${dayName.split('-')[0].toUpperCase()} ${String(targetDate.getDate()).padStart(2, '0')}/${String(targetDate.getMonth() + 1).padStart(2, '0')}`;
   };
 
-  const [dbCourses, setDbCourses] = useState([]);
-  const [dbClasses, setDbClasses] = useState([]);
 
   React.useEffect(() => {
     Promise.all([
@@ -327,14 +327,18 @@ export function PortalAluno({
 
   // Estatísticas e Labels
   const stats = React.useMemo(() => {
-    if (!selectedClass) return { lecionadas: 0, vagas: 0 };
+    if (!selectedClass || !schedules || !selectedConfigYear) return { lecionadas: 0, vagas: 0 };
     const classId = dbClasses.find(c => c.name === selectedClass)?.id;
-    const oficiales = schedules.filter(s => s.type === 'oficial' && String(s.classId) === String(classId));
+    const oficiais = schedules.filter(s => 
+      (s.type === 'oficial' || s.type === 'atual') && 
+      String(s.academic_year) === String(selectedConfigYear) && 
+      String(s.classId) === String(classId)
+    );
     return {
-      lecionadas: oficiales.length,
+      lecionadas: oficiais.length,
       vagas: oficiais.filter(s => !s.teacherId || s.teacherId === 'A Definir').length
     };
-  }, [schedules, selectedClass, dbClasses]);
+  }, [schedules, selectedClass, dbClasses, selectedConfigYear]);
 
   const weekLabel = React.useMemo(() => {
       const w = academicWeeks?.find(week => String(week.id) === String(selectedWeek));
