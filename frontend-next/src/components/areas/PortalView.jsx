@@ -797,7 +797,8 @@ export function PortalView({
 
     // 1. Atual (Minha Turma - oficiais da semana selecionada)
     const atualRaw = mappedSchedules.filter(s => 
-      String(s.classId) === classIdRef
+      String(s.classId) === classIdRef &&
+      String(s.week || s.week_id || s.academic_week_id) === String(selectedWeek)
     );
     const atual = groupByDay(atualRaw);
 
@@ -1179,19 +1180,6 @@ export function PortalView({
                               })}
                         </div>
                         
-                        <button 
-                          onClick={() => {
-                            // Se estiver no dashboard de aluno, muda para vista de turma antes de imprimir para garantir o grid completo, 
-                            // ou chama o handlePrint que se encarrega de saber o que imprimir.
-                            if (typeof handlePrint === 'function') handlePrint();
-                          }}
-                          className={`group flex items-center justify-center gap-2 px-6 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all duration-500 no-print border ${isDarkMode ? 'bg-slate-800 border-slate-700 text-slate-400 hover:text-white hover:bg-slate-700 hover:border-slate-600' : 'bg-white border-slate-200 text-slate-500 hover:bg-slate-50 hover:border-slate-300 shadow-sm'}`}
-                        >
-                          <div className={`w-8 h-8 rounded-lg flex items-center justify-center transition-all duration-500 ${isDarkMode ? 'bg-slate-900 text-slate-400 group-hover:bg-slate-600 group-hover:text-white' : 'bg-slate-100 text-slate-500 group-hover:bg-white group-hover:text-slate-900 shadow-inner'}`}>
-                             <Printer size={16} className="group-hover:rotate-12 group-hover:scale-110 transition-transform duration-500" />
-                          </div>
-                          Imprimir
-                        </button>
                       </div>
                    </div>
 

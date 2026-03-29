@@ -76,11 +76,13 @@ export const ClassGrid = React.memo(({
           </div>
         </div>
         
-        <button onClick={handlePrint} className="group relative flex items-center gap-3 px-6 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all duration-500 bg-white/10 hover:bg-white/20 text-white border border-white/20 active:scale-95 no-print overflow-hidden">
-          <div className="absolute inset-0 bg-white/10 opacity-0 group-hover:opacity-100 transition-opacity" />
-          <Printer size={16} className="relative z-10 transition-transform duration-500 group-hover:scale-110" />
-          <span className="relative z-10">Imprimir Grade</span>
-        </button>
+        {appMode !== 'aluno' && (
+          <button onClick={handlePrint} className="group relative flex items-center gap-3 px-6 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all duration-500 bg-white/10 hover:bg-white/20 text-white border border-white/20 active:scale-95 no-print overflow-hidden">
+            <div className="absolute inset-0 bg-white/10 opacity-0 group-hover:opacity-100 transition-opacity" />
+            <Printer size={16} className="relative z-10 transition-transform duration-500 group-hover:scale-110" />
+            <span className="relative z-10">Imprimir Grade</span>
+          </button>
+        )}
       </div>
       
       <div className="hidden print:block font-black text-[14px] uppercase border-b-[3px] border-black pb-2 tracking-widest mt-4 mb-4 text-black">
