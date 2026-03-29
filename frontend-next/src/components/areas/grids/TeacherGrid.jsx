@@ -353,9 +353,11 @@ export const TeacherGrid = React.memo(
                               {courseClasses.map((cls) => (
                                 <th
                                   key={`head-${cls}`}
-                                  className={`py-3 px-4 border-r-[3px] last:border-r-0 text-center ${isDarkMode ? "border-slate-700 text-slate-200" : "border-slate-300 text-slate-800"}`}
+                                  className={`py-4 px-2 border-r-[3px] last:border-r-0 text-center ${isDarkMode ? "border-slate-700/50" : "border-slate-300/50"} align-middle`}
                                 >
-                                  {cls}
+                                  <div className={`px-3 py-2 rounded-xl border-b-[4px] font-black text-[11px] uppercase tracking-tighter shadow-md transition-all ${isDarkMode ? "bg-slate-800/80 border-indigo-500/30 text-indigo-400 shadow-indigo-900/10" : "bg-white border-indigo-100 text-indigo-700 shadow-indigo-50/50"}`}>
+                                    {cls}
+                                  </div>
                                 </th>
                               ))}
                             </tr>

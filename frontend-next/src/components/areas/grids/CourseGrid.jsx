@@ -370,11 +370,17 @@ export const CourseGrid = React.memo(
                   <div className="overflow-x-auto p-4 sm:p-8">
                     <table className="w-full border-separate border-spacing-1.5">
                        <thead>
-                          <tr className={`text-[10px] font-black uppercase tracking-[0.2em] ${isDarkMode ? "text-slate-500" : "text-slate-400"}`}>
-                            <th className="py-2 px-2 w-16 text-center">Dia</th>
-                            <th className="py-2 px-2 w-32 text-center">Intervalo</th>
-                            {groupedClasses.map(cls => <th key={cls} className="py-2 px-4 text-center min-w-[150px]">{cls}</th>)}
-                          </tr>
+                           <tr className={`text-[10px] font-black uppercase tracking-[0.2em] ${isDarkMode ? "text-slate-500" : "text-slate-400"}`}>
+                             <th className="py-2 px-2 w-16 text-center">Dia</th>
+                             <th className="py-2 px-2 w-32 text-center">Intervalo</th>
+                             {groupedClasses.map(cls => (
+                                 <th key={cls} className="py-4 px-2 text-center min-w-[150px] align-middle">
+                                    <div className={`px-4 py-2.5 rounded-2xl border-b-[4px] font-black text-[12px] uppercase tracking-tighter shadow-lg transition-all scale-[1.02] ${isDarkMode ? "bg-slate-800/80 border-indigo-500/30 text-indigo-400 shadow-indigo-900/40" : "bg-white border-indigo-100 text-indigo-700 shadow-indigo-50/50"}`}>
+                                       {cls}
+                                    </div>
+                                 </th>
+                             ))}
+                           </tr>
                        </thead>
                        <tbody>
                           {safeDays.map(day => {
