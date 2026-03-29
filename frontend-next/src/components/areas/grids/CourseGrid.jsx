@@ -281,8 +281,8 @@ export const CourseGrid = React.memo(
     };
 
     return (
-      <div className={`flex flex-col gap-8 w-full ${appMode === 'professor' ? 'max-w-full' : 'max-w-7xl'} mx-auto px-4 sm:px-8 mt-8 pb-20`}>
-        {/* CABEÇALHO PREMIUM (TELA) - REMOVIDO OVERFLOW HIDDEN PARA APARECER O SELECT */}
+      <div className={`flex flex-col gap-6 w-full ${appMode === 'professor' ? 'max-w-full' : 'max-w-7xl'} mx-auto px-4 sm:px-8 mt-6 pb-20 animate-in fade-in duration-700`}>
+        {/* CABEÇALHO GLOBAL DA GRADE (TELA) */}
         <div className={`relative p-8 rounded-[2.5rem] shadow-2xl transition-all duration-700 ${scheduleMode === "padrao" ? "bg-gradient-to-br from-indigo-700 via-blue-700 to-emerald-800" : "bg-gradient-to-br from-blue-700 via-teal-700 to-emerald-800"}`}>
           <div className="absolute top-0 right-0 w-96 h-96 bg-white/5 rounded-full -translate-y-1/2 translate-x-1/2 blur-3xl pointer-events-none" />
           <div className="absolute bottom-0 left-0 w-64 h-64 bg-black/10 rounded-full translate-y-1/2 -translate-x-1/2 blur-2xl pointer-events-none" />
@@ -295,7 +295,7 @@ export const CourseGrid = React.memo(
                 </div>
                 <div>
                   <h2 className="text-white font-black text-2xl uppercase tracking-tighter leading-none">Grade de Horários</h2>
-                  <p className="text-white/70 text-[10px] uppercase font-bold tracking-[0.2em] mt-1">Portal do Docente • Gestão Acadêmica</p>
+                  <p className="text-white/70 text-[10px] uppercase font-bold tracking-[0.2em] mt-1">{appMode === 'aluno' ? 'Portal do Aluno · Quadro Oficial' : 'Portal do Docente · Gestão Acadêmica'}</p>
                 </div>
               </div>
               <div className="inline-flex items-center gap-2 bg-black/20 backdrop-blur-md px-4 py-2 rounded-full border border-white/10 w-fit">
@@ -325,14 +325,18 @@ export const CourseGrid = React.memo(
         </div>
 
         {/* NAVEGAÇÃO DE CURSOS (TELA) - ESCONDER SE TIVER FILTRO DE PROFESSOR OU FOR VISÃO CONSOLIDADA */}
-        {!isConsolidatedView && availableCourses.length > 0 && (
-          <div className="flex flex-wrap gap-3 animate-in fade-in slide-in-from-left-4 duration-700">
-            {["Todos", ...availableCourses].map(c => (
-              <button key={c} onClick={() => setActiveCourseTab(c)} className={`px-6 py-3.5 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all hover:translate-y-[-2px] ${activeCourseTab === c ? (isDarkMode ? "bg-slate-700 text-white shadow-xl shadow-indigo-500/20 ring-2 ring-indigo-500" : "bg-indigo-600 text-white shadow-xl shadow-indigo-500/30") : (isDarkMode ? "bg-slate-800/80 text-slate-400 hover:text-white border border-slate-700" : "bg-white text-slate-500 border border-slate-200 hover:border-indigo-400 hover:text-indigo-600 shadow-sm")}`}>
-                 {c === "Todos" ? "Todas as Turmas" : c}
-              </button>
-            ))}
-          </div>
+        {!isConsolidatedView && availableCourses.length > 1 && (
+            <div className="flex flex-wrap gap-2 animate-in fade-in slide-in-from-top-2 no-print">
+              {["Todos", ...availableCourses].map((course) => (
+                <button
+                  key={course}
+                  onClick={() => setActiveCourseTab(course)}
+                  className={`px-4 py-2.5 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all ${activeCourseTab === course ? (scheduleMode === "padrao" ? "bg-indigo-600 text-white shadow-md ring-2 ring-indigo-500/50" : "bg-emerald-600 text-white shadow-md ring-2 ring-emerald-500/50") : isDarkMode ? "bg-slate-800 text-slate-400 hover:bg-slate-700 hover:text-white" : "bg-white text-slate-500 border border-slate-200 hover:bg-slate-50 hover:text-slate-700"}`}
+                >
+                  {course === "Todos" ? "Todos os Cursos" : course}
+                </button>
+              ))}
+            </div>
         )}
 
         {/* GRADES VISUAIS (TELA) */}

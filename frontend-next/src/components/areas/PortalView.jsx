@@ -1481,40 +1481,32 @@ export function PortalView({
                         </>
                       ) : (
                         <>
-                          <button onClick={() => setViewMode("hoje")} 
-                                  className={`group p-6 rounded-3xl border text-left transition-all hover:scale-[1.02] ${isDarkMode ? "bg-slate-800 border-slate-700 hover:border-blue-500/50" : "bg-white border-slate-100 hover:border-blue-200 shadow-sm hover:shadow-xl"}`}>
-                            <div className={`w-10 h-10 rounded-xl flex items-center justify-center mb-4 transition-colors ${isDarkMode ? "bg-blue-950 text-blue-400 group-hover:bg-blue-600 group-hover:text-white" : "bg-blue-50 text-blue-600 group-hover:bg-blue-600 group-hover:text-white"}`}>
-                              <ListTodo size={20} />
-                            </div>
-                            <h3 className={`text-sm font-black mb-1 ${isDarkMode ? "text-white" : "text-slate-800"}`}>Painel Diário</h3>
-                            <p className="text-[10px] font-medium text-slate-500 leading-tight">O que temos para hoje?</p>
-                          </button>
-
                           <button onClick={() => setViewMode("turma")} 
-                                  className={`group p-6 rounded-3xl border text-left transition-all hover:scale-[1.02] ${isDarkMode ? "bg-slate-800 border-slate-700 hover:border-emerald-500/50" : "bg-white border-slate-100 hover:border-emerald-200 shadow-sm hover:shadow-xl"}`}>
-                            <div className={`w-10 h-10 rounded-xl flex items-center justify-center mb-4 transition-colors ${isDarkMode ? "bg-emerald-950 text-emerald-400 group-hover:bg-emerald-600 group-hover:text-white" : "bg-emerald-50 text-emerald-600 group-hover:bg-emerald-600 group-hover:text-white"}`}>
-                              <Calendar size={20} />
+                                  className={`group p-6 rounded-[2rem] border text-left transition-all duration-500 glass-card inner-glow-emerald ${isDarkMode ? "border-slate-800 hover:border-emerald-500/40" : "border-slate-100 hover:border-emerald-200 hover:shadow-xl hover:shadow-emerald-500/5"}`}>
+                            <div className={`w-12 h-12 rounded-2xl flex items-center justify-center mb-4 transition-all duration-500 ${isDarkMode ? "bg-emerald-950/60 text-emerald-400 group-hover:bg-emerald-600 group-hover:text-white" : "bg-emerald-50 text-emerald-600 group-hover:bg-emerald-600 group-hover:text-white shadow-sm"}`}>
+                              <Calendar size={24} />
                             </div>
-                            <h3 className={`text-sm font-black mb-1 ${isDarkMode ? "text-white" : "text-slate-800"}`}>Minha Turma</h3>
-                            <p className="text-[10px] font-medium text-slate-500 leading-tight">Visualizar horário completo.</p>
+                            <h3 className={`text-sm font-black mb-1 ${isDarkMode ? "text-emerald-50" : "text-slate-800"}`}>Minha Turma</h3>
+                            <p className="text-[10px] font-bold text-slate-500 leading-tight uppercase tracking-tighter">Visualizar horário completo</p>
                           </button>
 
                           <button onClick={() => setViewMode("professor")} 
-                                  className={`group p-6 rounded-3xl border text-left transition-all hover:scale-[1.02] ${isDarkMode ? "bg-slate-800 border-slate-700 hover:border-indigo-500/50" : "bg-white border-slate-100 hover:border-indigo-200 shadow-sm hover:shadow-xl"}`}>
-                            <div className={`w-10 h-10 rounded-xl flex items-center justify-center mb-4 transition-colors ${isDarkMode ? "bg-indigo-950 text-indigo-400 group-hover:bg-indigo-600 group-hover:text-white" : "bg-indigo-50 text-indigo-600 group-hover:bg-indigo-600 group-hover:text-white"}`}>
-                              <UserCircle size={20} />
+                                  className={`group p-6 rounded-[2rem] border text-left transition-all duration-500 glass-card inner-glow-indigo ${isDarkMode ? "border-slate-800 hover:border-indigo-500/40" : "border-slate-100 hover:border-indigo-200 hover:shadow-xl hover:shadow-indigo-500/5"}`}>
+                            <div className={`w-12 h-12 rounded-2xl flex items-center justify-center mb-4 transition-all duration-500 ${isDarkMode ? "bg-indigo-950/60 text-indigo-400 group-hover:bg-indigo-600 group-hover:text-white" : "bg-indigo-50 text-indigo-600 group-hover:bg-indigo-600 group-hover:text-white shadow-sm"}`}>
+                              <UserCircle size={24} />
                             </div>
-                            <h3 className={`text-sm font-black mb-1 ${isDarkMode ? "text-white" : "text-slate-800"}`}>Professor</h3>
-                            <p className="text-[10px] font-medium text-slate-500 leading-tight">Buscar por docente.</p>
+                            <h3 className={`text-sm font-black mb-1 ${isDarkMode ? "text-indigo-50" : "text-slate-800"}`}>Professor</h3>
+                            <p className="text-[10px] font-bold text-slate-500 leading-tight uppercase tracking-tighter">Buscar por docente</p>
                           </button>
 
                           <button onClick={() => { setViewMode('historico'); setScheduleMode('oficial'); }} 
-                                  className={`group p-6 rounded-3xl border text-left transition-all hover:scale-[1.02] ${isDarkMode ? "bg-slate-800 border-slate-700 hover:border-orange-500/50" : "bg-white border-slate-100 hover:border-orange-200 shadow-sm hover:shadow-xl"}`}>
-                            <div className={`w-10 h-10 rounded-xl flex items-center justify-center mb-4 transition-colors ${isDarkMode ? "bg-orange-950 text-orange-400 group-hover:bg-orange-600 group-hover:text-white" : "bg-orange-50 text-orange-600 group-hover:bg-orange-600 group-hover:text-white"}`}>
-                              <Clock size={20} />
+                                  className={`group p-6 rounded-[2rem] border text-left transition-all duration-500 glass-card inner-glow-orange ${isDarkMode ? "border-slate-800 hover:border-orange-500/40" : "border-slate-100 hover:border-orange-200 hover:shadow-xl hover:shadow-orange-500/5"}`}>
+                            <div className={`w-12 h-12 rounded-2xl flex items-center justify-center mb-4 transition-all duration-500 ${isDarkMode ? "bg-orange-950/60 text-orange-400 group-hover:bg-orange-600 group-hover:text-white" : "bg-orange-50 text-orange-600 group-hover:bg-orange-600 group-hover:text-white shadow-sm"}`}>
+                              <Clock size={24} />
                             </div>
-                            <h3 className={`text-sm font-black mb-1 ${isDarkMode ? "text-white" : "text-slate-800"}`}>Aulas Passadas</h3>
-                                         </button>
+                            <h3 className={`text-sm font-black mb-1 ${isDarkMode ? "text-orange-50" : "text-slate-800"}`}>Aulas Passadas</h3>
+                            <p className="text-[10px] font-bold text-slate-500 leading-tight uppercase tracking-tighter">Histórico semanal</p>
+                          </button>
                         </>
                       )}
                     </div>
@@ -1642,23 +1634,19 @@ export function PortalView({
                     <>
                       {/* Destaques Aluno */}
                       <button onClick={() => setViewMode('dashboard')} 
-                              className={`flex-1 sm:flex-none min-w-[130px] flex items-center justify-center gap-2 px-4 py-3 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all ${viewMode === 'dashboard' ? (isDarkMode ? 'bg-slate-700 text-white' : 'bg-slate-600 text-white shadow-lg ring-2 ring-slate-400/30') : (isDarkMode ? 'bg-slate-800 text-slate-300 hover:text-white hover:bg-slate-700' : 'bg-white text-slate-600 hover:text-slate-900 border border-slate-200 shadow-sm')}`}>
+                              className={`flex-1 sm:flex-none min-w-[130px] flex items-center justify-center gap-2 px-4 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${viewMode === 'dashboard' ? (isDarkMode ? 'bg-slate-700 text-white shadow-lg ring-1 ring-slate-600' : 'bg-slate-600 text-white shadow-lg ring-2 ring-slate-400/30') : (isDarkMode ? 'bg-slate-800 text-slate-300 hover:text-white hover:bg-slate-700' : 'bg-white text-slate-600 hover:text-slate-900 border border-slate-200 shadow-sm')}`}>
                         <Home size={14} /> Início
                       </button>
-                      <button onClick={() => { setViewMode('hoje'); if (scheduleMode === 'oficial') handleAlunoScheduleTab('atual'); }} 
-                              className={`flex-1 sm:flex-none min-w-[130px] flex items-center justify-center gap-2 px-4 py-3 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all ${viewMode === 'hoje' ? 'bg-blue-600 text-white shadow-lg shadow-blue-900/40 ring-2 ring-blue-400/50' : (isDarkMode ? 'bg-slate-800 text-slate-300 hover:text-white hover:bg-slate-700' : 'bg-white text-slate-600 hover:text-slate-900 border border-slate-200')}`}>
-                        <ListTodo size={14} /> Painel Diário
-                      </button>
                       <button onClick={() => { setViewMode('turma'); if (scheduleMode === 'oficial') handleAlunoScheduleTab('atual'); }} 
-                              className={`flex-1 sm:flex-none min-w-[130px] flex items-center justify-center gap-2 px-4 py-3 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all ${viewMode === 'turma' ? 'bg-emerald-600 text-white shadow-lg shadow-emerald-900/40 ring-2 ring-emerald-400/50' : (isDarkMode ? 'bg-slate-800 text-slate-300 hover:text-white hover:bg-slate-700' : 'bg-white text-slate-600 hover:text-slate-900 border border-slate-200')}`}>
+                              className={`flex-1 sm:flex-none min-w-[130px] flex items-center justify-center gap-2 px-4 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${viewMode === 'turma' ? 'bg-emerald-600 text-white shadow-lg shadow-emerald-900/40 ring-2 ring-emerald-400/50' : (isDarkMode ? 'bg-slate-800 text-slate-300 hover:text-white hover:bg-slate-700' : 'bg-white text-slate-600 hover:text-slate-900 border border-slate-200 shadow-sm')}`}>
                         <Calendar size={14} /> Minha Turma
                       </button>
                       <button onClick={() => setViewMode('professor')} 
-                              className={`flex-1 sm:flex-none min-w-[130px] flex items-center justify-center gap-2 px-4 py-3 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all ${viewMode === 'professor' ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-900/40 ring-2 ring-indigo-400/50' : (isDarkMode ? 'bg-slate-800 text-slate-300 hover:text-white hover:bg-slate-700' : 'bg-white text-slate-600 hover:text-slate-900 border border-slate-200')}`}>
+                              className={`flex-1 sm:flex-none min-w-[130px] flex items-center justify-center gap-2 px-4 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${viewMode === 'professor' ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-900/40 ring-2 ring-indigo-400/50' : (isDarkMode ? 'bg-slate-800 text-slate-300 hover:text-white hover:bg-slate-700' : 'bg-white text-slate-600 hover:text-slate-900 border border-slate-200 shadow-sm')}`}>
                         <UserCircle size={14} /> Professor
                       </button>
                       <button onClick={() => { setViewMode('historico'); setScheduleMode('oficial'); }} 
-                              className={`flex-1 sm:flex-none min-w-[130px] flex items-center justify-center gap-2 px-4 py-3 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all ${viewMode === 'historico' ? 'bg-orange-600 text-white shadow-lg shadow-orange-900/40 ring-2 ring-orange-400/50' : (isDarkMode ? 'bg-slate-800 text-slate-300 hover:text-white hover:bg-slate-700' : 'bg-white text-slate-600 hover:text-slate-900 border border-slate-200')}`}>
+                              className={`flex-1 sm:flex-none min-w-[130px] flex items-center justify-center gap-2 px-4 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${viewMode === 'historico' ? 'bg-orange-600 text-white shadow-lg shadow-orange-900/40 ring-2 ring-orange-400/50' : (isDarkMode ? 'bg-slate-800 text-slate-300 hover:text-white hover:bg-slate-700' : 'bg-white text-slate-600 hover:text-slate-900 border border-slate-200 shadow-sm')}`}>
                         <Clock size={14} /> Aulas Passadas
                       </button>
                     </>
@@ -1764,8 +1752,8 @@ export function PortalView({
               <React.Fragment>
             {/* OPÇÕES DE BASE DE DADOS (Movido para perto da tabela) */}
             {viewMode !== 'total' && (
-              <div className={`border p-2.5 rounded-2xl shadow-sm flex flex-col md:flex-row items-center justify-between gap-4 mb-2 no-print ${isDarkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'}`}>
-                <div className={`flex border p-1 rounded-xl w-full md:w-auto shrink-0 ${isDarkMode ? 'bg-slate-900 border-slate-700' : 'bg-slate-50 border-slate-200'}`}>
+              <div className={`border p-2.5 rounded-lg shadow-sm flex flex-col md:flex-row items-center justify-between gap-4 mb-2 no-print ${isDarkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'}`}>
+                <div className={`flex border p-1 rounded-lg w-full md:w-auto shrink-0 ${isDarkMode ? 'bg-slate-900 border-slate-700' : 'bg-slate-50 border-slate-200'}`}>
                   {appMode === 'aluno' ? (
                     <>
                       {viewMode !== 'historico' ? (
@@ -1778,9 +1766,9 @@ export function PortalView({
                           </button>
                         </>
                       ) : (
-                          <div className={`flex-1 md:flex-none flex items-center justify-center gap-1.5 px-6 py-2.5 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all bg-orange-500 text-white shadow-md cursor-default`}>
-                            <Clock size={14} /> Histórico Consolidado
-                          </div>
+                          <button onClick={() => handleAlunoScheduleTab('historico')} className={`flex-1 md:flex-none flex items-center justify-center gap-1.5 px-6 py-2.5 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all ${scheduleMode === 'oficial' ? 'bg-emerald-500 text-white shadow-md' : (isDarkMode ? 'text-slate-400 hover:bg-slate-800 hover:text-white' : 'text-slate-500 hover:bg-slate-100 hover:text-slate-800')}`}>
+                            <Clock size={14} /> Histórico Semanal
+                          </button>
                       )}
                     </>
                   ) : (
@@ -1842,104 +1830,6 @@ export function PortalView({
                 </div>
               ) : (
                 <>
-
-                  {/* VISTA: HORÁRIO DO DIA (Alunos) - COMPACTA EM LISTA */}
-                  {viewMode === 'hoje' && (
-                    <div className={`rounded-2xl shadow-sm border overflow-hidden animate-in zoom-in-95 duration-500 max-w-4xl mx-auto ${isDarkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'}`}>
-                      <div className={`text-white px-5 py-3.5 flex items-center justify-between no-print ${isDarkMode ? 'bg-blue-950' : 'bg-blue-800'}`}>
-                         <div className="flex items-center gap-2.5">
-                           <ListTodo size={18} />
-                           <h2 className="font-black text-sm uppercase tracking-widest flex items-center gap-2">
-                             {scheduleMode === 'padrao' && <span className="bg-white/20 px-1.5 py-0.5 rounded text-[8px]">PADRÃO</span>}
-                             {scheduleMode === 'previa' && <span className="bg-white/20 px-1.5 py-0.5 rounded text-[8px]">PRÉVIA</span>}
-                             Horário do Dia: {selectedClass}
-                           </h2>
-                           {weekLabel && <span className="text-[9px] font-black bg-white/10 px-3 py-1 rounded-full tracking-widest uppercase shadow-inner ml-2">{weekLabel}</span>}
-                         </div>
-                      </div>
-
-                      {/* Seletor Horizontal de Dias */}
-                      <div className={`flex overflow-x-auto p-1.5 border-b no-scrollbar no-print ${isDarkMode ? 'bg-slate-900/50 border-slate-800' : 'bg-slate-50 border-slate-100'}`}>
-                         {safeDays.map(d => (
-                            <button key={d} onClick={() => setSelectedDay(d)} className={`px-4 py-2 rounded-lg text-[10px] font-black uppercase tracking-widest whitespace-nowrap transition-all ${selectedDay === d ? 'bg-blue-500 text-white shadow-sm' : (isDarkMode ? 'text-slate-400 hover:bg-slate-800 hover:text-slate-300' : 'text-slate-400 hover:bg-slate-200 hover:text-slate-700')}`}>{getFormattedDayLabel(d)}</button>
-                         ))}
-                      </div>
-
-                      <div className="p-4 md:p-6 space-y-3">
-                         {(() => {
-                            let currentShift = '';
-                            const getEntityRecords = () => appMode === 'aluno' ? mappedSchedules.filter(r => r.className === selectedClass) : mappedSchedules.filter(r => r.teacherId && r.teacherId.includes(String(siape)));
-                            const eShifts = new Set(getEntityRecords().map(r => safeTimes.find(tObj => tObj.timeStr === r.time)?.shift).filter(Boolean));
-                            const activeSafeTimes = safeTimes.filter(t => eShifts.has(t.shift));
-                            if (activeSafeTimes.length === 0) return <div className="text-[10px] font-bold uppercase tracking-widest text-center py-8 text-slate-400">Não Letivo</div>;
-                            return activeSafeTimes.map((timeObj, index) => {
-                               const time = timeObj.timeStr;
-                               const shift = timeObj.shift;
-                               const isNewShift = shift !== currentShift;
-                               if (isNewShift) currentShift = shift;
-
-                               const records = mappedSchedules.filter(r => {
-                                  if (r.day !== selectedDay || r.time !== time) return false;
-                                  if (appMode === 'aluno' && r.className !== selectedClass) return false;
-                                  if (appMode === 'professor' && viewMode === 'hoje') {
-                                     if (!r.teacherId.includes(String(siape))) return false;
-                                  }
-                                  return true;
-                               });
-
-                               return (
-                                  <React.Fragment key={`frag-${time}`}>
-                                    {isNewShift && (
-                                       <div className={`flex items-center gap-2 mt-4 mb-2 opacity-50 ${index === 0 ? '!mt-0' : ''}`}>
-                                          <div className={`flex-1 h-px ${isDarkMode ? 'bg-slate-700' : 'bg-slate-300'}`}></div>
-                                          <span className="text-[9px] font-black uppercase tracking-[0.3em]">{shift}</span>
-                                          <div className={`flex-1 h-px ${isDarkMode ? 'bg-slate-700' : 'bg-slate-300'}`}></div>
-                                       </div>
-                                    )}
-                                    <div key={time} className={`flex flex-col sm:flex-row gap-3 sm:items-center p-3 rounded-xl border transition-colors ${isDarkMode ? 'border-slate-700 bg-slate-800/30 hover:bg-slate-800/50' : 'border-slate-100 bg-slate-50/50 hover:bg-slate-50'}`}>
-                                       <div className="w-32 shrink-0 text-center sm:text-left">
-                                          <span className={`border font-bold text-xs px-3 py-1.5 rounded-lg shadow-sm inline-block ${isDarkMode ? 'bg-slate-900 border-slate-700 text-slate-300' : 'bg-white border-slate-200 text-slate-600'}`}>{time}</span>
-                                       </div>
-                                       <div className="flex-1 space-y-2">
-                                          {records.length > 0 ? records.map(r => {
-                                             const isPending = isTeacherPending(r.teacher);
-                                             return (
-                                                <div key={r.id} className={`p-3 rounded-lg border flex flex-col sm:flex-row justify-between sm:items-center gap-2 shadow-sm relative overflow-hidden ${isPending ? (isDarkMode ? 'bg-red-900/30 border-red-800/50 text-red-300' : 'bg-red-50 border-red-200 text-red-800') : getColorHash(r.subject, isDarkMode)}`}>
-                                                   {isPending && (
-                                                      <div className="absolute top-0 left-0 z-10 pointer-events-none print:hidden">
-                                                         <span className="text-[6px] font-black uppercase tracking-wide text-white px-2 py-0.5 rounded-br-[8px] bg-rose-600 border-r border-b border-rose-700 block animate-pulse shadow-sm shadow-rose-900/30">AULA VAGA</span>
-                                                      </div>
-                                                   )}
-                                                   {r.isSubstituted && (
-                                                      <div className="absolute top-0 right-0 z-10 pointer-events-none print:hidden">
-                                                          <span title="Assumida no lugar de uma Vaga" className="text-[7px] font-black uppercase tracking-wide text-white px-2 py-0.5 rounded-bl-[8px] bg-indigo-600 border-l border-b border-indigo-700 block animate-pulse shadow-sm shadow-indigo-900/30">Substituição</span>
-                                                      </div>
-                                                   )}
-                                                   {r.classType && r.classType !== 'Regular' && (
-                                                      <div className="absolute bottom-0 right-0 z-10 pointer-events-none print:hidden">
-                                                          <span className="text-[7px] font-black uppercase tracking-wide text-white px-2 py-0.5 rounded-tl-[8px] bg-emerald-600 border-l border-t border-emerald-700 block shadow-sm shadow-emerald-900/30">{r.classType}</span>
-                                                      </div>
-                                                   )}
-                                                   <div className="pt-2 sm:pt-0">
-                                                      <p className={`font-black text-sm leading-tight ${isDarkMode ? 'text-white' : 'text-slate-900'}`}>
-                                                        {r.subject} {r.isSubstituted && r.originalSubject && <span className="block text-[8px] sm:text-[9.5px] opacity-80 mt-1 uppercase">Era: {r.originalSubject}</span>}
-                                                      </p>
-                                                      <p className={`text-[10px] font-bold uppercase tracking-wider mt-1.5 ${isPending ? (isDarkMode ? 'text-red-400' : 'text-red-600') : 'opacity-80'}`}>{isPending ? 'AULA VAGA' : resolveTeacherName(r.teacher, globalTeachers)}</p>
-                                                   </div>
-                                                   {r.room && <span className={`text-[9px] font-black uppercase tracking-widest px-2 py-1 rounded-md self-start sm:self-auto shrink-0 mt-2 sm:mt-0 shadow-sm ${isDarkMode ? 'bg-white/20' : 'bg-black/10'}`}>{r.room}</span>}
-                                                </div>
-                                             )
-                                          }) : <div className={`text-[10px] font-bold uppercase tracking-widest py-1.5 px-1 ${isDarkMode ? 'text-slate-500' : 'text-slate-400'}`}>- Horário Vago -</div>}
-                                       </div>
-                                    </div>
-                                  </React.Fragment>
-                               );
-                            });
-                         })()}
-                      </div>
-                    </div>
-                  )}
-
 
 
                   {/* TABELA DE CONTROLE (TOTAIS) E ESTATÍSTICAS DIÁRIO */}
