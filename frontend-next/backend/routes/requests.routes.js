@@ -218,11 +218,18 @@ router.post('/', verifyToken, async (req, res) => {
 
                             if (!cErr && cRows) {
                                 const cleanTarget = targetClassStr.toLowerCase().replace(/[^a-z0-9]/g, '');
+                                let foundExactId = false;
                                 cRows.forEach(r => {
+                                    if (foundExactId) return;
                                     try {
                                         const obj = JSON.parse(r.payload);
                                         const cleanName = (obj.name || '').toLowerCase().replace(/[^a-z0-9]/g, '');
-                                        if (cleanName === cleanTarget || obj.id === targetClassStr) {
+                                        if (obj.id === targetClassStr) {
+                                            realClassId = obj.id;
+                                            realCourseId = obj.matrixId || obj.courseId || realCourseId;
+                                            realYear = obj.academicYear || realYear;
+                                            foundExactId = true;
+                                        } else if (cleanName === cleanTarget) {
                                             realClassId = obj.id;
                                             realCourseId = obj.matrixId || obj.courseId || realCourseId;
                                             realYear = obj.academicYear || realYear;
@@ -230,7 +237,6 @@ router.post('/', verifyToken, async (req, res) => {
                                     } catch(e){}
                                 });
                             }
-
                             if (realCourseId === 'DESCONHECIDO') {
                                 // Turma não encontrada: registro criado mas grade não atualizada
                                 io.emit('schedule_updated');
@@ -558,16 +564,22 @@ router.put('/:id/status', verifyToken, (req, res) => {
                          if (!cErr && cRows) {
                              // Limpeza agressiva para garantir o match absoluto (ex: "3ºA INF" vira "3ainf")
                              const cleanTarget = targetClassStr.toLowerCase().replace(/[^a-z0-9]/g, '');
+                             let foundExactId = false;
                              
                              cRows.forEach(r => {
+                                 if (foundExactId) return;
                                  try {
                                      const obj = JSON.parse(r.payload);
                                      const cleanName = (obj.name || '').toLowerCase().replace(/[^a-z0-9]/g, '');
                                      
-                                     // Se bater o nome limpo OU se o frontend já enviou o UUID correto
-                                     if (cleanName === cleanTarget || obj.id === targetClassStr) {
-                                         realClassId = obj.id; // AQUI GARANTIMOS O UUID DA TURMA
-                                         realCourseId = obj.matrixId || obj.courseId || realCourseId; // GARANTIMOS O CURSO PAI
+                                     if (obj.id === targetClassStr) {
+                                         realClassId = obj.id;
+                                         realCourseId = obj.matrixId || obj.courseId || realCourseId;
+                                         realYear = obj.academicYear || realYear;
+                                         foundExactId = true;
+                                     } else if (cleanName === cleanTarget) {
+                                         realClassId = obj.id;
+                                         realCourseId = obj.matrixId || obj.courseId || realCourseId;
                                          realYear = obj.academicYear || realYear;
                                      }
                                  } catch(e){}
@@ -575,8 +587,7 @@ router.put('/:id/status', verifyToken, (req, res) => {
                          }
 
                          // Trava de Segurança: Se não achou o Curso PAI, aborta para não sujar a grade!
-                         if (realCourseId === 'DESCONHECIDO') {
-                             console.error("[EXTRA_ENGINE] ALERTA CRÍTICO: Falha ao resolver o UUID da Turma. Inserção abortada para proteger a integridade da grade.");
+                         if (realCourseId === 'DESCONHECIDO') {                             console.error("[EXTRA_ENGINE] ALERTA CRÍTICO: Falha ao resolver o UUID da Turma. Inserção abortada para proteger a integridade da grade.");
                              return res.status(400).json({ success: false, error: "Turma não encontrada no banco. Abortado." });
                          }
 

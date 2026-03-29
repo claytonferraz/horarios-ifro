@@ -1139,7 +1139,7 @@ export function PortalView({
                <div className="w-full lg:w-[60%] flex flex-col order-1">
                  <div className={`group flex flex-col h-full min-h-[500px] p-5 sm:p-10 rounded-[2.5rem] sm:rounded-[3rem] border text-left transition-all duration-500 glass-card inner-glow-emerald ${isDarkMode ? "bg-slate-900/40 border-slate-700 hover:border-emerald-500/30 shadow-2xl shadow-emerald-500/5" : "bg-white/60 border-emerald-100 hover:border-emerald-300 shadow-2xl shadow-emerald-500/5"}`}>
                    
-                   <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-8 gap-4">
+                   <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-8 gap-4 print:hidden">
                      <div className="flex items-center gap-5">
                        <div className={`w-12 h-12 sm:w-16 sm:h-16 rounded-[1.2rem] sm:rounded-[1.5rem] flex items-center justify-center transition-all duration-500 ${isDarkMode ? (appMode === "aluno" ? "bg-emerald-600" : "bg-blue-600") : (appMode === "aluno" ? "bg-emerald-600 shadow-emerald-500/20" : "bg-blue-600 shadow-blue-500/20")} text-white shadow-xl`}>
                          <Clock size={32} />
@@ -1880,7 +1880,7 @@ export function PortalView({
                   {viewMode === 'total' && (
                     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-5 duration-500">
                       {/* Cabeçalho de Controle Modernizado */}
-                      <div className={`relative overflow-hidden px-8 py-6 flex flex-col md:flex-row items-center justify-between gap-6 rounded-[2.5rem] shadow-2xl border transition-all duration-700 backdrop-blur-xl ${isDarkMode ? 'bg-slate-900/80 border-white/10' : 'bg-slate-900 border-slate-800'}`}>
+                      <div className={`print:hidden relative overflow-hidden px-8 py-6 flex flex-col md:flex-row items-center justify-between gap-6 rounded-[2.5rem] shadow-2xl border transition-all duration-700 backdrop-blur-xl ${isDarkMode ? 'bg-slate-900/80 border-white/10' : 'bg-slate-900 border-slate-800'}`}>
                          <div className="flex items-center gap-5">
                             <div className="w-14 h-14 rounded-2xl bg-amber-500 flex items-center justify-center text-white shadow-lg rotate-3">
                                <BarChart3 size={32} />
@@ -2157,16 +2157,15 @@ export function PortalView({
             <label className="block text-[10px] font-black uppercase text-slate-500 mb-1">Qual disciplina você vai lecionar?</label>
             <select id="vacantSubject" className={"w-full p-3 rounded-xl border mb-4 text-xs font-bold outline-none " + (isDarkMode ? 'bg-slate-950 border-slate-700' : 'bg-white border-slate-200')}>
               <option value="">Selecione a disciplina...</option>
-              {Object.values(mappedSchedules.filter(r => r.teacherId && String(r.teacherId).split(',').includes(String(selectedTeacher || siape)) && r.className === vacantRequestModal.className).reduce((acc, curr) => { 
-                  if (!acc[curr.subject]) acc[curr.subject] = { id: curr.disciplineId, name: curr.subject };
-                  return acc;
-              }, {})).map((sub, idx) => (
-                <option
-                  key={`vacant-subject-${String(sub.id ?? 'sem-id')}-${sub.name}-${idx}`}
-                  value={`${sub.id}|${sub.name}`}
-                >
-                  {sub.name}
-                </option>
+              {Object.values(
+                [ ...(schedules || []).map(s => enrichScheduleItem(s)), ...mappedSchedules ]
+                .filter(r => r && r.teacherId && String(r.teacherId).split(',').includes(String(selectedTeacher || siape)) && String(r.classId) === String(vacantRequestModal.classId || vacantRequestModal.raw?.classId) && !r.isPending && r.classType !== 'AULA VAGA' && !r.isExtra)
+                .reduce((acc, curr) => { 
+                    if (curr.subject && !acc[curr.subject]) acc[curr.subject] = { id: curr.disciplineId, name: curr.subject };
+                    return acc;
+                }, {})
+              ).map((sub, idx) => (
+                  <option key={idx} value={`${sub.id}|${sub.name}`}>{sub.name}</option>
               ))}
             </select>
             <div className="flex gap-3 mt-6">

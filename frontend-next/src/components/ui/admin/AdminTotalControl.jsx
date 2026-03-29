@@ -131,7 +131,7 @@ export function AdminTotalControl({
         </div>
       </div>
 
-      <div className={`rounded-2xl shadow-sm border overflow-hidden ${isDarkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'}`}>
+      <div className={`rounded-2xl shadow-sm border overflow-hidden print:shadow-none print:border-none print:bg-white ${isDarkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'}`}>
          <div className={`text-white p-5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 border-b no-print ${isDarkMode ? 'bg-slate-950 border-slate-800' : 'bg-slate-900 border-slate-800'}`}>
            <div className="flex items-center gap-2.5">
              <Clock className="text-amber-500" size={20}/>
@@ -144,7 +144,7 @@ export function AdminTotalControl({
              </button>
            </div>
          </div>
-         <div className="p-4 lg:p-6 grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-4 gap-4">
+         <div className="p-4 lg:p-6 grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-4 gap-4 print:grid-cols-2 print:gap-2 print:p-0">
            {(() => {
               const bimsUI = (bimesters && bimesters.length > 0) ? bimesters.map((b, i) => {
                 const fmtData = (iso) => iso ? iso.split('-').reverse().slice(0,2).join('/') : '';
@@ -192,25 +192,25 @@ export function AdminTotalControl({
               while (bimsUI.length < 4) bimsUI.push({ b: bimsUI.length + 1, name: `${bimsUI.length + 1}º Bimestre`, start: "-", diasLetivos: 0 });
               
               return bimsUI.slice(0,4).map(bim => (
-                <div key={bim.b} className={`rounded-xl border shadow-sm print:break-inside-avoid flex flex-col ${isDarkMode ? 'bg-slate-800/40 border-slate-700' : 'bg-slate-50 border-slate-200'}`}>
-                  <div className={`p-4 border-b flex flex-col gap-3 ${isDarkMode ? 'border-slate-700' : 'border-slate-200'}`}>
+                <div key={bim.b} className={`rounded-xl border shadow-sm print:break-inside-avoid print:shadow-none print:border-slate-300 print:bg-white flex flex-col ${isDarkMode ? 'bg-slate-800/40 border-slate-700' : 'bg-slate-50 border-slate-200'}`}>
+                  <div className={`p-4 border-b flex flex-col gap-3 print:p-2 print:border-slate-300 ${isDarkMode ? 'border-slate-700' : 'border-slate-200'}`}>
                     <div>
-                      <h4 className={`font-black text-sm uppercase tracking-wider ${isDarkMode ? 'text-indigo-400' : 'text-indigo-700'}`}>{bim.name}</h4>
-                      <p className="text-[10px] uppercase tracking-widest mt-1 opacity-70">
-                        Início: <b className="text-emerald-500 mr-2">{bim.start}</b> | 
-                        Dias Letivos: <b className="text-emerald-500">{bim.diasLetivos}</b>
+                      <h4 className={`font-black text-sm uppercase tracking-wider print:text-black ${isDarkMode ? 'text-indigo-400' : 'text-indigo-700'}`}>{bim.name}</h4>
+                      <p className="text-[10px] uppercase tracking-widest mt-1 opacity-70 print:text-black print:opacity-100">
+                        Início: <b className="text-emerald-500 print:text-black mr-2">{bim.start}</b> | 
+                        Dias Letivos: <b className="text-emerald-500 print:text-black">{bim.diasLetivos}</b>
                       </p>
                     </div>
-                    <div className={`text-white px-3 py-1.5 rounded-lg text-[10px] uppercase font-bold tracking-widest shadow-sm flex items-center justify-between ${isDarkMode ? 'bg-indigo-600' : 'bg-indigo-600'}`}>
-                      <span className="text-[8px] opacity-80">Aulas Contabilizadas</span>
-                      <span className="text-sm">{String((bimestresData[bim.b] || []).length).padStart(2, '0')}</span>
+                    <div className={`text-white px-3 py-1.5 rounded-lg text-[10px] uppercase font-bold tracking-widest shadow-sm flex items-center justify-between print:text-black print:bg-slate-100 print:shadow-none print:border border-slate-300 ${isDarkMode ? 'bg-indigo-600' : 'bg-indigo-600'}`}>
+                      <span className="text-[8px] opacity-80 print:opacity-100">Aulas Contabilizadas</span>
+                      <span className="text-sm print:font-black">{String((bimestresData[bim.b] || []).length).padStart(2, '0')}</span>
                     </div>
                   </div>
                   
-                  <div className="p-2 md:p-3 flex flex-col gap-1 flex-1">
+                  <div className="p-2 md:p-3 flex flex-col gap-1 flex-1 print:p-2">
                     {(bimestresData[bim.b] && bimestresData[bim.b].length > 0) ? bimestresData[bim.b].map(r => (
-                        <div key={r.id} className={`text-[10px] font-semibold py-1 border-b border-slate-500/10 last:border-0 hover:bg-slate-500/5 px-1 rounded transition-colors ${isDarkMode ? 'text-slate-300' : 'text-slate-700'}`}>
-                           {r.date} - {r.time.replace(' - ', ' ')} - <span className="uppercase">{r.subject}</span> {r.className && <span className="opacity-60 ml-1">({r.className})</span>}
+                        <div key={r.id} className={`text-[10px] font-semibold py-1 border-b border-slate-500/10 last:border-0 hover:bg-slate-500/5 px-1 rounded transition-colors print:text-black print:border-slate-300 ${isDarkMode ? 'text-slate-300' : 'text-slate-700'}`}>
+                           {r.date} - {r.time.replace(' - ', ' ')} - <span className="uppercase">{r.subject}</span> {r.className && <span className="opacity-60 ml-1 print:opacity-100">({r.className})</span>}
                         </div>
                     )) : (
                         <div className="col-span-full text-center py-8 opacity-40 flex flex-col items-center justify-center gap-2 select-none no-print">
