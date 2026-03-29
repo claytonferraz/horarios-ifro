@@ -1834,7 +1834,8 @@ function SaveMatrixModal({ isDarkMode, grade, selectedCourses, courses, saveOpti
                 payload.push({
                     courseId: pSlot.courseId, classId: pSlot.classId, dayOfWeek: normDbDay,
                     slotId: pSlot.slotId, teacherId: 'A Definir', disciplineId: pSlot.disciplineId, room: pSlot.room,
-                    isSubstituted: false, isPermuted: false, originalSubject: null, isDisponibilizada: false, classType: null, isExtra: false
+                    isSubstituted: false, isPermuted: false, originalSubject: null, isDisponibilizada: false, 
+                    classType: 'AULA VAGA', isExtra: false
                 });
             }
         });
