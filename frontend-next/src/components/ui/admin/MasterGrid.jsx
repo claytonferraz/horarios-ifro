@@ -1899,6 +1899,9 @@ function SaveMatrixModal({ isDarkMode, grade, selectedCourses, courses, saveOpti
                  {currentYearWeeks.map(w => {
                      const d1 = w.start_date?.split('-');
                      const d2 = w.end_date?.split('-');
+                     const dateLabel = (d1?.length === 3 && d2?.length === 3) 
+                        ? ` (${d1[2]}/${d1[1]} a ${d2[2]}/${d2[1]})` 
+                        : '';
                      return (
                          <option key={w.id} value={w.id}>{w.name}{dateLabel}</option>
                      );

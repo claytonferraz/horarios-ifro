@@ -150,19 +150,6 @@ export function TeacherRequestsSection({ isDarkMode, siape, selectedWeek, weekDa
             >
               <Printer size={14} /> Imprimir
             </button>
-            <button 
-              onClick={() => {
-                if (scheduleMode === 'consolidado' || scheduleMode === 'oficial') {
-                   alert('Aulas do histórico consolidado só podem ser retificadas diretamente pela gestão (MasterGrid).');
-                   return;
-                }
-                setIsModalOpen(true);
-              }}
-              title={(scheduleMode === 'consolidado' || scheduleMode === 'oficial') ? "Não é possível solicitar permutas para o Histórico Consolidado." : "Nova Solicitação"}
-              className={`flex-1 sm:flex-none px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all shadow-md flex items-center justify-center gap-2 ${(scheduleMode === 'consolidado' || scheduleMode === 'oficial') ? 'bg-slate-400 text-slate-200 cursor-not-allowed opacity-60' : (isDarkMode ? 'bg-indigo-600 hover:bg-indigo-500 text-white active:scale-95' : 'bg-indigo-600 hover:bg-indigo-700 text-white active:scale-95')}`}
-            >
-              <Send size={14} /> Nova Solicitação
-            </button>
           </div>
         </div>
         )}
@@ -334,109 +321,7 @@ export function TeacherRequestsSection({ isDarkMode, siape, selectedWeek, weekDa
         </div>
       </div>
 
-      {/* MODAL DE NOVA SOLICITAÇÃO */}
-      {isModalOpen && (
-        <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
-          <div className={`w-full max-w-lg rounded-3xl shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200 ${isDarkMode ? 'bg-slate-900 border border-slate-700' : 'bg-white'}`}>
-            <div className={`px-6 py-5 border-b flex items-center justify-between ${isDarkMode ? 'border-slate-800 bg-slate-800/30' : 'border-slate-100 bg-slate-50'}`}>
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-2xl bg-indigo-600 flex items-center justify-center text-white shadow-lg rotate-3">
-                  <Send size={18} />
-                </div>
-                <div>
-                  <h3 className={`text-base font-black uppercase tracking-tight ${isDarkMode ? 'text-white' : 'text-slate-900'}`}>Nova Solicitação</h3>
-                  <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Preencha os detalhes da mudança</p>
-                </div>
-              </div>
-              <button 
-                onClick={() => setIsModalOpen(false)}
-                className={`p-2 rounded-xl transition-colors ${isDarkMode ? 'hover:bg-slate-700 text-slate-400' : 'hover:bg-slate-200 text-slate-500'}`}
-              >
-                <XCircle size={20} />
-              </button>
-            </div>
 
-            <form onSubmit={handleSubmit} className="p-6 space-y-4">
-              <div className="space-y-1.5">
-                <label className="text-[10px] font-black uppercase tracking-widest text-slate-500 ml-1">Descrição do Pedido</label>
-                <textarea 
-                  required
-                  placeholder="Explique o motivo da solicitação e os detalhes da mudança..."
-                  className={`w-full min-h-[100px] p-4 rounded-2xl border text-sm font-medium focus:ring-2 focus:ring-indigo-500 transition-all outline-none resize-none ${isDarkMode ? 'bg-slate-950 border-slate-700 text-white placeholder-slate-600' : 'bg-slate-50 border-slate-200 text-slate-900 placeholder-slate-400'}`}
-                  value={newRequest.description}
-                  onChange={e => setNewRequest({...newRequest, description: e.target.value})}
-                />
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-1.5">
-                  <label className="text-[10px] font-black uppercase tracking-widest text-slate-500 ml-1">Horário Original (Selecione o slot atual)</label>
-                  <select 
-                    required
-                    className={`w-full p-3.5 rounded-xl border text-xs font-bold focus:ring-2 focus:ring-indigo-500 transition-all outline-none ${isDarkMode ? 'bg-slate-950 border-slate-700 text-white' : 'bg-white border-slate-200 text-slate-900'}`}
-                    value={newRequest.original_slot_id}
-                    onChange={e => setNewRequest({...newRequest, original_slot_id: e.target.value})}
-                  >
-                     <option value="">Selecione a aula atual</option>
-                     {weekData.map(r => (
-                        <option key={getSlotKey(r)} value={getSlotKey(r)}>
-                           {r.day} {r.time} | Turma: {r.className} | {r.subject}
-                        </option>
-                     ))}
-                  </select>
-                </div>
-                <div className="space-y-1.5 flex flex-col gap-2">
-                  <label className="text-[10px] font-black uppercase tracking-widest text-slate-500 ml-1">Horário Proposto</label>
-                  <div className="flex gap-2">
-                     <select required className={`w-1/2 p-2.5 rounded-xl border text-xs font-bold outline-none ${isDarkMode ? 'bg-slate-950 border-slate-700 text-white' : 'bg-white border-slate-200 text-slate-900'}`}
-                       value={newRequest.proposed_day} onChange={e => setNewRequest({...newRequest, proposed_day: e.target.value})}
-                     >
-                       <option value="">Selecione o Dia</option>
-                       {activeDays?.map(d => <option key={d} value={d}>{d}</option>)}
-                     </select>
-                     <select required className={`w-1/2 p-2.5 rounded-xl border text-xs font-bold outline-none ${isDarkMode ? 'bg-slate-950 border-slate-700 text-white' : 'bg-white border-slate-200 text-slate-900'}`}
-                       value={newRequest.proposed_time} onChange={e => setNewRequest({...newRequest, proposed_time: e.target.value})}
-                     >
-                       <option value="">Selecione a Hora</option>
-                       {classTimes?.map(t => <option key={t.timeStr} value={t.timeStr}>{t.timeStr} ({t.shift})</option>)}
-                     </select>
-                  </div>
-                  <select required className={`w-full p-2.5 rounded-xl border text-xs font-bold outline-none mt-1 ${isDarkMode ? 'bg-slate-950 border-slate-700 text-white' : 'bg-white border-slate-200 text-slate-900'}`}
-                    value={newRequest.proposed_type} onChange={e => setNewRequest({...newRequest, proposed_type: e.target.value})}
-                  >
-                    {['Regular', 'Recuperação', 'Exame', 'Atendimento'].map(t => <option key={t} value={t}>{t}</option>)}
-                  </select>
-                </div>
-              </div>
-
-              <div className={`p-4 rounded-2xl border flex items-start gap-3 mt-2 ${isDarkMode ? 'bg-amber-900/10 border-amber-800/30 text-amber-500' : 'bg-amber-50 border-amber-100 text-amber-700'}`}>
-                <AlertCircle size={16} className="shrink-0 mt-0.5" />
-                <p className="text-[10px] font-bold leading-relaxed uppercase tracking-wide">
-                  Sua solicitação será analisada pela coordenação. Você receberá o feedback diretamente nesta seção.
-                </p>
-              </div>
-
-              <div className="pt-4 flex gap-3">
-                <button 
-                  type="button"
-                  onClick={() => setIsModalOpen(false)}
-                  className={`flex-1 py-4 rounded-2xl text-[11px] font-black uppercase tracking-widest transition-all ${isDarkMode ? 'bg-slate-800 text-slate-400 hover:bg-slate-700' : 'bg-slate-100 text-slate-500 hover:bg-slate-200'}`}
-                >
-                  Cancelar
-                </button>
-                <button 
-                  type="submit"
-                  disabled={loading}
-                  className={`flex-1 py-4 rounded-2xl text-[11px] font-black uppercase tracking-widest transition-all shadow-xl shadow-indigo-500/20 active:scale-95 flex items-center justify-center gap-2 ${loading ? 'bg-slate-400 cursor-not-allowed text-white' : 'bg-indigo-600 hover:bg-indigo-700 text-white'}`}
-                >
-                  {loading ? <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : <Send size={14} />}
-                  Enviar Solicitação
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
 
       {rejectionTarget && (
         <div className="fixed inset-0 z-[9999] flex justify-center items-center bg-slate-900/60 backdrop-blur-sm p-4 animate-in fade-in duration-200 print:hidden text-left" onClick={(e) => e.stopPropagation()}>

@@ -796,12 +796,29 @@ export function PortalView({
         .sort((a,b) => a.sortVal - b.sortVal);
     };
 
-    // 1. Atual (Minha Turma - oficiais da semana selecionada)
+    // 0. Identificar a semana REAL de hoje (sem influência do seletor global)
+    const nowRef = new Date();
+    const refDate = new Date(nowRef);
+    if (nowRef.getDay() === 6) refDate.setDate(refDate.getDate() + 2);
+    else if (nowRef.getDay() === 0) refDate.setDate(refDate.getDate() + 1);
+    refDate.setHours(0,0,0,0);
+
+    const actualCurrentWeek = academicWeeks.find(w => {
+        const startStr = String(w.start_date || '').split('T')[0];
+        const endStr = String(w.end_date || '').split('T')[0];
+        if (!startStr || !endStr) return false;
+        const s = new Date(startStr + 'T00:00:00'); 
+        const e = new Date(endStr + 'T23:59:59');
+        return refDate >= s && refDate <= e;
+     });
+    const dashboardBaseWeekId = actualCurrentWeek ? String(actualCurrentWeek.id) : (selectedWeek || (academicWeeks.length > 0 ? String(academicWeeks[0].id) : null));
+
+    // 1. Atual (Minha Turma - oficiais da semana identificada como atual)
     const atualRaw = mappedSchedules.filter(s => 
       String(s.classId) === classIdRef &&
-      String(s.week || s.week_id || s.academic_week_id) === String(selectedWeek)
+      String(s.week || s.week_id || s.academic_week_id) === String(dashboardBaseWeekId)
     );
-    const atual = groupByDay(atualRaw);
+    const atual = groupByDay(atualRaw, dashboardBaseWeekId);
 
     // 2. Aulas Vagas (Minha Turma - oficiais sem professor)
     const vagasRaw = atualRaw.filter(s => 
@@ -809,9 +826,9 @@ export function PortalView({
     );
     const vagas = groupByDay(vagasRaw);
 
-    // 3. Prévia (Minha Turma - Exibe planejamento da SEMANA SEGUINTE à selecionada)
-    const currentWeekIdx = academicWeeks.findIndex(w => String(w.id) === String(selectedWeek));
-    const targetPreviewWeekId = academicWeeks[currentWeekIdx + 1]?.id || selectedWeek;
+    // 3. Prévia (Minha Turma - Exibe planejamento da SEMANA SEGUINTE à identificada hoje)
+    const currentWeekIdx = academicWeeks.findIndex(w => String(w.id) === String(dashboardBaseWeekId));
+    const targetPreviewWeekId = academicWeeks[currentWeekIdx + 1]?.id || dashboardBaseWeekId;
 
     const previaRaw = targetPreviewWeekId ? (schedules || []).filter(s => 
       s.type === 'previa' && 
@@ -1454,7 +1471,7 @@ export function PortalView({
                             <div className={`w-12 h-12 rounded-2xl flex items-center justify-center mb-4 transition-all duration-500 ${isDarkMode ? "bg-emerald-950/60 text-emerald-400 group-hover:bg-emerald-600 group-hover:text-white" : "bg-emerald-50 text-emerald-600 group-hover:bg-emerald-600 group-hover:text-white shadow-sm"}`}>
                               <Calendar size={24} className="transition-transform duration-500 group-hover:scale-110" />
                             </div>
-                            <h3 className={`text-sm font-black mb-1 ${isDarkMode ? "text-emerald-50" : "text-slate-800"}`}>Aulas Diárias</h3>
+                            <h3 className={`text-sm font-black mb-1 ${isDarkMode ? "text-emerald-50" : "text-slate-800"}`}>Solicitar troca de aulas</h3>
                             <p className="text-[10px] font-bold text-slate-500 leading-tight uppercase tracking-tighter">Grade do dia</p>
                           </button>
 
@@ -2111,13 +2128,12 @@ export function PortalView({
                 </div>
               </div>
               <div className="flex items-center gap-4">
-                 <button className={`group relative flex items-center gap-3 px-6 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all duration-500 bg-indigo-600 text-white shadow-lg shadow-indigo-500/30 scale-[1.05] z-10`}>
-                    <div className="w-8 h-8 rounded-xl bg-white/20 flex items-center justify-center transition-all duration-500 group-hover:scale-110">
+                 <div className={`flex items-center gap-3 px-6 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest bg-white/10 text-white shadow-lg`}>
+                    <div className="w-8 h-8 rounded-xl bg-white/20 flex items-center justify-center">
                        <Search size={16} />
                     </div>
                     Minhas Mudanças
-                    <div className="absolute inset-0 rounded-2xl opacity-0 bg-white/10 group-hover:opacity-100 pointer-events-none transition-opacity" />
-                 </button>
+                 </div>
               </div>
           </div>
 
