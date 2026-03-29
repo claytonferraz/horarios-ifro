@@ -26,6 +26,16 @@ function getTokenFromCookieHeader(cookieHeader = '') {
   return null;
 }
 
+function resolveYearFromRequest(req) {
+  return String(
+    req.query?.academicYear ||
+    req.query?.year ||
+    req.body?.academicYear ||
+    req.body?.year ||
+    new Date().getFullYear().toString()
+  );
+}
+
 function parsePerfis(perfisRaw) {
   try {
     const parsed = JSON.parse(perfisRaw || '[]');
@@ -101,10 +111,49 @@ const requireAdmin = (req, res, next) => {
   next();
 };
 
+function attachUserIfPresent(req, _res, next) {
+  const auth = req.headers.authorization;
+  const bearerToken = auth?.startsWith('Bearer ') ? auth.slice(7).trim() : '';
+  const cookieToken = getTokenFromCookieHeader(req.headers.cookie);
+  const token = bearerToken || cookieToken;
+
+  if (!token) return next();
+
+  jwt.verify(token, JWT_SECRET, (jwtErr, decoded) => {
+    if (jwtErr || !decoded?.id) return next();
+    db.get(
+      "SELECT siape, nome_exibicao, email, status, perfis, is_admin FROM users WHERE siape = ?",
+      [decoded.id],
+      (dbErr, user) => {
+        if (dbErr || !user || user.status !== 'ativo') return next();
+        req.userId = user.siape;
+        req.user = buildAccessContext(user);
+        next();
+      }
+    );
+  });
+}
+
+function requirePublicScheduleAccess(req, res, next) {
+  if (req.user) return next();
+
+  const targetYear = resolveYearFromRequest(req);
+  const configId = `config_${targetYear}`;
+  db.get("SELECT publicSchedulesEnabled FROM config WHERE id = ?", [configId], (err, row) => {
+    if (err) return res.status(500).json({ error: err.message });
+    const isPublic = row?.publicSchedulesEnabled === undefined || row?.publicSchedulesEnabled === null || Number(row?.publicSchedulesEnabled) !== 0;
+    if (isPublic) return next();
+    return res.status(403).json({ error: 'Acesso público aos horários está desativado pela administração.' });
+  });
+}
+
 module.exports = {
   buildAccessContext,
   requireAdmin,
   requireManager,
   verifyToken,
+  attachUserIfPresent,
+  requirePublicScheduleAccess,
+  resolveYearFromRequest,
   JWT_SECRET
 };
