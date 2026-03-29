@@ -50,12 +50,14 @@ const GridCell = React.memo(({
   onDrop, 
   onOpenModal,
   onRemoveCard,
-  alertasObj
+  alertasObj,
+  id
 }) => {
   const hasAlert = alertasObj?.prof || alertasObj?.sala;
 
   return (
     <td 
+      id={id}
       onDragOver={onDragOver}
       onDrop={(e) => onDrop(e, turmaId, diaId, hora)}
       className={`p-1.5 h-[62px] min-w-[130px] transition-all border group relative ${
@@ -955,7 +957,10 @@ export function MasterGrid({ isDarkMode, ...props }) {
                     if (!teacherConflictsTracker.has(uniqueKey)) {
                         teacherConflictsTracker.add(uniqueKey);
                         const profName = resolveTeacherName(detail.tId, globalTeachersList) || detail.tId;
-                        alerts.push(`[${diaId} às ${hora} | Turma: ${aula.className}] - Choque de Professor: ${profName} também está alocado(a) na turma ${detail.otherClassName}.`);
+                        alerts.push({
+                            msg: `[${diaId} às ${hora} | Turma: ${aula.className}] - Choque de Professor: ${profName} também está alocado(a) na turma ${detail.otherClassName}.`,
+                            context: { day: diaId, time: hora, involved: [aula.className, detail.otherClassName] }
+                        });
                     }
                 });
             }
@@ -968,7 +973,10 @@ export function MasterGrid({ isDarkMode, ...props }) {
                 const uniqueKey = `${detail.sala}_${diaId}_${hora}_${classId}_${detail.otherClassName}`;
                 if (!roomConflictsTracker.has(uniqueKey)) {
                     roomConflictsTracker.add(uniqueKey);
-                    alerts.push(`[${diaId} às ${hora} | Turma: ${aula.className}] - Choque de Ambiente: '${detail.sala}' também está alocado para a turma ${detail.otherClassName}.`);
+                    alerts.push({
+                        msg: `[${diaId} às ${hora} | Turma: ${aula.className}] - Choque de Ambiente: '${detail.sala}' também está alocado para a turma ${detail.otherClassName}.`,
+                        context: { day: diaId, time: hora, involved: [aula.className, detail.otherClassName] }
+                    });
                 }
             }
          }
@@ -987,13 +995,17 @@ export function MasterGrid({ isDarkMode, ...props }) {
              let m = false; let t = false; let n = false;
              const morningEnds = horariosExibidos.filter(h => parseInt(h.split(':')[0], 10) < 12).pop();
              const afternoonStarts = horariosExibidos.find(h => { const v = parseInt(h.split(':')[0],10); return v >= 12 && v < 18; });
+             
              if (profSlots.has(morningEnds) && profSlots.has(afternoonStarts) && (hora === morningEnds || hora === afternoonStarts)) {
                  const noRest = "Sem descanso (Manhã -> Tarde).";
                  cellAlerts[slotKey].profAlertMsg.push(noRest);
                  cellAlerts[slotKey].profAlert = true;
                  const pName = resolveTeacherName(tId, globalTeachersList);
-                 if (!alerts.some(a => a.includes(`[${diaId}] Professor(a) ${pName} leciona sem descanso`))) {
-                     alerts.push(`[${diaId}] Professor(a) ${pName} leciona sem descanso entre Turnos (M->T).`);
+                 if (!alerts.some(a => a.msg && a.msg.includes(`[${diaId}] Professor(a) ${pName} leciona sem descanso`))) {
+                     alerts.push({
+                        msg: `[${diaId}] Professor(a) ${pName} leciona sem descanso entre Turnos (M->T).`,
+                        context: { day: diaId, time: morningEnds, involved: [aula.className] }
+                     });
                  }
              }
 
@@ -1006,28 +1018,29 @@ export function MasterGrid({ isDarkMode, ...props }) {
                 cellAlerts[slotKey].profAlertMsg.push(threeShifts);
                 cellAlerts[slotKey].profAlert = true;
                 const pName = resolveTeacherName(tId, globalTeachersList);
-                if (!alerts.some(a => a.includes(`[${diaId}] Professor(a) ${pName} atua`))) {
-                     alerts.push(`[${diaId}] Professor(a) ${pName} atua em 3 Turnos diferentes.`);
+                if (!alerts.some(a => a.msg && a.msg.includes(`[${diaId}] Professor(a) ${pName} atua`))) {
+                     alerts.push({
+                        msg: `[${diaId}] Professor(a) ${pName} atua em 3 Turnos diferentes.`,
+                        context: { day: diaId, time: hora, involved: [aula.className] }
+                     });
                 }
              }
          });
       }
     });
-    // Filtro de desduplicação cruzada de alertas (Ex: Turma A acusando B, e Turma B acusando A)
+
+    // Filtro de desduplicação cruzada de alertas
     const uniqueAlerts = [];
     const seenMsgs = new Set();
     
     alerts.forEach(a => {
-        let signature = a;
-        // Processamento Regex para capturar os espelhos bidirecionais
-        const choqueMatch = a.match(/\[(.*?) \| Turma: (.*?)\] - Choque de (.*?): .* turma (.*?)\.?$/);
+        let signature = a.msg;
+        const choqueMatch = a.msg.match(/\[(.*?) \| Turma: (.*?)\] - Choque de (.*?): .* turma (.*?)\.?$/);
         
         if (choqueMatch) {
              const [_, diaHora, turmaA, tipoChoque, turmaB] = choqueMatch;
-             // Remove aspas caso seja a mensagem de "turma externa" e limpa espaços
              const cleanTurmaA = String(turmaA).trim();
              const cleanTurmaB = String(turmaB).replace(/["']/g, '').trim();
-             // Ordena para que choque A->B tenha a mesma assinatura que choque B->A
              const turmasEspelhadas = [cleanTurmaA, cleanTurmaB].sort().join('<->');
              signature = `${diaHora}|${tipoChoque}|${turmasEspelhadas}`;
         }
@@ -1040,7 +1053,7 @@ export function MasterGrid({ isDarkMode, ...props }) {
 
     return { list: uniqueAlerts, perCell: cellAlerts };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [grade, schedules, horariosExibidos]);
+  }, [grade, schedules, horariosExibidos, globalTeachersList, verificarChoqueHorario]);
 
   const weeksWithData = useMemo(() => {
      if (!schedules || !Array.isArray(schedules)) return new Set();
@@ -1543,6 +1556,7 @@ export function MasterGrid({ isDarkMode, ...props }) {
                           
                           return (
                             <GridCell
+                              id={`slot-${diaId}-${hora}`}
                               key={slotKey}
                               slotKey={slotKey}
                               turmaId={turma.id}
@@ -1624,14 +1638,51 @@ export function MasterGrid({ isDarkMode, ...props }) {
 
                      {/* Logs do Motor de Regras DAPE V1 */}
                      {pendingDrop.ruleLogs?.map((log, i) => (
-                        <li key={`rule-${i}`} className={`text-[11px] font-bold flex gap-2 p-2.5 rounded whitespace-pre-wrap ${
+                        <li 
+                           key={`rule-${i}`} 
+                           onClick={() => {
+                              if (log.context) {
+                                 // 1. Identifica turmas a exibir
+                                 const involved = [pendingDrop.aula.className, log.context.clashWith].filter(Boolean);
+                                 if (involved.length > 0) {
+                                    // Filtra os IDs das turmas
+                                    const ids = turmasDoCurso.filter(t => involved.includes(t.name)).map(t => t.id);
+                                    if (ids.length > 0) {
+                                       setSelectedCourses(prev => {
+                                          const base = [...prev];
+                                          ids.forEach(id => { if (!base.includes(id)) base.push(id); });
+                                          return base;
+                                       });
+                                       setHiddenClasses(prev => prev.filter(id => !ids.includes(id)));
+                                    }
+                                 }
+
+                                 // 2. Scroll para o slot
+                                 setTimeout(() => {
+                                    const dayNorm = log.context.day;
+                                    const timeNorm = log.context.time;
+                                    const element = document.getElementById(`slot-${dayNorm}-${timeNorm}`);
+                                    if (element) {
+                                       element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                                       element.classList.add('ring-4', 'ring-rose-500', 'ring-offset-2');
+                                       setTimeout(() => element.classList.remove('ring-4', 'ring-rose-500', 'ring-offset-2'), 4000);
+                                    }
+                                 }, 300);
+
+                                 setPendingDrop(null); // Fecha o modal para ver o foco
+                              }
+                           }}
+                           className={`text-[11px] font-bold flex gap-2 p-2.5 rounded whitespace-pre-wrap cursor-pointer group/log transition-all border ${
                            log.type === 'error' 
-                             ? (isDarkMode ? 'bg-slate-900 text-rose-300 border-rose-900/50 border' : 'bg-white text-rose-700 border-rose-100 shadow-sm border')
-                             : (isDarkMode ? 'bg-slate-900 text-amber-300 border-amber-900/50 border' : 'bg-white text-amber-700 border-amber-100 shadow-sm border')
+                             ? (isDarkMode ? 'bg-slate-900 text-rose-300 border-rose-900/50 hover:border-rose-500' : 'bg-white text-rose-700 border-rose-100 shadow-sm hover:border-rose-400')
+                             : (isDarkMode ? 'bg-slate-900 text-amber-300 border-amber-900/50 hover:border-amber-500' : 'bg-white text-amber-700 border-amber-100 shadow-sm hover:border-amber-400')
                         }`}>
                            <span className={`${log.type === 'error' ? 'text-rose-500' : 'text-amber-500'} font-black shrink-0`}>•</span>
                            <div className="flex flex-col">
-                              <span className="opacity-70 text-[9px] uppercase tracking-widest">{log.title}</span>
+                              <span className="opacity-70 text-[9px] uppercase tracking-widest flex items-center gap-2">
+                                 {log.title}
+                                 <span className="opacity-0 group-hover/log:opacity-100 transition-opacity text-[8px] bg-sky-500 text-white px-1 rounded">Clique para focar</span>
+                              </span>
                               <span className="mt-0.5">{log.message}</span>
                            </div>
                         </li>
@@ -1748,8 +1799,35 @@ export function MasterGrid({ isDarkMode, ...props }) {
                   <div className="p-3 max-h-[30vh] sm:max-h-[40vh] overflow-y-auto w-full">
                      <ul className="flex flex-col gap-2">
                         {dashboardAlerts.list.map((msg, i) => (
-                           <li key={i} className={`text-[10px] font-bold flex items-start gap-2 p-2 rounded-lg ${isDarkMode ? 'bg-red-900/20 text-red-300/80 border border-red-500/10' : 'bg-red-50 text-red-800/80 border border-red-200/50 shadow-sm'}`}>
-                              <span className="mt-0.5 pointer-events-none shrink-0">•</span> <span>{msg}</span>
+                           <li 
+                              key={i} 
+                              onClick={() => {
+                                 const item = dashboardAlerts.list[i];
+                                 if (item && item.context) {
+                                    const involved = item.context.involved || [];
+                                    const ids = turmasDoCurso.filter(t => involved.includes(t.name)).map(t => t.id);
+                                    if (ids.length > 0) {
+                                       setSelectedCourses(prev => {
+                                          const base = [...prev];
+                                          ids.forEach(id => { if (!base.includes(id)) base.push(id); });
+                                          return base;
+                                       });
+                                       setHiddenClasses(prev => prev.filter(id => !ids.includes(id)));
+                                    }
+                                    setTimeout(() => {
+                                       const element = document.getElementById(`slot-${item.context.day}-${item.context.time}`);
+                                       if (element) {
+                                          element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                                          element.classList.add('ring-4', 'ring-rose-500', 'ring-offset-2');
+                                          setTimeout(() => element.classList.remove('ring-4', 'ring-rose-500', 'ring-offset-2'), 4000);
+                                       }
+                                    }, 300);
+                                    setIsAlertsMinimized(true);
+                                 }
+                              }}
+                              className={`text-[10px] font-bold flex items-start gap-2 p-2 rounded-lg cursor-pointer hover:ring-1 hover:ring-red-500/50 transition-all ${isDarkMode ? 'bg-red-900/20 text-red-300/80 border border-red-500/10' : 'bg-red-50 text-red-800/80 border border-red-200/50 shadow-sm'}`}
+                           >
+                              <span className="mt-0.5 shrink-0">•</span> <span>{msg.msg || msg}</span>
                            </li>
                         ))}
                      </ul>
@@ -1787,9 +1865,36 @@ export function MasterGrid({ isDarkMode, ...props }) {
                   </h3>
                   <div className="flex-1 border-t border-rose-500/20"></div>
                   <ul className="flex flex-col gap-2 mt-1">
-                     {dashboardAlerts.list.map((msg, idx) => (
-                        <li key={`grid-alert-${idx}`} className={`p-2.5 rounded-lg text-[11px] font-bold leading-relaxed border ${isDarkMode ? 'bg-rose-900/15 border-rose-900/40 text-rose-200' : 'bg-rose-50 border-rose-200 text-rose-800'}`}>
-                           {msg}
+                     {dashboardAlerts.list.map((item, idx) => (
+                        <li 
+                           key={`grid-alert-${idx}`} 
+                           onClick={() => {
+                              if (item.context) {
+                                 const involved = item.context.involved || [];
+                                 if (involved.length > 0) {
+                                    const ids = turmasDoCurso.filter(t => involved.includes(t.name)).map(t => t.id);
+                                    if (ids.length > 0) {
+                                       setSelectedCourses(prev => {
+                                          const base = [...prev];
+                                          ids.forEach(id => { if (!base.includes(id)) base.push(id); });
+                                          return base;
+                                       });
+                                       setHiddenClasses(prev => prev.filter(id => !ids.includes(id)));
+                                    }
+                                 }
+                                 setTimeout(() => {
+                                    const element = document.getElementById(`slot-${item.context.day}-${item.context.time}`);
+                                    if (element) {
+                                       element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                                       element.classList.add('ring-4', 'ring-rose-500', 'ring-offset-2');
+                                       setTimeout(() => element.classList.remove('ring-4', 'ring-rose-500', 'ring-offset-2'), 4000);
+                                    }
+                                 }, 300);
+                                 setIsRightPanelOpen(false);
+                              }
+                           }}
+                           className={`p-2.5 rounded-lg text-[11px] font-bold leading-relaxed border cursor-pointer hover:ring-1 hover:ring-rose-500 transition-all ${isDarkMode ? 'bg-rose-900/15 border-rose-900/40 text-rose-200' : 'bg-rose-50 border-rose-200 text-rose-800'}`}>
+                           {item.msg}
                         </li>
                      ))}
                   </ul>

@@ -118,7 +118,14 @@ export function validateMove(rawSchedules, proposedDrop, activeRules, context = 
             title: rule.title,
             type: finalType,
             message: desc,
-            isExceptional
+            isExceptional,
+            context: {
+                day: simulatedAula.day,
+                time: simulatedAula.time,
+                className: simulatedAula.className,
+                teacher: teacher,
+                clashWith: null // Será preenchido quando houver uma turma específica
+            }
         });
     };
 
@@ -129,7 +136,10 @@ export function validateMove(rawSchedules, proposedDrop, activeRules, context = 
     if (ruleSimultaneous?.is_active) {
         const sameSlot = teacherSchedule.filter(r => r.day === simulatedAula.day && r.time === simulatedAula.time);
         if (sameSlot.length > 1) {
-            emitIssue(ruleSimultaneous, `O professor já possui aula alocada neste mesmo dia e horário na turma ${sameSlot[0].className === simulatedAula.className ? sameSlot[1].className : sameSlot[0].className}.`);
+            const collideWith = sameSlot.find(r => r.className !== simulatedAula.className);
+            const logIdx = logs.length;
+            emitIssue(ruleSimultaneous, `O professor já possui aula alocada neste mesmo dia e horário na turma ${collideWith?.className || 'Desconhecida'}.`);
+            if (logs[logIdx]) logs[logIdx].context.clashWith = collideWith?.className;
         }
     }
 
@@ -209,7 +219,9 @@ export function validateMove(rawSchedules, proposedDrop, activeRules, context = 
             r.room === proposedDrop.room
         );
         if (roomClash) {
+            const logIdx = logs.length;
             emitIssue(ruleRoom, `O espaço "${proposedDrop.room}" já está sendo usado pela turma "${roomClash.className}".`);
+            if (logs[logIdx]) logs[logIdx].context.clashWith = roomClash.className;
         }
     }
 
